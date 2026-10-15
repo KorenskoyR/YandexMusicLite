@@ -443,21 +443,21 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 12",
-            buildGradle.contains("versionCode = 12"))
-        assertTrue("build.gradle.kts must be versionName 1.3.5",
-            buildGradle.contains("versionName = \"1.3.5\""))
+        assertTrue("build.gradle.kts must be versionCode 13",
+            buildGradle.contains("versionCode = 13"))
+        assertTrue("build.gradle.kts must be versionName 1.3.6",
+            buildGradle.contains("versionName = \"1.3.6\""))
     }
 
     @Test
     fun testWarmStandbyAndEqualPowerCrossfadeIntegration() {
         val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
         assertTrue("PlayerRepositoryImpl must define PREPARE_STANDBY_THRESHOLD_MS",
-            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 20_000L"))
+            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 15_000L"))
         assertTrue("PlayerRepositoryImpl must define CROSSFADE_DURATION_MS",
-            playerRepo.contains("CROSSFADE_DURATION_MS = 5000L"))
+            playerRepo.contains("CROSSFADE_DURATION_MS = 3000L"))
         assertTrue("PlayerRepositoryImpl must define CROSSFADE_STEPS",
-            playerRepo.contains("CROSSFADE_STEPS = 100"))
+            playerRepo.contains("CROSSFADE_STEPS = 60"))
         assertTrue("PlayerRepositoryImpl must have prepareNextTrackEvent",
             playerRepo.contains("override val prepareNextTrackEvent: Flow<Unit>"))
         assertTrue("PlayerRepositoryImpl must wait for STATE_READY before starting crossfade",
