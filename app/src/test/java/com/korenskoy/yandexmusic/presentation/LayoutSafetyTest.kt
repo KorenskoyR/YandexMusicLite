@@ -435,15 +435,18 @@ class LayoutSafetyTest {
         assertTrue("GitHubUpdateManager must pass EXTRA_NOT_UNKNOWN_SOURCE",
             updateManagerFile.contains("Intent.EXTRA_NOT_UNKNOWN_SOURCE"))
 
+        assertTrue("GitHubUpdateManager must have checkApkCompatibility",
+            updateManagerFile.contains("fun checkApkCompatibility("))
+
         val manifestFile = File("src/main/AndroidManifest.xml").readText()
         assertTrue("AndroidManifest must declare autoRevokePermissions discouraged",
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 8",
-            buildGradle.contains("versionCode = 8"))
-        assertTrue("build.gradle.kts must be versionName 1.3.1",
-            buildGradle.contains("versionName = \"1.3.1\""))
+        assertTrue("build.gradle.kts must be versionCode 9",
+            buildGradle.contains("versionCode = 9"))
+        assertTrue("build.gradle.kts must be versionName 1.3.2",
+            buildGradle.contains("versionName = \"1.3.2\""))
     }
 }
 

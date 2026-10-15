@@ -70,6 +70,7 @@ fun MainScreen(
     val updateCheckResult by viewModel.updateCheckResult.collectAsState()
     val updateDownloadProgress by viewModel.updateDownloadProgress.collectAsState()
     val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
+    val isSignatureMismatch by viewModel.isSignatureMismatch.collectAsState()
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
@@ -418,12 +419,16 @@ fun MainScreen(
                 downloadProgress = updateDownloadProgress,
                 statusMessage = updateStatusMessage,
                 hasInstallPermission = viewModel.canRequestPackageInstalls,
+                isSignatureMismatch = isSignatureMismatch,
                 onRequestPermission = { viewModel.openInstallPermissionSettings() },
                 onStartDownload = {
                     viewModel.startUpdateDownload(updateAvailable.apkDownloadUrl)
                 },
                 onInstall = {
-                    viewModel.installDownloadedUpdate()
+                    viewModel.installDownloadedUpdate(forceSystemInstall = true)
+                },
+                onShareOrSave = {
+                    viewModel.shareOrSaveDownloadedApk()
                 },
                 onDismiss = {
                     viewModel.dismissUpdateDialog()

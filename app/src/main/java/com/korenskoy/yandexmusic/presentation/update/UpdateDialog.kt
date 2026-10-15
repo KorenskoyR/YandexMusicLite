@@ -52,9 +52,11 @@ fun UpdateDialog(
     downloadProgress: Float, // -1f = idle, 0f..1f = downloading, 2f = ready to install
     statusMessage: String? = null,
     hasInstallPermission: Boolean = true,
+    isSignatureMismatch: Boolean = false,
     onRequestPermission: () -> Unit = {},
     onStartDownload: () -> Unit,
     onInstall: () -> Unit,
+    onShareOrSave: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -242,6 +244,43 @@ fun UpdateDialog(
                     )
                 }
 
+                if (isSignatureMismatch) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFFFF9900).copy(alpha = 0.15f))
+                            .border(BorderStroke(1.dp, Color(0xFFFF9900).copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFB74D),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Переход на официальный релиз",
+                                    color = Color(0xFFFFD54F),
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Этот релиз подписан официальным постоянным ключом. Android запрещает установку поверх тестовой сборки. Пожалуйста, удалите текущую версию приложения и установите скачанный APK. Все данные медиатеки и кэш сохранятся, а последующие обновления будут устанавливаться автоматически.",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
+                }
+
                 if (!hasInstallPermission) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Box(
@@ -294,7 +333,26 @@ fun UpdateDialog(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    if (isSignatureMismatch) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)), RoundedCornerShape(14.dp))
+                                .clickable { onShareOrSave() }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "Сохранить APK",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     // Primary Action Button (Download / Install)
                     val isDownloading = downloadProgress in 0f..1f
@@ -319,7 +377,7 @@ fun UpdateDialog(
                                     onStartDownload()
                                 }
                             }
-                            .padding(horizontal = 20.dp, vertical = 11.dp),
+                            .padding(horizontal = 18.dp, vertical = 11.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -359,7 +417,7 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Установить",
+                                    text = if (isSignatureMismatch) "Открыть установщик" else "Установить",
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold

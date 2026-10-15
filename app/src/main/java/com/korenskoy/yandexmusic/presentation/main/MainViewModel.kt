@@ -143,6 +143,9 @@ class MainViewModel @Inject constructor(
     private val _updateStatusMessage = MutableStateFlow<String?>(null)
     val updateStatusMessage: StateFlow<String?> = _updateStatusMessage.asStateFlow()
 
+    private val _isSignatureMismatch = MutableStateFlow(false)
+    val isSignatureMismatch: StateFlow<Boolean> = _isSignatureMismatch.asStateFlow()
+
     private var downloadedApkFile: java.io.File? = null
 
     private val _isFetchingMoreQueue = MutableStateFlow(false)
@@ -1480,6 +1483,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             _updateDownloadProgress.value = 0f
             _updateStatusMessage.value = null
+            _isSignatureMismatch.value = false
             val result = updateManager.downloadApk(apkUrl) { progress ->
                 _updateDownloadProgress.value = progress
             }
@@ -1494,12 +1498,29 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun installDownloadedUpdate() {
+    fun installDownloadedUpdate(forceSystemInstall: Boolean = false) {
         val file = downloadedApkFile ?: return
+
+        if (!forceSystemInstall) {
+            val preCheck = updateManager.checkApkCompatibility(file)
+            if (preCheck is com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck.SignatureMismatch) {
+                _isSignatureMismatch.value = true
+                _updateStatusMessage.value = "Обновление готово! Требуется разовая чистая переустановка из-за смены ключа подписи на официальный."
+                return
+            } else if (preCheck is com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck.CorruptedApk) {
+                _updateStatusMessage.value = "Ошибка пакета: ${preCheck.reason}"
+                return
+            }
+        }
+
         val result = updateManager.installApk(file)
         result.onFailure { err ->
             _updateStatusMessage.value = err.localizedMessage
         }
+    }
+
+    fun shareOrSaveDownloadedApk() {
+        downloadedApkFile?.let { updateManager.shareOrSaveApk(it) }
     }
 
     val canRequestPackageInstalls: Boolean
@@ -1513,5 +1534,6 @@ class MainViewModel @Inject constructor(
         _updateCheckResult.value = null
         _updateDownloadProgress.value = -1f
         _updateStatusMessage.value = null
+        _isSignatureMismatch.value = false
     }
 }

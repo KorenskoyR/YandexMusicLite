@@ -2,6 +2,8 @@ package com.korenskoy.yandexmusic.data.updater
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -17,8 +19,18 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
+
+sealed class ApkInstallPreCheck {
+    object Compatible : ApkInstallPreCheck()
+    data class SignatureMismatch(
+        val currentSignatureDigest: String,
+        val newSignatureDigest: String
+    ) : ApkInstallPreCheck()
+    data class CorruptedApk(val reason: String) : ApkInstallPreCheck()
+}
 
 sealed class UpdateCheckResult {
     data class UpdateAvailable(
@@ -179,8 +191,16 @@ class GitHubUpdateManager @Inject constructor(
             }
 
             if (tempFile.exists()) {
+                if (contentLength > 0 && tempFile.length() != contentLength) {
+                    tempFile.delete()
+                    return@withContext Result.failure(Exception("Загрузка прервана: получено ${tempFile.length()} из $contentLength байт"))
+                }
                 if (targetFile.exists()) targetFile.delete()
                 tempFile.renameTo(targetFile)
+            }
+
+            if (!targetFile.exists() || targetFile.length() == 0L) {
+                return@withContext Result.failure(Exception("Файл APK пуст или не был сохранен"))
             }
 
             Result.success(targetFile)
@@ -192,12 +212,112 @@ class GitHubUpdateManager @Inject constructor(
     }
 
     /**
+     * Pre-checks the downloaded APK for corruption and signature compatibility with the installed application.
+     */
+    fun checkApkCompatibility(apkFile: File): ApkInstallPreCheck {
+        if (!apkFile.exists() || apkFile.length() == 0L) {
+            return ApkInstallPreCheck.CorruptedApk("Файл обновления пуст или не найден")
+        }
+
+        return try {
+            val packageArchiveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                context.packageManager.getPackageArchiveInfo(
+                    apkFile.absolutePath,
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageArchiveInfo(
+                    apkFile.absolutePath,
+                    PackageManager.GET_SIGNATURES
+                )
+            }
+
+            if (packageArchiveInfo == null) {
+                return ApkInstallPreCheck.CorruptedApk("Файл поврежден или не является корректным пакетом APK")
+            }
+
+            val currentPackageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    PackageManager.GET_SIGNATURES
+                )
+            }
+
+            val currentDigests = extractSignatures(currentPackageInfo)
+            val newDigests = extractSignatures(packageArchiveInfo)
+
+            if (currentDigests.isNotEmpty() && newDigests.isNotEmpty()) {
+                val hasMatchingSignature = currentDigests.any { it in newDigests }
+                if (!hasMatchingSignature) {
+                    return ApkInstallPreCheck.SignatureMismatch(
+                        currentSignatureDigest = currentDigests.first(),
+                        newSignatureDigest = newDigests.first()
+                    )
+                }
+            }
+
+            ApkInstallPreCheck.Compatible
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking APK compatibility", e)
+            ApkInstallPreCheck.Compatible
+        }
+    }
+
+    private fun extractSignatures(packageInfo: PackageInfo): List<String> {
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.signingInfo?.apkContentsSigners
+                ?: packageInfo.signingInfo?.signingCertificateHistory
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.signatures
+        }
+
+        return signatures?.mapNotNull { sig ->
+            try {
+                val md = MessageDigest.getInstance("SHA-256")
+                val digest = md.digest(sig.toByteArray())
+                digest.joinToString(":") { "%02X".format(it) }
+            } catch (e: Exception) {
+                null
+            }
+        } ?: emptyList()
+    }
+
+    /**
+     * Shares or saves the downloaded APK using Android system chooser.
+     */
+    fun shareOrSaveApk(apkFile: File) {
+        try {
+            val authority = "${context.packageName}.update_provider"
+            val contentUri = FileProvider.getUriForFile(context, authority, apkFile)
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/vnd.android.package-archive"
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            val chooser = Intent.createChooser(shareIntent, "Сохранить или отправить файл обновления").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sharing APK file", e)
+        }
+    }
+
+    /**
      * Installs the downloaded APK using Android PackageInstaller.
      */
     fun installApk(apkFile: File): Result<Unit> {
         return try {
-            if (!apkFile.exists()) {
-                return Result.failure(Exception("Файл APK не найден"))
+            if (!apkFile.exists() || apkFile.length() == 0L) {
+                return Result.failure(Exception("Файл APK не найден или пуст"))
             }
 
             // On Android 8.0+ check if installing from unknown sources is permitted
@@ -211,10 +331,33 @@ class GitHubUpdateManager @Inject constructor(
 
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(contentUri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
                 putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, context.packageName)
             }
+
+            val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.queryIntentActivities(
+                    installIntent,
+                    PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.queryIntentActivities(
+                    installIntent,
+                    PackageManager.MATCH_DEFAULT_ONLY
+                )
+            }
+
+            for (resolveInfo in resInfoList) {
+                val packageName = resolveInfo.activityInfo.packageName
+                context.grantUriPermission(
+                    packageName,
+                    contentUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+
             context.startActivity(installIntent)
             Result.success(Unit)
         } catch (e: Exception) {
