@@ -116,6 +116,7 @@ class MainViewModel @Inject constructor(
     val downloadProgress = downloadManager.downloadProgress
 
     private var downloadJob: Job? = null
+    private var currentPlayJob: Job? = null
 
     private val _wavePlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
 
@@ -1346,6 +1347,7 @@ class MainViewModel @Inject constructor(
 
         // Instant play if already cached on disk or pre-resolved in memory (0ms latency for seamless crossfade)
         if (downloadManager.isTrackDownloaded(trackId)) {
+            currentPlayJob?.cancel()
             consecutiveTrackErrors = 0
             playerRepository.playTrack(trackId, "", title, artist, coverUrl, isAutoCrossfade)
             return
@@ -1353,12 +1355,14 @@ class MainViewModel @Inject constructor(
 
         val fastResolvedUrl = preloadManager.getResolvedUrl(trackId)
         if (fastResolvedUrl != null) {
+            currentPlayJob?.cancel()
             consecutiveTrackErrors = 0
             playerRepository.playTrack(trackId, fastResolvedUrl, title, artist, coverUrl, isAutoCrossfade)
             return
         }
 
-        viewModelScope.launch {
+        currentPlayJob?.cancel()
+        currentPlayJob = viewModelScope.launch {
             try {
                 // Wait for high priority fetch of url if not loaded yet
                 val mp3Url = preloadManager.preloadSingleTrackPriority(trackId)
@@ -1379,6 +1383,7 @@ class MainViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e("MainViewModel", "Error playing track", e)
                 // Fallback attempt to play local if network failed
                 if (downloadManager.isTrackDownloaded(trackId)) {

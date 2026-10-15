@@ -443,10 +443,10 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 14",
-            buildGradle.contains("versionCode = 14"))
-        assertTrue("build.gradle.kts must be versionName 1.3.7",
-            buildGradle.contains("versionName = \"1.3.7\""))
+        assertTrue("build.gradle.kts must be versionCode 15",
+            buildGradle.contains("versionCode = 15"))
+        assertTrue("build.gradle.kts must be versionName 1.3.8",
+            buildGradle.contains("versionName = \"1.3.8\""))
     }
 
     @Test
@@ -464,8 +464,8 @@ class LayoutSafetyTest {
             playerRepo.contains("incomingStandby.playbackState != Player.STATE_READY"))
         assertTrue("PlayerRepositoryImpl must support isAutoCrossfade",
             playerRepo.contains("isAutoCrossfade: Boolean"))
-        assertTrue("PlayerRepositoryImpl must synchronize sessionListeners",
-            playerRepo.contains("sessionListeners"))
+        assertTrue("PlayerRepositoryImpl must expose activePlayerState StateFlow",
+            playerRepo.contains("override val activePlayerState: StateFlow<ExoPlayer>"))
 
         val preloadManager = File(sourceDir, "data/network/TrackPreloadManager.kt").readText()
         assertTrue("TrackPreloadManager must use Deferred concurrency for in-flight requests",

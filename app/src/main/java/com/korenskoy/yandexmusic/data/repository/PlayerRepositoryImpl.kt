@@ -86,44 +86,37 @@ class PlayerRepositoryImpl @Inject constructor(
     @Volatile
     private var hasEmittedTrackEndedForCurrent = false
 
-    private val sessionListeners = java.util.concurrent.CopyOnWriteArrayList<Player.Listener>()
+    private val _activePlayerState = MutableStateFlow<ExoPlayer>(playerA)
+    override val activePlayerState: StateFlow<ExoPlayer> = _activePlayerState.asStateFlow()
+
+    private var playJob: Job? = null
 
     private val delegatingPlayer = object : ForwardingPlayer(playerA) {
-        override fun addListener(listener: Player.Listener) {
-            sessionListeners.add(listener)
-            super.addListener(listener)
-        }
-        override fun removeListener(listener: Player.Listener) {
-            sessionListeners.remove(listener)
-            super.removeListener(listener)
-        }
-        override fun getPlayWhenReady(): Boolean = activePlayer.playWhenReady
-        override fun getPlaybackState(): Int = activePlayer.playbackState
-        override fun isPlaying(): Boolean = playerA.isPlaying || playerB.isPlaying
-        override fun getCurrentPosition(): Long = activePlayer.currentPosition
-        override fun getDuration(): Long = activePlayer.duration
-        override fun getCurrentMediaItem(): MediaItem? = activePlayer.currentMediaItem
-        override fun getMediaMetadata(): MediaMetadata = activePlayer.mediaMetadata
         override fun getCurrentTimeline(): androidx.media3.common.Timeline = activePlayer.currentTimeline
+        override fun getCurrentMediaItemIndex(): Int = activePlayer.currentMediaItemIndex
+        override fun getCurrentPeriodIndex(): Int = activePlayer.currentPeriodIndex
+        override fun getCurrentMediaItem(): MediaItem? = activePlayer.currentMediaItem
+        override fun getMediaItemCount(): Int = activePlayer.mediaItemCount
+        override fun getMediaItemAt(index: Int): MediaItem = activePlayer.getMediaItemAt(index)
+        override fun getAvailableCommands(): Player.Commands = activePlayer.availableCommands
+        override fun isCommandAvailable(command: Int): Boolean = activePlayer.isCommandAvailable(command)
+        override fun getPlaybackState(): Int = activePlayer.playbackState
+        override fun getPlayWhenReady(): Boolean = activePlayer.playWhenReady
+        override fun isPlaying(): Boolean = playerA.isPlaying || playerB.isPlaying
+        override fun getDuration(): Long = activePlayer.duration
+        override fun getCurrentPosition(): Long = activePlayer.currentPosition
+        override fun getMediaMetadata(): MediaMetadata = activePlayer.mediaMetadata
         override fun getCurrentTracks(): androidx.media3.common.Tracks = activePlayer.currentTracks
+        override fun getPlaybackParameters(): androidx.media3.common.PlaybackParameters = activePlayer.playbackParameters
+        override fun getPlaybackSuppressionReason(): Int = activePlayer.playbackSuppressionReason
+        override fun getPlayerError(): androidx.media3.common.PlaybackException? = activePlayer.playerError
+        override fun getAudioAttributes(): androidx.media3.common.AudioAttributes = activePlayer.audioAttributes
+        override fun getVolume(): Float = activePlayer.volume
         override fun play() { this@PlayerRepositoryImpl.resume() }
         override fun pause() { this@PlayerRepositoryImpl.pause() }
         override fun stop() { this@PlayerRepositoryImpl.stop() }
         override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
             this@PlayerRepositoryImpl.seekTo(positionMs)
-        }
-    }
-
-    private fun notifySessionTrackChanged() {
-        val currentItem = activePlayer.currentMediaItem
-        val metadata = activePlayer.mediaMetadata
-        val playbackState = activePlayer.playbackState
-        val isPlaying = playerA.isPlaying || playerB.isPlaying
-        sessionListeners.forEach { listener ->
-            listener.onMediaItemTransition(currentItem, Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)
-            listener.onMediaMetadataChanged(metadata)
-            listener.onPlaybackStateChanged(playbackState)
-            listener.onIsPlayingChanged(isPlaying)
         }
     }
 
@@ -183,13 +176,12 @@ class PlayerRepositoryImpl @Inject constructor(
                     isTransitioning = false
                     wakeLockHelper.releaseTransitionLock()
                 }
-                sessionListeners.forEach { it.onIsPlayingChanged(playerA.isPlaying || playerB.isPlaying) }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     android.util.Log.d("PlayerRepositoryImpl", "Player[$playerIdx] reached STATE_ENDED, active=$activePlayerIndex, isCrossfading=$isCrossfading")
-                    if (activePlayerIndex == playerIdx || (!playerA.isPlaying && !playerB.isPlaying)) {
+                    if (activePlayerIndex == playerIdx && !isCrossfading && !isTransitioning) {
                         wakeLockHelper.releaseTransitionLock()
                         isCrossfading = false
                         isTransitioning = false
@@ -201,9 +193,6 @@ class PlayerRepositoryImpl @Inject constructor(
                 if (playbackState == Player.STATE_READY && activePlayerIndex == playerIdx) {
                     isTransitioning = false
                 }
-                if (activePlayerIndex == playerIdx) {
-                    sessionListeners.forEach { it.onPlaybackStateChanged(playbackState) }
-                }
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -213,9 +202,6 @@ class PlayerRepositoryImpl @Inject constructor(
                     isTransitioning = false
                     isCrossfading = false
                     triggerSkipNext()
-                }
-                if (activePlayerIndex == playerIdx) {
-                    sessionListeners.forEach { it.onPlayerError(error) }
                 }
             }
 
@@ -227,27 +213,6 @@ class PlayerRepositoryImpl @Inject constructor(
                 if (reason == Player.DISCONTINUITY_REASON_SEEK && activePlayerIndex == playerIdx) {
                     pendingSeekPosition = -1L
                     _progress.value = newPosition.positionMs
-                }
-                if (activePlayerIndex == playerIdx) {
-                    sessionListeners.forEach { it.onPositionDiscontinuity(oldPosition, newPosition, reason) }
-                }
-            }
-
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                if (activePlayerIndex == playerIdx) {
-                    sessionListeners.forEach { it.onMediaItemTransition(mediaItem, reason) }
-                }
-            }
-
-            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
-                if (activePlayerIndex == playerIdx) {
-                    sessionListeners.forEach { it.onMediaMetadataChanged(mediaMetadata) }
-                }
-            }
-
-            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
-                if (activePlayerIndex == playerIdx) {
-                    sessionListeners.forEach { it.onTimelineChanged(timeline, reason) }
                 }
             }
         })
@@ -303,7 +268,8 @@ class PlayerRepositoryImpl @Inject constructor(
         coverUrl: String?,
         isAutoCrossfade: Boolean
     ) {
-        scope.launch {
+        playJob?.cancel()
+        playJob = scope.launch {
             val resolvedUrl = preloadManager.getResolvedUrl(trackId) ?: url
             val localFile = downloadManager.getLocalTrackFile(trackId)
             val playUri = if (localFile != null) {
@@ -359,6 +325,7 @@ class PlayerRepositoryImpl @Inject constructor(
 
                     incomingStandby.volume = 1f
                     activePlayerIndex = 1 - activePlayerIndex
+                    _activePlayerState.value = activePlayer
                     incomingStandby.playWhenReady = true
                     incomingStandby.play()
                 } else {
@@ -372,8 +339,8 @@ class PlayerRepositoryImpl @Inject constructor(
                     currentActive.prepare()
                     currentActive.playWhenReady = true
                     currentActive.play()
+                    _activePlayerState.value = activePlayer
                 }
-                notifySessionTrackChanged()
                 wakeLockHelper.releaseTransitionLock()
             } else {
                 // AUTO CROSSFADE (Automatic end-of-track transition)
@@ -394,7 +361,7 @@ class PlayerRepositoryImpl @Inject constructor(
 
                     // Swap active index immediately so progress and UI lock onto incoming track
                     activePlayerIndex = 1 - activePlayerIndex
-                    notifySessionTrackChanged()
+                    _activePlayerState.value = activePlayer
 
                     crossfadeJob = scope.launch {
                         // Guard: wait until incomingStandby is in STATE_READY and rendering audio
@@ -438,7 +405,7 @@ class PlayerRepositoryImpl @Inject constructor(
                     currentActive.prepare()
                     currentActive.playWhenReady = true
                     currentActive.play()
-                    notifySessionTrackChanged()
+                    _activePlayerState.value = activePlayer
                     wakeLockHelper.releaseTransitionLock()
                 }
             }
@@ -458,13 +425,11 @@ class PlayerRepositoryImpl @Inject constructor(
         playerA.pause()
         playerB.pause()
         _isPlaying.value = false
-        notifySessionTrackChanged()
     }
 
     override fun resume() {
         activePlayer.play()
         _isPlaying.value = true
-        notifySessionTrackChanged()
     }
 
     override fun stop() {
@@ -479,7 +444,6 @@ class PlayerRepositoryImpl @Inject constructor(
         _isPlaying.value = false
         _currentTrackId.value = null
         _progress.value = 0L
-        notifySessionTrackChanged()
     }
 
     override fun seekTo(position: Long) {

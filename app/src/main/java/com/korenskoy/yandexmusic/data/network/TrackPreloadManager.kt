@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.SupervisorJob
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,7 +21,7 @@ class TrackPreloadManager @Inject constructor(
     private val downloadManager: TrackDownloadManager,
     private val okHttpClient: OkHttpClient
 ) {
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resolvedUrls = ConcurrentHashMap<String, String>()
     private val inFlightRequests = ConcurrentHashMap<String, Deferred<String?>>()
 
@@ -78,7 +79,12 @@ class TrackPreloadManager @Inject constructor(
                 }
             }
         }
-        return deferred.await()
+        return try {
+            deferred.await()
+        } catch (e: Exception) {
+            inFlightRequests.remove(trackId)
+            null
+        }
     }
 
     fun clearCache() {

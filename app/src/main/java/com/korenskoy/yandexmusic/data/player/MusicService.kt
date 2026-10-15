@@ -15,12 +15,19 @@ import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+
 @AndroidEntryPoint
 class MusicService : MediaLibraryService() {
 
     @Inject
     lateinit var playerRepository: PlayerRepository
 
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: android.media.AudioManager? = null
     private var focusRequest: android.media.AudioFocusRequest? = null
@@ -71,17 +78,28 @@ class MusicService : MediaLibraryService() {
         
         setupMediaSession()
 
-        // Track isPlaying to request/abandon system audio focus
-        val player = playerRepository.getPlayer()
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
+        // Track isPlaying via StateFlow to request/abandon system audio focus without dropping it during player swaps
+        serviceScope.launch {
+            playerRepository.isPlaying.collect { isPlaying ->
                 if (isPlaying) {
                     requestSystemAudioFocus()
                 } else if (!wasPlayingBeforeTransientLoss) {
                     abandonSystemAudioFocus()
                 }
             }
-        })
+        }
+
+        // Dynamically update MediaLibrarySession when active player swaps
+        serviceScope.launch {
+            playerRepository.activePlayerState.collect { activePl ->
+                val forwardingPl = createForwardingPlayer(activePl)
+                if (mediaLibrarySession == null) {
+                    setupMediaSession(forwardingPl)
+                } else {
+                    mediaLibrarySession?.player = forwardingPl
+                }
+            }
+        }
     }
 
     private fun requestSystemAudioFocus() {
@@ -123,7 +141,7 @@ class MusicService : MediaLibraryService() {
         }
     }
 
-    private fun setupMediaSession() {
+    private fun setupMediaSession(forwardingPlayer: ForwardingPlayer = createForwardingPlayer(playerRepository.getPlayer())) {
         val intent = Intent(this, com.korenskoy.yandexmusic.MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -131,8 +149,6 @@ class MusicService : MediaLibraryService() {
             this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        
-        val forwardingPlayer = createForwardingPlayer(playerRepository.getPlayer())
 
         val sessionCallback = object : MediaLibrarySession.Callback {
             // Can implement browsing callbacks here for Android Auto / WearOS
@@ -185,6 +201,7 @@ class MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
         mediaLibrarySession?.run {
             removeSession(this)
             release()

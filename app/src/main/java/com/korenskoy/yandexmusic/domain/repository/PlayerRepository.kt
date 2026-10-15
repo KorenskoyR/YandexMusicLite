@@ -11,6 +11,7 @@ interface PlayerRepository {
     val prepareNextTrackEvent: Flow<Unit>
     val skipNextEvent: Flow<Unit>
     val skipPrevEvent: Flow<Unit>
+    val activePlayerState: StateFlow<androidx.media3.exoplayer.ExoPlayer>
 
     fun playTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?, isAutoCrossfade: Boolean = false)
     fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
