@@ -165,12 +165,6 @@ class MusicService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        
-        if (intent?.action == "UPDATE_PLAYER") {
-            // Rebind the MediaSession player to the new active player from dual ExoPlayer setup
-            setupMediaSession()
-        }
-        
         return START_STICKY
     }
 

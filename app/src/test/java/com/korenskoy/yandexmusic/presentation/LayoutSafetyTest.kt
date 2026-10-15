@@ -443,10 +443,27 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 10",
-            buildGradle.contains("versionCode = 10"))
-        assertTrue("build.gradle.kts must be versionName 1.3.3",
-            buildGradle.contains("versionName = \"1.3.3\""))
+        assertTrue("build.gradle.kts must be versionCode 11",
+            buildGradle.contains("versionCode = 11"))
+        assertTrue("build.gradle.kts must be versionName 1.3.4",
+            buildGradle.contains("versionName = \"1.3.4\""))
+    }
+
+    @Test
+    fun testWarmStandbyAndEqualPowerCrossfadeIntegration() {
+        val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
+        assertTrue("PlayerRepositoryImpl must define PREPARE_STANDBY_THRESHOLD_MS",
+            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 15_000L"))
+        assertTrue("PlayerRepositoryImpl must have prepareNextTrackEvent",
+            playerRepo.contains("override val prepareNextTrackEvent: Flow<Unit>"))
+        assertTrue("PlayerRepositoryImpl must wait for STATE_READY before starting crossfade",
+            playerRepo.contains("incomingStandby.playbackState != Player.STATE_READY"))
+
+        val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertTrue("MainViewModel must observe prepareNextTrackEvent",
+            viewModel.contains("playerRepository.prepareNextTrackEvent"))
+        assertTrue("MainViewModel must implement prepareNextTrackInQueue",
+            viewModel.contains("fun prepareNextTrackInQueue()"))
     }
 }
 

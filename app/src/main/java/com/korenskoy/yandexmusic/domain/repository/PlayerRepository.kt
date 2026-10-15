@@ -8,6 +8,7 @@ interface PlayerRepository {
     val isPlaying: StateFlow<Boolean>
     val progress: StateFlow<Long>
     val trackEndedEvent: Flow<Unit>
+    val prepareNextTrackEvent: Flow<Unit>
     val skipNextEvent: Flow<Unit>
     val skipPrevEvent: Flow<Unit>
 

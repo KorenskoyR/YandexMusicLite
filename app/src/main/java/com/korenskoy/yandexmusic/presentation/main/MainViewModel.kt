@@ -163,6 +163,10 @@ class MainViewModel @Inject constructor(
         playerRepository.trackEndedEvent
             .onEach { playNext() }
             .launchIn(viewModelScope)
+
+        playerRepository.prepareNextTrackEvent
+            .onEach { prepareNextTrackInQueue() }
+            .launchIn(viewModelScope)
             
         playerRepository.skipNextEvent
             .onEach { playNext() }
@@ -1340,15 +1344,22 @@ class MainViewModel @Inject constructor(
             if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
         }
 
+        // Instant play if already cached on disk or pre-resolved in memory (0ms latency for seamless crossfade)
+        if (downloadManager.isTrackDownloaded(trackId)) {
+            consecutiveTrackErrors = 0
+            playerRepository.playTrack(trackId, "", title, artist, coverUrl)
+            return
+        }
+
+        val fastResolvedUrl = preloadManager.getResolvedUrl(trackId)
+        if (fastResolvedUrl != null) {
+            consecutiveTrackErrors = 0
+            playerRepository.playTrack(trackId, fastResolvedUrl, title, artist, coverUrl)
+            return
+        }
+
         viewModelScope.launch {
             try {
-                if (downloadManager.isTrackDownloaded(trackId)) {
-                    consecutiveTrackErrors = 0
-                    // Play directly from cache
-                    playerRepository.playTrack(trackId, "", title, artist, coverUrl)
-                    return@launch
-                }
-
                 // Wait for high priority fetch of url if not loaded yet
                 val mp3Url = preloadManager.preloadSingleTrackPriority(trackId)
                 if (mp3Url != null) {
@@ -1375,6 +1386,33 @@ class MainViewModel @Inject constructor(
                     playerRepository.playTrack(trackId, "", title, artist, coverUrl)
                 } else if (++consecutiveTrackErrors < 5) {
                     playNext()
+                }
+            }
+        }
+    }
+
+    private fun prepareNextTrackInQueue() {
+        val current = _currentTrack.value ?: return
+        if (current.isRadio) return
+        val playlist = _currentPlaylist.value
+        val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
+        if (currentIndex != -1 && currentIndex + 1 < playlist.size) {
+            val nextTrack = playlist[currentIndex + 1]
+            if (nextTrack.isRadio) return
+            viewModelScope.launch(Dispatchers.IO) {
+                val nextId = nextTrack.idString
+                val nextTitle = nextTrack.title
+                val nextArtist = nextTrack.artists.firstOrNull()?.name
+                val nextCover = nextTrack.coverUri?.let { uri ->
+                    if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
+                }
+                val nextMp3Url = if (downloadManager.isTrackDownloaded(nextId)) {
+                    ""
+                } else {
+                    preloadManager.preloadSingleTrackPriority(nextId) ?: preloadManager.getOrFetchUrl(nextId)
+                }
+                if (nextMp3Url != null || downloadManager.isTrackDownloaded(nextId)) {
+                    playerRepository.prepareNextTrack(nextId, nextMp3Url ?: "", nextTitle, nextArtist, nextCover)
                 }
             }
         }

@@ -50,6 +50,9 @@ class PlayerRepositoryImpl @Inject constructor(
     private val _trackEndedEvent = MutableSharedFlow<Unit>()
     override val trackEndedEvent: Flow<Unit> = _trackEndedEvent.asSharedFlow()
 
+    private val _prepareNextTrackEvent = MutableSharedFlow<Unit>()
+    override val prepareNextTrackEvent: Flow<Unit> = _prepareNextTrackEvent.asSharedFlow()
+
     private val _skipNextEvent = MutableSharedFlow<Unit>()
     override val skipNextEvent: Flow<Unit> = _skipNextEvent.asSharedFlow()
 
@@ -79,6 +82,8 @@ class PlayerRepositoryImpl @Inject constructor(
     @Volatile
     private var isCrossfading = false
     @Volatile
+    private var hasEmittedPrepareForCurrent = false
+    @Volatile
     private var hasEmittedTrackEndedForCurrent = false
 
     private val delegatingPlayer = object : ForwardingPlayer(playerA) {
@@ -87,6 +92,10 @@ class PlayerRepositoryImpl @Inject constructor(
         override fun isPlaying(): Boolean = playerA.isPlaying || playerB.isPlaying
         override fun getCurrentPosition(): Long = activePlayer.currentPosition
         override fun getDuration(): Long = activePlayer.duration
+        override fun getCurrentMediaItem(): MediaItem? = activePlayer.currentMediaItem
+        override fun getMediaMetadata(): MediaMetadata = activePlayer.mediaMetadata
+        override fun getCurrentTimeline(): androidx.media3.common.Timeline = activePlayer.currentTimeline
+        override fun getCurrentTracks(): androidx.media3.common.Tracks = activePlayer.currentTracks
         override fun play() { this@PlayerRepositoryImpl.resume() }
         override fun pause() { this@PlayerRepositoryImpl.pause() }
         override fun stop() { this@PlayerRepositoryImpl.stop() }
@@ -115,11 +124,20 @@ class PlayerRepositoryImpl @Inject constructor(
                         _progress.value = currentP.currentPosition
                     }
 
-                    // 3-second early trigger for seamless overlapping crossfade:
                     val duration = currentP.duration
                     val currentPos = currentP.currentPosition
-                    if (duration > 6000L && currentPos > 0L) {
+                    if (duration > 8000L && currentPos > 0L) {
                         val remaining = duration - currentPos
+
+                        // 1. Warm standby preparation at 15 seconds remaining:
+                        if (remaining <= PREPARE_STANDBY_THRESHOLD_MS && !hasEmittedPrepareForCurrent && !isCrossfading) {
+                            hasEmittedPrepareForCurrent = true
+                            scope.launch {
+                                _prepareNextTrackEvent.emit(Unit)
+                            }
+                        }
+
+                        // 2. 3-second early trigger for seamless overlapping crossfade:
                         if (remaining in 1L..CROSSFADE_DURATION_MS && !hasEmittedTrackEndedForCurrent && !isCrossfading) {
                             hasEmittedTrackEndedForCurrent = true
                             wakeLockHelper.acquireTransitionLock(30_000L)
@@ -218,9 +236,9 @@ class PlayerRepositoryImpl @Inject constructor(
             targetStandby.volume = 0f
             targetStandby.setMediaItem(mediaItem, true)
             targetStandby.prepare()
-            targetStandby.pause()
+            targetStandby.playWhenReady = false
             preloadedTrackId = trackId
-            android.util.Log.d("PlayerRepositoryImpl", "Preloaded standby player ready for crossfade with trackId = $trackId")
+            android.util.Log.d("PlayerRepositoryImpl", "Preloaded warm standby player ready for crossfade with trackId = $trackId")
         }
     }
 
@@ -248,6 +266,7 @@ class PlayerRepositoryImpl @Inject constructor(
                 .build()
 
             crossfadeJob?.cancel()
+            hasEmittedPrepareForCurrent = false
             hasEmittedTrackEndedForCurrent = false
             _currentTrackId.value = trackId
             _progress.value = 0L
@@ -277,11 +296,18 @@ class PlayerRepositoryImpl @Inject constructor(
 
                 // Swap active index immediately so progress and UI lock onto incoming track
                 activePlayerIndex = 1 - activePlayerIndex
-                notifyServicePlayerUpdated()
 
                 crossfadeJob = scope.launch {
+                    // Guard: wait until incomingStandby is in STATE_READY and rendering audio
+                    // If preloaded at 15s remaining, this check succeeds in 0-10ms.
+                    // If buffering, currentActive continues playing at full volume without silent pause!
+                    val waitStart = System.currentTimeMillis()
+                    while (isActive && incomingStandby.playbackState != Player.STATE_READY && (System.currentTimeMillis() - waitStart < 4000L)) {
+                        delay(20)
+                    }
+
                     val steps = CROSSFADE_STEPS
-                    val stepDelay = CROSSFADE_DURATION_MS / steps // 100ms per step
+                    val stepDelay = CROSSFADE_DURATION_MS / steps // 50ms per step
 
                     for (step in 1..steps) {
                         if (!isActive) break
@@ -297,8 +323,9 @@ class PlayerRepositoryImpl @Inject constructor(
                         delay(stepDelay)
                     }
 
-                    // Finish crossfade: clean stop previous player
-                    currentActive.stop()
+                    // Finish crossfade: clean soft pause on previous player without harsh stop
+                    currentActive.pause()
+                    currentActive.clearMediaItems()
                     currentActive.volume = 1f
                     incomingStandby.volume = 1f
                     isCrossfading = false
@@ -314,7 +341,6 @@ class PlayerRepositoryImpl @Inject constructor(
                 currentActive.prepare()
                 currentActive.play()
                 wakeLockHelper.releaseTransitionLock()
-                notifyServicePlayerUpdated()
             }
 
             try {
@@ -323,17 +349,6 @@ class PlayerRepositoryImpl @Inject constructor(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-    }
-
-    private fun notifyServicePlayerUpdated() {
-        try {
-            val intent = Intent(context, MusicService::class.java).apply {
-                action = "UPDATE_PLAYER"
-            }
-            context.startService(intent)
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 
@@ -355,6 +370,8 @@ class PlayerRepositoryImpl @Inject constructor(
         isCrossfading = false
         playerA.stop()
         playerB.stop()
+        playerA.clearMediaItems()
+        playerB.clearMediaItems()
         playerA.volume = 1f
         playerB.volume = 1f
         _isPlaying.value = false
@@ -387,6 +404,7 @@ class PlayerRepositoryImpl @Inject constructor(
 
     companion object {
         const val CROSSFADE_DURATION_MS = 3000L
-        const val CROSSFADE_STEPS = 30
+        const val CROSSFADE_STEPS = 60
+        const val PREPARE_STANDBY_THRESHOLD_MS = 15_000L
     }
 }
