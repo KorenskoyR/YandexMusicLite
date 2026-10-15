@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Deferred
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,7 +22,7 @@ class TrackPreloadManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val resolvedUrls = ConcurrentHashMap<String, String>()
-    private val preloadingIds = ConcurrentHashMap<String, Boolean>()
+    private val inFlightRequests = ConcurrentHashMap<String, Deferred<String?>>()
 
     fun getResolvedUrl(trackId: String): String? {
         return resolvedUrls[trackId]
@@ -31,76 +32,59 @@ class TrackPreloadManager @Inject constructor(
         scope.launch {
             trackIds.map { trackId ->
                 async {
-                    preloadSingleTrack(trackId)
+                    fetchOrAwait(trackId)
                 }
             }.awaitAll()
         }
     }
 
     suspend fun preloadSingleTrackPriority(trackId: String): String? {
-        if (resolvedUrls.containsKey(trackId)) return resolvedUrls[trackId]
-        preloadSingleTrack(trackId)
-        return resolvedUrls[trackId]
+        return fetchOrAwait(trackId)
     }
 
-    private suspend fun preloadSingleTrack(trackId: String) {
-        if (downloadManager.isTrackDownloaded(trackId)) return
-        if (resolvedUrls.containsKey(trackId) || preloadingIds.containsKey(trackId)) return
-
-        preloadingIds[trackId] = true
-        try {
-            val downloadInfoResponse = api.getTrackDownloadInfo(trackId)
-            val infoList = downloadInfoResponse.result ?: emptyList()
-            val preferredInfo = infoList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
-                .maxByOrNull { it.bitrateInKbps }
-                ?: infoList.filter { !it.preview }.maxByOrNull { it.bitrateInKbps }
-                ?: infoList.firstOrNull()
-            val infoUrl = preferredInfo?.downloadInfoUrl
-            
-            if (infoUrl != null) {
-                val mp3Url = resolveXmlToMp3Url(infoUrl)
-                if (mp3Url != null) {
-                    resolvedUrls[trackId] = mp3Url
-                    Log.d("TrackPreloadManager", "Successfully preloaded URL for track $trackId")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("TrackPreloadManager", "Error preloading track $trackId", e)
-        } finally {
-            preloadingIds.remove(trackId)
-        }
-    }
-    
-    fun clearCache() {
-        resolvedUrls.clear()
-        preloadingIds.clear()
-    }
-    
     suspend fun getOrFetchUrl(trackId: String): String? {
-        if (downloadManager.isTrackDownloaded(trackId)) return null // Local file is used
+        return fetchOrAwait(trackId)
+    }
+
+    private suspend fun fetchOrAwait(trackId: String): String? {
+        if (downloadManager.isTrackDownloaded(trackId)) return null
         resolvedUrls[trackId]?.let { return it }
 
-        return try {
-            val downloadInfoResponse = api.getTrackDownloadInfo(trackId)
-            val infoList = downloadInfoResponse.result ?: emptyList()
-            val preferredInfo = infoList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
-                .maxByOrNull { it.bitrateInKbps }
-                ?: infoList.filter { !it.preview }.maxByOrNull { it.bitrateInKbps }
-                ?: infoList.firstOrNull()
-            val infoUrl = preferredInfo?.downloadInfoUrl
-            
-            if (infoUrl != null) {
-                val mp3Url = resolveXmlToMp3Url(infoUrl)
-                if (mp3Url != null) {
-                    resolvedUrls[trackId] = mp3Url
-                    return mp3Url
+        val deferred = inFlightRequests.computeIfAbsent(trackId) {
+            scope.async(Dispatchers.IO) {
+                try {
+                    val downloadInfoResponse = api.getTrackDownloadInfo(trackId)
+                    val infoList = downloadInfoResponse.result ?: emptyList()
+                    val preferredInfo = infoList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
+                        .maxByOrNull { it.bitrateInKbps }
+                        ?: infoList.filter { !it.preview }.maxByOrNull { it.bitrateInKbps }
+                        ?: infoList.firstOrNull()
+                    val infoUrl = preferredInfo?.downloadInfoUrl
+                    
+                    if (infoUrl != null) {
+                        val mp3Url = resolveXmlToMp3Url(infoUrl)
+                        if (mp3Url != null) {
+                            resolvedUrls[trackId] = mp3Url
+                            Log.d("TrackPreloadManager", "Successfully resolved URL for track $trackId")
+                            return@async mp3Url
+                        }
+                    }
+                    null
+                } catch (e: Exception) {
+                    Log.e("TrackPreloadManager", "Error resolving URL for track $trackId", e)
+                    null
+                } finally {
+                    inFlightRequests.remove(trackId)
                 }
             }
-            null
-        } catch (e: Exception) {
-            Log.e("TrackPreloadManager", "Error fetching URL on demand for track $trackId", e)
-            null
         }
+        return deferred.await()
+    }
+
+    fun clearCache() {
+        resolvedUrls.clear()
+        inFlightRequests.values.forEach { it.cancel() }
+        inFlightRequests.clear()
     }
     
     private suspend fun resolveXmlToMp3Url(infoUrl: String): String? = withContext(Dispatchers.IO) {

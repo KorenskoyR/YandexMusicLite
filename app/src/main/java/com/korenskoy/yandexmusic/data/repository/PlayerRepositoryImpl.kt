@@ -86,7 +86,17 @@ class PlayerRepositoryImpl @Inject constructor(
     @Volatile
     private var hasEmittedTrackEndedForCurrent = false
 
+    private val sessionListeners = java.util.concurrent.CopyOnWriteArrayList<Player.Listener>()
+
     private val delegatingPlayer = object : ForwardingPlayer(playerA) {
+        override fun addListener(listener: Player.Listener) {
+            sessionListeners.add(listener)
+            super.addListener(listener)
+        }
+        override fun removeListener(listener: Player.Listener) {
+            sessionListeners.remove(listener)
+            super.removeListener(listener)
+        }
         override fun getPlayWhenReady(): Boolean = activePlayer.playWhenReady
         override fun getPlaybackState(): Int = activePlayer.playbackState
         override fun isPlaying(): Boolean = playerA.isPlaying || playerB.isPlaying
@@ -101,6 +111,19 @@ class PlayerRepositoryImpl @Inject constructor(
         override fun stop() { this@PlayerRepositoryImpl.stop() }
         override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
             this@PlayerRepositoryImpl.seekTo(positionMs)
+        }
+    }
+
+    private fun notifySessionTrackChanged() {
+        val currentItem = activePlayer.currentMediaItem
+        val metadata = activePlayer.mediaMetadata
+        val playbackState = activePlayer.playbackState
+        val isPlaying = playerA.isPlaying || playerB.isPlaying
+        sessionListeners.forEach { listener ->
+            listener.onMediaItemTransition(currentItem, Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)
+            listener.onMediaMetadataChanged(metadata)
+            listener.onPlaybackStateChanged(playbackState)
+            listener.onIsPlayingChanged(isPlaying)
         }
     }
 
@@ -160,6 +183,7 @@ class PlayerRepositoryImpl @Inject constructor(
                     isTransitioning = false
                     wakeLockHelper.releaseTransitionLock()
                 }
+                sessionListeners.forEach { it.onIsPlayingChanged(playerA.isPlaying || playerB.isPlaying) }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -177,6 +201,9 @@ class PlayerRepositoryImpl @Inject constructor(
                 if (playbackState == Player.STATE_READY && activePlayerIndex == playerIdx) {
                     isTransitioning = false
                 }
+                if (activePlayerIndex == playerIdx) {
+                    sessionListeners.forEach { it.onPlaybackStateChanged(playbackState) }
+                }
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -186,6 +213,9 @@ class PlayerRepositoryImpl @Inject constructor(
                     isTransitioning = false
                     isCrossfading = false
                     triggerSkipNext()
+                }
+                if (activePlayerIndex == playerIdx) {
+                    sessionListeners.forEach { it.onPlayerError(error) }
                 }
             }
 
@@ -197,6 +227,27 @@ class PlayerRepositoryImpl @Inject constructor(
                 if (reason == Player.DISCONTINUITY_REASON_SEEK && activePlayerIndex == playerIdx) {
                     pendingSeekPosition = -1L
                     _progress.value = newPosition.positionMs
+                }
+                if (activePlayerIndex == playerIdx) {
+                    sessionListeners.forEach { it.onPositionDiscontinuity(oldPosition, newPosition, reason) }
+                }
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (activePlayerIndex == playerIdx) {
+                    sessionListeners.forEach { it.onMediaItemTransition(mediaItem, reason) }
+                }
+            }
+
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                if (activePlayerIndex == playerIdx) {
+                    sessionListeners.forEach { it.onMediaMetadataChanged(mediaMetadata) }
+                }
+            }
+
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                if (activePlayerIndex == playerIdx) {
+                    sessionListeners.forEach { it.onTimelineChanged(timeline, reason) }
                 }
             }
         })
@@ -244,7 +295,14 @@ class PlayerRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun playTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
+    override fun playTrack(
+        trackId: String,
+        url: String,
+        title: String?,
+        artist: String?,
+        coverUrl: String?,
+        isAutoCrossfade: Boolean
+    ) {
         scope.launch {
             val resolvedUrl = preloadManager.getResolvedUrl(trackId) ?: url
             val localFile = downloadManager.getLocalTrackFile(trackId)
@@ -252,6 +310,14 @@ class PlayerRepositoryImpl @Inject constructor(
                 android.net.Uri.fromFile(localFile).toString()
             } else {
                 resolvedUrl
+            }
+
+            if (playUri.isBlank()) {
+                android.util.Log.w("PlayerRepositoryImpl", "playUri is blank for track $trackId, skipping next")
+                isCrossfading = false
+                isTransitioning = false
+                triggerSkipNext()
+                return@launch
             }
 
             val mediaMetadata = MediaMetadata.Builder()
@@ -281,80 +347,100 @@ class PlayerRepositoryImpl @Inject constructor(
             val isAlreadyPreloaded = (preloadedTrackId == trackId)
             preloadedTrackId = null
 
-            if (wasPlaying) {
-                // TRUE 5-SECOND OVERLAPPING CROSSFADE
-                isCrossfading = true
+            if (!isAutoCrossfade) {
+                // MANUAL SKIP (Immediate switch, no 3s delay, no timeout abort)
+                isCrossfading = false
                 isTransitioning = true
-                wakeLockHelper.acquireTransitionLock(30_000L)
 
-                if (!isAlreadyPreloaded) {
-                    incomingStandby.volume = 0f
-                    incomingStandby.setMediaItem(mediaItem, true)
-                    incomingStandby.prepare()
+                if (isAlreadyPreloaded) {
+                    currentActive.stop()
+                    currentActive.clearMediaItems()
+                    currentActive.volume = 1f
+
+                    incomingStandby.volume = 1f
+                    activePlayerIndex = 1 - activePlayerIndex
+                    incomingStandby.playWhenReady = true
+                    incomingStandby.play()
+                } else {
+                    incomingStandby.stop()
+                    incomingStandby.clearMediaItems()
+                    incomingStandby.volume = 1f
+
+                    currentActive.stop()
+                    currentActive.volume = 1f
+                    currentActive.setMediaItem(mediaItem, true)
+                    currentActive.prepare()
+                    currentActive.playWhenReady = true
+                    currentActive.play()
                 }
+                notifySessionTrackChanged()
+                wakeLockHelper.releaseTransitionLock()
+            } else {
+                // AUTO CROSSFADE (Automatic end-of-track transition)
+                if (wasPlaying) {
+                    isCrossfading = true
+                    isTransitioning = true
+                    wakeLockHelper.acquireTransitionLock(30_000L)
 
-                incomingStandby.volume = 0f
-                incomingStandby.play()
-
-                // Swap active index immediately so progress and UI lock onto incoming track
-                activePlayerIndex = 1 - activePlayerIndex
-
-                crossfadeJob = scope.launch {
-                    // Guard: wait until incomingStandby is in STATE_READY and rendering audio
-                    // If preloaded at 15s remaining, this check succeeds in 0-10ms.
-                    // If buffering, currentActive continues playing at full volume without silent pause!
-                    val waitStart = System.currentTimeMillis()
-                    while (isActive && incomingStandby.playbackState != Player.STATE_READY && (System.currentTimeMillis() - waitStart < 3000L)) {
-                        delay(20)
+                    if (!isAlreadyPreloaded) {
+                        incomingStandby.volume = 0f
+                        incomingStandby.setMediaItem(mediaItem, true)
+                        incomingStandby.prepare()
                     }
 
-                    if (incomingStandby.playbackState != Player.STATE_READY) {
-                        android.util.Log.w("PlayerRepositoryImpl", "Incoming standby player not ready within 3s; aborting crossfade safely to let current active player finish")
-                        activePlayerIndex = 1 - activePlayerIndex
+                    incomingStandby.volume = 0f
+                    incomingStandby.playWhenReady = true
+                    incomingStandby.play()
+
+                    // Swap active index immediately so progress and UI lock onto incoming track
+                    activePlayerIndex = 1 - activePlayerIndex
+                    notifySessionTrackChanged()
+
+                    crossfadeJob = scope.launch {
+                        // Guard: wait until incomingStandby is in STATE_READY and rendering audio
+                        val waitStart = System.currentTimeMillis()
+                        while (isActive && incomingStandby.playbackState != Player.STATE_READY && (System.currentTimeMillis() - waitStart < 5000L)) {
+                            delay(20)
+                        }
+
+                        val steps = CROSSFADE_STEPS
+                        val stepDelay = CROSSFADE_DURATION_MS / steps // 50ms per step
+
+                        for (step in 1..steps) {
+                            if (!isActive) break
+                            val fraction = step.toDouble() / steps
+                            val angle = fraction * (PI / 2.0)
+                            
+                            // Equal-Power Crossfade curve (cos^2 + sin^2 = 1.0)
+                            val outVol = cos(angle).toFloat().coerceIn(0f, 1f)
+                            val inVol = sin(angle).toFloat().coerceIn(0f, 1f)
+
+                            currentActive.volume = outVol
+                            incomingStandby.volume = inVol
+                            delay(stepDelay)
+                        }
+
+                        // Finish crossfade: clean soft pause on previous player without harsh stop
+                        currentActive.pause()
+                        currentActive.clearMediaItems()
                         currentActive.volume = 1f
-                        incomingStandby.volume = 0f
-                        incomingStandby.stop()
+                        incomingStandby.volume = 1f
                         isCrossfading = false
                         isTransitioning = false
                         wakeLockHelper.releaseTransitionLock()
-                        return@launch
                     }
-
-                    val steps = CROSSFADE_STEPS
-                    val stepDelay = CROSSFADE_DURATION_MS / steps // 50ms per step
-
-                    for (step in 1..steps) {
-                        if (!isActive) break
-                        val fraction = step.toDouble() / steps
-                        val angle = fraction * (PI / 2.0)
-                        
-                        // Equal-Power Crossfade curve (cos^2 + sin^2 = 1.0)
-                        val outVol = cos(angle).toFloat().coerceIn(0f, 1f)
-                        val inVol = sin(angle).toFloat().coerceIn(0f, 1f)
-
-                        currentActive.volume = outVol
-                        incomingStandby.volume = inVol
-                        delay(stepDelay)
-                    }
-
-                    // Finish crossfade: clean soft pause on previous player without harsh stop
-                    currentActive.pause()
-                    currentActive.clearMediaItems()
+                } else {
+                    // Immediate clean start when previous track wasn't playing
+                    isTransitioning = true
+                    currentActive.stop()
                     currentActive.volume = 1f
-                    incomingStandby.volume = 1f
-                    isCrossfading = false
-                    isTransitioning = false
+                    currentActive.setMediaItem(mediaItem, true)
+                    currentActive.prepare()
+                    currentActive.playWhenReady = true
+                    currentActive.play()
+                    notifySessionTrackChanged()
                     wakeLockHelper.releaseTransitionLock()
                 }
-            } else {
-                // Immediate clean start when previous track wasn't playing
-                isTransitioning = true
-                currentActive.stop()
-                currentActive.volume = 1f
-                currentActive.setMediaItem(mediaItem, true)
-                currentActive.prepare()
-                currentActive.play()
-                wakeLockHelper.releaseTransitionLock()
             }
 
             try {
@@ -372,11 +458,13 @@ class PlayerRepositoryImpl @Inject constructor(
         playerA.pause()
         playerB.pause()
         _isPlaying.value = false
+        notifySessionTrackChanged()
     }
 
     override fun resume() {
         activePlayer.play()
         _isPlaying.value = true
+        notifySessionTrackChanged()
     }
 
     override fun stop() {
@@ -391,6 +479,7 @@ class PlayerRepositoryImpl @Inject constructor(
         _isPlaying.value = false
         _currentTrackId.value = null
         _progress.value = 0L
+        notifySessionTrackChanged()
     }
 
     override fun seekTo(position: Long) {

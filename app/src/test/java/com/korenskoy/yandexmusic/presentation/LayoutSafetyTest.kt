@@ -443,10 +443,10 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 13",
-            buildGradle.contains("versionCode = 13"))
-        assertTrue("build.gradle.kts must be versionName 1.3.6",
-            buildGradle.contains("versionName = \"1.3.6\""))
+        assertTrue("build.gradle.kts must be versionCode 14",
+            buildGradle.contains("versionCode = 14"))
+        assertTrue("build.gradle.kts must be versionName 1.3.7",
+            buildGradle.contains("versionName = \"1.3.7\""))
     }
 
     @Test
@@ -462,6 +462,14 @@ class LayoutSafetyTest {
             playerRepo.contains("override val prepareNextTrackEvent: Flow<Unit>"))
         assertTrue("PlayerRepositoryImpl must wait for STATE_READY before starting crossfade",
             playerRepo.contains("incomingStandby.playbackState != Player.STATE_READY"))
+        assertTrue("PlayerRepositoryImpl must support isAutoCrossfade",
+            playerRepo.contains("isAutoCrossfade: Boolean"))
+        assertTrue("PlayerRepositoryImpl must synchronize sessionListeners",
+            playerRepo.contains("sessionListeners"))
+
+        val preloadManager = File(sourceDir, "data/network/TrackPreloadManager.kt").readText()
+        assertTrue("TrackPreloadManager must use Deferred concurrency for in-flight requests",
+            preloadManager.contains("Deferred<String?>"))
 
         val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
         assertTrue("MusicService must track transient loss",

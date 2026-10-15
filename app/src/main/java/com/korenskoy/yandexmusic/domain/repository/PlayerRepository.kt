@@ -12,7 +12,7 @@ interface PlayerRepository {
     val skipNextEvent: Flow<Unit>
     val skipPrevEvent: Flow<Unit>
 
-    fun playTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
+    fun playTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?, isAutoCrossfade: Boolean = false)
     fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
     fun pause()
     fun resume()

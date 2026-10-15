@@ -161,7 +161,7 @@ class MainViewModel @Inject constructor(
 
     init {
         playerRepository.trackEndedEvent
-            .onEach { playNext() }
+            .onEach { playNext(isAutoCrossfade = true) }
             .launchIn(viewModelScope)
 
         playerRepository.prepareNextTrackEvent
@@ -169,7 +169,7 @@ class MainViewModel @Inject constructor(
             .launchIn(viewModelScope)
             
         playerRepository.skipNextEvent
-            .onEach { playNext() }
+            .onEach { playNext(isAutoCrossfade = false) }
             .launchIn(viewModelScope)
             
         playerRepository.skipPrevEvent
@@ -1286,7 +1286,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun playTrack(trackId: String, playlist: List<TrackDetailsDto>) {
+    fun playTrack(trackId: String, playlist: List<TrackDetailsDto>, isAutoCrossfade: Boolean = false) {
         _currentPlaylist.value = playlist
         val track = playlist.find { it.idString == trackId }
         _currentTrack.value = track
@@ -1347,14 +1347,14 @@ class MainViewModel @Inject constructor(
         // Instant play if already cached on disk or pre-resolved in memory (0ms latency for seamless crossfade)
         if (downloadManager.isTrackDownloaded(trackId)) {
             consecutiveTrackErrors = 0
-            playerRepository.playTrack(trackId, "", title, artist, coverUrl)
+            playerRepository.playTrack(trackId, "", title, artist, coverUrl, isAutoCrossfade)
             return
         }
 
         val fastResolvedUrl = preloadManager.getResolvedUrl(trackId)
         if (fastResolvedUrl != null) {
             consecutiveTrackErrors = 0
-            playerRepository.playTrack(trackId, fastResolvedUrl, title, artist, coverUrl)
+            playerRepository.playTrack(trackId, fastResolvedUrl, title, artist, coverUrl, isAutoCrossfade)
             return
         }
 
@@ -1364,17 +1364,17 @@ class MainViewModel @Inject constructor(
                 val mp3Url = preloadManager.preloadSingleTrackPriority(trackId)
                 if (mp3Url != null) {
                     consecutiveTrackErrors = 0
-                    playerRepository.playTrack(trackId, mp3Url, title, artist, coverUrl)
+                    playerRepository.playTrack(trackId, mp3Url, title, artist, coverUrl, isAutoCrossfade)
                 } else {
                     // Fallback to on demand resolve
                     val demandUrl = preloadManager.getOrFetchUrl(trackId)
                     if (demandUrl != null) {
                         consecutiveTrackErrors = 0
-                        playerRepository.playTrack(trackId, demandUrl, title, artist, coverUrl)
+                        playerRepository.playTrack(trackId, demandUrl, title, artist, coverUrl, isAutoCrossfade)
                     } else {
                         Log.e("MainViewModel", "Failed to resolve mp3 URL for track $trackId, auto-skipping")
                         if (++consecutiveTrackErrors < 5) {
-                            playNext()
+                            playNext(isAutoCrossfade = false)
                         }
                     }
                 }
@@ -1383,9 +1383,9 @@ class MainViewModel @Inject constructor(
                 // Fallback attempt to play local if network failed
                 if (downloadManager.isTrackDownloaded(trackId)) {
                     consecutiveTrackErrors = 0
-                    playerRepository.playTrack(trackId, "", title, artist, coverUrl)
+                    playerRepository.playTrack(trackId, "", title, artist, coverUrl, isAutoCrossfade)
                 } else if (++consecutiveTrackErrors < 5) {
-                    playNext()
+                    playNext(isAutoCrossfade = false)
                 }
             }
         }
@@ -1431,12 +1431,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun playNext() {
+    fun playNext(isAutoCrossfade: Boolean = false) {
         val currentTrack = _currentTrack.value
         if (currentTrack == null) {
             val playlist = _currentPlaylist.value
             if (playlist.isNotEmpty()) {
-                playTrack(playlist.first().idString, playlist)
+                playTrack(playlist.first().idString, playlist, isAutoCrossfade)
             } else {
                 playAllLikedTracks()
             }
@@ -1446,10 +1446,12 @@ class MainViewModel @Inject constructor(
         if (currentTrack.isRadio) {
             val currentRadioId = currentTrack.idString.removePrefix("radio_")
             val stations = radioStations.value
-            val currentIndex = stations.indexOfFirst { it.id == currentRadioId }
-            if (currentIndex != -1) {
-                val nextIndex = (currentIndex + 1) % stations.size
-                playRadioStation(stations[nextIndex])
+            if (stations.isNotEmpty()) {
+                val currentIndex = stations.indexOfFirst { it.id == currentRadioId }
+                if (currentIndex != -1) {
+                    val nextIndex = (currentIndex + 1) % stations.size
+                    playRadioStation(stations[nextIndex])
+                }
             }
             return
         }
@@ -1471,7 +1473,7 @@ class MainViewModel @Inject constructor(
         val currentIndex = playlist.indexOfFirst { it.idString == currentId }
         
         if (currentIndex != -1 && currentIndex + 1 < playlist.size) {
-            playTrack(playlist[currentIndex + 1].idString, playlist)
+            playTrack(playlist[currentIndex + 1].idString, playlist, isAutoCrossfade)
         } else if (_currentSource.value == PlaylistSource.VIBE) {
             // We are at the end of the wave playlist! Don't stop.
             // Try to play from cached library or wait for fetch.
@@ -1479,9 +1481,9 @@ class MainViewModel @Inject constructor(
                 val updatedPlaylist = _currentPlaylist.value
                 val newIndex = updatedPlaylist.indexOfFirst { it.idString == currentId }
                 if (newIndex != -1 && newIndex + 1 < updatedPlaylist.size) {
-                    playTrack(updatedPlaylist[newIndex + 1].idString, updatedPlaylist)
+                    playTrack(updatedPlaylist[newIndex + 1].idString, updatedPlaylist, isAutoCrossfade)
                 } else if (updatedPlaylist.isNotEmpty()) {
-                    playTrack(updatedPlaylist.first().idString, updatedPlaylist)
+                    playTrack(updatedPlaylist.first().idString, updatedPlaylist, isAutoCrossfade)
                 } else {
                     // Fallback to library if we totally failed to get new vibe tracks
                     playAllLikedTracks()
@@ -1489,7 +1491,7 @@ class MainViewModel @Inject constructor(
             }
         } else if (playlist.isNotEmpty()) {
             // Wrap around: Loop playlist back to start so playback continues seamlessly
-            playTrack(playlist.first().idString, playlist)
+            playTrack(playlist.first().idString, playlist, isAutoCrossfade)
         } else {
             playAllLikedTracks()
         }
@@ -1514,10 +1516,12 @@ class MainViewModel @Inject constructor(
         if (currentTrack.isRadio) {
             val currentRadioId = currentTrack.idString.removePrefix("radio_")
             val stations = radioStations.value
-            val currentIndex = stations.indexOfFirst { it.id == currentRadioId }
-            if (currentIndex != -1) {
-                val prevIndex = if (currentIndex - 1 < 0) stations.size - 1 else currentIndex - 1
-                playRadioStation(stations[prevIndex])
+            if (stations.isNotEmpty()) {
+                val currentIndex = stations.indexOfFirst { it.id == currentRadioId }
+                if (currentIndex != -1) {
+                    val prevIndex = if (currentIndex - 1 < 0) stations.size - 1 else currentIndex - 1
+                    playRadioStation(stations[prevIndex])
+                }
             }
             return
         }

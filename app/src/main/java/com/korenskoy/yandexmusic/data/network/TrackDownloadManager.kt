@@ -83,7 +83,12 @@ class TrackDownloadManager @Inject constructor(
             }
             
             // Rename after successful download
-            tempFile.renameTo(file)
+            if (file.exists()) file.delete()
+            val renamed = tempFile.renameTo(file)
+            if (!renamed) {
+                tempFile.copyTo(file, overwrite = true)
+                tempFile.delete()
+            }
             updateCacheStats()
             return@withContext true
         } catch (e: Exception) {
