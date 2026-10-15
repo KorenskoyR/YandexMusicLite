@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -37,10 +38,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.SubcomposeAsyncImage
 import java.util.Locale
 
 @Composable
@@ -52,6 +58,7 @@ fun CacheMenuBottomSheet(
     onDownloadAllClick: () -> Unit,
     onClearCache: () -> Unit,
     accountName: String = "",
+    avatarUrl: String? = null,
     defaultAccountName: String? = null,
     updateStatus: String? = null,
     onCheckForUpdates: () -> Unit = {},
@@ -62,67 +69,86 @@ fun CacheMenuBottomSheet(
     val cacheSizeFormatted = String.format(Locale.US, "%.1f МБ", cacheSizeMb)
     val scrollState = rememberScrollState()
 
-    // Fullscreen Glass Backdrop with Centered Floating Modal
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onDismiss() },
-        contentAlignment = Alignment.Center
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val screenHeight = configuration.screenHeightDp.dp
+    val maxModalHeight = if (isLandscape) {
+        (screenHeight * 0.94f).coerceAtLeast(340.dp)
+    } else {
+        (screenHeight * 0.90f).coerceIn(600.dp, 800.dp)
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        AnimatedVisibility(
-            visible = true,
-            enter = scaleIn(
-                initialScale = 0.90f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeIn(animationSpec = tween(220)),
-            exit = scaleOut(targetScale = 0.92f) + fadeOut(animationSpec = tween(150))
+        // Fullscreen Glass Backdrop with Centered Floating Modal
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.72f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() }
+                .padding(
+                    start = if (isLandscape) 96.dp else 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
+                    bottom = 16.dp
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .widthIn(max = 480.dp)
-                    .wrapContentHeight()
-                    .heightIn(max = 640.dp)
-                    .shadow(36.dp, RoundedCornerShape(28.dp), spotColor = Color.Black.copy(alpha = 0.85f))
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFF23232C),
-                                Color(0xFF16161E)
-                            )
-                        )
+            AnimatedVisibility(
+                visible = true,
+                enter = scaleIn(
+                    initialScale = 0.90f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMedium
                     )
-                    .border(
-                        BorderStroke(
-                            1.dp,
+                ) + fadeIn(animationSpec = tween(220)),
+                exit = scaleOut(targetScale = 0.92f) + fadeOut(animationSpec = tween(150))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(if (isLandscape) 0.85f else 0.94f)
+                        .widthIn(max = 500.dp)
+                        .wrapContentHeight()
+                        .heightIn(max = maxModalHeight)
+                        .shadow(36.dp, RoundedCornerShape(28.dp), spotColor = Color.Black.copy(alpha = 0.85f))
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.White.copy(alpha = 0.20f),
-                                    Color.White.copy(alpha = 0.05f)
+                                    Color(0xFF23232C),
+                                    Color(0xFF16161E)
                                 )
                             )
-                        ),
-                        RoundedCornerShape(28.dp)
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { /* Prevent click through to backdrop */ }
-                    .padding(20.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
+                        )
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.20f),
+                                        Color.White.copy(alpha = 0.05f)
+                                    )
+                                )
+                            ),
+                            RoundedCornerShape(28.dp)
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { /* Prevent click through to backdrop */ }
+                        .padding(20.dp)
                 ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                    ) {
                     // Header Bar (Title + Close Button) - pinned outside verticalScroll to prevent any clipping
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -200,7 +226,7 @@ fun CacheMenuBottomSheet(
                             ) {
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
+                                    .size(44.dp)
                                     .clip(CircleShape)
                                     .background(
                                         Brush.linearGradient(
@@ -209,14 +235,33 @@ fun CacheMenuBottomSheet(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.AccountCircle,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(26.dp)
-                                )
+                                if (!avatarUrl.isNullOrBlank()) {
+                                    SubcomposeAsyncImage(
+                                        model = avatarUrl,
+                                        contentDescription = "Аватар",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        error = {
+                                            val initialLetter = (accountName.firstOrNull() ?: 'Я').uppercaseChar()
+                                            Text(
+                                                text = initialLetter.toString(),
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 17.sp
+                                            )
+                                        }
+                                    )
+                                } else {
+                                    val initialLetter = (accountName.firstOrNull() ?: 'Я').uppercaseChar()
+                                    Text(
+                                        text = initialLetter.toString(),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 17.sp
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Аккаунт Яндекс",
@@ -233,27 +278,24 @@ fun CacheMenuBottomSheet(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            // Active Status Indicator Badge
-                            Row(
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // Quick Switch Button
+                            Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x2200E676))
-                                    .border(BorderStroke(1.dp, Color(0x5500E676)), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onAccountManagementClick()
+                                        onDismiss()
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF00E676))
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "В сети",
-                                    color = Color(0xFF00E676),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = "Сменить",
+                                    color = Color.White,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -666,10 +708,12 @@ fun CacheMenuBottomSheet(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(18.dp))
                 }
             }
         }
     }
+}
 }
 }
 

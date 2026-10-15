@@ -171,6 +171,7 @@ class AuthRepositoryImpl @Inject constructor(
                 login = account.login.ifBlank { currentAccounts[existingIndex].login },
                 displayName = account.displayName.ifBlank { currentAccounts[existingIndex].displayName },
                 token = account.token.ifBlank { currentAccounts[existingIndex].token },
+                avatarUrl = account.avatarUrl ?: currentAccounts[existingIndex].avatarUrl,
                 lastActiveTimestamp = System.currentTimeMillis()
             )
         } else {

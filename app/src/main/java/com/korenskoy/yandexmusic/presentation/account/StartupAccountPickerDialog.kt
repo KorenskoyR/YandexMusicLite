@@ -24,8 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.SubcomposeAsyncImage
 import com.korenskoy.yandexmusic.domain.model.UserAccount
 
 @Composable
@@ -174,25 +176,42 @@ fun StartupAccountPickerDialog(
                                     modifier = Modifier
                                         .size(38.dp)
                                         .clip(CircleShape)
-                                    .background(
-                                        if (isSelected) {
-                                            Brush.linearGradient(
-                                                listOf(Color(0xFFFF3366), Color(0xFFFF9900))
-                                            )
-                                        } else {
-                                            Brush.linearGradient(
-                                                listOf(Color(0xFF33333E), Color(0xFF22222A))
-                                            )
-                                        }
-                                    ),
+                                        .background(
+                                            if (isSelected) {
+                                                Brush.linearGradient(
+                                                    listOf(Color(0xFFFF3366), Color(0xFFFF9900))
+                                                )
+                                            } else {
+                                                Brush.linearGradient(
+                                                    listOf(Color(0xFF33333E), Color(0xFF22222A))
+                                                )
+                                            }
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = initialLetter.toString(),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
-                                    )
+                                    if (!account.avatarUrl.isNullOrBlank()) {
+                                        SubcomposeAsyncImage(
+                                            model = account.avatarUrl,
+                                            contentDescription = "Аватар",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            error = {
+                                                Text(
+                                                    text = initialLetter.toString(),
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 16.sp
+                                                )
+                                            }
+                                        )
+                                    } else {
+                                        Text(
+                                            text = initialLetter.toString(),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.width(12.dp))

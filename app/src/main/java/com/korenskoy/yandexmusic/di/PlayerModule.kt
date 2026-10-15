@@ -43,13 +43,13 @@ object PlayerModule {
 
         return try {
             ExoPlayer.Builder(context, renderersFactory)
-                .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
+                .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
                 .setHandleAudioBecomingNoisy(true)
                 .setWakeMode(C.WAKE_MODE_LOCAL)
                 .build()
         } catch (e: Exception) {
             ExoPlayer.Builder(context, renderersFactory)
-                .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
+                .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
                 .setHandleAudioBecomingNoisy(true)
                 .build()
         }

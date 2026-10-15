@@ -26,7 +26,8 @@ data class ErrorDto(
 @Serializable
 data class AccountStatusResponseDto(
     @SerialName("account") val account: AccountDto? = null,
-    @SerialName("uid") val directUid: JsonElement? = null
+    @SerialName("uid") val directUid: JsonElement? = null,
+    @SerialName("default_avatar_id") val defaultAvatarId: String? = null
 ) {
     val uidLong: Long?
         get() = account?.uidLong ?: when (directUid) {
@@ -41,6 +42,11 @@ data class AccountStatusResponseDto(
         }
     val displayUserName: String
         get() = account?.displayUserName ?: if (uidString.isNotEmpty()) "UID: $uidString" else "Яндекс Аккаунт"
+
+    val avatarUrl: String?
+        get() = account?.avatarUrl ?: defaultAvatarId?.takeIf { it.isNotBlank() && it != "0/0-0" }?.let {
+            "https://avatars.yandex.net/get-yapic/$it/islands-200"
+        }
 }
 
 @Serializable
@@ -50,7 +56,10 @@ data class AccountDto(
     @SerialName("fullName") val fullName: String? = null,
     @SerialName("displayName") val displayName: String? = null,
     @SerialName("firstName") val firstName: String? = null,
-    @SerialName("secondName") val secondName: String? = null
+    @SerialName("secondName") val secondName: String? = null,
+    @SerialName("default_avatar_id") val defaultAvatarId: String? = null,
+    @SerialName("defaultAvatarId") val defaultAvatarIdCamel: String? = null,
+    @SerialName("avatarUrl") val directAvatarUrl: String? = null
 ) {
     val uidLong: Long?
         get() = when (uid) {
@@ -72,6 +81,31 @@ data class AccountDto(
             if (!login.isNullOrBlank()) return login
             return if (uidString.isNotEmpty()) "UID: $uidString" else "Яндекс Аккаунт"
         }
+
+    val avatarId: String?
+        get() = defaultAvatarId?.takeIf { it.isNotBlank() && it != "0/0-0" }
+            ?: defaultAvatarIdCamel?.takeIf { it.isNotBlank() && it != "0/0-0" }
+
+    val avatarUrl: String?
+        get() = directAvatarUrl?.takeIf { it.isNotBlank() }
+            ?: avatarId?.let { "https://avatars.yandex.net/get-yapic/$it/islands-200" }
+}
+
+@Serializable
+data class YandexLoginInfoDto(
+    @SerialName("id") val id: String? = null,
+    @SerialName("login") val login: String? = null,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("real_name") val realName: String? = null,
+    @SerialName("first_name") val firstName: String? = null,
+    @SerialName("last_name") val lastName: String? = null,
+    @SerialName("default_avatar_id") val defaultAvatarId: String? = null,
+    @SerialName("is_avatar_empty") val isAvatarEmpty: Boolean? = null
+) {
+    val avatarUrl: String?
+        get() = if (isAvatarEmpty != true && !defaultAvatarId.isNullOrBlank() && defaultAvatarId != "0/0-0") {
+            "https://avatars.yandex.net/get-yapic/$defaultAvatarId/islands-200"
+        } else null
 }
 
 @Serializable

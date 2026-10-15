@@ -8,6 +8,7 @@ data class UserAccount(
     val login: String = "",
     val displayName: String = "",
     val token: String,
+    val avatarUrl: String? = null,
     val lastActiveTimestamp: Long = System.currentTimeMillis()
 ) {
     /**

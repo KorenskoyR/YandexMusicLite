@@ -186,6 +186,44 @@ class PlayerRepositoryImpl @Inject constructor(
         return delegatingPlayer
     }
 
+    @Volatile
+    private var preloadedTrackId: String? = null
+
+    override fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
+        if (preloadedTrackId == trackId || isCrossfading) return
+        scope.launch {
+            val resolvedUrl = preloadManager.getResolvedUrl(trackId) ?: url
+            val localFile = downloadManager.getLocalTrackFile(trackId)
+            val playUri = if (localFile != null) {
+                android.net.Uri.fromFile(localFile).toString()
+            } else {
+                resolvedUrl
+            }
+            if (playUri.isBlank()) return@launch
+
+            val mediaMetadata = MediaMetadata.Builder()
+                .setTitle(title ?: "Unknown Track")
+                .setDisplayTitle(title ?: "Unknown Track")
+                .setArtist(artist ?: "Unknown Artist")
+                .setArtworkUri(coverUrl?.let { android.net.Uri.parse(it) })
+                .build()
+
+            val mediaItem = MediaItem.Builder()
+                .setMediaId(trackId)
+                .setUri(playUri)
+                .setMediaMetadata(mediaMetadata)
+                .build()
+
+            val targetStandby = standbyPlayer
+            targetStandby.volume = 0f
+            targetStandby.setMediaItem(mediaItem, true)
+            targetStandby.prepare()
+            targetStandby.pause()
+            preloadedTrackId = trackId
+            android.util.Log.d("PlayerRepositoryImpl", "Preloaded standby player ready for crossfade with trackId = $trackId")
+        }
+    }
+
     override fun playTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
         scope.launch {
             val resolvedUrl = preloadManager.getResolvedUrl(trackId) ?: url
@@ -219,6 +257,8 @@ class PlayerRepositoryImpl @Inject constructor(
             val currentActive = activePlayer
             val incomingStandby = standbyPlayer
             val wasPlaying = currentActive.isPlaying
+            val isAlreadyPreloaded = (preloadedTrackId == trackId)
+            preloadedTrackId = null
 
             if (wasPlaying) {
                 // TRUE 3-SECOND OVERLAPPING CROSSFADE
@@ -226,9 +266,13 @@ class PlayerRepositoryImpl @Inject constructor(
                 isTransitioning = true
                 wakeLockHelper.acquireTransitionLock(30_000L)
 
+                if (!isAlreadyPreloaded) {
+                    incomingStandby.volume = 0f
+                    incomingStandby.setMediaItem(mediaItem, true)
+                    incomingStandby.prepare()
+                }
+
                 incomingStandby.volume = 0f
-                incomingStandby.setMediaItem(mediaItem, true)
-                incomingStandby.prepare()
                 incomingStandby.play()
 
                 // Swap active index immediately so progress and UI lock onto incoming track

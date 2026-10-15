@@ -443,10 +443,10 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 9",
-            buildGradle.contains("versionCode = 9"))
-        assertTrue("build.gradle.kts must be versionName 1.3.2",
-            buildGradle.contains("versionName = \"1.3.2\""))
+        assertTrue("build.gradle.kts must be versionCode 10",
+            buildGradle.contains("versionCode = 10"))
+        assertTrue("build.gradle.kts must be versionName 1.3.3",
+            buildGradle.contains("versionName = \"1.3.3\""))
     }
 }
 

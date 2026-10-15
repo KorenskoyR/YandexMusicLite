@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -76,6 +77,10 @@ class MainViewModel @Inject constructor(
 
     private val _accountName = MutableStateFlow<String>("")
     val accountName: StateFlow<String> = _accountName.asStateFlow()
+
+    val accountAvatarUrl: StateFlow<String?> = authRepository.activeAccount
+        .map { it?.avatarUrl }
+        .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     private val _currentSource = MutableStateFlow(PlaylistSource.LIBRARY)
     val currentSource: StateFlow<PlaylistSource> = _currentSource.asStateFlow()
@@ -173,6 +178,37 @@ class MainViewModel @Inject constructor(
                 if (account != null) {
                     val name = account.displayName.ifBlank { account.login }.ifBlank { "UID: ${account.uid}" }
                     _accountName.value = name
+                }
+            }
+        }
+
+        // Background profile & avatar refresh if missing
+        viewModelScope.launch(Dispatchers.IO) {
+            val token = authRepository.getToken()
+            if (!token.isNullOrEmpty()) {
+                val active = authRepository.getActiveAccount()
+                if (active != null && (active.avatarUrl.isNullOrEmpty() || active.displayName.isBlank() || active.displayName.startsWith("UID:"))) {
+                    try {
+                        val status = api.getAccountStatus().result
+                        if (status != null) {
+                            var avatar = status.avatarUrl
+                            if (avatar == null) {
+                                try {
+                                    avatar = api.getYandexLoginInfo().avatarUrl
+                                } catch (_: Exception) {}
+                            }
+                            val bestName = status.displayUserName
+                            authRepository.saveOrUpdateAccount(
+                                active.copy(
+                                    displayName = bestName,
+                                    login = status.account?.login?.ifBlank { active.login } ?: active.login,
+                                    avatarUrl = avatar ?: active.avatarUrl
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.d("MainViewModel", "Initial silent avatar refresh: ${e.message}")
+                    }
                 }
             }
         }
@@ -609,6 +645,15 @@ class MainViewModel @Inject constructor(
                             val bestName = resultObj.displayUserName
                             val login = resultObj.account?.login ?: ""
                             val uidStr = resultObj.uidString
+                            var avatarUrl = resultObj.avatarUrl
+                            if (avatarUrl == null) {
+                                try {
+                                    val loginInfo = api.getYandexLoginInfo()
+                                    avatarUrl = loginInfo.avatarUrl
+                                } catch (e: Exception) {
+                                    Log.d("LikedTracks", "getYandexLoginInfo failed: ${e.message}")
+                                }
+                            }
                             _accountName.value = bestName
 
                             val currentToken = authRepository.getToken() ?: ""
@@ -618,7 +663,8 @@ class MainViewModel @Inject constructor(
                                         uid = uidStr,
                                         login = login,
                                         displayName = bestName,
-                                        token = currentToken
+                                        token = currentToken,
+                                        avatarUrl = avatarUrl
                                     )
                                 )
                             }
@@ -1248,6 +1294,27 @@ class MainViewModel @Inject constructor(
             val upcoming = playlist.drop(currentIndex + 1).take(3).map { it.idString }
             if (upcoming.isNotEmpty()) {
                 preloadManager.preloadTracks(upcoming)
+            }
+            
+            // Proactive preparation of the immediate next track for true 3-second overlapping crossfade
+            val nextTrack = playlist.getOrNull(currentIndex + 1)
+            if (nextTrack != null && !nextTrack.isRadio) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    val nextId = nextTrack.idString
+                    val nextTitle = nextTrack.title
+                    val nextArtist = nextTrack.artists.firstOrNull()?.name
+                    val nextCover = nextTrack.coverUri?.let { uri ->
+                        if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
+                    }
+                    val nextMp3Url = if (downloadManager.isTrackDownloaded(nextId)) {
+                        ""
+                    } else {
+                        preloadManager.preloadSingleTrackPriority(nextId) ?: preloadManager.getOrFetchUrl(nextId)
+                    }
+                    if (nextMp3Url != null || downloadManager.isTrackDownloaded(nextId)) {
+                        playerRepository.prepareNextTrack(nextId, nextMp3Url ?: "", nextTitle, nextArtist, nextCover)
+                    }
+                }
             }
             
             // Continuous Queue Auto-Refill

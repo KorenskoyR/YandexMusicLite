@@ -14,6 +14,9 @@ interface YandexMusicApi {
     @GET("account/status")
     suspend fun getAccountStatus(): ResponseWrapper<AccountStatusResponseDto>
 
+    @GET("https://login.yandex.ru/info?format=json")
+    suspend fun getYandexLoginInfo(): com.korenskoy.yandexmusic.data.dto.YandexLoginInfoDto
+
     @retrofit2.http.FormUrlEncoded
     @retrofit2.http.POST("tracks")
     suspend fun getTracksMetadata(

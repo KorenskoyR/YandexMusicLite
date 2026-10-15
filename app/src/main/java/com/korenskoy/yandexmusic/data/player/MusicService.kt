@@ -22,9 +22,21 @@ class MusicService : MediaLibraryService() {
     lateinit var playerRepository: PlayerRepository
 
     private var mediaLibrarySession: MediaLibrarySession? = null
+    private var audioManager: android.media.AudioManager? = null
+    private var focusRequest: android.media.AudioFocusRequest? = null
+
+    private val audioFocusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            android.media.AudioManager.AUDIOFOCUS_LOSS,
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                playerRepository.pause()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
+        audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -46,6 +58,57 @@ class MusicService : MediaLibraryService() {
         setMediaNotificationProvider(notificationProvider)
         
         setupMediaSession()
+
+        // Track isPlaying to request/abandon system audio focus
+        val player = playerRepository.getPlayer()
+        player.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    requestSystemAudioFocus()
+                } else {
+                    abandonSystemAudioFocus()
+                }
+            }
+        })
+    }
+
+    private fun requestSystemAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val playbackAttributes = android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+                focusRequest = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(playbackAttributes)
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                    .build()
+                focusRequest?.let { audioManager?.requestAudioFocus(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager?.requestAudioFocus(
+                    audioFocusChangeListener,
+                    android.media.AudioManager.STREAM_MUSIC,
+                    android.media.AudioManager.AUDIOFOCUS_GAIN
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun abandonSystemAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager?.abandonAudioFocus(audioFocusChangeListener)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun setupMediaSession() {

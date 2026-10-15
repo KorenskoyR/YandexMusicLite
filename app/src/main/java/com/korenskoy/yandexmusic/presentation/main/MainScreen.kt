@@ -64,6 +64,7 @@ fun MainScreen(
     val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     val accountName by viewModel.accountName.collectAsState()
+    val accountAvatarUrl by viewModel.accountAvatarUrl.collectAsState()
     val defaultAccountUid by viewModel.defaultAccountUid.collectAsState()
     val defaultAccountName by viewModel.defaultAccountName.collectAsState()
 
@@ -174,6 +175,7 @@ fun MainScreen(
                     onRefresh = { viewModel.loadLikedTracks() },
                     hasActiveTrack = currentTrack != null,
                     accountName = accountName,
+                    avatarUrl = accountAvatarUrl,
                     defaultAccountName = defaultAccountName,
                     updateStatus = updateStatusMessage,
                     onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },

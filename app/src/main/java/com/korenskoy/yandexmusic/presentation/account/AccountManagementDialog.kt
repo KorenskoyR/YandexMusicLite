@@ -29,8 +29,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.SubcomposeAsyncImage
 import com.korenskoy.yandexmusic.domain.model.UserAccount
 
 import androidx.compose.material.icons.filled.Star
@@ -191,12 +193,29 @@ fun AccountManagementDialog(
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = initialLetter.toString(),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 17.sp
-                                        )
+                                        if (!account.avatarUrl.isNullOrBlank()) {
+                                            SubcomposeAsyncImage(
+                                                model = account.avatarUrl,
+                                                contentDescription = "Аватар",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                                error = {
+                                                    Text(
+                                                        text = initialLetter.toString(),
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 17.sp
+                                                    )
+                                                }
+                                            )
+                                        } else {
+                                            Text(
+                                                text = initialLetter.toString(),
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 17.sp
+                                            )
+                                        }
                                     }
 
                                     Spacer(modifier = Modifier.width(12.dp))
