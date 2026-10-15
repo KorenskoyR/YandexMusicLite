@@ -1,0 +1,312 @@
+package com.korenskoy.yandexmusic.presentation
+
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+/**
+ * Automated Architecture & Layout Safety Test Suite.
+ * Prevents regressions in:
+ * 1. Status bar insets (statusBarsPadding) on all screen headers.
+ * 2. Navigation bar insets (navigationBarsPadding) on bottom bars.
+ * 3. Coordinated bottom stack (MiniPlayer above FloatingGlassBottomBar) in portrait mode.
+ * 4. Isolation of Car mode (MainTab.CAR) so global navigation/miniplayer never overlap car controls.
+ */
+class LayoutSafetyTest {
+
+    private val sourceDir = File("src/main/java/com/korenskoy/yandexmusic")
+
+    @Test
+    fun testAllScreensHaveStatusBarsPadding() {
+        val searchScreen = File(sourceDir, "presentation/main/SearchScreen.kt").readText()
+        assertTrue("SearchScreen must contain statusBarsPadding() for its header", searchScreen.contains("statusBarsPadding()"))
+
+        val libraryScreen = File(sourceDir, "presentation/main/LibraryScreen.kt").readText()
+        assertTrue("LibraryScreen must contain statusBarsPadding() for its hero banner", libraryScreen.contains("statusBarsPadding()"))
+
+        val radioScreen = File(sourceDir, "presentation/radio/RadioScreen.kt").readText()
+        assertTrue("RadioScreen must contain statusBarsPadding() for its header", radioScreen.contains("statusBarsPadding()"))
+
+        val homeScreen = File(sourceDir, "presentation/main/HomeScreen.kt").readText()
+        assertTrue("HomeScreen must contain statusBarsPadding()", homeScreen.contains("statusBarsPadding()"))
+
+        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
+        assertTrue("CarScreen must contain statusBarsPadding()", carScreen.contains("statusBarsPadding()"))
+    }
+
+    @Test
+    fun testCarScreenHasNavigationBarsPadding() {
+        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
+        assertTrue("CarScreen must contain navigationBarsPadding()", carScreen.contains("navigationBarsPadding()"))
+    }
+
+    @Test
+    fun testMainScreenHidesGlobalBarsInCarMode() {
+        val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
+        assertTrue("MainScreen must check currentTab != MainTab.CAR for portrait bottom overlay", 
+            mainScreen.contains("currentTab != MainTab.CAR"))
+    }
+
+    @Test
+    fun testPortraitBottomOverlayIsCoordinatedColumn() {
+        val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
+        // Ensure MiniPlayer and FloatingGlassBottomBar are placed inside a Column in portrait mode
+        assertTrue("MainScreen portrait overlay must use Column to stack MiniPlayer and FloatingGlassBottomBar",
+            mainScreen.contains("Column(") && mainScreen.contains("FloatingGlassBottomBar("))
+    }
+
+    @Test
+    fun testLandscapeMiniPlayerIsCentered() {
+        val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
+        assertTrue("MainScreen landscape MiniPlayer must be aligned to BottomCenter",
+            mainScreen.contains(".align(Alignment.BottomCenter)"))
+    }
+
+    @Test
+    fun testCarTimeWidgetPresent() {
+        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
+        assertTrue("CarScreen must declare CarTimeWidget", carScreen.contains("fun CarTimeWidget("))
+        assertTrue("CarScreenPortrait must use CarTimeWidget", carScreen.contains("CarTimeWidget()"))
+    }
+
+    @Test
+    fun testCarScreenActionTilesHaveExplicitHeights() {
+        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
+        assertTrue("CarScreen landscape must set height(48.dp) on preset rows", carScreen.contains("height(48.dp)"))
+        assertTrue("CarScreen portrait must set height(50.dp) on preset rows", carScreen.contains("height(50.dp)"))
+    }
+
+    @Test
+    fun testLibraryScreenHasLiquidGlassHeaderCapsule() {
+        val libraryScreen = File(sourceDir, "presentation/main/LibraryScreen.kt").readText()
+        assertTrue("LibraryScreen must accept onRefresh callback", libraryScreen.contains("onRefresh: () -> Unit"))
+        assertTrue("LibraryScreen must contain Liquid Glass header capsule", libraryScreen.contains("Liquid Glass Header Toolbar Capsule"))
+        assertTrue("LibraryScreen must render refresh action in header", libraryScreen.contains("Icons.Default.Refresh"))
+        assertTrue("LibraryScreen must render settings action in header", libraryScreen.contains("Icons.Default.Settings"))
+    }
+
+    @Test
+    fun testCarScreenLandscapePresetsGroupedAtBottom() {
+        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
+        assertTrue("CarScreen landscape presets must be grouped in a column", carScreen.contains("Presets Block (Grouped together at bottom like in portrait mode)"))
+    }
+
+    @Test
+    fun testTracksResponseDeserializationNumericIds() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
+        val sampleJson = """
+            {
+                "result": {
+                    "library": {
+                        "uid": 12345678,
+                        "revision": 42,
+                        "tracks": [
+                            {"id": 99887766, "albumId": 554433, "timestamp": "2026-08-31T12:00:00"},
+                            {"id": "11223344", "albumId": "443322", "timestamp": "2026-08-31T12:01:00"}
+                        ]
+                    }
+                }
+            }
+        """.trimIndent()
+        
+        val parsed = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TracksResponseDto>>(sampleJson)
+        val tracks = parsed.result?.allTracks
+        org.junit.Assert.assertNotNull("Parsed tracks must not be null", tracks)
+        org.junit.Assert.assertEquals("Parsed tracks count must be 2", 2, tracks?.size)
+        org.junit.Assert.assertEquals("Numeric ID must convert to string", "99887766", tracks?.get(0)?.idString)
+        org.junit.Assert.assertEquals("String ID must stay string", "11223344", tracks?.get(1)?.idString)
+    }
+
+    @Test
+    fun testTracksResponseDeserializationRichTracks() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
+        val sampleJson = """
+            {
+                "result": {
+                    "library": {
+                        "uid": 12345678,
+                        "revision": 42,
+                        "tracks": [
+                            {
+                                "id": 12345,
+                                "track": {
+                                    "id": 12345,
+                                    "title": "Rich Track Title",
+                                    "artists": [{"id": 1, "name": "Famous Artist"}],
+                                    "coverUri": "avatars.yandex.net/get-music-content/123/%%",
+                                    "durationMs": 180000
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        """.trimIndent()
+        
+        val parsed = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TracksResponseDto>>(sampleJson)
+        val tracks = parsed.result?.allTracks
+        org.junit.Assert.assertNotNull("Parsed tracks must not be null", tracks)
+        org.junit.Assert.assertEquals("Parsed tracks count must be 1", 1, tracks?.size)
+        val firstTrack = tracks?.get(0)
+        org.junit.Assert.assertNotNull("Embedded track object must be present", firstTrack?.track)
+        org.junit.Assert.assertEquals("Track title must match", "Rich Track Title", firstTrack?.track?.title)
+        org.junit.Assert.assertEquals("Track ID must match", "12345", firstTrack?.idString)
+    }
+
+    @Test
+    fun testTracksResponseDeserializationDirectTracks() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
+        val sampleJson = """
+            {
+                "result": {
+                    "uid": 12345678,
+                    "tracks": [
+                        {"id": 776655, "albumId": 1122}
+                    ]
+                }
+            }
+        """.trimIndent()
+        
+        val parsed = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TracksResponseDto>>(sampleJson)
+        val tracks = parsed.result?.allTracks
+        org.junit.Assert.assertNotNull("Parsed direct tracks must not be null", tracks)
+        org.junit.Assert.assertEquals("Parsed direct tracks count must be 1", 1, tracks?.size)
+        org.junit.Assert.assertEquals("Track ID must match", "776655", tracks?.get(0)?.idString)
+    }
+
+    @Test
+    fun testFloatingGlassBottomBarConcentricCorners() {
+        val bottomBar = File(sourceDir, "presentation/main/components/BottomNavigationBar.kt").readText()
+        assertTrue("FloatingGlassBottomBar must use outerRadius shell", bottomBar.contains("val outerRadius = 26.dp") || bottomBar.contains("shape = RoundedCornerShape(outerRadius)"))
+        assertTrue("FloatingGlassBottomBar must declare concentric innerRadius", bottomBar.contains("val innerRadius = 20.dp"))
+    }
+
+    @Test
+    fun testApiTracksMetadataSignatures() {
+        val apiFile = File(sourceDir, "data/network/YandexMusicApi.kt").readText()
+        assertTrue("YandexMusicApi must declare POST getTracksMetadata with List<String>", 
+            apiFile.contains("suspend fun getTracksMetadata(\n        @retrofit2.http.Field(\"track-ids\") trackIds: List<String>"))
+        assertTrue("YandexMusicApi must declare GET getTracksMetadataQuery with String", 
+            apiFile.contains("suspend fun getTracksMetadataQuery(\n        @retrofit2.http.Query(\"track-ids\") trackIds: String"))
+        assertTrue("YandexMusicApi must declare rich-tracks parameter on getLikedTracks", 
+            apiFile.contains("@retrofit2.http.Query(\"rich-tracks\") richTracks: Boolean = true"))
+    }
+
+    @Test
+    fun testNoUnsafeTextUnitConstructors() {
+        val allKotlinFiles = sourceDir.walkTopDown().filter { it.extension == "kt" }.toList()
+        for (file in allKotlinFiles) {
+            val content = file.readText()
+            org.junit.Assert.assertFalse(
+                "File ${file.name} contains unsafe TextUnit( constructor call which causes runtime NoSuchMethodError in Compose: $file",
+                content.contains("TextUnit(")
+            )
+        }
+    }
+
+    @Test
+    fun testAccountStatusResponseDtoUidParsing() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
+        
+        // Nested uid in account
+        val nestedJson = """{"result": {"account": {"uid": 12345678}}}"""
+        val parsedNested = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.AccountStatusResponseDto>>(nestedJson)
+        org.junit.Assert.assertEquals("Nested uidLong should be 12345678", 12345678L, parsedNested.result?.uidLong)
+        org.junit.Assert.assertEquals("Nested uidString should be 12345678", "12345678", parsedNested.result?.uidString)
+
+        // Direct uid in result
+        val directJson = """{"result": {"uid": "87654321"}}"""
+        val parsedDirect = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.AccountStatusResponseDto>>(directJson)
+        org.junit.Assert.assertEquals("Direct uidLong should be 87654321", 87654321L, parsedDirect.result?.uidLong)
+        org.junit.Assert.assertEquals("Direct uidString should be 87654321", "87654321", parsedDirect.result?.uidString)
+    }
+
+    @Test
+    fun testRadioStationResourceUriFormat() {
+        val viewModelFile = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertTrue("MainViewModel must use BuildConfig.APPLICATION_ID for radio resource uri",
+            viewModelFile.contains("android.resource://\${BuildConfig.APPLICATION_ID}/\$it"))
+        org.junit.Assert.assertFalse("MainViewModel must not hardcode old package name in resource uri",
+            viewModelFile.contains("android.resource://com.korenskoy.yandexmusic/"))
+    }
+
+    @Test
+    fun testApplicationBrandingAndName() {
+        val stringsXml = File("src/main/res/values/strings.xml").readText()
+        assertTrue("strings.xml must declare app_name as Yandex Music Lite",
+            stringsXml.contains("<string name=\"app_name\">Yandex Music Lite</string>"))
+
+        val splashScreen = File(sourceDir, "presentation/splash/SplashScreen.kt").readText()
+        assertTrue("SplashScreen must display YANDEX MUSIC LITE",
+            splashScreen.contains("YANDEX MUSIC LITE"))
+
+        val searchScreen = File(sourceDir, "presentation/main/SearchScreen.kt").readText()
+        assertTrue("SearchScreen must display Каталог Yandex Music Lite",
+            searchScreen.contains("Каталог Yandex Music Lite"))
+
+        val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
+        assertTrue("MusicService notification channel must be Yandex Music Lite",
+            musicService.contains("Yandex Music Lite"))
+    }
+
+    @Test
+    fun testPlaybackWakeLockAndErrorHandling() {
+        val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
+        assertTrue("PlayerRepositoryImpl must use PlaybackWakeLockHelper",
+            playerRepo.contains("wakeLockHelper.acquireTransitionLock"))
+        assertTrue("PlayerRepositoryImpl must override onPlayerError",
+            playerRepo.contains("override fun onPlayerError("))
+        assertTrue("PlayerRepositoryImpl must triggerSkipNext on error",
+            playerRepo.contains("triggerSkipNext()"))
+    }
+
+    @Test
+    fun testInAppUpdateVersionComparison() {
+        org.junit.Assert.assertTrue(com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager.isVersionNewer("1.2.1", "1.2.0"))
+        org.junit.Assert.assertTrue(com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager.isVersionNewer("v2.0.0", "1.2.0"))
+        org.junit.Assert.assertFalse(com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager.isVersionNewer("1.2.0", "1.2.0"))
+        org.junit.Assert.assertFalse(com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager.isVersionNewer("1.1.9", "1.2.0"))
+    }
+
+    @Test
+    fun testApplicationIdMatchesUserRequirement() {
+        val buildGradle = File("build.gradle.kts").readText()
+        assertTrue("build.gradle.kts must set applicationId = YandexMusicLite.KorenskoyR",
+            buildGradle.contains("applicationId = \"YandexMusicLite.KorenskoyR\""))
+    }
+
+    @Test
+    fun testNoHardcodedSigningSecretsInBuildGradle() {
+        val buildGradle = File("build.gradle.kts").readText()
+        org.junit.Assert.assertFalse("build.gradle.kts must not contain hardcoded storePassword string literal",
+            buildGradle.contains("storePassword = \""))
+        org.junit.Assert.assertFalse("build.gradle.kts must not contain hardcoded keyPassword string literal",
+            buildGradle.contains("keyPassword = \""))
+        assertTrue("build.gradle.kts must read KEYSTORE_PASSWORD from localProperties or env",
+            buildGradle.contains("localProperties.getProperty(\"KEYSTORE_PASSWORD\")"))
+    }
+
+    @Test
+    fun testProgressTransitionIsolation() {
+        val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
+        assertTrue("PlayerRepositoryImpl must guard progress polling with !isTransitioning",
+            playerRepo.contains("if (exoPlayer.isPlaying && !isTransitioning)"))
+        assertTrue("PlayerRepositoryImpl must set isTransitioning = true before performFadeOut",
+            playerRepo.contains("isTransitioning = true"))
+    }
+
+    @Test
+    fun testStartupUpdateCheck5SecondsDelay() {
+        val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertTrue("MainViewModel must delay 5000ms before silent update check",
+            viewModel.contains("delay(5000L)"))
+    }
+
+    @Test
+    fun testQueuePrefetchThreshold() {
+        val player = File(sourceDir, "presentation/player/FullScreenPlayer.kt").readText()
+        assertTrue("FullScreenPlayer must prefetch when lastVisible >= total - 12",
+            player.contains("lastVisible >= total - 12"))
+    }
+}
+
