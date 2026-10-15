@@ -385,5 +385,65 @@ class LayoutSafetyTest {
         assertTrue("AccountManagementDialog must support removing accounts",
             dialogFile.contains("onRemoveAccount"))
     }
+
+    @Test
+    fun testCleanChangelogRemovesTechnicalNoise() {
+        val rawGitHubChangelog = """
+            ## What's Changed
+            * feat: added multi-account switching by @user in https://github.com/repo/pull/1
+            * fix: memory leak in player by @dev in https://github.com/repo/pull/2
+            **Full Changelog**: https://github.com/KorenskoyR/YandexMusicLite/compare/v1.2.1...v1.3.0
+        """.trimIndent()
+
+        val cleaned = com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager.cleanChangelog(rawGitHubChangelog)
+
+        org.junit.Assert.assertFalse("Cleaned changelog must not contain Full Changelog", cleaned.contains("Full Changelog"))
+        org.junit.Assert.assertFalse("Cleaned changelog must not contain compare/ link", cleaned.contains("compare/v1"))
+        org.junit.Assert.assertFalse("Cleaned changelog must not contain PR links", cleaned.contains("by @"))
+        org.junit.Assert.assertFalse("Cleaned changelog must not contain raw github url", cleaned.contains("https://github.com"))
+        assertTrue("Cleaned changelog must format items with clean bullet points", cleaned.contains("• feat: added multi-account switching"))
+    }
+
+    @Test
+    fun testDefaultAccountAndStartupPickerArchitecture() {
+        val authRepoImpl = File(sourceDir, "data/repository/AuthRepositoryImpl.kt").readText()
+        assertTrue("AuthRepositoryImpl must contain KEY_DEFAULT_ACCOUNT_UID",
+            authRepoImpl.contains("KEY_DEFAULT_ACCOUNT_UID"))
+        assertTrue("AuthRepositoryImpl must implement defaultAccountUid StateFlow",
+            authRepoImpl.contains("defaultAccountUid: StateFlow<String?>"))
+        assertTrue("AuthRepositoryImpl must implement setDefaultAccountUid",
+            authRepoImpl.contains("fun setDefaultAccountUid("))
+
+        val startupDialogFile = File(sourceDir, "presentation/account/StartupAccountPickerDialog.kt").readText()
+        assertTrue("StartupAccountPickerDialog must declare composable",
+            startupDialogFile.contains("fun StartupAccountPickerDialog("))
+        assertTrue("StartupAccountPickerDialog must have rememberAsDefault option",
+            startupDialogFile.contains("rememberAsDefault"))
+
+        val mainScreenFile = File(sourceDir, "presentation/main/MainScreen.kt").readText()
+        assertTrue("MainScreen must check showStartupAccountPicker",
+            mainScreenFile.contains("showStartupAccountPicker"))
+    }
+
+    @Test
+    fun testUpdateInstallationSecurityAndUnknownSourcesHandling() {
+        val updateManagerFile = File(sourceDir, "data/updater/GitHubUpdateManager.kt").readText()
+        assertTrue("GitHubUpdateManager must have cleanupUpdateFiles",
+            updateManagerFile.contains("fun cleanupUpdateFiles("))
+        assertTrue("GitHubUpdateManager must have canRequestPackageInstalls",
+            updateManagerFile.contains("fun canRequestPackageInstalls("))
+        assertTrue("GitHubUpdateManager must pass EXTRA_NOT_UNKNOWN_SOURCE",
+            updateManagerFile.contains("Intent.EXTRA_NOT_UNKNOWN_SOURCE"))
+
+        val manifestFile = File("src/main/AndroidManifest.xml").readText()
+        assertTrue("AndroidManifest must declare autoRevokePermissions discouraged",
+            manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
+
+        val buildGradle = File("build.gradle.kts").readText()
+        assertTrue("build.gradle.kts must be versionCode 8",
+            buildGradle.contains("versionCode = 8"))
+        assertTrue("build.gradle.kts must be versionName 1.3.1",
+            buildGradle.contains("versionName = \"1.3.1\""))
+    }
 }
 

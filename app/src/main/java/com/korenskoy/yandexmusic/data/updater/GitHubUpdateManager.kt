@@ -77,7 +77,7 @@ class GitHubUpdateManager @Inject constructor(
                 UpdateCheckResult.UpdateAvailable(
                     versionName = remoteVersion,
                     title = release.name ?: "Yandex Music Lite v$remoteVersion",
-                    changelog = release.body ?: "Улучшения стабильности и производительности",
+                    changelog = cleanChangelog(release.body ?: ""),
                     apkDownloadUrl = apkAsset.browserDownloadUrl,
                     apkSizeBytes = apkAsset.size
                 )
@@ -91,16 +91,61 @@ class GitHubUpdateManager @Inject constructor(
     }
 
     /**
+     * Cleans up all files in the updates cache folder.
+     */
+    fun cleanupUpdateFiles() {
+        try {
+            val updatesDir = File(context.cacheDir, "updates")
+            if (updatesDir.exists()) {
+                updatesDir.listFiles()?.forEach { file ->
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cleaning update cache", e)
+        }
+    }
+
+    /**
+     * Checks if the app is allowed to request package installations.
+     */
+    fun canRequestPackageInstalls(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return context.packageManager.canRequestPackageInstalls()
+    }
+
+    /**
+     * Opens Android system settings for allowing installation of unknown apps for this package.
+     */
+    fun openInstallPermissionSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(settingsIntent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to launch unknown sources settings", e)
+            }
+        }
+    }
+
+    /**
      * Downloads the APK file to the app's cache directory with streaming progress.
      */
     suspend fun downloadApk(
         downloadUrl: String,
         onProgress: (Float) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
+        val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val tempFile = File(updatesDir, "YandexMusicLite_download.tmp")
+        val targetFile = File(updatesDir, "YandexMusicLite.apk")
+
         try {
-            val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val tempFile = File(updatesDir, "YandexMusicLite_download.tmp")
-            val targetFile = File(updatesDir, "YandexMusicLite.apk")
+            // Clean up old files before downloading
+            cleanupUpdateFiles()
+            updatesDir.mkdirs()
 
             val request = Request.Builder()
                 .url(downloadUrl)
@@ -141,6 +186,7 @@ class GitHubUpdateManager @Inject constructor(
             Result.success(targetFile)
         } catch (e: Exception) {
             Log.e(TAG, "Error downloading APK", e)
+            if (tempFile.exists()) tempFile.delete()
             Result.failure(e)
         }
     }
@@ -155,13 +201,9 @@ class GitHubUpdateManager @Inject constructor(
             }
 
             // On Android 8.0+ check if installing from unknown sources is permitted
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(settingsIntent)
-                return Result.failure(SecurityException("Пожалуйста, разрешите установку приложений для Yandex Music Lite в открывшихся настройках, затем повторите"))
+            if (!canRequestPackageInstalls()) {
+                openInstallPermissionSettings()
+                return Result.failure(SecurityException("Пожалуйста, разрешите установку приложений для Yandex Music Lite в открывшихся настройках"))
             }
 
             val authority = "${context.packageName}.update_provider"
@@ -170,6 +212,8 @@ class GitHubUpdateManager @Inject constructor(
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(contentUri, "application/vnd.android.package-archive")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, context.packageName)
             }
             context.startActivity(installIntent)
             Result.success(Unit)
@@ -181,6 +225,33 @@ class GitHubUpdateManager @Inject constructor(
 
     companion object {
         private const val TAG = "GitHubUpdateManager"
+
+        /**
+         * Cleans technical noise and links from changelog text for user display.
+         */
+        fun cleanChangelog(rawBody: String): String {
+            if (rawBody.isBlank()) return "• Улучшения стабильности и воспроизведения аудио"
+
+            val lines = rawBody.lines()
+                .filterNot { it.contains("Full Changelog", ignoreCase = true) }
+                .filterNot { it.contains("compare/v", ignoreCase = true) }
+                .filterNot { it.contains("github.com", ignoreCase = true) && it.contains("/compare/") }
+                .filterNot { it.startsWith("## What's Changed", ignoreCase = true) }
+                .map { line ->
+                    line.replace(Regex("by @[a-zA-Z0-9_-]+ in https://\\S+"), "")
+                        .replace(Regex("\\[(.*?)\\]\\(https://\\S+\\)"), "$1")
+                        .replace(Regex("https://github\\.com/\\S+"), "")
+                        .replace(Regex("^[*-]\\s*"), "• ")
+                        .trim()
+                }
+                .filter { it.isNotBlank() }
+
+            return if (lines.isEmpty()) {
+                "• Улучшения стабильности и воспроизведения аудио"
+            } else {
+                lines.joinToString("\n")
+            }
+        }
 
         /**
          * Compares two semantic version strings (e.g. "1.2.0" vs "1.1.1").

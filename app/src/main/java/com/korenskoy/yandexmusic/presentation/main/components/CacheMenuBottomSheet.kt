@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ fun CacheMenuBottomSheet(
     onDownloadAllClick: () -> Unit,
     onClearCache: () -> Unit,
     accountName: String = "",
+    defaultAccountName: String? = null,
     updateStatus: String? = null,
     onCheckForUpdates: () -> Unit = {},
     onAccountManagementClick: () -> Unit = {},
@@ -254,6 +256,46 @@ fun CacheMenuBottomSheet(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+
+                        // Default Profile Row
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color.White.copy(alpha = 0.08f))
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onAccountManagementClick() }
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Профиль по умолчанию:",
+                                    color = Color.White.copy(alpha = 0.65f),
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Text(
+                                text = defaultAccountName ?: "Спрашивать при старте",
+                                color = if (defaultAccountName != null) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.5f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))

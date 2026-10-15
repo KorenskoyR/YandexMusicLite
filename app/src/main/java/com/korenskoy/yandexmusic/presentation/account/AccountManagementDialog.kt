@@ -33,10 +33,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.korenskoy.yandexmusic.domain.model.UserAccount
 
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+
 @Composable
 fun AccountManagementDialog(
     accounts: List<UserAccount>,
     activeAccount: UserAccount?,
+    defaultAccountUid: String? = null,
+    onSetDefaultAccount: (String?) -> Unit = {},
     onSwitchAccount: (String) -> Unit,
     onRemoveAccount: (String) -> Unit,
     onAddNewAccount: () -> Unit,
@@ -217,7 +222,29 @@ fun AccountManagementDialog(
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+
+                                    // Default Account Star Toggle
+                                    val isDefault = account.uid == defaultAccountUid
+                                    IconButton(
+                                        onClick = {
+                                            if (isDefault) {
+                                                onSetDefaultAccount(null)
+                                            } else {
+                                                onSetDefaultAccount(account.uid)
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isDefault) Icons.Default.Star else Icons.Default.StarBorder,
+                                            contentDescription = if (isDefault) "По умолчанию" else "Сделать по умолчанию",
+                                            tint = if (isDefault) Color(0xFFFFD700) else Color.White.copy(alpha = 0.35f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(4.dp))
 
                                     // Status Badge or Action
                                     if (isActive) {
@@ -259,6 +286,14 @@ fun AccountManagementDialog(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "★ — профиль по умолчанию (авто-вход при старте)",
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))

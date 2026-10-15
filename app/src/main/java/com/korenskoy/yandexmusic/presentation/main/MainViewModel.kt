@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.async
@@ -55,6 +56,20 @@ class MainViewModel @Inject constructor(
 
     val allAccounts: StateFlow<List<com.korenskoy.yandexmusic.domain.model.UserAccount>> = authRepository.allAccounts
     val activeAccount: StateFlow<com.korenskoy.yandexmusic.domain.model.UserAccount?> = authRepository.activeAccount
+    val defaultAccountUid: StateFlow<String?> = authRepository.defaultAccountUid
+
+    val defaultAccountName: StateFlow<String?> = combine(
+        authRepository.defaultAccountUid,
+        authRepository.allAccounts
+    ) { defUid, accounts ->
+        if (defUid == null) return@combine null
+        val account = accounts.firstOrNull { it.uid == defUid }
+        account?.displayName?.ifBlank { account.login }?.ifBlank { "UID: ${account.uid}" }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    fun setDefaultAccount(uid: String?) {
+        authRepository.setDefaultAccountUid(uid)
+    }
 
     private val activeUserFolder: String
         get() = authRepository.getActiveAccount()?.folderName ?: "default"
@@ -206,6 +221,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             delay(5000L)
             checkForUpdates(silent = true)
+        }
+
+        // Clean up any remaining update files in cache asynchronously on launch
+        viewModelScope.launch(Dispatchers.IO) {
+            updateManager.cleanupUpdateFiles()
         }
     }
     
@@ -1480,6 +1500,13 @@ class MainViewModel @Inject constructor(
         result.onFailure { err ->
             _updateStatusMessage.value = err.localizedMessage
         }
+    }
+
+    val canRequestPackageInstalls: Boolean
+        get() = updateManager.canRequestPackageInstalls()
+
+    fun openInstallPermissionSettings() {
+        updateManager.openInstallPermissionSettings()
     }
 
     fun dismissUpdateDialog() {

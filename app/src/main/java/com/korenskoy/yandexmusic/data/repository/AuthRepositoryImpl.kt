@@ -47,6 +47,9 @@ class AuthRepositoryImpl @Inject constructor(
     private val _activeAccount = MutableStateFlow<UserAccount?>(null)
     override val activeAccount: StateFlow<UserAccount?> = _activeAccount.asStateFlow()
 
+    private val _defaultAccountUid = MutableStateFlow<String?>(null)
+    override val defaultAccountUid: StateFlow<String?> = _defaultAccountUid.asStateFlow()
+
     private val _isAuthorized = MutableStateFlow(false)
     override fun isAuthorized(): Flow<Boolean> = _isAuthorized.asStateFlow()
 
@@ -83,9 +86,15 @@ class AuthRepositoryImpl @Inject constructor(
             sharedPreferences.edit().putString(KEY_ACTIVE_UID, "me").apply()
         }
 
+        val defaultUid = sharedPreferences.getString(KEY_DEFAULT_ACCOUNT_UID, null)
         val activeUid = sharedPreferences.getString(KEY_ACTIVE_UID, null)
-        val active = loadedAccounts.firstOrNull { it.uid == activeUid } ?: loadedAccounts.maxByOrNull { it.lastActiveTimestamp }
 
+        // Prioritize explicit default UID if configured and valid, otherwise activeUid, otherwise last active
+        val defaultAccount = loadedAccounts.firstOrNull { it.uid == defaultUid }
+        val active = defaultAccount
+            ?: (loadedAccounts.firstOrNull { it.uid == activeUid } ?: loadedAccounts.maxByOrNull { it.lastActiveTimestamp })
+
+        _defaultAccountUid.value = defaultAccount?.uid
         _allAccounts.value = loadedAccounts.sortedByDescending { it.lastActiveTimestamp }
         _activeAccount.value = active
         _isAuthorized.value = active != null && active.token.isNotEmpty()
@@ -228,6 +237,10 @@ class AuthRepositoryImpl @Inject constructor(
             }.apply()
         }
 
+        if (_defaultAccountUid.value == uid) {
+            setDefaultAccountUid(null)
+        }
+
         persistAccounts(currentAccounts)
         _allAccounts.value = currentAccounts.sortedByDescending { it.lastActiveTimestamp }
         _activeAccount.value = newActive
@@ -240,12 +253,30 @@ class AuthRepositoryImpl @Inject constructor(
         sharedPreferences.edit()
             .remove(KEY_ACCOUNTS_JSON)
             .remove(KEY_ACTIVE_UID)
+            .remove(KEY_DEFAULT_ACCOUNT_UID)
             .remove(KEY_LEGACY_TOKEN)
             .apply()
 
+        _defaultAccountUid.value = null
         _allAccounts.value = emptyList()
         _activeAccount.value = null
         _isAuthorized.value = false
+    }
+
+    override fun getDefaultAccountUid(): String? {
+        return sharedPreferences.getString(KEY_DEFAULT_ACCOUNT_UID, null)
+    }
+
+    @Synchronized
+    override fun setDefaultAccountUid(uid: String?) {
+        sharedPreferences.edit().apply {
+            if (uid != null) {
+                putString(KEY_DEFAULT_ACCOUNT_UID, uid)
+            } else {
+                remove(KEY_DEFAULT_ACCOUNT_UID)
+            }
+        }.apply()
+        _defaultAccountUid.value = uid
     }
 
     override fun clearToken() {
@@ -261,5 +292,6 @@ class AuthRepositoryImpl @Inject constructor(
         private const val KEY_LEGACY_TOKEN = "yandex_token"
         private const val KEY_ACCOUNTS_JSON = "accounts_list_json"
         private const val KEY_ACTIVE_UID = "active_account_uid"
+        private const val KEY_DEFAULT_ACCOUNT_UID = "default_account_uid"
     }
 }

@@ -64,6 +64,8 @@ fun MainScreen(
     val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     val accountName by viewModel.accountName.collectAsState()
+    val defaultAccountUid by viewModel.defaultAccountUid.collectAsState()
+    val defaultAccountName by viewModel.defaultAccountName.collectAsState()
 
     val updateCheckResult by viewModel.updateCheckResult.collectAsState()
     val updateDownloadProgress by viewModel.updateDownloadProgress.collectAsState()
@@ -84,6 +86,23 @@ fun MainScreen(
     var currentTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
+    var hasHandledStartupAccountPicker by rememberSaveable { mutableStateOf(false) }
+    val showStartupAccountPicker = !hasHandledStartupAccountPicker && allAccounts.size > 1 && defaultAccountUid == null
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                if (updateDownloadProgress >= 2f && viewModel.canRequestPackageInstalls) {
+                    viewModel.installDownloadedUpdate()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadLikedTracks()
@@ -154,6 +173,7 @@ fun MainScreen(
                     onRefresh = { viewModel.loadLikedTracks() },
                     hasActiveTrack = currentTrack != null,
                     accountName = accountName,
+                    defaultAccountName = defaultAccountName,
                     updateStatus = updateStatusMessage,
                     onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
                     onAccountManagementClick = { showAccountDialog = true },
@@ -397,6 +417,8 @@ fun MainScreen(
                 updateInfo = updateAvailable,
                 downloadProgress = updateDownloadProgress,
                 statusMessage = updateStatusMessage,
+                hasInstallPermission = viewModel.canRequestPackageInstalls,
+                onRequestPermission = { viewModel.openInstallPermissionSettings() },
                 onStartDownload = {
                     viewModel.startUpdateDownload(updateAvailable.apkDownloadUrl)
                 },
@@ -414,12 +436,33 @@ fun MainScreen(
             AccountManagementDialog(
                 accounts = allAccounts,
                 activeAccount = activeAccount,
+                defaultAccountUid = defaultAccountUid,
+                onSetDefaultAccount = { uid -> viewModel.setDefaultAccount(uid) },
                 onSwitchAccount = { uid -> viewModel.switchAccount(uid) },
                 onRemoveAccount = { uid -> viewModel.removeAccount(uid) },
                 onAddNewAccount = { onNavigateToAuth() },
                 onLogoutCurrent = { viewModel.logoutCurrentAccount() },
                 onLogoutAll = { viewModel.logoutAllAccounts() },
                 onDismiss = { showAccountDialog = false }
+            )
+        }
+
+        // Startup Account Picker Dialog (shown when multiple accounts exist and no default user set)
+        if (showStartupAccountPicker) {
+            com.korenskoy.yandexmusic.presentation.account.StartupAccountPickerDialog(
+                accounts = allAccounts,
+                activeAccount = activeAccount,
+                onSelectAccount = { uid, rememberAsDefault ->
+                    viewModel.switchAccount(uid)
+                    if (rememberAsDefault) {
+                        viewModel.setDefaultAccount(uid)
+                    }
+                    hasHandledStartupAccountPicker = true
+                },
+                onAddNewAccount = {
+                    hasHandledStartupAccountPicker = true
+                    onNavigateToAuth()
+                }
             )
         }
     }

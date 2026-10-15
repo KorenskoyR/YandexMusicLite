@@ -44,11 +44,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.korenskoy.yandexmusic.data.updater.UpdateCheckResult
 
+import androidx.compose.material.icons.filled.Settings
+
 @Composable
 fun UpdateDialog(
     updateInfo: UpdateCheckResult.UpdateAvailable,
     downloadProgress: Float, // -1f = idle, 0f..1f = downloading, 2f = ready to install
     statusMessage: String? = null,
+    hasInstallPermission: Boolean = true,
+    onRequestPermission: () -> Unit = {},
     onStartDownload: () -> Unit,
     onInstall: () -> Unit,
     onDismiss: () -> Unit
@@ -238,6 +242,35 @@ fun UpdateDialog(
                     )
                 }
 
+                if (!hasInstallPermission) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFFFF9900).copy(alpha = 0.12f))
+                            .border(BorderStroke(1.dp, Color(0xFFFF9900).copy(alpha = 0.35f)), RoundedCornerShape(14.dp))
+                            .clickable { onRequestPermission() }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = Color(0xFFFFB74D),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Требуется один раз разрешить установку обновлений в настройках Android (нажмите здесь)",
+                                color = Color(0xFFFFD54F),
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(22.dp))
 
                 // Actions row
@@ -277,7 +310,11 @@ fun UpdateDialog(
                             )
                             .clickable(enabled = !isDownloading) {
                                 if (isReadyToInstall) {
-                                    onInstall()
+                                    if (!hasInstallPermission) {
+                                        onRequestPermission()
+                                    } else {
+                                        onInstall()
+                                    }
                                 } else {
                                     onStartDownload()
                                 }
@@ -295,6 +332,20 @@ fun UpdateDialog(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Загрузка...",
+                                    color = Color.White,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else if (isReadyToInstall && !hasInstallPermission) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Разрешить в настройках",
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold

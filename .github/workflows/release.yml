@@ -32,7 +32,8 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
             echo "Production keystore restored from secret."
           else
-            echo "No KEYSTORE_BASE64 secret found, build will fallback to debug signature."
+            echo "::error::KEYSTORE_BASE64 secret is missing in GitHub repository settings!"
+            exit 1
           fi
 
       - name: Grant execute permission for gradlew
@@ -55,8 +56,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release_artifacts/YandexMusicLite.apk
-          generate_release_notes: true
+          generate_release_notes: false
           name: Yandex Music Lite ${{ github.ref_name }}
+          body: |
+            ### Yandex Music Lite ${{ github.ref_name }}
+
+            • Исправлена ошибка установки при обновлении («Приложение не обновлено»)
+            • Устранено повторное появление запроса на установку из неизвестных источников
+            • Добавлен выбор аккаунта при старте и назначение профиля по умолчанию
+            • Автоматическая очистка временных файлов обновления
+            • Оптимизация воспроизведения аудио и стабильности
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

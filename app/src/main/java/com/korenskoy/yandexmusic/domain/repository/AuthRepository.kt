@@ -19,4 +19,8 @@ interface AuthRepository {
 
     val activeAccount: StateFlow<UserAccount?>
     val allAccounts: StateFlow<List<UserAccount>>
+    val defaultAccountUid: StateFlow<String?>
+
+    fun getDefaultAccountUid(): String?
+    fun setDefaultAccountUid(uid: String?)
 }
