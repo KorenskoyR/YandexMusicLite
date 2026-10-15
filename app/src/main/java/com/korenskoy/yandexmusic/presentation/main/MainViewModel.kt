@@ -53,6 +53,12 @@ class MainViewModel @Inject constructor(
     val isAuthorized = authRepository.isAuthorized()
         .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.getToken() != null)
 
+    val allAccounts: StateFlow<List<com.korenskoy.yandexmusic.domain.model.UserAccount>> = authRepository.allAccounts
+    val activeAccount: StateFlow<com.korenskoy.yandexmusic.domain.model.UserAccount?> = authRepository.activeAccount
+
+    private val activeUserFolder: String
+        get() = authRepository.getActiveAccount()?.folderName ?: "default"
+
     private val _accountName = MutableStateFlow<String>("")
     val accountName: StateFlow<String> = _accountName.asStateFlow()
 
@@ -143,18 +149,29 @@ class MainViewModel @Inject constructor(
             .onEach { playPrev() }
             .launchIn(viewModelScope)
 
+        // Keep display name synchronized with active account
+        viewModelScope.launch {
+            authRepository.activeAccount.collect { account ->
+                if (account != null) {
+                    val name = account.displayName.ifBlank { account.login }.ifBlank { "UID: ${account.uid}" }
+                    _accountName.value = name
+                }
+            }
+        }
+
         // Instant Startup from Cache & Saved History
         viewModelScope.launch(Dispatchers.IO) {
-            val savedRecent = cacheManager.loadRecentTrackIds()
+            val userFolder = activeUserFolder
+            val savedRecent = cacheManager.loadRecentTrackIds(userFolder)
             if (savedRecent.isNotEmpty()) {
                 recentPlayedTrackIds.addAll(savedRecent.takeLast(100))
             }
 
-            val cachedTracks = cacheManager.loadLikedTracks()
+            val cachedTracks = cacheManager.loadLikedTracks(userFolder)
             val cachedHits = cacheManager.loadWeeklyHits()
             val cachedTrends = cacheManager.loadTrendTracks()
             val cachedPopular = cacheManager.loadPopularTracks()
-            val cachedWave = cacheManager.loadWaveQueue()
+            val cachedWave = cacheManager.loadWaveQueue(userFolder)
             
             withContext(Dispatchers.Main) {
                 if (cachedTracks.isNotEmpty()) {
@@ -200,7 +217,7 @@ class MainViewModel @Inject constructor(
                 recentPlayedTrackIds.removeFirst()
             }
             viewModelScope.launch(Dispatchers.IO) {
-                cacheManager.saveRecentTrackIds(recentPlayedTrackIds.toList())
+                cacheManager.saveRecentTrackIds(activeUserFolder, recentPlayedTrackIds.toList())
             }
         }
     }
@@ -287,7 +304,7 @@ class MainViewModel @Inject constructor(
                                     _tracks.value = fullTracks
                                     _likedTrackIds.value = allIds
                                 }
-                                cacheManager.saveLikedTracks(fullTracks)
+                                cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
                             }
                         }
                     } catch (e: Exception) {
@@ -358,7 +375,7 @@ class MainViewModel @Inject constructor(
                                     _currentPlaylist.value = _wavePlaylist.value
                                 }
                             }
-                            cacheManager.saveWaveQueue(_wavePlaylist.value)
+                            cacheManager.saveWaveQueue(activeUserFolder, _wavePlaylist.value)
                             
                             // Proactively fetch top 5 MP3 URLs for instant start
                             val top5 = _wavePlaylist.value.take(5).map { it.idString }
@@ -375,9 +392,36 @@ class MainViewModel @Inject constructor(
     }
 
     fun clearMusicCache() {
-        viewModelScope.launch {
-            downloadManager.clearMusicCache()
-            _likedTrackIds.value = emptySet() // Optionally reset, but tracks are still in API
+        viewModelScope.launch(Dispatchers.IO) {
+            val userFolder = activeUserFolder
+            val activeUid = authRepository.getActiveAccount()?.uid
+
+            // 1. Clear active user's isolated playlist and recent cache
+            cacheManager.clearUserCache(userFolder)
+
+            // 2. Protect tracks of other saved accounts
+            val otherAccounts = authRepository.getAllAccounts().filter { it.uid != activeUid }
+            val protectedTrackIds = mutableSetOf<String>()
+            for (other in otherAccounts) {
+                val otherTracks = cacheManager.loadLikedTracks(other.folderName)
+                protectedTrackIds.addAll(otherTracks.map { it.idString })
+            }
+
+            // 3. Remove downloaded tracks belonging to active user only
+            val activeTrackIds = _tracks.value.map { it.idString }
+            for (trackId in activeTrackIds) {
+                if (!protectedTrackIds.contains(trackId)) {
+                    downloadManager.removeTrack(trackId)
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                _tracks.value = emptyList()
+                _likedTrackIds.value = emptySet()
+                _wavePlaylist.value = emptyList()
+                recentPlayedTrackIds.clear()
+                loadLikedTracks()
+            }
         }
     }
 
@@ -407,13 +451,118 @@ class MainViewModel @Inject constructor(
     }
 
     fun logout() {
+        logoutCurrentAccount()
+    }
+
+    fun switchAccount(uid: String) {
         viewModelScope.launch {
-            authRepository.clearToken()
-            cacheManager.saveLikedTracks(emptyList())
+            stopAndClearPlayer()
+            recentPlayedTrackIds.clear()
+            _wavePlaylist.value = emptyList()
+
+            val switched = authRepository.switchAccount(uid)
+            if (!switched) return@launch
+
+            val newAccount = authRepository.getActiveAccount()
+            val userFolder = newAccount?.folderName ?: "default"
+            _accountName.value = newAccount?.displayName?.ifBlank { newAccount.login } ?: "Яндекс Аккаунт"
+
+            // Load isolated cache for this switched user immediately
+            withContext(Dispatchers.IO) {
+                val cachedTracks = cacheManager.loadLikedTracks(userFolder)
+                val cachedWave = cacheManager.loadWaveQueue(userFolder)
+                val cachedRecent = cacheManager.loadRecentTrackIds(userFolder)
+
+                recentPlayedTrackIds.addAll(cachedRecent.takeLast(100))
+                withContext(Dispatchers.Main) {
+                    _tracks.value = cachedTracks
+                    _likedTrackIds.value = cachedTracks.map { it.idString }.toSet()
+                    if (cachedWave.isNotEmpty()) {
+                        _wavePlaylist.value = cachedWave
+                    }
+                }
+            }
+
+            // Silently refresh from API in background
+            loadLikedTracks()
+        }
+    }
+
+    fun logoutCurrentAccount() {
+        viewModelScope.launch {
+            val currentAccount = authRepository.getActiveAccount()
+            val currentUid = currentAccount?.uid
+            val currentFolder = currentAccount?.folderName ?: "default"
+
+            stopAndClearPlayer()
+            recentPlayedTrackIds.clear()
+            _wavePlaylist.value = emptyList()
+
+            // Delete only this user's cache folder
+            withContext(Dispatchers.IO) {
+                cacheManager.clearUserCache(currentFolder)
+            }
+
+            if (currentUid != null) {
+                authRepository.removeAccount(currentUid)
+            }
+
+            val nextAccount = authRepository.getActiveAccount()
+            if (nextAccount != null) {
+                switchAccount(nextAccount.uid)
+            } else {
+                _tracks.value = emptyList()
+                _likedTrackIds.value = emptySet()
+                _accountName.value = ""
+            }
+        }
+    }
+
+    fun logoutAllAccounts() {
+        viewModelScope.launch {
+            stopAndClearPlayer()
+            recentPlayedTrackIds.clear()
+            _wavePlaylist.value = emptyList()
+
+            withContext(Dispatchers.IO) {
+                cacheManager.clearAllUserCaches()
+            }
+            authRepository.clearAllAccounts()
+
             _tracks.value = emptyList()
             _likedTrackIds.value = emptySet()
             _accountName.value = ""
-            stopAndClearPlayer()
+        }
+    }
+
+    fun removeAccount(uid: String) {
+        viewModelScope.launch {
+            val target = authRepository.getAllAccounts().firstOrNull { it.uid == uid }
+            if (target != null) {
+                withContext(Dispatchers.IO) {
+                    cacheManager.clearUserCache(target.folderName)
+                }
+            }
+            val currentActiveUid = authRepository.getActiveAccount()?.uid
+            if (currentActiveUid == uid) {
+                logoutCurrentAccount()
+            } else {
+                authRepository.removeAccount(uid)
+            }
+        }
+    }
+
+    fun clearActiveUserCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val userFolder = activeUserFolder
+            cacheManager.clearUserCache(userFolder)
+            withContext(Dispatchers.Main) {
+                _tracks.value = emptyList()
+                _likedTrackIds.value = emptySet()
+                _wavePlaylist.value = emptyList()
+                recentPlayedTrackIds.clear()
+                loadLikedTracks()
+            }
         }
     }
 
@@ -425,7 +574,7 @@ class MainViewModel @Inject constructor(
                 Log.d("LikedTracks", "=== loadLikedTracks START ===")
                 Log.d("LikedTracks", "token present: ${!token.isNullOrEmpty()}, token prefix: ${token?.take(8) ?: "NULL"}")
 
-                // Step 1: Get UID from account status
+                // Step 1: Get UID and profile info from account status
                 var uid: String? = null
                 for (attempt in 1..3) {
                     try {
@@ -434,11 +583,22 @@ class MainViewModel @Inject constructor(
                         Log.d("LikedTracks", "Attempt $attempt: accountStatus.result is null: ${resultObj == null}")
                         Log.d("LikedTracks", "Attempt $attempt: accountStatus.error: ${accountStatus.error?.message ?: "none"}")
                         if (resultObj != null) {
-                            Log.d("LikedTracks", "Attempt $attempt: account.uid raw = ${resultObj.account?.uid}")
-                            Log.d("LikedTracks", "Attempt $attempt: uidString = '${resultObj.uidString}'")
-                            Log.d("LikedTracks", "Attempt $attempt: directUid = ${resultObj.directUid}")
-                            val name = resultObj.account?.uidString ?: ""
-                            _accountName.value = if (resultObj.uidString.isNotEmpty()) "UID: ${resultObj.uidString}" else "Яндекс Аккаунт"
+                            val bestName = resultObj.displayUserName
+                            val login = resultObj.account?.login ?: ""
+                            val uidStr = resultObj.uidString
+                            _accountName.value = bestName
+
+                            val currentToken = authRepository.getToken() ?: ""
+                            if (currentToken.isNotEmpty() && uidStr.isNotEmpty()) {
+                                authRepository.saveOrUpdateAccount(
+                                    com.korenskoy.yandexmusic.domain.model.UserAccount(
+                                        uid = uidStr,
+                                        login = login,
+                                        displayName = bestName,
+                                        token = currentToken
+                                    )
+                                )
+                            }
                         }
                         uid = resultObj?.uidString?.takeIf { it.isNotEmpty() }
                         if (uid != null) break
@@ -604,7 +764,7 @@ class MainViewModel @Inject constructor(
                         withContext(Dispatchers.Main) {
                             _tracks.value = fullTracks
                         }
-                        cacheManager.saveLikedTracks(fullTracks)
+                        cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
                     }
                     
                     val autoDownload = settingsRepository.autoDownloadLikedTracks.first()
@@ -687,7 +847,7 @@ class MainViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            cacheManager.saveLikedTracks(_tracks.value)
+            cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
             try {
                 val accountStatus = try { api.getAccountStatus() } catch (e: Exception) { null }
                 val uid = accountStatus?.result?.uidString?.takeIf { it.isNotEmpty() } ?: "me"
@@ -710,7 +870,7 @@ class MainViewModel @Inject constructor(
                 } else {
                     _likedTrackIds.value - trackId
                 }
-                cacheManager.saveLikedTracks(_tracks.value)
+                cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
             }
         }
     }
@@ -724,7 +884,7 @@ class MainViewModel @Inject constructor(
         _tracks.value = _tracks.value.filter { it.idString != trackId }
 
         viewModelScope.launch {
-            cacheManager.saveLikedTracks(_tracks.value)
+            cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
             try {
                 val accountStatus = try { api.getAccountStatus() } catch (e: Exception) { null }
                 val uid = accountStatus?.result?.uidString?.takeIf { it.isNotEmpty() } ?: "me"
@@ -1001,7 +1161,7 @@ class MainViewModel @Inject constructor(
                             }
                         }
                         if (hasNew) {
-                            cacheManager.saveWaveQueue(_wavePlaylist.value)
+                            cacheManager.saveWaveQueue(activeUserFolder, _wavePlaylist.value)
                             preloadManager.preloadTracks(tracksToAdd.take(5).map { it.idString })
                         }
                     }

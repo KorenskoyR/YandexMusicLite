@@ -39,11 +39,18 @@ data class AccountStatusResponseDto(
             null -> ""
             else -> directUid.toString()
         }
+    val displayUserName: String
+        get() = account?.displayUserName ?: if (uidString.isNotEmpty()) "UID: $uidString" else "Яндекс Аккаунт"
 }
 
 @Serializable
 data class AccountDto(
-    @SerialName("uid") val uid: JsonElement? = null
+    @SerialName("uid") val uid: JsonElement? = null,
+    @SerialName("login") val login: String? = null,
+    @SerialName("fullName") val fullName: String? = null,
+    @SerialName("displayName") val displayName: String? = null,
+    @SerialName("firstName") val firstName: String? = null,
+    @SerialName("secondName") val secondName: String? = null
 ) {
     val uidLong: Long?
         get() = when (uid) {
@@ -55,6 +62,15 @@ data class AccountDto(
             is kotlinx.serialization.json.JsonPrimitive -> uid.content
             null -> ""
             else -> uid.toString()
+        }
+    val displayUserName: String
+        get() {
+            if (!displayName.isNullOrBlank()) return displayName
+            if (!fullName.isNullOrBlank()) return fullName
+            val combinedName = listOfNotNull(firstName, secondName).joinToString(" ").trim()
+            if (combinedName.isNotBlank()) return combinedName
+            if (!login.isNullOrBlank()) return login
+            return if (uidString.isNotEmpty()) "UID: $uidString" else "Яндекс Аккаунт"
         }
 }
 

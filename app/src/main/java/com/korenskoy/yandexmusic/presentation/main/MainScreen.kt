@@ -37,15 +37,19 @@ import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassNavig
 import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
 import com.korenskoy.yandexmusic.presentation.main.components.MainTab
 import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
+import com.korenskoy.yandexmusic.presentation.account.AccountManagementDialog
 import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
+    onNavigateToAuth: () -> Unit = {}
 ) {
     val tracks by viewModel.tracks.collectAsState()
+    val allAccounts by viewModel.allAccounts.collectAsState()
+    val activeAccount by viewModel.activeAccount.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isDownloadingAll by viewModel.isDownloadingAll.collectAsState()
     val autoDownloadEnabled by viewModel.autoDownloadEnabled.collectAsState()
@@ -79,6 +83,7 @@ fun MainScreen(
 
     var currentTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
+    var showAccountDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadLikedTracks()
@@ -151,7 +156,8 @@ fun MainScreen(
                     accountName = accountName,
                     updateStatus = updateStatusMessage,
                     onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
-                    onLogout = { viewModel.logout() }
+                    onAccountManagementClick = { showAccountDialog = true },
+                    onLogout = { showAccountDialog = true }
                 )
                 MainTab.RADIO -> {
                     val radioStations by viewModel.radioStations.collectAsState()
@@ -400,6 +406,20 @@ fun MainScreen(
                 onDismiss = {
                     viewModel.dismissUpdateDialog()
                 }
+            )
+        }
+
+        // Account Management Dialog
+        if (showAccountDialog) {
+            AccountManagementDialog(
+                accounts = allAccounts,
+                activeAccount = activeAccount,
+                onSwitchAccount = { uid -> viewModel.switchAccount(uid) },
+                onRemoveAccount = { uid -> viewModel.removeAccount(uid) },
+                onAddNewAccount = { onNavigateToAuth() },
+                onLogoutCurrent = { viewModel.logoutCurrentAccount() },
+                onLogoutAll = { viewModel.logoutAllAccounts() },
+                onDismiss = { showAccountDialog = false }
             )
         }
     }

@@ -86,6 +86,7 @@ fun LibraryScreen(
     accountName: String = "",
     updateStatus: String? = null,
     onCheckForUpdates: () -> Unit = {},
+    onAccountManagementClick: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     var showCacheMenu by remember { mutableStateOf(false) }
@@ -451,6 +452,7 @@ fun LibraryScreen(
             accountName = accountName,
             updateStatus = updateStatus,
             onCheckForUpdates = onCheckForUpdates,
+            onAccountManagementClick = onAccountManagementClick,
             onLogout = onLogout
         )
     }

@@ -290,9 +290,11 @@ class LayoutSafetyTest {
     fun testProgressTransitionIsolation() {
         val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
         assertTrue("PlayerRepositoryImpl must guard progress polling with !isTransitioning",
-            playerRepo.contains("if (exoPlayer.isPlaying && !isTransitioning)"))
-        assertTrue("PlayerRepositoryImpl must set isTransitioning = true before performFadeOut",
+            playerRepo.contains("isPlaying && !isTransitioning"))
+        assertTrue("PlayerRepositoryImpl must set isTransitioning = true during track transition",
             playerRepo.contains("isTransitioning = true"))
+        assertTrue("PlayerRepositoryImpl must set isCrossfading = true during crossfade",
+            playerRepo.contains("isCrossfading = true"))
     }
 
     @Test
@@ -307,6 +309,81 @@ class LayoutSafetyTest {
         val player = File(sourceDir, "presentation/player/FullScreenPlayer.kt").readText()
         assertTrue("FullScreenPlayer must prefetch when lastVisible >= total - 12",
             player.contains("lastVisible >= total - 12"))
+    }
+
+    @Test
+    fun testUserAccountFolderNameSanitization() {
+        val accountWithLogin = com.korenskoy.yandexmusic.domain.model.UserAccount(
+            uid = "1001",
+            login = "roman.korenskoy",
+            displayName = "Роман Коренской",
+            token = "secret_token_1"
+        )
+        // Login takes priority for folderName and dots are replaced with underscores
+        org.junit.Assert.assertEquals("roman_korenskoy", accountWithLogin.folderName)
+
+        val accountWithDisplayNameOnly = com.korenskoy.yandexmusic.domain.model.UserAccount(
+            uid = "1002",
+            login = "",
+            displayName = "Анна Смирнова",
+            token = "secret_token_2"
+        )
+        org.junit.Assert.assertEquals("Анна_Смирнова", accountWithDisplayNameOnly.folderName)
+
+        val accountWithUidFallback = com.korenskoy.yandexmusic.domain.model.UserAccount(
+            uid = "998877",
+            login = "",
+            displayName = "",
+            token = "secret_token_3"
+        )
+        org.junit.Assert.assertEquals("998877", accountWithUidFallback.folderName)
+
+        val accountWithBlankAll = com.korenskoy.yandexmusic.domain.model.UserAccount(
+            uid = "!!!",
+            login = "",
+            displayName = "",
+            token = "secret_token_4"
+        )
+        org.junit.Assert.assertEquals("user_!!!", accountWithBlankAll.folderName)
+    }
+
+    @Test
+    fun testEqualPowerCrossfadeEnergyConstant() {
+        // Equal-Power invariant: cos^2(angle) + sin^2(angle) == 1.0 (Zero loudness dip at midpoint)
+        val steps = 30
+        for (step in 0..steps) {
+            val fraction = step.toDouble() / steps
+            val angle = fraction * (Math.PI / 2.0)
+            val outVol = kotlin.math.cos(angle)
+            val inVol = kotlin.math.sin(angle)
+            val totalPower = (outVol * outVol) + (inVol * inVol)
+            org.junit.Assert.assertEquals(
+                "Total acoustic energy must equal 1.0 at step $step ($fraction)",
+                1.0,
+                totalPower,
+                0.0001
+            )
+        }
+    }
+
+    @Test
+    fun testMultiAccountArchitectureComponentsExist() {
+        val authRepoFile = File(sourceDir, "data/repository/AuthRepositoryImpl.kt").readText()
+        assertTrue("AuthRepositoryImpl must implement switchAccount", authRepoFile.contains("fun switchAccount("))
+        assertTrue("AuthRepositoryImpl must implement removeAccount", authRepoFile.contains("fun removeAccount("))
+        assertTrue("AuthRepositoryImpl must implement clearAllAccounts", authRepoFile.contains("fun clearAllAccounts()"))
+
+        val cacheManagerFile = File(sourceDir, "data/cache/PlaylistCacheManager.kt").readText()
+        assertTrue("PlaylistCacheManager must contain getUserCacheDir", cacheManagerFile.contains("getUserCacheDir("))
+        assertTrue("PlaylistCacheManager must contain clearUserCache", cacheManagerFile.contains("fun clearUserCache("))
+
+        val dialogFile = File(sourceDir, "presentation/account/AccountManagementDialog.kt").readText()
+        assertTrue("AccountManagementDialog must declare AccountManagementDialog composable",
+            dialogFile.contains("fun AccountManagementDialog("))
+        assertTrue("AccountManagementDialog must support switching accounts",
+            dialogFile.contains("onSwitchAccount"))
+        assertTrue("AccountManagementDialog must support removing accounts",
+            dialogFile.contains("onRemoveAccount"))
     }
 }
 

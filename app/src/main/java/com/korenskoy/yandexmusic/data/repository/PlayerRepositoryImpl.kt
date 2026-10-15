@@ -2,6 +2,7 @@ package com.korenskoy.yandexmusic.data.repository
 
 import android.content.Context
 import android.content.Intent
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -17,18 +18,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.pow
+import kotlin.math.cos
+import kotlin.math.sin
 
 class PlayerRepositoryImpl @Inject constructor(
     private val context: Context,
-    private val exoPlayer: ExoPlayer,
+    private val playerA: ExoPlayer,
+    private val playerB: ExoPlayer,
     private val downloadManager: TrackDownloadManager,
     private val preloadManager: TrackPreloadManager,
     private val wakeLockHelper: com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
@@ -42,7 +46,7 @@ class PlayerRepositoryImpl @Inject constructor(
 
     private val _progress = MutableStateFlow(0L)
     override val progress: StateFlow<Long> = _progress.asStateFlow()
-    
+
     private val _trackEndedEvent = MutableSharedFlow<Unit>()
     override val trackEndedEvent: Flow<Unit> = _trackEndedEvent.asSharedFlow()
 
@@ -53,7 +57,17 @@ class PlayerRepositoryImpl @Inject constructor(
     override val skipPrevEvent: Flow<Unit> = _skipPrevEvent.asSharedFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main)
-    private var fadeJob: Job? = null
+    private var crossfadeJob: Job? = null
+
+    // Dual-Player ping-pong: 0 -> playerA, 1 -> playerB
+    @Volatile
+    private var activePlayerIndex = 0
+
+    private val activePlayer: ExoPlayer
+        get() = if (activePlayerIndex == 0) playerA else playerB
+
+    private val standbyPlayer: ExoPlayer
+        get() = if (activePlayerIndex == 0) playerB else playerA
 
     @Volatile
     private var lastSeekTimestamp = 0L
@@ -63,26 +77,56 @@ class PlayerRepositoryImpl @Inject constructor(
     @Volatile
     private var isTransitioning = false
     @Volatile
-    private var isFadingIn = false
+    private var isCrossfading = false
+    @Volatile
+    private var hasEmittedTrackEndedForCurrent = false
+
+    private val delegatingPlayer = object : ForwardingPlayer(playerA) {
+        override fun getPlayWhenReady(): Boolean = activePlayer.playWhenReady
+        override fun getPlaybackState(): Int = activePlayer.playbackState
+        override fun isPlaying(): Boolean = playerA.isPlaying || playerB.isPlaying
+        override fun getCurrentPosition(): Long = activePlayer.currentPosition
+        override fun getDuration(): Long = activePlayer.duration
+        override fun play() { this@PlayerRepositoryImpl.resume() }
+        override fun pause() { this@PlayerRepositoryImpl.pause() }
+        override fun stop() { this@PlayerRepositoryImpl.stop() }
+        override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+            this@PlayerRepositoryImpl.seekTo(positionMs)
+        }
+    }
 
     init {
-        setupPlayerListener()
+        setupPlayerListener(playerA, 0)
+        setupPlayerListener(playerB, 1)
 
         scope.launch {
             while (isActive) {
-                if (exoPlayer.isPlaying && !isTransitioning) {
+                val currentP = activePlayer
+                if (currentP.isPlaying && !isTransitioning) {
                     val now = System.currentTimeMillis()
                     val timeSinceSeek = now - lastSeekTimestamp
                     if (timeSinceSeek < 600L && pendingSeekPosition >= 0L) {
-                        // Check if exoPlayer has caught up to the seek target
-                        if (abs(exoPlayer.currentPosition - pendingSeekPosition) < 400L) {
+                        if (abs(currentP.currentPosition - pendingSeekPosition) < 400L) {
                             pendingSeekPosition = -1L
-                            _progress.value = exoPlayer.currentPosition
+                            _progress.value = currentP.currentPosition
                         }
-                        // Otherwise, hold optimistic _progress.value and ignore stale ticks
                     } else {
                         pendingSeekPosition = -1L
-                        _progress.value = exoPlayer.currentPosition
+                        _progress.value = currentP.currentPosition
+                    }
+
+                    // 3-second early trigger for seamless overlapping crossfade:
+                    val duration = currentP.duration
+                    val currentPos = currentP.currentPosition
+                    if (duration > 6000L && currentPos > 0L) {
+                        val remaining = duration - currentPos
+                        if (remaining in 1L..CROSSFADE_DURATION_MS && !hasEmittedTrackEndedForCurrent && !isCrossfading) {
+                            hasEmittedTrackEndedForCurrent = true
+                            wakeLockHelper.acquireTransitionLock(30_000L)
+                            scope.launch {
+                                _trackEndedEvent.emit(Unit)
+                            }
+                        }
                     }
                 }
                 delay(100)
@@ -90,41 +134,39 @@ class PlayerRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun setupPlayerListener() {
-        exoPlayer.addListener(object : Player.Listener {
+    private fun setupPlayerListener(player: ExoPlayer, playerIdx: Int) {
+        player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
-                if (isPlaying) {
+                _isPlaying.value = playerA.isPlaying || playerB.isPlaying
+                if (isPlaying && activePlayerIndex == playerIdx) {
                     isTransitioning = false
                     wakeLockHelper.releaseTransitionLock()
                 }
-                // Start Fade-In strictly when audio actually starts playing through decoder
-                if (isPlaying && isFadingIn) {
-                    startFadeIn()
-                }
             }
-            
+
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED && !isTransitioning) {
-                    wakeLockHelper.acquireTransitionLock(30_000L)
-                    scope.launch {
-                        _trackEndedEvent.emit(Unit)
+                if (playbackState == Player.STATE_ENDED && activePlayerIndex == playerIdx) {
+                    if (!hasEmittedTrackEndedForCurrent && !isCrossfading && !isTransitioning) {
+                        hasEmittedTrackEndedForCurrent = true
+                        wakeLockHelper.acquireTransitionLock(30_000L)
+                        scope.launch {
+                            _trackEndedEvent.emit(Unit)
+                        }
                     }
                 }
-                if (playbackState == Player.STATE_READY) {
+                if (playbackState == Player.STATE_READY && activePlayerIndex == playerIdx) {
                     isTransitioning = false
-                    if (exoPlayer.playWhenReady && isFadingIn) {
-                        startFadeIn()
-                    }
                 }
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                android.util.Log.e("PlayerRepositoryImpl", "ExoPlayer playback error: ${error.errorCodeName}", error)
-                wakeLockHelper.releaseTransitionLock()
-                isFadingIn = false
-                isTransitioning = false
-                triggerSkipNext()
+                android.util.Log.e("PlayerRepositoryImpl", "ExoPlayer error on player[$playerIdx]: ${error.errorCodeName}", error)
+                if (activePlayerIndex == playerIdx) {
+                    wakeLockHelper.releaseTransitionLock()
+                    isTransitioning = false
+                    isCrossfading = false
+                    triggerSkipNext()
+                }
             }
 
             override fun onPositionDiscontinuity(
@@ -132,7 +174,7 @@ class PlayerRepositoryImpl @Inject constructor(
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
-                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK && activePlayerIndex == playerIdx) {
                     pendingSeekPosition = -1L
                     _progress.value = newPosition.positionMs
                 }
@@ -140,50 +182,20 @@ class PlayerRepositoryImpl @Inject constructor(
         })
     }
 
-    private fun startFadeIn() {
-        fadeJob?.cancel()
-        fadeJob = scope.launch {
-            val fadeInSteps = 12
-            for (i in 1..fadeInSteps) {
-                if (!isActive) break
-                // Logarithmic / exponential power curve for smooth audio perception
-                val fraction = i.toFloat() / fadeInSteps
-                val volumeCurve = fraction.toDouble().pow(1.5).toFloat().coerceIn(0f, 1f)
-                exoPlayer.volume = volumeCurve
-                delay(18) // ~216ms total fade-in
-            }
-            exoPlayer.volume = 1f
-            isFadingIn = false
-        }
-    }
-
-    private suspend fun performFadeOut(steps: Int = 5, stepDelay: Long = 12) {
-        val currentVol = exoPlayer.volume
-        if (currentVol <= 0f) return
-        for (i in steps downTo 1) {
-            val fraction = i.toFloat() / steps
-            exoPlayer.volume = (currentVol * (fraction * fraction)).coerceIn(0f, 1f)
-            delay(stepDelay)
-        }
-        exoPlayer.volume = 0f
-    }
-
     override fun getPlayer(): Player {
-        return exoPlayer
+        return delegatingPlayer
     }
 
     override fun playTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
         scope.launch {
-            // Check if we can use the preloaded URL
             val resolvedUrl = preloadManager.getResolvedUrl(trackId) ?: url
-            
             val localFile = downloadManager.getLocalTrackFile(trackId)
             val playUri = if (localFile != null) {
                 android.net.Uri.fromFile(localFile).toString()
             } else {
                 resolvedUrl
             }
-            
+
             val mediaMetadata = MediaMetadata.Builder()
                 .setTitle(title ?: "Unknown Track")
                 .setDisplayTitle(title ?: "Unknown Track")
@@ -197,95 +209,140 @@ class PlayerRepositoryImpl @Inject constructor(
                 .setMediaMetadata(mediaMetadata)
                 .build()
 
-            fadeJob?.cancel()
-            isTransitioning = true
+            crossfadeJob?.cancel()
+            hasEmittedTrackEndedForCurrent = false
             _currentTrackId.value = trackId
             _progress.value = 0L
             pendingSeekPosition = -1L
             lastSeekTimestamp = 0L
 
-            val wasPlaying = exoPlayer.isPlaying
+            val currentActive = activePlayer
+            val incomingStandby = standbyPlayer
+            val wasPlaying = currentActive.isPlaying
+
             if (wasPlaying) {
-                // Quick ultra-smooth 40ms fade out of previous track/radio before starting next
-                performFadeOut(steps = 4, stepDelay = 10)
-            }
+                // TRUE 3-SECOND OVERLAPPING CROSSFADE
+                isCrossfading = true
+                isTransitioning = true
+                wakeLockHelper.acquireTransitionLock(30_000L)
 
-            wakeLockHelper.acquireTransitionLock(30_000L)
-            isFadingIn = true
-            exoPlayer.volume = 0f
-            
-            // Set media item with resetPosition=true (avoids full pipeline tear down/stop)
-            exoPlayer.setMediaItem(mediaItem, true)
-            exoPlayer.prepare()
-            exoPlayer.play()
+                incomingStandby.volume = 0f
+                incomingStandby.setMediaItem(mediaItem, true)
+                incomingStandby.prepare()
+                incomingStandby.play()
 
-            // If already playing immediately (cached/local source)
-            if (exoPlayer.isPlaying) {
+                // Swap active index immediately so progress and UI lock onto incoming track
+                activePlayerIndex = 1 - activePlayerIndex
+                notifyServicePlayerUpdated()
+
+                crossfadeJob = scope.launch {
+                    val steps = CROSSFADE_STEPS
+                    val stepDelay = CROSSFADE_DURATION_MS / steps // 100ms per step
+
+                    for (step in 1..steps) {
+                        if (!isActive) break
+                        val fraction = step.toDouble() / steps
+                        val angle = fraction * (PI / 2.0)
+                        
+                        // Equal-Power Crossfade curve (cos^2 + sin^2 = 1.0)
+                        val outVol = cos(angle).toFloat().coerceIn(0f, 1f)
+                        val inVol = sin(angle).toFloat().coerceIn(0f, 1f)
+
+                        currentActive.volume = outVol
+                        incomingStandby.volume = inVol
+                        delay(stepDelay)
+                    }
+
+                    // Finish crossfade: clean stop previous player
+                    currentActive.stop()
+                    currentActive.volume = 1f
+                    incomingStandby.volume = 1f
+                    isCrossfading = false
+                    isTransitioning = false
+                    wakeLockHelper.releaseTransitionLock()
+                }
+            } else {
+                // Immediate clean start when previous track wasn't playing
+                isTransitioning = true
+                currentActive.stop()
+                currentActive.volume = 1f
+                currentActive.setMediaItem(mediaItem, true)
+                currentActive.prepare()
+                currentActive.play()
                 wakeLockHelper.releaseTransitionLock()
-                startFadeIn()
+                notifyServicePlayerUpdated()
             }
 
             try {
                 val intent = Intent(context, MusicService::class.java)
                 androidx.core.content.ContextCompat.startForegroundService(context, intent)
             } catch (e: Exception) {
-                // Ignore background start restrictions if service is already running
+                e.printStackTrace()
             }
         }
     }
 
-    override fun pause() {
-        wakeLockHelper.releaseTransitionLock()
-        fadeJob?.cancel()
-        isFadingIn = false
-        fadeJob = scope.launch {
-            performFadeOut(steps = 5, stepDelay = 12)
-            exoPlayer.pause()
-            exoPlayer.volume = 1f
+    private fun notifyServicePlayerUpdated() {
+        try {
+            val intent = Intent(context, MusicService::class.java).apply {
+                action = "UPDATE_PLAYER"
+            }
+            context.startService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+    }
+
+    override fun pause() {
+        crossfadeJob?.cancel()
+        isCrossfading = false
+        playerA.pause()
+        playerB.pause()
+        _isPlaying.value = false
     }
 
     override fun resume() {
-        wakeLockHelper.acquireTransitionLock(30_000L)
-        fadeJob?.cancel()
-        if (exoPlayer.playbackState == Player.STATE_ENDED || exoPlayer.playbackState == Player.STATE_IDLE) {
-            exoPlayer.seekTo(0)
-            exoPlayer.prepare()
-        }
-        isFadingIn = true
-        exoPlayer.volume = 0f
-        exoPlayer.play()
-        if (exoPlayer.isPlaying) {
-            wakeLockHelper.releaseTransitionLock()
-            startFadeIn()
-        }
-    }
-
-    override fun seekTo(position: Long) {
-        pendingSeekPosition = position
-        lastSeekTimestamp = System.currentTimeMillis()
-        _progress.value = position
-        exoPlayer.seekTo(position)
-    }
-
-    override fun triggerSkipNext() {
-        scope.launch { _skipNextEvent.emit(Unit) }
-    }
-
-    override fun triggerSkipPrev() {
-        scope.launch { _skipPrevEvent.emit(Unit) }
+        activePlayer.play()
+        _isPlaying.value = true
     }
 
     override fun stop() {
-        wakeLockHelper.releaseTransitionLock()
-        fadeJob?.cancel()
-        isFadingIn = false
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
-        _currentTrackId.value = null
+        crossfadeJob?.cancel()
+        isCrossfading = false
+        playerA.stop()
+        playerB.stop()
+        playerA.volume = 1f
+        playerB.volume = 1f
         _isPlaying.value = false
+        _currentTrackId.value = null
         _progress.value = 0L
-        pendingSeekPosition = -1L
-        lastSeekTimestamp = 0L
+    }
+
+    override fun seekTo(position: Long) {
+        crossfadeJob?.cancel()
+        isCrossfading = false
+        val p = activePlayer
+        p.volume = 1f
+        lastSeekTimestamp = System.currentTimeMillis()
+        pendingSeekPosition = position
+        _progress.value = position
+        p.seekTo(position)
+    }
+
+    override fun triggerSkipNext() {
+        scope.launch {
+            _skipNextEvent.emit(Unit)
+        }
+    }
+
+    override fun triggerSkipPrev() {
+        scope.launch {
+            _skipPrevEvent.emit(Unit)
+        }
+    }
+
+    companion object {
+        const val CROSSFADE_DURATION_MS = 3000L
+        const val CROSSFADE_STEPS = 30
     }
 }

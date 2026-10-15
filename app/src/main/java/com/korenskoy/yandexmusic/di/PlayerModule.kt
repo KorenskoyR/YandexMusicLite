@@ -17,22 +17,12 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object PlayerModule {
 
-    @Provides
-    @Singleton
-    fun providePlayerRepository(
-        @ApplicationContext context: Context,
-        downloadManager: com.korenskoy.yandexmusic.data.network.TrackDownloadManager,
-        preloadManager: com.korenskoy.yandexmusic.data.network.TrackPreloadManager,
-        wakeLockHelper: com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
-    ): com.korenskoy.yandexmusic.domain.repository.PlayerRepository {
+    private fun createConfiguredExoPlayer(context: Context): ExoPlayer {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        // Prioritize standard Google software decoders (c2.android.* / OMX.google.*)
-        // for audio to prevent speed acceleration / chipmunk effect caused by buggy
-        // vendor hardware audio decoders (common on Android car head units).
         val audioSoftwareCodecSelector = MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
             val decoders = MediaCodecSelector.DEFAULT.getDecoderInfos(
                 mimeType, requiresSecureDecoder, requiresTunnelingDecoder
@@ -51,8 +41,7 @@ object PlayerModule {
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
 
-        // ExoPlayer with Software Audio Decoder priority, AudioAttributes, and safe WakeLock fallback.
-        val player = try {
+        return try {
             ExoPlayer.Builder(context, renderersFactory)
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
                 .setHandleAudioBecomingNoisy(true)
@@ -64,8 +53,21 @@ object PlayerModule {
                 .setHandleAudioBecomingNoisy(true)
                 .build()
         }
+    }
 
-        return com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl(context, player, downloadManager, preloadManager, wakeLockHelper)
+    @Provides
+    @Singleton
+    fun providePlayerRepository(
+        @ApplicationContext context: Context,
+        downloadManager: com.korenskoy.yandexmusic.data.network.TrackDownloadManager,
+        preloadManager: com.korenskoy.yandexmusic.data.network.TrackPreloadManager,
+        wakeLockHelper: com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
+    ): com.korenskoy.yandexmusic.domain.repository.PlayerRepository {
+        val playerA = createConfiguredExoPlayer(context)
+        val playerB = createConfiguredExoPlayer(context)
+        return com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl(
+            context, playerA, playerB, downloadManager, preloadManager, wakeLockHelper
+        )
     }
 
 }

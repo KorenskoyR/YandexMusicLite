@@ -98,7 +98,10 @@ fun AppNavigation() {
         }
         composable("main") {
             MainScreen(
-                viewModel = mainViewModel
+                viewModel = mainViewModel,
+                onNavigateToAuth = {
+                    navController.navigate("auth")
+                }
             )
         }
     }

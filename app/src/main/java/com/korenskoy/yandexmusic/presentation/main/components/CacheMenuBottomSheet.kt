@@ -53,6 +53,7 @@ fun CacheMenuBottomSheet(
     accountName: String = "",
     updateStatus: String? = null,
     onCheckForUpdates: () -> Unit = {},
+    onAccountManagementClick: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val cacheSizeMb = cacheSizeBytes / (1024.0 * 1024.0)
@@ -174,23 +175,27 @@ fun CacheMenuBottomSheet(
                         if (accountName.isNotEmpty()) {
                             Row(
                                 modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.07f),
-                                            Color.White.copy(alpha = 0.03f)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(
+                                                Color.White.copy(alpha = 0.07f),
+                                                Color.White.copy(alpha = 0.03f)
+                                            )
                                         )
                                     )
-                                )
-                                .border(
-                                    BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
-                                    RoundedCornerShape(18.dp)
-                                )
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                                    .border(
+                                        BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
+                                        RoundedCornerShape(18.dp)
+                                    )
+                                    .clickable {
+                                        onAccountManagementClick()
+                                        onDismiss()
+                                    }
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
@@ -584,7 +589,7 @@ fun CacheMenuBottomSheet(
                                 RoundedCornerShape(18.dp)
                             )
                             .clickable {
-                                onLogout()
+                                onAccountManagementClick()
                                 onDismiss()
                             }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -613,7 +618,7 @@ fun CacheMenuBottomSheet(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Войти под другим логином Яндекс",
+                                text = "Переключение профилей и настройки входа",
                                 color = Color.White.copy(alpha = 0.5f),
                                 fontSize = 11.5.sp
                             )
