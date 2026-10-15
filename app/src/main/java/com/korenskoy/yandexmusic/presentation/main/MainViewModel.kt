@@ -1396,30 +1396,53 @@ class MainViewModel @Inject constructor(
         if (current.isRadio) return
         val playlist = _currentPlaylist.value
         val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
-        if (currentIndex != -1 && currentIndex + 1 < playlist.size) {
-            val nextTrack = playlist[currentIndex + 1]
-            if (nextTrack.isRadio) return
-            viewModelScope.launch(Dispatchers.IO) {
-                val nextId = nextTrack.idString
-                val nextTitle = nextTrack.title
-                val nextArtist = nextTrack.artists.firstOrNull()?.name
-                val nextCover = nextTrack.coverUri?.let { uri ->
-                    if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
-                }
-                val nextMp3Url = if (downloadManager.isTrackDownloaded(nextId)) {
-                    ""
-                } else {
-                    preloadManager.preloadSingleTrackPriority(nextId) ?: preloadManager.getOrFetchUrl(nextId)
-                }
-                if (nextMp3Url != null || downloadManager.isTrackDownloaded(nextId)) {
-                    playerRepository.prepareNextTrack(nextId, nextMp3Url ?: "", nextTitle, nextArtist, nextCover)
-                }
+
+        // Proactively refill Vibe queue if remaining tracks <= 5
+        if (_currentSource.value == PlaylistSource.VIBE && (playlist.size - currentIndex <= 5)) {
+            fetchMoreVibeTracks(prefetchOnly = true)
+        }
+
+        val nextTrack = if (currentIndex != -1 && currentIndex + 1 < playlist.size) {
+            playlist[currentIndex + 1]
+        } else if (playlist.isNotEmpty() && _currentSource.value != PlaylistSource.VIBE) {
+            // Loop wrap-around: prepare first track in playlist
+            playlist.first()
+        } else {
+            null
+        }
+
+        if (nextTrack == null || nextTrack.isRadio) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val nextId = nextTrack.idString
+            val nextTitle = nextTrack.title
+            val nextArtist = nextTrack.artists.firstOrNull()?.name
+            val nextCover = nextTrack.coverUri?.let { uri ->
+                if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
+            }
+            val nextMp3Url = if (downloadManager.isTrackDownloaded(nextId)) {
+                ""
+            } else {
+                preloadManager.preloadSingleTrackPriority(nextId) ?: preloadManager.getOrFetchUrl(nextId)
+            }
+            if (nextMp3Url != null || downloadManager.isTrackDownloaded(nextId)) {
+                playerRepository.prepareNextTrack(nextId, nextMp3Url ?: "", nextTitle, nextArtist, nextCover)
             }
         }
     }
 
     fun playNext() {
-        val currentTrack = _currentTrack.value ?: return
+        val currentTrack = _currentTrack.value
+        if (currentTrack == null) {
+            val playlist = _currentPlaylist.value
+            if (playlist.isNotEmpty()) {
+                playTrack(playlist.first().idString, playlist)
+            } else {
+                playAllLikedTracks()
+            }
+            return
+        }
+
         if (currentTrack.isRadio) {
             val currentRadioId = currentTrack.idString.removePrefix("radio_")
             val stations = radioStations.value
@@ -1457,6 +1480,8 @@ class MainViewModel @Inject constructor(
                 val newIndex = updatedPlaylist.indexOfFirst { it.idString == currentId }
                 if (newIndex != -1 && newIndex + 1 < updatedPlaylist.size) {
                     playTrack(updatedPlaylist[newIndex + 1].idString, updatedPlaylist)
+                } else if (updatedPlaylist.isNotEmpty()) {
+                    playTrack(updatedPlaylist.first().idString, updatedPlaylist)
                 } else {
                     // Fallback to library if we totally failed to get new vibe tracks
                     playAllLikedTracks()
@@ -1465,6 +1490,8 @@ class MainViewModel @Inject constructor(
         } else if (playlist.isNotEmpty()) {
             // Wrap around: Loop playlist back to start so playback continues seamlessly
             playTrack(playlist.first().idString, playlist)
+        } else {
+            playAllLikedTracks()
         }
     }
 

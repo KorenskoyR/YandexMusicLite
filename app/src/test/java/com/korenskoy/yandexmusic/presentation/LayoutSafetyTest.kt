@@ -443,21 +443,31 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 11",
-            buildGradle.contains("versionCode = 11"))
-        assertTrue("build.gradle.kts must be versionName 1.3.4",
-            buildGradle.contains("versionName = \"1.3.4\""))
+        assertTrue("build.gradle.kts must be versionCode 12",
+            buildGradle.contains("versionCode = 12"))
+        assertTrue("build.gradle.kts must be versionName 1.3.5",
+            buildGradle.contains("versionName = \"1.3.5\""))
     }
 
     @Test
     fun testWarmStandbyAndEqualPowerCrossfadeIntegration() {
         val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
         assertTrue("PlayerRepositoryImpl must define PREPARE_STANDBY_THRESHOLD_MS",
-            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 15_000L"))
+            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 20_000L"))
+        assertTrue("PlayerRepositoryImpl must define CROSSFADE_DURATION_MS",
+            playerRepo.contains("CROSSFADE_DURATION_MS = 5000L"))
+        assertTrue("PlayerRepositoryImpl must define CROSSFADE_STEPS",
+            playerRepo.contains("CROSSFADE_STEPS = 100"))
         assertTrue("PlayerRepositoryImpl must have prepareNextTrackEvent",
             playerRepo.contains("override val prepareNextTrackEvent: Flow<Unit>"))
         assertTrue("PlayerRepositoryImpl must wait for STATE_READY before starting crossfade",
             playerRepo.contains("incomingStandby.playbackState != Player.STATE_READY"))
+
+        val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
+        assertTrue("MusicService must track transient loss",
+            musicService.contains("wasPlayingBeforeTransientLoss"))
+        assertTrue("MusicService must resume on AUDIOFOCUS_GAIN",
+            musicService.contains("AUDIOFOCUS_GAIN"))
 
         val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
         assertTrue("MainViewModel must observe prepareNextTrackEvent",

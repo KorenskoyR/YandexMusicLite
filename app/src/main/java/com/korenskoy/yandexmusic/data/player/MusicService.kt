@@ -24,12 +24,24 @@ class MusicService : MediaLibraryService() {
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: android.media.AudioManager? = null
     private var focusRequest: android.media.AudioFocusRequest? = null
+    private var wasPlayingBeforeTransientLoss = false
 
     private val audioFocusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
-            android.media.AudioManager.AUDIOFOCUS_LOSS,
-            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+            android.media.AudioManager.AUDIOFOCUS_LOSS -> {
+                wasPlayingBeforeTransientLoss = false
                 playerRepository.pause()
+            }
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                wasPlayingBeforeTransientLoss = playerRepository.isPlaying.value
+                playerRepository.pause()
+            }
+            android.media.AudioManager.AUDIOFOCUS_GAIN -> {
+                if (wasPlayingBeforeTransientLoss) {
+                    wasPlayingBeforeTransientLoss = false
+                    playerRepository.resume()
+                }
             }
         }
     }
@@ -65,7 +77,7 @@ class MusicService : MediaLibraryService() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) {
                     requestSystemAudioFocus()
-                } else {
+                } else if (!wasPlayingBeforeTransientLoss) {
                     abandonSystemAudioFocus()
                 }
             }
