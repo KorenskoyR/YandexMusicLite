@@ -12,7 +12,7 @@
 [![Language](https://img.shields.io/badge/Kotlin-100%25-7F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 
-### Быстрый, лёгкий и красивый плеер Яндекс Музыки для Android
+### Быстрый и лёгкий плеер Яндекс Музыки для Android
 
 Создан для смартфонов, планшетов и автомагнитол — весит всего ~6 МБ, моментально запускается, не перегружает память и играет музыку без пауз и рекламы.
 
