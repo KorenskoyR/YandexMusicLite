@@ -70,16 +70,21 @@ class TrackDownloadManager @Inject constructor(
         
         try {
             val request = Request.Builder().url(url).build()
-            val response = okHttpClient.newCall(request).execute()
-            
-            if (!response.isSuccessful) return@withContext false
-            
-            val body = response.body ?: return@withContext false
-            
-            FileOutputStream(tempFile).use { fos ->
-                body.byteStream().use { inputStream ->
-                    inputStream.copyTo(fos)
+            val isSuccess = okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use false
+                val body = response.body ?: return@use false
+                
+                FileOutputStream(tempFile).use { fos ->
+                    body.byteStream().use { inputStream ->
+                        inputStream.copyTo(fos)
+                    }
                 }
+                true
+            }
+            
+            if (!isSuccess) {
+                tempFile.delete()
+                return@withContext false
             }
             
             // Rename after successful download

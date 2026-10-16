@@ -1,6 +1,8 @@
 package com.korenskoy.yandexmusic.presentation
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
@@ -443,10 +445,10 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 15",
-            buildGradle.contains("versionCode = 15"))
-        assertTrue("build.gradle.kts must be versionName 1.3.8",
-            buildGradle.contains("versionName = \"1.3.8\""))
+        assertTrue("build.gradle.kts must be versionCode 16",
+            buildGradle.contains("versionCode = 16"))
+        assertTrue("build.gradle.kts must be versionName 1.3.9",
+            buildGradle.contains("versionName = \"1.3.9\""))
     }
 
     @Test
@@ -482,6 +484,69 @@ class LayoutSafetyTest {
             viewModel.contains("playerRepository.prepareNextTrackEvent"))
         assertTrue("MainViewModel must implement prepareNextTrackInQueue",
             viewModel.contains("fun prepareNextTrackInQueue()"))
+    }
+
+    @Test
+    fun testMd5HelperFallbackSaltArchitecture() {
+        val md5HelperFile = File(sourceDir, "data/network/Md5Helper.kt").readText()
+        assertTrue("Md5Helper must define FALLBACK_SALT",
+            md5HelperFile.contains("const val FALLBACK_SALT = \"XGR3485624001b979\""))
+        assertTrue("Md5Helper must fallback if BuildConfig.YANDEX_SALT is blank",
+            md5HelperFile.contains("if (BuildConfig.YANDEX_SALT.isNotBlank()) BuildConfig.YANDEX_SALT else FALLBACK_SALT"))
+        assertEquals("Md5Helper.FALLBACK_SALT must match standard production salt",
+            "XGR3485624001b979", com.korenskoy.yandexmusic.data.network.Md5Helper.FALLBACK_SALT)
+        assertTrue("Md5Helper.SALT must not be blank",
+            com.korenskoy.yandexmusic.data.network.Md5Helper.SALT.isNotBlank())
+    }
+
+    @Test
+    fun testTrackPreloadManagerTtlAndEvictUrlArchitecture() {
+        val preloadManagerFile = File(sourceDir, "data/network/TrackPreloadManager.kt").readText()
+        assertTrue("TrackPreloadManager must define URL_TTL_MS constant",
+            preloadManagerFile.contains("URL_TTL_MS = 45 * 60 * 1000L"))
+        assertTrue("TrackPreloadManager must implement evictUrl",
+            preloadManagerFile.contains("fun evictUrl(trackId: String)"))
+        assertTrue("TrackPreloadManager must skip radio streams",
+            preloadManagerFile.contains("trackId.startsWith(\"radio_\")"))
+        assertTrue("TrackPreloadManager must check TTL expiration",
+            preloadManagerFile.contains("System.currentTimeMillis() - cached.fetchedAtMs > URL_TTL_MS"))
+
+        val playerRepoFile = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
+        assertTrue("PlayerRepositoryImpl must evict URL on player error",
+            playerRepoFile.contains("preloadManager.evictUrl(failedTrackId)"))
+    }
+
+    @Test
+    fun testLikedTracksZeroLikesSanitization() {
+        val viewModelFile = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertFalse("MainViewModel must not call landing personal-playlists fallback",
+            viewModelFile.contains("landing3?blocks=personal-playlists"))
+        assertFalse("MainViewModel must not call getPlaylistsListRaw fallback",
+            viewModelFile.contains("api.getPlaylistsListRaw(targetUid)"))
+        assertFalse("MainViewModel must not call liked playlists fallback",
+            viewModelFile.contains("likes/playlists"))
+        assertTrue("MainViewModel must reset liked tracks when allIds is empty",
+            viewModelFile.contains("User has 0 liked tracks. Resetting state."))
+        assertTrue("MainViewModel must save empty liked tracks to cache on 0 likes",
+            viewModelFile.contains("cacheManager.saveLikedTracks(activeUserFolder, emptyList())"))
+    }
+
+    @Test
+    fun testMultiAccountCacheIsolationNewProfileEmpty() {
+        val cacheManagerFile = File(sourceDir, "data/cache/PlaylistCacheManager.kt").readText()
+        assertFalse("PlaylistCacheManager must not copy legacy cache to new user folders",
+            cacheManagerFile.contains("val legacyFile = File(rootCacheDir, \"liked_tracks.json\")"))
+    }
+
+    @Test
+    fun testSearchDebounceAndJobCancellation() {
+        val viewModelFile = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertTrue("MainViewModel must declare searchJob",
+            viewModelFile.contains("private var searchJob: Job? = null"))
+        assertTrue("MainViewModel must cancel obsolete searchJob on query change",
+            viewModelFile.contains("searchJob?.cancel()"))
+        assertTrue("MainViewModel must implement 300ms debounce delay",
+            viewModelFile.contains("delay(300L)"))
     }
 }
 

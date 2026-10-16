@@ -21,12 +21,28 @@ class TrackPreloadManager @Inject constructor(
     private val downloadManager: TrackDownloadManager,
     private val okHttpClient: OkHttpClient
 ) {
+    private data class CachedTrackUrl(val url: String, val fetchedAtMs: Long)
+
+    companion object {
+        const val URL_TTL_MS = 45 * 60 * 1000L // 45 минут
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val resolvedUrls = ConcurrentHashMap<String, String>()
+    private val resolvedUrls = ConcurrentHashMap<String, CachedTrackUrl>()
     private val inFlightRequests = ConcurrentHashMap<String, Deferred<String?>>()
 
     fun getResolvedUrl(trackId: String): String? {
-        return resolvedUrls[trackId]
+        val cached = resolvedUrls[trackId] ?: return null
+        if (System.currentTimeMillis() - cached.fetchedAtMs > URL_TTL_MS) {
+            resolvedUrls.remove(trackId)
+            return null
+        }
+        return cached.url
+    }
+
+    fun evictUrl(trackId: String) {
+        resolvedUrls.remove(trackId)
+        inFlightRequests.remove(trackId)?.cancel()
     }
 
     fun preloadTracks(trackIds: List<String>) {
@@ -44,12 +60,15 @@ class TrackPreloadManager @Inject constructor(
     }
 
     suspend fun getOrFetchUrl(trackId: String): String? {
+        val cached = getResolvedUrl(trackId)
+        if (cached != null) return cached
         return fetchOrAwait(trackId)
     }
 
     private suspend fun fetchOrAwait(trackId: String): String? {
+        if (trackId.startsWith("radio_")) return null
         if (downloadManager.isTrackDownloaded(trackId)) return null
-        resolvedUrls[trackId]?.let { return it }
+        getResolvedUrl(trackId)?.let { return it }
 
         val deferred = inFlightRequests.computeIfAbsent(trackId) {
             scope.async(Dispatchers.IO) {
@@ -65,7 +84,7 @@ class TrackPreloadManager @Inject constructor(
                     if (infoUrl != null) {
                         val mp3Url = resolveXmlToMp3Url(infoUrl)
                         if (mp3Url != null) {
-                            resolvedUrls[trackId] = mp3Url
+                            resolvedUrls[trackId] = CachedTrackUrl(mp3Url, System.currentTimeMillis())
                             Log.d("TrackPreloadManager", "Successfully resolved URL for track $trackId")
                             return@async mp3Url
                         }
@@ -96,10 +115,11 @@ class TrackPreloadManager @Inject constructor(
     private suspend fun resolveXmlToMp3Url(infoUrl: String): String? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url(infoUrl).build()
-            val response = okHttpClient.newCall(request).execute()
-            val xmlResponse = response.body?.string() ?: return@withContext null
-            
-            val xmlData = DownloadInfoParser.parseXml(xmlResponse)
+            val xmlData = okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val xmlResponse = response.body?.string() ?: return@use null
+                DownloadInfoParser.parseXml(xmlResponse)
+            }
             if (xmlData != null) {
                 return@withContext Md5Helper.generateMp3Url(
                     xmlData.host,

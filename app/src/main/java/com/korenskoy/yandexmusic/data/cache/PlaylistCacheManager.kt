@@ -47,17 +47,7 @@ class PlaylistCacheManager @Inject constructor(
         if (userFile.exists()) {
             loadList(userDir, "liked_tracks.json")
         } else {
-            // Check legacy un-isolated file for automatic migration
-            val legacyFile = File(rootCacheDir, "liked_tracks.json")
-            if (legacyFile.exists()) {
-                val legacyTracks = loadList(rootCacheDir, "liked_tracks.json")
-                if (legacyTracks.isNotEmpty()) {
-                    saveList(userDir, "liked_tracks.json", legacyTracks)
-                }
-                legacyTracks
-            } else {
-                emptyList()
-            }
+            emptyList()
         }
     }
 

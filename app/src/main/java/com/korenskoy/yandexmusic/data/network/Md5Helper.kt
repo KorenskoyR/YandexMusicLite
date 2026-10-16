@@ -4,7 +4,8 @@ import com.korenskoy.yandexmusic.BuildConfig
 import java.security.MessageDigest
 
 object Md5Helper {
-    private const val SALT = BuildConfig.YANDEX_SALT
+    const val FALLBACK_SALT = "XGR3485624001b979"
+    val SALT: String = if (BuildConfig.YANDEX_SALT.isNotBlank()) BuildConfig.YANDEX_SALT else FALLBACK_SALT
 
     fun generateMp3Url(host: String, path: String, ts: String, s: String): String {
         // path starts with "/", substring(1) removes it

@@ -68,16 +68,17 @@ class GitHubUpdateManager @Inject constructor(
                 .header("User-Agent", "YandexMusicLite-Android")
                 .build()
 
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                if (response.code == 404) {
-                    return@withContext UpdateCheckResult.UpToDate(BuildConfig.VERSION_NAME)
+            val release = okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    if (response.code == 404) {
+                        return@withContext UpdateCheckResult.UpToDate(BuildConfig.VERSION_NAME)
+                    }
+                    return@withContext UpdateCheckResult.Error("HTTP ${response.code}: ${response.message}")
                 }
-                return@withContext UpdateCheckResult.Error("HTTP ${response.code}: ${response.message}")
-            }
 
-            val body = response.body?.string() ?: return@withContext UpdateCheckResult.Error("Пустой ответ от GitHub API")
-            val release = json.decodeFromString<GitHubReleaseDto>(body)
+                val body = response.body?.string() ?: return@withContext UpdateCheckResult.Error("Пустой ответ от GitHub API")
+                json.decodeFromString<GitHubReleaseDto>(body)
+            }
 
             val remoteVersion = release.tagName.removePrefix("v").trim()
             val localVersion = BuildConfig.VERSION_NAME.removePrefix("v").trim()
@@ -164,37 +165,45 @@ class GitHubUpdateManager @Inject constructor(
                 .header("User-Agent", "YandexMusicLite-Android")
                 .build()
 
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("HTTP ${response.code} при скачивании обновления"))
-            }
-
-            val responseBody = response.body ?: return@withContext Result.failure(Exception("Пустое тело ответа"))
-            val contentLength = responseBody.contentLength()
-
-            responseBody.byteStream().use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    val buffer = ByteArray(8 * 1024)
-                    var bytesRead: Int
-                    var totalRead = 0L
-
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        totalRead += bytesRead
-                        if (contentLength > 0) {
-                            val progress = (totalRead.toFloat() / contentLength).coerceIn(0f, 1f)
-                            onProgress(progress)
-                        }
-                    }
-                    output.flush()
+            val downloadResult = okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${response.code} при скачивании обновления"))
                 }
-            }
 
-            if (tempFile.exists()) {
+                val responseBody = response.body ?: return@withContext Result.failure(Exception("Пустое тело ответа"))
+                val contentLength = responseBody.contentLength()
+
+                responseBody.byteStream().use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        val buffer = ByteArray(8 * 1024)
+                        var bytesRead: Int
+                        var totalRead = 0L
+
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            totalRead += bytesRead
+                            if (contentLength > 0) {
+                                val progress = (totalRead.toFloat() / contentLength).coerceIn(0f, 1f)
+                                onProgress(progress)
+                            }
+                        }
+                        output.flush()
+                    }
+                }
+
                 if (contentLength > 0 && tempFile.length() != contentLength) {
                     tempFile.delete()
                     return@withContext Result.failure(Exception("Загрузка прервана: получено ${tempFile.length()} из $contentLength байт"))
                 }
+                true
+            }
+
+            if (!downloadResult) {
+                if (tempFile.exists()) tempFile.delete()
+                return@withContext Result.failure(Exception("Ошибка сохранения обновления"))
+            }
+
+            if (tempFile.exists()) {
                 if (targetFile.exists()) targetFile.delete()
                 tempFile.renameTo(targetFile)
             }

@@ -14,7 +14,16 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(FileInputStream(localPropertiesFile))
 }
-val yandexSalt = localProperties.getProperty("YANDEX_SALT") ?: "\"\""
+val defaultSalt = "\"XGR3485624001b979\""
+val rawSalt = localProperties.getProperty("YANDEX_SALT")
+    ?: System.getenv("YANDEX_SALT")
+val yandexSalt = if (rawSalt.isNullOrBlank()) {
+    defaultSalt
+} else if (rawSalt.startsWith("\"") && rawSalt.endsWith("\"")) {
+    rawSalt
+} else {
+    "\"$rawSalt\""
+}
 
 android {
     namespace = "com.korenskoy.yandexmusic"
@@ -26,8 +35,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 24
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.3.8"
+        versionCode = 16
+        versionName = "1.3.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         

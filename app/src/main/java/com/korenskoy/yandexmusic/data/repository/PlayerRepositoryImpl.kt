@@ -198,6 +198,9 @@ class PlayerRepositoryImpl @Inject constructor(
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 android.util.Log.e("PlayerRepositoryImpl", "ExoPlayer error on player[$playerIdx]: ${error.errorCodeName}", error)
                 if (activePlayerIndex == playerIdx) {
+                    _currentTrackId.value?.let { failedTrackId ->
+                        preloadManager.evictUrl(failedTrackId)
+                    }
                     wakeLockHelper.releaseTransitionLock()
                     isTransitioning = false
                     isCrossfading = false

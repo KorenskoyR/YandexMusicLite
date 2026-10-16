@@ -370,6 +370,13 @@ class MainViewModel @Inject constructor(
                                 }
                                 cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
                             }
+                        } else {
+                            Log.d("LikedTracks", "[SilentRefresh] Library has 0 tracks, resetting state.")
+                            withContext(Dispatchers.Main) {
+                                _tracks.value = emptyList()
+                                _likedTrackIds.value = emptySet()
+                            }
+                            cacheManager.saveLikedTracks(activeUserFolder, emptyList())
                         }
                     } catch (e: Exception) {
                         Log.e("MainViewModel", "Silent refresh liked failed", e)
@@ -730,51 +737,6 @@ class MainViewModel @Inject constructor(
                     }
                 }
 
-                if (allIds.isEmpty()) {
-                    Log.d("LikedTracks", "Trying landing personal-playlists...")
-                    try {
-                        val landing = api.getRawUrl("https://api.music.yandex.net/landing3?blocks=personal-playlists")
-                        Log.d("LikedTracks", "landing raw JSON: ${landing.result?.toString()?.take(600)}")
-                        val landingIds = extractTrackIdsFromJson(landing.result)
-                        Log.d("LikedTracks", "landing extracted track IDs: ${landingIds.size}")
-                        if (landingIds.isNotEmpty()) {
-                            allIds = landingIds.toSet()
-                        }
-                    } catch (e: Exception) {
-                        Log.w("LikedTracks", "Landing personal-playlists failed: ${e.message}")
-                    }
-                }
-
-                if (allIds.isEmpty()) {
-                    Log.d("LikedTracks", "Trying user playlists list...")
-                    try {
-                        val plList = api.getPlaylistsListRaw(targetUid)
-                        Log.d("LikedTracks", "plList full JSON: ${plList.result?.toString()}")
-                        val plIds = extractTrackIdsFromJson(plList.result)
-                        Log.d("LikedTracks", "plList extracted track IDs: ${plIds.size}")
-                        if (plIds.isNotEmpty()) {
-                            allIds = plIds.toSet()
-                        }
-                    } catch (e: Exception) {
-                        Log.w("LikedTracks", "User playlists list failed: ${e.message}")
-                    }
-                }
-
-                if (allIds.isEmpty()) {
-                    Log.d("LikedTracks", "Trying liked playlists...")
-                    try {
-                        val likedPl = api.getRawUrl("https://api.music.yandex.net/users/$targetUid/likes/playlists")
-                        Log.d("LikedTracks", "likedPl JSON: ${likedPl.result?.toString()?.take(600)}")
-                        val likedPlIds = extractTrackIdsFromJson(likedPl.result)
-                        Log.d("LikedTracks", "likedPl extracted track IDs: ${likedPlIds.size}")
-                        if (likedPlIds.isNotEmpty()) {
-                            allIds = likedPlIds.toSet()
-                        }
-                    } catch (e: Exception) {
-                        Log.w("LikedTracks", "Liked playlists failed: ${e.message}")
-                    }
-                }
-
                 if (allIds.isNotEmpty()) {
                     Log.d("LikedTracks", "=== Total Liked Track IDs found = ${allIds.size} ===")
                     withContext(Dispatchers.Main) {
@@ -846,7 +808,12 @@ class MainViewModel @Inject constructor(
                         downloadAllLikedTracks()
                     }
                 } else {
-                    Log.w("LikedTracks", "=== API RETURNED NO TRACKS ACROSS ALL ENDPOINTS ===")
+                    Log.d("LikedTracks", "=== User has 0 liked tracks. Resetting state. ===")
+                    withContext(Dispatchers.Main) {
+                        _likedTrackIds.value = emptySet()
+                        _tracks.value = emptyList()
+                    }
+                    cacheManager.saveLikedTracks(activeUserFolder, emptyList())
                 }
             } catch (e: Exception) {
                 Log.e("LikedTracks", "=== loadLikedTracks EXCEPTION ===", e)
@@ -905,6 +872,8 @@ class MainViewModel @Inject constructor(
     fun toggleLike(track: TrackDetailsDto) {
         val trackId = track.idString
         val isCurrentlyLiked = isTrackLiked(trackId)
+        val previousLikedIds = _likedTrackIds.value
+        val previousTracks = _tracks.value
         
         // Optimistic UI update for likedTrackIds and library tracks
         _likedTrackIds.value = if (isCurrentlyLiked) {
@@ -938,13 +907,12 @@ class MainViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error toggling like", e)
-                // Revert on error
-                _likedTrackIds.value = if (isCurrentlyLiked) {
-                    _likedTrackIds.value + trackId
-                } else {
-                    _likedTrackIds.value - trackId
+                // Full revert of both IDs and tracks on error
+                withContext(Dispatchers.Main) {
+                    _likedTrackIds.value = previousLikedIds
+                    _tracks.value = previousTracks
                 }
-                cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
+                cacheManager.saveLikedTracks(activeUserFolder, previousTracks)
             }
         }
     }
@@ -1130,26 +1098,30 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private var searchJob: Job? = null
+
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
-        if (query.length > 2) {
-            performSearch(query)
+        searchJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.length > 2) {
+            searchJob = viewModelScope.launch {
+                try {
+                    delay(300L)
+                    _isSearching.value = true
+                    val response = api.search(trimmed)
+                    _searchResults.value = response.result?.tracks?.results ?: emptyList()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("MainViewModel", "Search error", e)
+                } finally {
+                    _isSearching.value = false
+                }
+            }
         } else {
             _searchResults.value = emptyList()
-        }
-    }
-
-    private fun performSearch(query: String) {
-        viewModelScope.launch {
-            try {
-                _isSearching.value = true
-                val response = api.search(query)
-                _searchResults.value = response.result?.tracks?.results ?: emptyList()
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Search error", e)
-            } finally {
-                _isSearching.value = false
-            }
+            _isSearching.value = false
         }
     }
 
