@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Android](https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
-[![Version](https://img.shields.io/badge/Version-1.2.0-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.9-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
 [![Size](https://img.shields.io/badge/APK%20Size-5.8%20MB-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
 [![Language](https://img.shields.io/badge/Kotlin-100%25-7F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
@@ -11,7 +11,40 @@
 **Быстрый, легковесный клиент Яндекс Музыки.**  
 Создан для смартфонов, планшетов и автомагнитол на базе Android.
 
-[📥 Скачать актуальный APK](https://github.com/KorenskoyR/YandexMusicLite/releases/latest) • [✨ Возможности](#-основные-возможности) • [🚗 Авторежим](#-режим-в-автомобиле-car-mode) • [🛠 Сборка](#-сборка-из-исходников)
+[📥 Скачать актуальный APK](https://github.com/KorenskoyR/YandexMusicLite/releases/latest) • [📸 Скриншоты](#-скриншоты) • [✨ Возможности](#-основные-возможности) • [🚗 Авторежим](#-режим-в-автомобиле-car-mode) • [🛠 Сборка](#-сборка-из-исходников)
+
+<br/>
+
+<a href="#-скриншоты">
+  <img src="screenshots/1.jpg" width="280" alt="Yandex Music Lite — Главный экран «Моя Волна»" />
+</a>
+
+</div>
+
+---
+
+## 📸 Скриншоты
+
+<div align="center">
+
+### 🌟 Главный экран
+<img src="screenshots/1.jpg" width="300" alt="Главный экран — Моя Волна" />
+
+*«Моя Волна» — персональный бесконечный поток музыки с адаптивным дизайном Liquid Glass*
+
+<br/>
+
+### 📱 Разделы интерфейса
+
+| 🔍 Каталог и Поиск | ❤️ Медиатека («Мне нравится») |
+|:---:|:---:|
+| <img src="screenshots/2.jpg" width="280" alt="Каталог и Поиск" /> | <img src="screenshots/3.jpg" width="280" alt="Мне нравится" /> |
+| *Поиск, хиты недели и тренды* | *Любимые треки с оффлайн-кэшем* |
+
+| 📻 Встроенное FM Радио | 🚗 Режим «В автомобиле» |
+|:---:|:---:|
+| <img src="screenshots/4.jpg" width="280" alt="FM Радио" /> | <img src="screenshots/5.jpg" width="280" alt="В автомобиле" /> |
+| *37+ радиостанций с прямым эфиром* | *Car Mode для Android-магнитол и вождения* |
 
 </div>
 
