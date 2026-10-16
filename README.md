@@ -25,12 +25,26 @@
 ## 📸 Скриншоты интерфейса
 
 <div align="center">
+  <img src="screenshots/showcase.png" alt="Скриншоты интерфейса Yandex Music Lite" />
+</div>
 
-| 🌟 1. Моя Волна *(Главная)* | 2. Каталог и поиск | 3. Любимые треки | 4. FM Радио | 5. Режим «В авто» |
-| :---: | :---: | :---: | :---: | :---: |
-| <img src="screenshots/1.jpg" width="160" height="330" alt="Моя Волна" /> | <img src="screenshots/2.jpg" width="160" height="330" alt="Поиск и Чарты" /> | <img src="screenshots/3.jpg" width="160" height="330" alt="Мне нравится" /> | <img src="screenshots/4.jpg" width="160" height="330" alt="FM Радио" /> | <img src="screenshots/5.jpg" width="160" height="330" alt="В авто" /> |
+<details>
+<summary><b>🔍 Посмотреть отдельные экраны в полном разрешении</b></summary>
+<br/>
+
+<div align="center">
+
+| [🌟 1. Моя Волна (Главная)](screenshots/1.jpg) | [🔍 2. Каталог и поиск](screenshots/2.jpg) | [❤️ 3. Любимые треки](screenshots/3.jpg) |
+| :---: | :---: | :---: |
+| <a href="screenshots/1.jpg"><img src="screenshots/1.jpg" width="220" alt="Моя Волна" /></a> | <a href="screenshots/2.jpg"><img src="screenshots/2.jpg" width="220" alt="Поиск и Чарты" /></a> | <a href="screenshots/3.jpg"><img src="screenshots/3.jpg" width="220" alt="Мне нравится" /></a> |
+
+| [📻 4. FM Радио](screenshots/4.jpg) | [🚗 5. Режим «В авто»](screenshots/5.jpg) |
+| :---: | :---: |
+| <a href="screenshots/4.jpg"><img src="screenshots/4.jpg" width="220" alt="FM Радио" /></a> | <a href="screenshots/5.jpg"><img src="screenshots/5.jpg" width="220" alt="В авто" /></a> |
 
 </div>
+
+</details>
 
 ---
 
