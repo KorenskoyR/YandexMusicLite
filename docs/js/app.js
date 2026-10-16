@@ -5,8 +5,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const GITHUB_REPO = 'KorenskoyR/YandexMusicLite';
-  const FALLBACK_VERSION = 'v1.3.9';
-  const FALLBACK_DOWNLOAD_URL = `https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/YandexMusicLite.apk`;
+  const FALLBACK_DOWNLOAD_URL = `https://github.com/${GITHUB_REPO}/releases/latest/download/YandexMusicLite.apk`;
 
   let currentDownloadUrl = FALLBACK_DOWNLOAD_URL;
 
@@ -23,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const release = await response.json();
 
-      const tagName = release.tag_name || FALLBACK_VERSION;
       const apkAsset = (release.assets || []).find(a => a.name.endsWith('.apk'));
 
       if (apkAsset) {
@@ -31,21 +29,21 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBtns.forEach(btn => {
           btn.href = currentDownloadUrl;
           const label = btn.querySelector('.btn-label');
-          if (label) label.textContent = `Скачать APK (${tagName})`;
+          if (label) label.textContent = 'Скачать APK';
         });
       }
 
       if (versionBadge) {
-        versionBadge.textContent = `Версия ${tagName}`;
+        versionBadge.textContent = 'Актуальный релиз';
       }
     } catch {
-      // Graceful fallback to static v1.3.9 release values
+      // Graceful fallback
       downloadBtns.forEach(btn => {
         btn.href = FALLBACK_DOWNLOAD_URL;
         const label = btn.querySelector('.btn-label');
-        if (label) label.textContent = `Скачать APK (${FALLBACK_VERSION})`;
+        if (label) label.textContent = 'Скачать APK';
       });
-      if (versionBadge) versionBadge.textContent = `Версия ${FALLBACK_VERSION}`;
+      if (versionBadge) versionBadge.textContent = 'Актуальный релиз';
     }
 
     renderQrCode(currentDownloadUrl);

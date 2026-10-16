@@ -8,7 +8,7 @@
 
 [![Website](https://img.shields.io/badge/Website-GitHub%20Pages-FF9900.svg?style=for-the-badge&logo=googlechrome&logoColor=white)](https://korenskoyr.github.io/YandexMusicLite/)
 [![Android](https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
-[![Version](https://img.shields.io/badge/Version-1.3.9-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
+[![Release](https://img.shields.io/badge/Release-Latest-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
 [![Performance](https://img.shields.io/badge/Performance-Ultra%20Fast-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite)
 [![Language](https://img.shields.io/badge/Kotlin-100%25-7F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)

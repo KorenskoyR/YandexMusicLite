@@ -776,7 +776,7 @@ h1, h2, h3, h4 {
   max-width: 360px;
   background: #0E121B;
   border-radius: 26px;
-  padding: 14px 14px 18px;
+  padding: 14px;
   border: 1.5px solid rgba(255, 153, 0, 0.3);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(255, 120, 0, 0.2);
   transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
@@ -853,42 +853,7 @@ h1, h2, h3, h4 {
   pointer-events: none;
 }
 
-/* Equalizer Bars Animation */
-.car-equalizer-bar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 5px;
-  height: 24px;
-  margin-top: 14px;
-  padding: 0 10px;
-}
 
-.eq-bar {
-  flex: 1;
-  max-width: 14px;
-  background: linear-gradient(180deg, #FF9900 0%, #FF5500 100%);
-  border-radius: 4px;
-  animation: eqPulse 1.2s ease-in-out infinite alternate;
-}
-
-.eq-bar:nth-child(2) { animation-delay: 0.2s; }
-.eq-bar:nth-child(3) { animation-delay: 0.4s; }
-.eq-bar:nth-child(4) { animation-delay: 0.1s; }
-.eq-bar:nth-child(5) { animation-delay: 0.5s; }
-.eq-bar:nth-child(6) { animation-delay: 0.3s; }
-.eq-bar:nth-child(7) { animation-delay: 0.6s; }
-.eq-bar:nth-child(8) { animation-delay: 0.25s; }
-.eq-bar:nth-child(9) { animation-delay: 0.45s; }
-.eq-bar:nth-child(10) { animation-delay: 0.15s; }
-.eq-bar:nth-child(11) { animation-delay: 0.35s; }
-.eq-bar:nth-child(12) { animation-delay: 0.55s; }
-
-@keyframes eqPulse {
-  0% { height: 4px; opacity: 0.4; }
-  50% { height: 18px; opacity: 0.85; }
-  100% { height: 10px; opacity: 0.6; }
-}
 
 /* ===================================================================
    Full Showcase Banner
