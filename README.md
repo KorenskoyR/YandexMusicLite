@@ -28,7 +28,7 @@
 
 | 🌟 1. Моя Волна *(Главная)* | 2. Каталог и поиск | 3. Любимые треки | 4. FM Радио | 5. Режим «В авто» |
 | :---: | :---: | :---: | :---: | :---: |
-| <img src="screenshots/1.jpg" width="160" alt="Моя Волна" /> | <img src="screenshots/2.jpg" width="160" alt="Поиск и Чарты" /> | <img src="screenshots/3.jpg" width="160" alt="Мне нравится" /> | <img src="screenshots/4.jpg" width="160" alt="FM Радио" /> | <img src="screenshots/5.jpg" width="160" alt="В авто" /> |
+| <img src="screenshots/1.jpg" width="160" height="330" alt="Моя Волна" /> | <img src="screenshots/2.jpg" width="160" height="330" alt="Поиск и Чарты" /> | <img src="screenshots/3.jpg" width="160" height="330" alt="Мне нравится" /> | <img src="screenshots/4.jpg" width="160" height="330" alt="FM Радио" /> | <img src="screenshots/5.jpg" width="160" height="330" alt="В авто" /> |
 
 </div>
 
