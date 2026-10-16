@@ -768,26 +768,126 @@ h1, h2, h3, h4 {
   position: relative;
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
-.car-frame {
-  max-width: 380px;
-  border-radius: 28px;
+.car-device-frame {
+  width: 100%;
+  max-width: 360px;
+  background: #0E121B;
+  border-radius: 26px;
+  padding: 14px 14px 18px;
+  border: 1.5px solid rgba(255, 153, 0, 0.3);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(255, 120, 0, 0.2);
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
+  animation: carAmbientFloat 6s ease-in-out infinite alternate;
+}
+
+.car-device-frame:hover {
+  transform: translateY(-5px);
+  border-color: rgba(255, 153, 0, 0.55);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85), 0 0 50px rgba(255, 120, 0, 0.35);
+}
+
+@keyframes carAmbientFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
+}
+
+.car-device-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 8px 10px;
+  font-size: 0.75rem;
+  color: #94A3B8;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.car-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #22C55E;
+  box-shadow: 0 0 8px #22C55E;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.car-status-title {
+  display: flex;
+  align-items: center;
+  color: #CBD5E1;
+}
+
+.car-status-clock {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--neon-gold);
+}
+
+.car-screen-inner {
+  position: relative;
+  width: 100%;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(255, 107, 0, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  transform: perspective(1000px) rotateY(-6deg) rotateX(2deg);
-  transition: transform var(--transition-smooth);
+  background: #07090E;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.car-frame:hover {
-  transform: perspective(1000px) rotateY(0deg) rotateX(0deg) scale(1.02);
-}
-
-.car-frame img {
+.car-screen-img {
   width: 100%;
   height: auto;
   display: block;
+  object-fit: cover;
+}
+
+.car-screen-glare {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Equalizer Bars Animation */
+.car-equalizer-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  margin-top: 14px;
+  padding: 0 10px;
+}
+
+.eq-bar {
+  flex: 1;
+  max-width: 14px;
+  background: linear-gradient(180deg, #FF9900 0%, #FF5500 100%);
+  border-radius: 4px;
+  animation: eqPulse 1.2s ease-in-out infinite alternate;
+}
+
+.eq-bar:nth-child(2) { animation-delay: 0.2s; }
+.eq-bar:nth-child(3) { animation-delay: 0.4s; }
+.eq-bar:nth-child(4) { animation-delay: 0.1s; }
+.eq-bar:nth-child(5) { animation-delay: 0.5s; }
+.eq-bar:nth-child(6) { animation-delay: 0.3s; }
+.eq-bar:nth-child(7) { animation-delay: 0.6s; }
+.eq-bar:nth-child(8) { animation-delay: 0.25s; }
+.eq-bar:nth-child(9) { animation-delay: 0.45s; }
+.eq-bar:nth-child(10) { animation-delay: 0.15s; }
+.eq-bar:nth-child(11) { animation-delay: 0.35s; }
+.eq-bar:nth-child(12) { animation-delay: 0.55s; }
+
+@keyframes eqPulse {
+  0% { height: 4px; opacity: 0.4; }
+  50% { height: 18px; opacity: 0.85; }
+  100% { height: 10px; opacity: 0.6; }
 }
 
 /* ===================================================================

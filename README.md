@@ -9,13 +9,13 @@
 [![Website](https://img.shields.io/badge/Website-GitHub%20Pages-FF9900.svg?style=for-the-badge&logo=googlechrome&logoColor=white)](https://korenskoyr.github.io/YandexMusicLite/)
 [![Android](https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
 [![Version](https://img.shields.io/badge/Version-1.3.9-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
-[![Size](https://img.shields.io/badge/APK%20Size-5.8%20MB-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
+[![Performance](https://img.shields.io/badge/Performance-Ultra%20Fast-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite)
 [![Language](https://img.shields.io/badge/Kotlin-100%25-7F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 
 ### Быстрый и лёгкий плеер Яндекс Музыки для Android
 
-Создан для смартфонов, планшетов и автомагнитол — весит всего ~6 МБ, моментально запускается, не перегружает память.
+Создан для смартфонов, планшетов и автомагнитол — моментально запускается, не перегружает память и играет музыку без рекламы.
 
 [🌐 Официальный промо-сайт](https://korenskoyr.github.io/YandexMusicLite/) • [📥 Скачать актуальный APK](https://github.com/KorenskoyR/YandexMusicLite/releases/latest) • [📸 Скриншоты](#-скриншоты-интерфейса) • [✨ Особенности](#-главные-особенности) • [🚗 В автомобиле](#-специально-для-автомобиля-car-mode) • [🛠 Сборка](#-сборка-из-исходников)
 
@@ -52,7 +52,7 @@
 ## ✨ Главные особенности
 
 - 🌊 **«Моя волна» в одно касание**: включите персональный поток музыки, который моментально подстраивается под ваш вкус. Нажали одну кнопку — и треки играют бесконечно, без повторов одного и того же.
-- ⚡ **Невероятная лёгкость (всего ~6 МБ)**: приложение в десятки раз компактнее официального клиента. Оно моментально запускается, бережёт заряд аккумулятора и работает быстро даже на бюджетных смартфонах и китайских магнитолах.
+- ⚡ **Мгновенный старт и отзывчивость**: приложение открывается за доли секунды, бережёт заряд аккумулятора и работает плавно даже на бюджетных смартфонах и китайских магнитолах.
 - 🚗 **Удобный режим для авто (Car Mode)**: продуманный экран с крупными кнопками, часами и быстрым переключением между волной, избранным и радио. Комфортно управлять музыкой за рулём, не отвлекаясь от дороги.
 - 🎨 **Эстетичный дизайн Liquid Glass**: стильная тёмная тема, парящие полупрозрачные панели, мягкие неоновые переливы и обложки высокого разрешения. Приятно пользоваться днём и не слепит глаза ночью.
 - 📻 **Эфирное FM Радио**: 37+ популярных радиостанций в прямом эфире прямо в приложении — от танцевальной музыки до рока и новостей.

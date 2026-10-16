@@ -6,7 +6,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const GITHUB_REPO = 'KorenskoyR/YandexMusicLite';
   const FALLBACK_VERSION = 'v1.3.9';
-  const FALLBACK_SIZE = '5.8 МБ';
   const FALLBACK_DOWNLOAD_URL = `https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/YandexMusicLite.apk`;
 
   let currentDownloadUrl = FALLBACK_DOWNLOAD_URL;
@@ -15,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const initReleaseInfo = async () => {
     const downloadBtns = document.querySelectorAll('.js-download-btn');
     const versionBadge = document.querySelector('.js-version-badge');
-    const sizeBadge = document.querySelector('.js-size-badge');
 
     try {
       const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
@@ -30,12 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (apkAsset) {
         currentDownloadUrl = apkAsset.browser_download_url;
-        const sizeMb = (apkAsset.size / (1024 * 1024)).toFixed(1);
-        if (sizeBadge) sizeBadge.textContent = `${sizeMb} МБ`;
         downloadBtns.forEach(btn => {
           btn.href = currentDownloadUrl;
           const label = btn.querySelector('.btn-label');
-          if (label) label.textContent = `Скачать APK (${tagName} • ${sizeMb} МБ)`;
+          if (label) label.textContent = `Скачать APK (${tagName})`;
         });
       }
 
@@ -47,10 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
       downloadBtns.forEach(btn => {
         btn.href = FALLBACK_DOWNLOAD_URL;
         const label = btn.querySelector('.btn-label');
-        if (label) label.textContent = `Скачать APK (${FALLBACK_VERSION} • ${FALLBACK_SIZE})`;
+        if (label) label.textContent = `Скачать APK (${FALLBACK_VERSION})`;
       });
       if (versionBadge) versionBadge.textContent = `Версия ${FALLBACK_VERSION}`;
-      if (sizeBadge) sizeBadge.textContent = FALLBACK_SIZE;
     }
 
     renderQrCode(currentDownloadUrl);
