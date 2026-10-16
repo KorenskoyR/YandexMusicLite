@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="screenshots/logo.png" width="130" alt="Yandex Music Lite Logo" />
+<img src="docs/assets/logo.png" width="130" alt="Yandex Music Lite Logo" />
 
 # Yandex Music Lite
 
@@ -26,7 +26,7 @@
 ## 📸 Скриншоты интерфейса
 
 <div align="center">
-  <img src="screenshots/showcase.png" alt="Скриншоты интерфейса Yandex Music Lite" />
+  <img src="docs/assets/showcase.png" alt="Скриншоты интерфейса Yandex Music Lite" />
 </div>
 
 <details>
@@ -35,13 +35,13 @@
 
 <div align="center">
 
-| [🌟 1. Моя Волна (Главная)](screenshots/1.jpg) | [🔍 2. Каталог и поиск](screenshots/2.jpg) | [❤️ 3. Любимые треки](screenshots/3.jpg) |
+| [🌟 1. Моя Волна (Главная)](docs/assets/1.jpg) | [🔍 2. Каталог и поиск](docs/assets/2.jpg) | [❤️ 3. Любимые треки](docs/assets/3.jpg) |
 | :---: | :---: | :---: |
-| <a href="screenshots/1.jpg"><img src="screenshots/1.jpg" width="220" alt="Моя Волна" /></a> | <a href="screenshots/2.jpg"><img src="screenshots/2.jpg" width="220" alt="Поиск и Чарты" /></a> | <a href="screenshots/3.jpg"><img src="screenshots/3.jpg" width="220" alt="Мне нравится" /></a> |
+| <a href="docs/assets/1.jpg"><img src="docs/assets/1.jpg" width="220" alt="Моя Волна" /></a> | <a href="docs/assets/2.jpg"><img src="docs/assets/2.jpg" width="220" alt="Поиск и Чарты" /></a> | <a href="docs/assets/3.jpg"><img src="docs/assets/3.jpg" width="220" alt="Мне нравится" /></a> |
 
-| [📻 4. FM Радио](screenshots/4.jpg) | [🚗 5. Режим «В авто»](screenshots/5.jpg) |
+| [📻 4. FM Радио](docs/assets/4.jpg) | [🚗 5. Режим «В авто»](docs/assets/5.jpg) |
 | :---: | :---: |
-| <a href="screenshots/4.jpg"><img src="screenshots/4.jpg" width="220" alt="FM Радио" /></a> | <a href="screenshots/5.jpg"><img src="screenshots/5.jpg" width="220" alt="В авто" /></a> |
+| <a href="docs/assets/4.jpg"><img src="docs/assets/4.jpg" width="220" alt="FM Радио" /></a> | <a href="docs/assets/5.jpg"><img src="docs/assets/5.jpg" width="220" alt="В авто" /></a> |
 
 </div>
 
