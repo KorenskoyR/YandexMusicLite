@@ -6,6 +6,7 @@
 
 # Yandex Music Lite
 
+[![Website](https://img.shields.io/badge/Website-GitHub%20Pages-FF9900.svg?style=for-the-badge&logo=googlechrome&logoColor=white)](https://korenskoyr.github.io/YandexMusicLite/)
 [![Android](https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
 [![Version](https://img.shields.io/badge/Version-1.3.9-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
 [![Size](https://img.shields.io/badge/APK%20Size-5.8%20MB-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
@@ -16,7 +17,7 @@
 
 Создан для смартфонов, планшетов и автомагнитол — весит всего ~6 МБ, моментально запускается, не перегружает память.
 
-[📥 Скачать актуальный APK](https://github.com/KorenskoyR/YandexMusicLite/releases/latest) • [📸 Скриншоты](#-скриншоты-интерфейса) • [✨ Особенности](#-главные-особенности) • [🚗 В автомобиле](#-специально-для-автомобиля-car-mode) • [🛠 Сборка](#-сборка-из-исходников)
+[🌐 Официальный промо-сайт](https://korenskoyr.github.io/YandexMusicLite/) • [📥 Скачать актуальный APK](https://github.com/KorenskoyR/YandexMusicLite/releases/latest) • [📸 Скриншоты](#-скриншоты-интерфейса) • [✨ Особенности](#-главные-особенности) • [🚗 В автомобиле](#-специально-для-автомобиля-car-mode) • [🛠 Сборка](#-сборка-из-исходников)
 
 </div>
 
