@@ -193,7 +193,16 @@ class MusicService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val isCurrentlyPlaying = playerRepository.isPlaying.value
+        if (!isCurrentlyPlaying) {
+            playerRepository.stop()
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
@@ -202,6 +211,7 @@ class MusicService : MediaLibraryService() {
 
     override fun onDestroy() {
         serviceScope.cancel()
+        abandonSystemAudioFocus()
         mediaLibrarySession?.run {
             removeSession(this)
             release()

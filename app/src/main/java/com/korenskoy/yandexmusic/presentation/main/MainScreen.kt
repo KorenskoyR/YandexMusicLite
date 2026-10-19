@@ -129,11 +129,12 @@ fun MainScreen(
                     isPlaying = isPlaying,
                     isWavePlaying = currentSource == MainViewModel.PlaylistSource.VIBE,
                     onPlayPauseVibe = {
-                        if (currentSource == MainViewModel.PlaylistSource.VIBE) {
-                            if (isPlaying) viewModel.playerRepository.pause()
-                            else viewModel.playerRepository.resume()
-                        } else {
-                            viewModel.playMyVibe(forceRestart = true)
+                        val hasActiveTrack = currentTrack != null && currentTrackId != null
+                        when {
+                            currentSource == MainViewModel.PlaylistSource.VIBE -> viewModel.togglePlayPause()
+                            hasActiveTrack && isPlaying -> viewModel.playerRepository.pause()
+                            hasActiveTrack && !isPlaying -> viewModel.resumeOrPlayCurrent()
+                            else -> viewModel.playMyVibe(forceRestart = true)
                         }
                     }
                 )
@@ -215,8 +216,7 @@ fun MainScreen(
                     isPlaying = isPlaying,
                     likedTrackIds = likedTrackIds,
                     onPlayPauseClick = {
-                        if (isPlaying) viewModel.playerRepository.pause()
-                        else viewModel.playerRepository.resume()
+                        viewModel.togglePlayPause()
                     },
                     onNextClick = { viewModel.playNext() },
                     onPrevClick = { viewModel.playPrev() },
@@ -286,8 +286,7 @@ fun MainScreen(
                     isLiked = isMiniLiked,
                     progress = progress,
                     onPlayPauseClick = {
-                        if (isPlaying) viewModel.playerRepository.pause()
-                        else viewModel.playerRepository.resume()
+                        viewModel.togglePlayPause()
                     },
                     onToggleLike = {
                         if (currentTrack?.isRadio == true) {
@@ -333,8 +332,7 @@ fun MainScreen(
                             isLiked = isMiniLiked,
                             progress = progress,
                             onPlayPauseClick = {
-                                if (isPlaying) viewModel.playerRepository.pause()
-                                else viewModel.playerRepository.resume()
+                                viewModel.togglePlayPause()
                             },
                             onToggleLike = {
                                 if (currentTrack?.isRadio == true) {
@@ -380,8 +378,7 @@ fun MainScreen(
                     progress = progress,
                     queue = currentPlaylist,
                     onPlayPauseClick = {
-                        if (isPlaying) viewModel.playerRepository.pause()
-                        else viewModel.playerRepository.resume()
+                        viewModel.togglePlayPause()
                     },
                     onToggleLike = {
                         if (currentTrack?.isRadio == true) {

@@ -21,5 +21,6 @@ interface PlayerRepository {
     fun triggerSkipNext()
     fun triggerSkipPrev()
     fun stop()
+    fun release()
     fun getPlayer(): androidx.media3.common.Player
 }

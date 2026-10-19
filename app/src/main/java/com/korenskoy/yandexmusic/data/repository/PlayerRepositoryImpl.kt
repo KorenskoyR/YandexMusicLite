@@ -2,7 +2,6 @@ package com.korenskoy.yandexmusic.data.repository
 
 import android.content.Context
 import android.content.Intent
-import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -14,6 +13,7 @@ import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -90,35 +90,6 @@ class PlayerRepositoryImpl @Inject constructor(
     override val activePlayerState: StateFlow<ExoPlayer> = _activePlayerState.asStateFlow()
 
     private var playJob: Job? = null
-
-    private val delegatingPlayer = object : ForwardingPlayer(playerA) {
-        override fun getCurrentTimeline(): androidx.media3.common.Timeline = activePlayer.currentTimeline
-        override fun getCurrentMediaItemIndex(): Int = activePlayer.currentMediaItemIndex
-        override fun getCurrentPeriodIndex(): Int = activePlayer.currentPeriodIndex
-        override fun getCurrentMediaItem(): MediaItem? = activePlayer.currentMediaItem
-        override fun getMediaItemCount(): Int = activePlayer.mediaItemCount
-        override fun getMediaItemAt(index: Int): MediaItem = activePlayer.getMediaItemAt(index)
-        override fun getAvailableCommands(): Player.Commands = activePlayer.availableCommands
-        override fun isCommandAvailable(command: Int): Boolean = activePlayer.isCommandAvailable(command)
-        override fun getPlaybackState(): Int = activePlayer.playbackState
-        override fun getPlayWhenReady(): Boolean = activePlayer.playWhenReady
-        override fun isPlaying(): Boolean = playerA.isPlaying || playerB.isPlaying
-        override fun getDuration(): Long = activePlayer.duration
-        override fun getCurrentPosition(): Long = activePlayer.currentPosition
-        override fun getMediaMetadata(): MediaMetadata = activePlayer.mediaMetadata
-        override fun getCurrentTracks(): androidx.media3.common.Tracks = activePlayer.currentTracks
-        override fun getPlaybackParameters(): androidx.media3.common.PlaybackParameters = activePlayer.playbackParameters
-        override fun getPlaybackSuppressionReason(): Int = activePlayer.playbackSuppressionReason
-        override fun getPlayerError(): androidx.media3.common.PlaybackException? = activePlayer.playerError
-        override fun getAudioAttributes(): androidx.media3.common.AudioAttributes = activePlayer.audioAttributes
-        override fun getVolume(): Float = activePlayer.volume
-        override fun play() { this@PlayerRepositoryImpl.resume() }
-        override fun pause() { this@PlayerRepositoryImpl.pause() }
-        override fun stop() { this@PlayerRepositoryImpl.stop() }
-        override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
-            this@PlayerRepositoryImpl.seekTo(positionMs)
-        }
-    }
 
     init {
         setupPlayerListener(playerA, 0)
@@ -204,6 +175,7 @@ class PlayerRepositoryImpl @Inject constructor(
                     wakeLockHelper.releaseTransitionLock()
                     isTransitioning = false
                     isCrossfading = false
+                    _isPlaying.value = false
                     triggerSkipNext()
                 }
             }
@@ -222,7 +194,7 @@ class PlayerRepositoryImpl @Inject constructor(
     }
 
     override fun getPlayer(): Player {
-        return delegatingPlayer
+        return activePlayer
     }
 
     @Volatile
@@ -431,8 +403,16 @@ class PlayerRepositoryImpl @Inject constructor(
     }
 
     override fun resume() {
-        activePlayer.play()
+        val player = activePlayer
+        if (player.mediaItemCount == 0) return
+        player.play()
         _isPlaying.value = true
+        try {
+            val intent = Intent(context, MusicService::class.java)
+            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun stop() {
@@ -447,6 +427,15 @@ class PlayerRepositoryImpl @Inject constructor(
         _isPlaying.value = false
         _currentTrackId.value = null
         _progress.value = 0L
+    }
+
+    override fun release() {
+        scope.cancel()
+        crossfadeJob?.cancel()
+        playJob?.cancel()
+        wakeLockHelper.releaseTransitionLock()
+        playerA.release()
+        playerB.release()
     }
 
     override fun seekTo(position: Long) {

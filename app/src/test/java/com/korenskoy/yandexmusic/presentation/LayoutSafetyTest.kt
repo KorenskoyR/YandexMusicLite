@@ -445,10 +445,10 @@ class LayoutSafetyTest {
             manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 16",
-            buildGradle.contains("versionCode = 16"))
-        assertTrue("build.gradle.kts must be versionName 1.3.9",
-            buildGradle.contains("versionName = \"1.3.9\""))
+        assertTrue("build.gradle.kts must be versionCode 17",
+            buildGradle.contains("versionCode = 17"))
+        assertTrue("build.gradle.kts must be versionName 1.4.0",
+            buildGradle.contains("versionName = \"1.4.0\""))
     }
 
     @Test
@@ -548,5 +548,43 @@ class LayoutSafetyTest {
         assertTrue("MainViewModel must implement 300ms debounce delay",
             viewModelFile.contains("delay(300L)"))
     }
+
+    @Test
+    fun testPlayerLifecycleAndStateSyncArchitecture() {
+        val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
+        assertTrue("MusicService must implement onTaskRemoved",
+            musicService.contains("override fun onTaskRemoved(rootIntent: Intent?)"))
+        assertTrue("MusicService must return START_NOT_STICKY",
+            musicService.contains("return START_NOT_STICKY"))
+        assertTrue("MusicService must abandon audio focus in onDestroy",
+            musicService.contains("abandonSystemAudioFocus()"))
+
+        val playerRepo = File(sourceDir, "domain/repository/PlayerRepository.kt").readText()
+        assertTrue("PlayerRepository interface must declare release()",
+            playerRepo.contains("fun release()"))
+
+        val playerRepoImpl = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
+        assertTrue("PlayerRepositoryImpl must implement release()",
+            playerRepoImpl.contains("override fun release()"))
+        assertTrue("PlayerRepositoryImpl must check mediaItemCount in resume",
+            playerRepoImpl.contains("if (player.mediaItemCount == 0) return"))
+        assertTrue("PlayerRepositoryImpl must start foreground service in resume",
+            playerRepoImpl.contains("ContextCompat.startForegroundService(context, intent)"))
+
+        val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertTrue("MainViewModel must reactively collect playerRepository.currentTrackId",
+            viewModel.contains("playerRepository.currentTrackId.collect"))
+        assertTrue("MainViewModel must implement resumeOrPlayCurrent",
+            viewModel.contains("fun resumeOrPlayCurrent()"))
+        assertTrue("MainViewModel must implement togglePlayPause",
+            viewModel.contains("fun togglePlayPause()"))
+        assertTrue("MainViewModel must debounce playNext",
+            viewModel.contains("now - lastPlayNextTime < 500L"))
+
+        val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
+        assertTrue("MainScreen must use togglePlayPause",
+            mainScreen.contains("viewModel.togglePlayPause()"))
+    }
 }
+
 

@@ -159,6 +159,7 @@ class MainViewModel @Inject constructor(
     private var isFetchingMoreVibe = false
     private var consecutiveTrackErrors = 0
     private val recentPlayedTrackIds = ArrayDeque<String>(100)
+    private var lastPlayNextTime = 0L
 
     init {
         playerRepository.trackEndedEvent
@@ -176,6 +177,26 @@ class MainViewModel @Inject constructor(
         playerRepository.skipPrevEvent
             .onEach { playPrev() }
             .launchIn(viewModelScope)
+
+        // Reactively synchronize _currentTrack with playerRepository.currentTrackId
+        viewModelScope.launch {
+            playerRepository.currentTrackId.collect { trackId ->
+                if (trackId == null) {
+                    if (!playerRepository.isPlaying.value) {
+                        _currentTrack.value = null
+                    }
+                } else if (_currentTrack.value?.idString != trackId) {
+                    val pool = (_currentPlaylist.value + _tracks.value + _wavePlaylist.value + _weeklyHits.value + _trendTracks.value + _popularTracks.value)
+                    val found = pool.find { it.idString == trackId }
+                    if (found != null) {
+                        _currentTrack.value = found
+                        if (_currentPlaylist.value.none { it.idString == trackId }) {
+                            _currentPlaylist.value = listOf(found) + _currentPlaylist.value
+                        }
+                    }
+                }
+            }
+        }
 
         // Keep display name synchronized with active account
         viewModelScope.launch {
@@ -244,6 +265,19 @@ class MainViewModel @Inject constructor(
                     // Filter out already played tracks to guarantee a fresh first track on launch
                     val freshWave = cachedWave.filter { it.idString !in recentPlayedTrackIds }
                     _wavePlaylist.value = if (freshWave.isNotEmpty()) freshWave else cachedWave
+                }
+
+                // Restore active playing track on app open
+                val playingTrackId = playerRepository.currentTrackId.value
+                if (playingTrackId != null && _currentTrack.value == null) {
+                    val allLoaded = (_tracks.value + _wavePlaylist.value + _weeklyHits.value + _trendTracks.value + _popularTracks.value).distinctBy { it.idString }
+                    val foundTrack = allLoaded.find { it.idString == playingTrackId }
+                    if (foundTrack != null) {
+                        _currentTrack.value = foundTrack
+                        if (_currentPlaylist.value.isEmpty()) {
+                            _currentPlaylist.value = allLoaded
+                        }
+                    }
                 }
             }
             
@@ -1409,6 +1443,13 @@ class MainViewModel @Inject constructor(
     }
 
     fun playNext(isAutoCrossfade: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (now - lastPlayNextTime < 500L) {
+            Log.d("MainViewModel", "playNext debounced (call within 500ms)")
+            return
+        }
+        lastPlayNextTime = now
+
         val currentTrack = _currentTrack.value
         if (currentTrack == null) {
             val playlist = _currentPlaylist.value
@@ -1471,6 +1512,29 @@ class MainViewModel @Inject constructor(
             playTrack(playlist.first().idString, playlist, isAutoCrossfade)
         } else {
             playAllLikedTracks()
+        }
+    }
+
+    fun resumeOrPlayCurrent() {
+        val current = _currentTrack.value
+        val trackId = playerRepository.currentTrackId.value ?: current?.idString
+        if (trackId != null && current != null) {
+            val player = playerRepository.getPlayer()
+            if (player.mediaItemCount > 0) {
+                playerRepository.resume()
+            } else {
+                playTrack(current.idString, _currentPlaylist.value.ifEmpty { listOf(current) })
+            }
+        } else {
+            playMyVibe(forceRestart = false)
+        }
+    }
+
+    fun togglePlayPause() {
+        if (playerRepository.isPlaying.value) {
+            playerRepository.pause()
+        } else {
+            resumeOrPlayCurrent()
         }
     }
 
