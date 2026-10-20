@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -164,7 +166,7 @@ fun CacheMenuBottomSheet(
                     ) {
                         Column {
                             Text(
-                                text = "Настройки медиатеки",
+                                text = stringResource(R.string.cache_menu_nastroyki_mediateki),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 19.sp
@@ -172,7 +174,7 @@ fun CacheMenuBottomSheet(
                                 color = Color.White
                             )
                             Text(
-                                text = "Параметры кэша и синхронизации",
+                                text = stringResource(R.string.cache_menu_parametry_kesha_i_sinhronizatsii),
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontSize = 12.sp,
                                     color = Color.White.copy(alpha = 0.55f)
@@ -190,7 +192,7 @@ fun CacheMenuBottomSheet(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Закрыть",
+                                contentDescription = stringResource(R.string.cd_zakryt),
                                 tint = Color.White.copy(alpha = 0.85f),
                                 modifier = Modifier.size(18.dp)
                             )
@@ -245,7 +247,7 @@ fun CacheMenuBottomSheet(
                                 if (!avatarUrl.isNullOrBlank()) {
                                     SubcomposeAsyncImage(
                                         model = avatarUrl,
-                                        contentDescription = "Аватар",
+                                        contentDescription = stringResource(R.string.cd_avatar),
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize().clip(CircleShape),
                                         error = {
@@ -271,7 +273,7 @@ fun CacheMenuBottomSheet(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Аккаунт Яндекс",
+                                    text = stringResource(R.string.cache_menu_akkaunt_yandeks),
                                     color = Color.White.copy(alpha = 0.55f),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium
@@ -299,7 +301,7 @@ fun CacheMenuBottomSheet(
                                     .padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
                                 Text(
-                                    text = "Сменить",
+                                    text = stringResource(R.string.cache_menu_smenit),
                                     color = Color.White,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -334,7 +336,7 @@ fun CacheMenuBottomSheet(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Профиль по умолчанию:",
+                                    text = stringResource(R.string.cache_menu_profil_po_umolchaniyu),
                                     color = Color.White.copy(alpha = 0.65f),
                                     fontSize = 12.sp
                                 )
@@ -387,13 +389,13 @@ fun CacheMenuBottomSheet(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "Размер кэша",
+                                        text = stringResource(R.string.cache_menu_razmer_kesha),
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = "Локальные MP3 треки",
+                                        text = stringResource(R.string.cache_menu_lokalnye_mp3_treki),
                                         color = Color.White.copy(alpha = 0.5f),
                                         fontSize = 11.5.sp
                                     )
@@ -446,13 +448,13 @@ fun CacheMenuBottomSheet(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Авто-скачивание",
+                                    text = stringResource(R.string.cache_menu_avto_skachivanie),
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Сохранять лайкнутые треки офлайн",
+                                    text = stringResource(R.string.cache_menu_sohranyat_layknutye_treki_oflayn),
                                     color = Color.White.copy(alpha = 0.5f),
                                     fontSize = 11.5.sp
                                 )
@@ -520,13 +522,13 @@ fun CacheMenuBottomSheet(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Скачать всю коллекцию",
+                                text = stringResource(R.string.cache_menu_skachat_vsyu_kollektsiyu),
                                 color = Color.White,
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Загрузить все треки для прослушивания офлайн",
+                                text = stringResource(R.string.cache_menu_zagruzit_vse_treki_dlya),
                                 color = Color.White.copy(alpha = 0.55f),
                                 fontSize = 11.5.sp
                             )
@@ -578,13 +580,13 @@ fun CacheMenuBottomSheet(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Очистить кэш",
+                                text = stringResource(R.string.cache_menu_ochistit_kesh),
                                 color = Color.White,
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Освободить $cacheSizeFormatted локального хранилища",
+                                text = stringResource(R.string.cache_free_space, cacheSizeFormatted),
                                 color = Color(0xFFFFB74D).copy(alpha = 0.7f),
                                 fontSize = 11.5.sp
                             )
@@ -634,7 +636,7 @@ fun CacheMenuBottomSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "Yandex Music Lite",
+                                    text = stringResource(R.string.cache_menu_yandex_music_lite),
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
@@ -707,13 +709,13 @@ fun CacheMenuBottomSheet(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Сменить аккаунт / Выйти",
+                                text = stringResource(R.string.cache_menu_smenit_akkaunt_vyyti),
                                 color = Color(0xFFFF5252),
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Переключение профилей и настройки входа",
+                                text = stringResource(R.string.account_management_pereklyuchenie_profiley_i_nastroyki),
                                 color = Color.White.copy(alpha = 0.5f),
                                 fontSize = 11.5.sp
                             )
@@ -744,13 +746,13 @@ private fun CrossfadeSettingCard(seconds: Int, onChange: (Int) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Кроссфейд",
+                    text = stringResource(R.string.cache_menu_krossfeyd),
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Плавный переход между треками",
+                    text = stringResource(R.string.cache_menu_plavnyy_perehod_mezhdu_trekami),
                     color = Color.White.copy(alpha = 0.5f),
                     fontSize = 11.5.sp
                 )

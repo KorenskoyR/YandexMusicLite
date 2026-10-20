@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -56,7 +58,7 @@ fun HomeScreen(
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.8f, 2.0f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "wave_spheres")
+    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.home_wave_spheres))
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -64,7 +66,7 @@ fun HomeScreen(
             animation = tween(15000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "rotation"
+        label = stringResource(R.string.home_rotation)
     )
 
     // Make the spheres pulse slightly more aggressively if playing the wave
@@ -78,7 +80,7 @@ fun HomeScreen(
             animation = tween(scaleSpecDuration, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "scale"
+        label = stringResource(R.string.home_scale)
     )
 
     Box(
@@ -138,7 +140,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Моя Волна",
+                text = stringResource(R.string.home_moya_volna),
                 style = MaterialTheme.typography.displaySmall,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
@@ -153,7 +155,7 @@ fun HomeScreen(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessLow
                 ),
-                label = "button_scale"
+                label = stringResource(R.string.home_button_scale)
             )
 
             Box(

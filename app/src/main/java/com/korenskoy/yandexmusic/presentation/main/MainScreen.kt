@@ -119,11 +119,6 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadLikedTracks()
-        viewModel.loadPopularTracks()
-    }
-
     LaunchedEffect(currentTab) {
         if (currentTab == MainTab.LIBRARY && tracks.isEmpty()) {
             viewModel.loadLikedTracks()

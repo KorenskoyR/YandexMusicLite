@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.splash
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -33,7 +34,7 @@ fun SplashScreen(
     val minSide = minOf(windowSize.widthDp, windowSize.heightDp)
     val scaleFactor = (minSide / 400f).coerceIn(0.7f, 1.4f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "Resonance")
+    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.splash_resonance))
 
     // 1. Subwoofer breath / pulse effect for the main sphere
     val sphereScale by infiniteTransition.animateFloat(
@@ -43,7 +44,7 @@ fun SplashScreen(
             animation = tween(1400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "SpherePulse"
+        label = stringResource(R.string.splash_spherepulse)
     )
 
     // 2. Continuous expanding soundwaves (Golden / Neon)
@@ -54,7 +55,7 @@ fun SplashScreen(
             animation = tween(2200, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "WaveProgress"
+        label = stringResource(R.string.auth_waveprogress)
     )
 
     // 3. Typography fade-in and overall fade-out transition
@@ -62,12 +63,10 @@ fun SplashScreen(
     val screenAlpha = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        // Fade in the text smoothly
-        textAlpha.animateTo(1f, animationSpec = tween(800, delayMillis = 400))
-        // Wait for the full splash duration
-        delay(2000)
-        // Fade out the entire screen before navigating
-        screenAlpha.animateTo(0f, animationSpec = tween(400))
+        // Short brand moment (~0.8 s): the cached library is already loading behind it
+        textAlpha.animateTo(1f, animationSpec = tween(300, delayMillis = 100))
+        delay(250)
+        screenAlpha.animateTo(0f, animationSpec = tween(200))
         onSplashFinished()
     }
 
@@ -108,7 +107,7 @@ fun SplashScreen(
         // The glowing Audio-Sphere (matches the system splash screen icon)
         Image(
             painter = painterResource(id = R.drawable.splash_icon),
-            contentDescription = "App Logo",
+            contentDescription = stringResource(R.string.cd_logotip_prilozheniya),
             modifier = Modifier
                 .size((160 * scaleFactor).dp)
                 .scale(sphereScale)
@@ -124,7 +123,7 @@ fun SplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "YANDEX MUSIC LITE",
+                text = stringResource(R.string.splash_yandex_music_lite),
                 style = TextStyle(
                     color = Color.White,
                     fontSize = (18 * scaleFactor).sp,
@@ -134,7 +133,7 @@ fun SplashScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "LOSSLESS AUDIO",
+                text = stringResource(R.string.splash_lossless_audio),
                 style = TextStyle(
                     color = Color(0xFFFFB703),
                     fontSize = (12 * scaleFactor).sp,

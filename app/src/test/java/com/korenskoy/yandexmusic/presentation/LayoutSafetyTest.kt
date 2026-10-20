@@ -240,11 +240,11 @@ class LayoutSafetyTest {
 
         val splashScreen = File(sourceDir, "presentation/splash/SplashScreen.kt").readText()
         assertTrue("SplashScreen must display YANDEX MUSIC LITE",
-            splashScreen.contains("YANDEX MUSIC LITE"))
+            splashScreen.contains("R.string.splash_yandex_music_lite") && stringsXml.contains(">YANDEX MUSIC LITE<"))
 
         val searchScreen = File(sourceDir, "presentation/main/SearchScreen.kt").readText()
         assertTrue("SearchScreen must display Каталог Yandex Music Lite",
-            searchScreen.contains("Каталог Yandex Music Lite"))
+            searchScreen.contains("R.string.search_katalog_yandex_music_lite") && stringsXml.contains(">Каталог Yandex Music Lite<"))
 
         val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
         assertTrue("MusicService notification channel must be Yandex Music Lite",
@@ -451,9 +451,9 @@ class LayoutSafetyTest {
 
         val buildGradle = File("build.gradle.kts").readText()
         assertTrue("build.gradle.kts must be versionCode 17",
-            buildGradle.contains("versionCode = 21"))
+            buildGradle.contains("versionCode = 22"))
         assertTrue("build.gradle.kts must be versionName 1.4.0",
-            buildGradle.contains("versionName = \"1.4.4\""))
+            buildGradle.contains("versionName = \"1.4.5\""))
     }
 
     @Test
@@ -523,17 +523,26 @@ class LayoutSafetyTest {
 
     @Test
     fun testLikedTracksZeroLikesSanitization() {
-        val viewModelFile = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
-        assertFalse("MainViewModel must not call landing personal-playlists fallback",
-            viewModelFile.contains("landing3?blocks=personal-playlists"))
-        assertFalse("MainViewModel must not call getPlaylistsListRaw fallback",
-            viewModelFile.contains("api.getPlaylistsListRaw(targetUid)"))
-        assertFalse("MainViewModel must not call liked playlists fallback",
-            viewModelFile.contains("likes/playlists"))
-        assertTrue("MainViewModel must reset liked tracks when allIds is empty",
-            viewModelFile.contains("User has 0 liked tracks. Resetting state."))
-        assertTrue("MainViewModel must save empty liked tracks to cache on 0 likes",
-            viewModelFile.contains("cacheManager.saveLikedTracks(activeUserFolder, emptyList())"))
+        val repo = File(sourceDir, "data/repository/LibraryRepository.kt").readText()
+        assertFalse("must not call landing personal-playlists fallback", repo.contains("landing3?blocks=personal-playlists"))
+        assertFalse("must not call getPlaylistsListRaw fallback", repo.contains("getPlaylistsListRaw"))
+        assertFalse("must not call liked playlists fallback", repo.contains("likes/playlists"))
+        // Zero likes is a valid state: the (empty) server list replaces the cache instead of being ignored
+        assertTrue("likes sync must store whatever list the server returned",
+            repo.contains("_likedTracks.value = tracks") && repo.contains("cacheManager.saveLikedTracks(folder, tracks)"))
+    }
+
+    @Test
+    fun testLibrarySyncIsSingleFlightAndIncremental() {
+        val repo = File(sourceDir, "data/repository/LibraryRepository.kt").readText()
+        assertTrue("concurrent syncs must join the running one", repo.contains("likesSync?.takeIf { it.isActive }"))
+        assertTrue("unchanged revision must skip work", repo.contains("cacheManager.loadLikesRevision(folder)"))
+        assertTrue("metadata only for tracks that are not cached", repo.contains("it !in cachedById"))
+        val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
+        assertFalse("the ViewModel must not fetch likes itself", viewModel.contains("api.getLikedTracks"))
+        val screen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
+        assertFalse("the screen must not trigger a second startup load",
+            Regex("""LaunchedEffect\(Unit\)\s*\{\s*viewModel\.loadLikedTracks""").containsMatchIn(screen))
     }
 
     @Test

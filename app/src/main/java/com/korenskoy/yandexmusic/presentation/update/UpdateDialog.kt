@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -114,14 +116,14 @@ fun UpdateDialog(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Доступно обновление",
+                            text = stringResource(R.string.update_dostupno_obnovlenie),
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Yandex Music Lite",
+                                text = stringResource(R.string.cache_menu_yandex_music_lite),
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 12.sp
                             )
@@ -153,7 +155,7 @@ fun UpdateDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
+                            contentDescription = stringResource(R.string.cd_zakryt),
                             tint = Color.White.copy(alpha = 0.8f),
                             modifier = Modifier.size(18.dp)
                         )
@@ -164,7 +166,7 @@ fun UpdateDialog(
 
                 // Changelog Card
                 Text(
-                    text = "Что нового в этой версии:",
+                    text = stringResource(R.string.update_chto_novogo_v_etoy),
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
@@ -211,7 +213,7 @@ fun UpdateDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Загрузка пакета...",
+                            text = stringResource(R.string.update_zagruzka_paketa),
                             color = Color(0xFFFFB74D),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -264,7 +266,7 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Переход на официальный релиз",
+                                    text = stringResource(R.string.update_perehod_na_ofitsialnyy_reliz),
                                     color = Color(0xFFFFD54F),
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -272,7 +274,7 @@ fun UpdateDialog(
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Этот релиз подписан официальным постоянным ключом. Android запрещает установку поверх тестовой сборки. Пожалуйста, удалите текущую версию приложения и установите скачанный APK. Все данные медиатеки и кэш сохранятся, а последующие обновления будут устанавливаться автоматически.",
+                                text = stringResource(R.string.update_etot_reliz_podpisan_ofitsialnym),
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
@@ -301,7 +303,7 @@ fun UpdateDialog(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Требуется один раз разрешить установку обновлений в настройках Android (нажмите здесь)",
+                                text = stringResource(R.string.update_trebuetsya_odin_raz_razreshit),
                                 color = Color(0xFFFFD54F),
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
@@ -326,7 +328,7 @@ fun UpdateDialog(
                             .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
                         Text(
-                            text = "Позже",
+                            text = stringResource(R.string.update_pozzhe),
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Medium
@@ -344,7 +346,7 @@ fun UpdateDialog(
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(
-                                text = "Сохранить APK",
+                                text = stringResource(R.string.update_sohranit_apk),
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -389,7 +391,7 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Загрузка...",
+                                    text = stringResource(R.string.update_zagruzka),
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -403,7 +405,7 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Разрешить в настройках",
+                                    text = stringResource(R.string.update_razreshit_v_nastroykah),
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -431,7 +433,7 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Обновить сейчас",
+                                    text = stringResource(R.string.update_obnovit_seychas),
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold

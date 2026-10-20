@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.account
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -94,14 +96,14 @@ fun AccountManagementDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Управление аккаунтами",
+                                text = stringResource(R.string.account_management_upravlenie_akkauntami),
                                 color = Color.White,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "Переключение профилей и настройки входа",
+                                text = stringResource(R.string.account_management_pereklyuchenie_profiley_i_nastroyki),
                                 color = Color.White.copy(alpha = 0.55f),
                                 fontSize = 12.sp
                             )
@@ -115,7 +117,7 @@ fun AccountManagementDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Закрыть",
+                                contentDescription = stringResource(R.string.cd_zakryt),
                                 tint = Color.White.copy(alpha = 0.8f),
                                 modifier = Modifier.size(18.dp)
                             )
@@ -127,7 +129,7 @@ fun AccountManagementDialog(
                     // Accounts List
                     if (accounts.isNotEmpty()) {
                         Text(
-                            text = "СОХРАНЁННЫЕ АККАУНТЫ (${accounts.size})",
+                            text = stringResource(R.string.account_saved_accounts_header, accounts.size),
                             color = Color.White.copy(alpha = 0.45f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -196,7 +198,7 @@ fun AccountManagementDialog(
                                         if (!account.avatarUrl.isNullOrBlank()) {
                                             SubcomposeAsyncImage(
                                                 model = account.avatarUrl,
-                                                contentDescription = "Аватар",
+                                                contentDescription = stringResource(R.string.cd_avatar),
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize().clip(CircleShape),
                                                 error = {
@@ -283,7 +285,7 @@ fun AccountManagementDialog(
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
-                                                text = "Активен",
+                                                text = stringResource(R.string.account_management_aktiven),
                                                 color = Color(0xFF00E676),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
@@ -296,7 +298,7 @@ fun AccountManagementDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
-                                                contentDescription = "Удалить профиль",
+                                                contentDescription = stringResource(R.string.cd_udalit_profil),
                                                 tint = Color(0xFFFF5252).copy(alpha = 0.75f),
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -308,7 +310,7 @@ fun AccountManagementDialog(
 
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "★ — профиль по умолчанию (авто-вход при старте)",
+                            text = stringResource(R.string.account_management_profil_po_umolchaniyu_avto),
                             color = Color.White.copy(alpha = 0.45f),
                             fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -340,7 +342,7 @@ fun AccountManagementDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Войти в другой аккаунт",
+                            text = stringResource(R.string.account_management_voyti_v_drugoy_akkaunt),
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
@@ -369,7 +371,7 @@ fun AccountManagementDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Выйти из этого аккаунта",
+                            text = stringResource(R.string.account_management_vyyti_iz_etogo_akkaunta),
                             color = Color(0xFFFF5252),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
@@ -383,7 +385,7 @@ fun AccountManagementDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Выйти со всех аккаунтов",
+                                text = stringResource(R.string.account_management_vyyti_so_vseh_akkauntov),
                                 color = Color.White.copy(alpha = 0.45f),
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Normal
@@ -401,7 +403,7 @@ fun AccountManagementDialog(
             onDismissRequest = { confirmLogoutCurrent = false },
             title = {
                 Text(
-                    text = "Выйти из аккаунта?",
+                    text = stringResource(R.string.account_management_vyyti_iz_akkaunta),
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
@@ -409,7 +411,7 @@ fun AccountManagementDialog(
             },
             text = {
                 Text(
-                    text = "Данные и кэш текущего профиля будут удалены с устройства. Другие сохранённые профили останутся неизменными.",
+                    text = stringResource(R.string.account_management_dannye_i_kesh_tekuschego),
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 13.5.sp
                 )
@@ -423,12 +425,12 @@ fun AccountManagementDialog(
                         onDismiss()
                     }
                 ) {
-                    Text("Выйти", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.account_management_vyyti), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmLogoutCurrent = false }) {
-                    Text("Отмена", color = Color.White.copy(alpha = 0.7f))
+                    Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
                 }
             }
         )
@@ -440,7 +442,7 @@ fun AccountManagementDialog(
             onDismissRequest = { confirmLogoutAll = false },
             title = {
                 Text(
-                    text = "Выйти со всех аккаунтов?",
+                    text = stringResource(R.string.account_management_vyyti_so_vseh_akkauntov_2),
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
@@ -448,7 +450,7 @@ fun AccountManagementDialog(
             },
             text = {
                 Text(
-                    text = "Все сохранённые учётные записи и локальные кэши будут полностью удалены из приложения.",
+                    text = stringResource(R.string.account_management_vse_sohranennye_uchetnye_zapisi),
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 13.5.sp
                 )
@@ -462,12 +464,12 @@ fun AccountManagementDialog(
                         onDismiss()
                     }
                 ) {
-                    Text("Выйти со всех", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.account_management_vyyti_so_vseh), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmLogoutAll = false }) {
-                    Text("Отмена", color = Color.White.copy(alpha = 0.7f))
+                    Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
                 }
             }
         )
@@ -479,7 +481,7 @@ fun AccountManagementDialog(
             onDismissRequest = { accountToDelete = null },
             title = {
                 Text(
-                    text = "Удалить профиль?",
+                    text = stringResource(R.string.account_management_udalit_profil),
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
@@ -488,7 +490,7 @@ fun AccountManagementDialog(
             text = {
                 val name = target.displayName.ifBlank { target.login }.ifBlank { target.uid }
                 Text(
-                    text = "Удалить сохранённый профиль \"$name\" и его локальные данные?",
+                    text = stringResource(R.string.account_remove_confirm, name),
                     color = Color.White.copy(alpha = 0.75f),
                     fontSize = 13.5.sp
                 )
@@ -502,12 +504,12 @@ fun AccountManagementDialog(
                         onRemoveAccount(uidToRemove)
                     }
                 ) {
-                    Text("Удалить", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.account_management_udalit), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { accountToDelete = null }) {
-                    Text("Отмена", color = Color.White.copy(alpha = 0.7f))
+                    Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
                 }
             }
         )

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -135,7 +137,7 @@ fun FullScreenPlayer(
     val coverUrl = track.coverUri.toCoverUrl("1000x1000") ?: ""
 
     // Subtle scale animation for the cover (Live Canvas breathing effect)
-    val infiniteTransition = rememberInfiniteTransition(label = "cover_breath")
+    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.full_player_cover_breath))
     val coverScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.035f,
@@ -143,7 +145,7 @@ fun FullScreenPlayer(
             animation = tween(6000, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "cover_scale"
+        label = stringResource(R.string.full_player_cover_scale)
     )
 
     var showQueue by remember { mutableStateOf(false) }
@@ -163,7 +165,7 @@ fun FullScreenPlayer(
         } else {
             androidx.compose.animation.core.tween(durationMillis = 150, easing = androidx.compose.animation.core.LinearEasing)
         },
-        label = "fullscreen_slider_progress"
+        label = stringResource(R.string.full_player_fullscreen_slider_progress)
     )
 
     val activeFraction = if (isDraggingSlider) sliderPosition else animatedFraction
@@ -245,13 +247,13 @@ fun FullScreenPlayer(
                 ) {
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Collapse",
+                        contentDescription = stringResource(R.string.cd_svernut_pleer),
                         tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
                 }
                 Text(
-                    text = "СЕЙЧАС ИГРАЕТ",
+                    text = stringResource(R.string.full_player_seychas_igraet),
                     style = MaterialTheme.typography.labelMedium.copy(
                         letterSpacing = 2.sp,
                         fontWeight = FontWeight.SemiBold
@@ -283,7 +285,7 @@ fun FullScreenPlayer(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = "Queue",
+                            contentDescription = stringResource(R.string.cd_ochered),
                             tint = Color.White,
                             modifier = Modifier.size(22.dp)
                         )
@@ -299,7 +301,7 @@ fun FullScreenPlayer(
             val animatedSwipeOffset by animateFloatAsState(
                 targetValue = swipeOffset,
                 animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                label = "swipe_offset"
+                label = stringResource(R.string.full_player_swipe_offset)
             )
 
             // Album Art (Adaptive 1:1 square centered in available space)
@@ -360,7 +362,7 @@ fun FullScreenPlayer(
                                 .data(coverUrl)
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = "Cover",
+                            contentDescription = stringResource(R.string.cd_oblozhka),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -518,7 +520,7 @@ fun FullScreenPlayer(
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Prev",
+                        contentDescription = stringResource(R.string.cd_predyduschiy_trek),
                         tint = Color.White,
                         modifier = Modifier.size(30.dp)
                     )
@@ -557,7 +559,7 @@ fun FullScreenPlayer(
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
+                        contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),
                         tint = Color.White,
                         modifier = Modifier.size(38.dp)
                     )
@@ -587,7 +589,7 @@ fun FullScreenPlayer(
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next",
+                        contentDescription = stringResource(R.string.cd_sleduyuschiy_trek),
                         tint = Color.White,
                         modifier = Modifier.size(30.dp)
                     )
@@ -723,7 +725,7 @@ fun QueueDialogCard(
         ) {
             Column {
                 Text(
-                    text = "Очередь воспроизведения",
+                    text = stringResource(R.string.full_player_ochered_vosproizvedeniya),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
@@ -731,7 +733,7 @@ fun QueueDialogCard(
                     color = Color.White
                 )
                 Text(
-                    text = "Треков в очереди: ${upcoming.size}",
+                    text = stringResource(R.string.player_queue_count, upcoming.size),
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontSize = 12.sp,
                         color = Color.White.copy(alpha = 0.6f)
@@ -747,7 +749,7 @@ fun QueueDialogCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(R.string.cd_zakryt),
                     tint = Color.White.copy(alpha = 0.8f),
                     modifier = Modifier.size(20.dp)
                 )
@@ -790,7 +792,7 @@ fun QueueDialogCard(
                                 }
                             }
                             .build(),
-                        contentDescription = "Cover",
+                        contentDescription = stringResource(R.string.cd_oblozhka),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(44.dp)
@@ -825,7 +827,7 @@ fun QueueDialogCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Remove",
+                                contentDescription = stringResource(R.string.cd_udalit_iz_ocheredi),
                                 tint = Color.White.copy(alpha = 0.4f),
                                 modifier = Modifier.size(16.dp)
                             )
@@ -867,7 +869,7 @@ fun BouncyIconButton(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
         ),
-        label = "bounce_scale"
+        label = stringResource(R.string.full_player_bounce_scale)
     )
 
     Box(
@@ -908,7 +910,7 @@ fun LikeHeartButton(
             stiffness = Spring.StiffnessMedium
         ),
         finishedListener = { isPulsing = false },
-        label = "heart_pop"
+        label = stringResource(R.string.full_player_heart_pop)
     )
 
     BouncyIconButton(
@@ -953,7 +955,7 @@ fun LikeHeartButton(
     ) {
         Icon(
             imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-            contentDescription = "Like",
+            contentDescription = stringResource(R.string.cd_nravitsya),
             tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.55f),
             modifier = Modifier
                 .size(24.dp)
@@ -993,7 +995,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "FM STEREO • 128 KBPS",
+                        text = stringResource(R.string.full_player_fm_stereo_128_kbps),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFFFF9900),
                         fontWeight = FontWeight.Bold,
@@ -1014,7 +1016,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "Lossless HD",
+                        text = stringResource(R.string.full_player_lossless_hd),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFFFFD700), // Gold color for premium feel
                         fontWeight = FontWeight.Bold
@@ -1028,7 +1030,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "Dolby Atmos",
+                        text = stringResource(R.string.full_player_dolby_atmos),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold
@@ -1082,7 +1084,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                             }
                         }
                         .build(),
-                    contentDescription = "Next Track Cover",
+                    contentDescription = stringResource(R.string.cd_oblozhka_sleduyuschego_treka),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(36.dp)
@@ -1093,7 +1095,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "ДАЛЕЕ",
+                        text = stringResource(R.string.full_player_dalee),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = Color.White.copy(alpha = 0.5f),
                         fontWeight = FontWeight.Bold,
@@ -1110,7 +1112,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                 }
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play Next",
+                    contentDescription = stringResource(R.string.cd_sleduyuschiy_trek),
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.size(22.dp)
                 )
@@ -1132,7 +1134,7 @@ fun DislikeButton(
             stiffness = Spring.StiffnessMedium
         ),
         finishedListener = { isDisliked = false },
-        label = "dislike_pop"
+        label = stringResource(R.string.full_player_dislike_pop)
     )
 
     BouncyIconButton(
@@ -1161,7 +1163,7 @@ fun DislikeButton(
     ) {
         Icon(
             imageVector = Icons.Outlined.HeartBroken,
-            contentDescription = "Dislike",
+            contentDescription = stringResource(R.string.cd_ne_nravitsya),
             tint = if (isDisliked) Color(0xFFFF3B6A) else Color.White.copy(alpha = 0.55f),
             modifier = Modifier
                 .size(22.dp)

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
@@ -146,7 +148,7 @@ fun LibraryScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Favorite,
-                                contentDescription = "Любимые треки",
+                                contentDescription = stringResource(R.string.cd_lyubimye_treki),
                                 tint = Color.White,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -156,14 +158,14 @@ fun LibraryScreen(
                         
                         Column {
                             Text(
-                                text = "Мне нравится",
+                                text = stringResource(R.string.library_mne_nravitsya),
                                 style = MaterialTheme.typography.titleLarge,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 22.sp
                             )
                             Text(
-                                text = "${tracks.size} треков",
+                                text = com.korenskoy.yandexmusic.utils.russianQuantityString(tracks.size, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 14.sp
@@ -190,7 +192,7 @@ fun LibraryScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Обновить",
+                                contentDescription = stringResource(R.string.cd_obnovit),
                                 tint = Color.White,
                                 modifier = Modifier.size(19.dp)
                             )
@@ -215,7 +217,7 @@ fun LibraryScreen(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
-                                    contentDescription = "Настройки кэша",
+                                    contentDescription = stringResource(R.string.cd_nastroyki_kesha),
                                     tint = Color.White,
                                     modifier = Modifier.size(19.dp)
                                 )
@@ -255,9 +257,9 @@ fun LibraryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.cd_slushat), tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Слушать", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(stringResource(R.string.cd_slushat), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                     
                     // Shuffle Button
@@ -285,9 +287,9 @@ fun LibraryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.Shuffle, contentDescription = "Shuffle", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Shuffle, contentDescription = stringResource(R.string.cd_peremeshat), tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Перемешать", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(stringResource(R.string.cd_peremeshat), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
                 
@@ -327,13 +329,13 @@ fun LibraryScreen(
                 ) {
                     Icon(
                         Icons.Default.DownloadDone,
-                        contentDescription = "Only Downloaded",
+                        contentDescription = stringResource(R.string.cd_tolko_skachannye),
                         tint = if (showOnlyDownloaded) Color(0xFF00E676) else Color.White.copy(alpha = 0.6f),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Только скачанные",
+                        text = stringResource(R.string.cd_tolko_skachannye),
                         color = if (showOnlyDownloaded) Color(0xFF00E676) else Color.White.copy(alpha = 0.8f),
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold
@@ -387,7 +389,7 @@ fun LibraryScreen(
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Обновить медиатеку", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.library_obnovit_mediateku), color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

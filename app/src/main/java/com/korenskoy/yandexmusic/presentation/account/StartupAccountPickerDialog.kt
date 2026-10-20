@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.account
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -107,14 +109,14 @@ fun StartupAccountPickerDialog(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Выберите профиль",
+                                text = stringResource(R.string.startup_account_picker_vyberite_profil),
                                 color = Color.White,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Вход в Yandex Music Lite",
+                                text = stringResource(R.string.startup_account_picker_vhod_v_yandex_music),
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 12.sp
                             )
@@ -124,7 +126,7 @@ fun StartupAccountPickerDialog(
                     Spacer(modifier = Modifier.height(18.dp))
 
                     Text(
-                        text = "ДОСТУПНЫЕ АККАУНТЫ",
+                        text = stringResource(R.string.startup_account_picker_dostupnye_akkaunty),
                         color = Color.White.copy(alpha = 0.45f),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -192,7 +194,7 @@ fun StartupAccountPickerDialog(
                                     if (!account.avatarUrl.isNullOrBlank()) {
                                         SubcomposeAsyncImage(
                                             model = account.avatarUrl,
-                                            contentDescription = "Аватар",
+                                            contentDescription = stringResource(R.string.cd_avatar),
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize().clip(CircleShape),
                                             error = {
@@ -279,7 +281,7 @@ fun StartupAccountPickerDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Запомнить как профиль по умолчанию",
+                            text = stringResource(R.string.startup_account_picker_zapomnit_kak_profil_po),
                             color = Color.White.copy(alpha = 0.85f),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Medium
@@ -311,7 +313,7 @@ fun StartupAccountPickerDialog(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Новый",
+                                text = stringResource(R.string.startup_account_picker_novyy),
                                 color = Color.White.copy(alpha = 0.8f),
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Medium
@@ -337,7 +339,7 @@ fun StartupAccountPickerDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Войти",
+                                text = stringResource(R.string.startup_account_picker_voyti),
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold

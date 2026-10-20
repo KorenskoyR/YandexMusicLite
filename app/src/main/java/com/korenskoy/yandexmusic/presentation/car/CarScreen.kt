@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -194,13 +196,13 @@ fun CarScreenPortrait(
                 IconButton(onClick = onExit) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.cd_nazad),
                         tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "В АВТОМОБИЛЕ",
+                    text = stringResource(R.string.car_v_avtomobile),
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -342,13 +344,13 @@ fun CarScreenLandscape(
                 IconButton(onClick = onExit) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.cd_nazad),
                         tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "В АВТОМОБИЛЕ",
+                    text = stringResource(R.string.car_v_avtomobile),
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -500,7 +502,7 @@ fun CarControls(
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.car_pulse))
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = if (isPlaying) 1.08f else 1f,
@@ -508,7 +510,7 @@ fun CarControls(
             animation = tween(900, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse_anim"
+        label = stringResource(R.string.car_pulse_anim)
     )
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.45f,
@@ -517,7 +519,7 @@ fun CarControls(
             animation = tween(900, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "glow_anim"
+        label = stringResource(R.string.car_glow_anim)
     )
 
     Row(
@@ -550,7 +552,7 @@ fun CarControls(
         ) {
             Icon(
                 imageVector = Icons.Default.HeartBroken,
-                contentDescription = "Дизлайк",
+                contentDescription = stringResource(R.string.cd_dizlayk),
                 tint = Color.White.copy(alpha = 0.55f),
                 modifier = Modifier.size(24.dp * scaleFactor)
             )
@@ -581,7 +583,7 @@ fun CarControls(
         ) {
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
-                contentDescription = "Предыдущий",
+                contentDescription = stringResource(R.string.cd_predyduschiy),
                 tint = Color.White,
                 modifier = Modifier.size(32.dp * scaleFactor)
             )
@@ -624,7 +626,7 @@ fun CarControls(
         ) {
             Icon(
                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = "Воспроизведение/Пауза",
+                contentDescription = stringResource(R.string.cd_vosproizvedenie_pauza),
                 tint = Color.White,
                 modifier = Modifier.size(42.dp * scaleFactor)
             )
@@ -655,7 +657,7 @@ fun CarControls(
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,
-                contentDescription = "Следующий",
+                contentDescription = stringResource(R.string.cd_sleduyuschiy),
                 tint = Color.White,
                 modifier = Modifier.size(32.dp * scaleFactor)
             )
@@ -702,7 +704,7 @@ fun CarControls(
         ) {
             Icon(
                 imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = "Нравится",
+                contentDescription = stringResource(R.string.cd_nravitsya),
                 tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.55f),
                 modifier = Modifier.size(24.dp * scaleFactor)
             )
@@ -723,7 +725,7 @@ fun CarWaveformVisualizerAndTimeline(
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
     // Animated Waveform Heights using Transition
-    val infiniteTransition = rememberInfiniteTransition(label = "car_wave")
+    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.car_car_wave))
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * Math.PI).toFloat(),
@@ -731,7 +733,7 @@ fun CarWaveformVisualizerAndTimeline(
             animation = tween(2200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "phase"
+        label = stringResource(R.string.car_phase)
     )
 
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -749,7 +751,7 @@ fun CarWaveformVisualizerAndTimeline(
         } else {
             androidx.compose.animation.core.tween(durationMillis = 150, easing = androidx.compose.animation.core.LinearEasing)
         },
-        label = "car_slider_progress"
+        label = stringResource(R.string.car_car_slider_progress)
     )
 
     val displayFraction = if (isDraggingSlider) dragFraction else animatedProgressFraction
@@ -829,7 +831,7 @@ fun CarWaveformVisualizerAndTimeline(
             val playActivity by animateFloatAsState(
                 targetValue = if (isPlaying) 1f else 0f,
                 animationSpec = tween(350, easing = FastOutSlowInEasing),
-                label = "play_activity"
+                label = stringResource(R.string.car_play_activity)
             )
 
             Row(
@@ -965,7 +967,7 @@ fun CarWaveformVisualizerAndTimeline(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Бесконечный поток радиовещания",
+                        text = stringResource(R.string.car_beskonechnyy_potok_radioveschaniya),
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = (12 * scaleFactor).sp,
                         fontWeight = FontWeight.Medium

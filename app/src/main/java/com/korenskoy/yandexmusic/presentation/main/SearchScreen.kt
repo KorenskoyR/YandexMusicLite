@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -125,7 +127,7 @@ fun SearchScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "Поиск",
+                        contentDescription = stringResource(R.string.cd_poisk),
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
@@ -135,14 +137,14 @@ fun SearchScreen(
 
                 Column {
                     Text(
-                        text = "Поиск",
+                        text = stringResource(R.string.cd_poisk),
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
                     )
                     Text(
-                        text = "Каталог Yandex Music Lite",
+                        text = stringResource(R.string.search_katalog_yandex_music_lite),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.7f),
                         fontSize = 14.sp
@@ -163,14 +165,14 @@ fun SearchScreen(
                         .fillMaxWidth(if (isLandscape) 0.6f else 1f)
                         .height(52.dp)
                         .clip(RoundedCornerShape(26.dp)),
-                    placeholder = { Text("Треки, артисты, альбомы", color = Color.White.copy(alpha = 0.5f)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White.copy(alpha = 0.5f)) },
+                    placeholder = { Text(stringResource(R.string.search_treki_artisty_albomy), color = Color.White.copy(alpha = 0.5f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.cd_poisk), tint = Color.White.copy(alpha = 0.5f)) },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
                             IconButton(onClick = { onQueryChange("") }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Очистить",
+                                    contentDescription = stringResource(R.string.cd_ochistit),
                                     tint = Color.White.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -236,7 +238,7 @@ fun SearchScreen(
                         item {
                             Column {
                                 Text(
-                                    text = "Хиты недели",
+                                    text = stringResource(R.string.search_hity_nedeli),
                                     style = MaterialTheme.typography.titleLarge,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
@@ -308,7 +310,7 @@ fun SearchScreen(
                     if (trends.isNotEmpty()) {
                         item {
                             Text(
-                                text = "В тренде",
+                                text = stringResource(R.string.search_v_trende),
                                 style = MaterialTheme.typography.titleLarge,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
@@ -422,7 +424,7 @@ fun PopularTrackCard(track: TrackDetailsDto, isLandscape: Boolean = false, onCli
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
         ),
-        label = "card_scale"
+        label = stringResource(R.string.search_card_scale)
     )
 
     val cardWidth = if (isLandscape) 150.dp else 140.dp
@@ -459,7 +461,7 @@ fun PopularTrackCard(track: TrackDetailsDto, isLandscape: Boolean = false, onCli
                 .data(coverUrl)
                 .crossfade(true)
                 .build(),
-            contentDescription = "Cover",
+            contentDescription = stringResource(R.string.cd_oblozhka),
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )

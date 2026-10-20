@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -41,14 +43,14 @@ fun AudioVisualizer(
 
     // The animation runs only while playing; paused bars are static and cost nothing per frame
     val phaseState: State<Float> = if (isPlaying) {
-        rememberInfiniteTransition(label = "visualizer_transition").animateFloat(
+        rememberInfiniteTransition(label = stringResource(R.string.audio_visualizer_visualizer_transition)).animateFloat(
             initialValue = 0f,
             targetValue = 2 * Math.PI.toFloat(),
             animationSpec = infiniteRepeatable(
                 animation = tween(1200, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
-            label = "phase"
+            label = stringResource(R.string.car_phase)
         )
     } else {
         remember { mutableFloatStateOf(0f) }

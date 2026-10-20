@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.view.ViewGroup
@@ -110,6 +112,12 @@ fun AuthScreen(
                 loadUrl(authUrl)
                 isUrlLoaded = true
             }
+        },
+        // Release Chromium when the login screen goes away; otherwise the WebView and its threads
+        // stay alive in the music process for the rest of the session
+        onRelease = { webView ->
+            webView.stopLoading()
+            webView.destroy()
         }
     )
     }
@@ -144,7 +152,7 @@ internal fun extractTokenFromUrl(url: String): String? {
 
 @Composable
 fun WaitingForInternetScreen() {
-    val infiniteTransition = rememberInfiniteTransition(label = "NetworkResonance")
+    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.auth_networkresonance))
     val waveProgress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -152,7 +160,7 @@ fun WaitingForInternetScreen() {
             animation = tween(2200, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "WaveProgress"
+        label = stringResource(R.string.auth_waveprogress)
     )
 
     Box(
@@ -196,14 +204,14 @@ fun WaitingForInternetScreen() {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Ожидание интернета...",
+                text = stringResource(R.string.auth_ozhidanie_interneta),
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Вход в Яндекс начнется автоматически\nпри появлении сети",
+                text = stringResource(R.string.auth_waiting_for_network),
                 color = Color.Gray,
                 fontSize = 14.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

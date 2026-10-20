@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -29,7 +31,7 @@ fun DownloadProgressModal(
     val animatedProgress by animateFloatAsState(
         targetValue = progressInfo.percent,
         animationSpec = tween(durationMillis = 300),
-        label = "progressAnim"
+        label = stringResource(R.string.download_progress_modal_progressanim)
     )
 
     Dialog(
@@ -51,7 +53,7 @@ fun DownloadProgressModal(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Загрузка коллекции",
+                    text = stringResource(R.string.download_progress_modal_zagruzka_kollektsii),
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -60,7 +62,7 @@ fun DownloadProgressModal(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "Скачано ${progressInfo.current} из ${progressInfo.total}",
+                    text = stringResource(R.string.download_progress_count, progressInfo.current, progressInfo.total),
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 14.sp
                 )
@@ -107,7 +109,7 @@ fun DownloadProgressModal(
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.7f))
                     ) {
-                        Text("Свернуть", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.download_progress_modal_svernut), fontWeight = FontWeight.Bold)
                     }
                     
                     Button(
@@ -119,7 +121,7 @@ fun DownloadProgressModal(
                         ),
                         elevation = null
                     ) {
-                        Text("Отменить", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.download_progress_modal_otmenit), fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -70,10 +70,18 @@ class NotificationOpensPlayerInstrumentedTest {
             if (hasText("FM Радио", 15_000)) device.findObject(By.text("FM Радио")).click()
             Thread.sleep(3_000)
             device.takeScreenshot(java.io.File(context.filesDir, "radio_list.png"))
+            device.findObject(By.text("Dance & Club"))?.click()
+            Thread.sleep(2_000)
+            device.takeScreenshot(java.io.File(context.filesDir, "radio_dance.png"))
+            device.findObject(By.text("Все"))?.click()
+            device.findObject(By.clazz("android.widget.EditText"))?.text = "России"
+            Thread.sleep(2_000)
+            device.takeScreenshot(java.io.File(context.filesDir, "radio_search.png"))
+            device.findObject(By.clazz("android.widget.EditText"))?.text = ""
             val station = vm.radioStations.value.first { it.id == "record" }
             instrumentation.runOnMainSync { vm.playRadioStation(station) }
-            hasDesc("Play/Pause", 10_000) // mini player is up
-            assertFalse("full player must be closed before the tap", hasDesc("Collapse", 1_000))
+            hasDesc("Воспроизведение или пауза", 10_000) // mini player is up
+            assertFalse("full player must be closed before the tap", hasDesc("Свернуть плеер", 1_000))
 
             // Same intent MusicService puts into the notification (singleTop -> onNewIntent)
             scenario.onActivity {
@@ -83,7 +91,7 @@ class NotificationOpensPlayerInstrumentedTest {
                         .putExtra(MainActivity.EXTRA_OPEN_PLAYER, true)
                 )
             }
-            assertTrue("notification tap opens the full-screen player", hasDesc("Collapse", 10_000))
+            assertTrue("notification tap opens the full-screen player", hasDesc("Свернуть плеер", 10_000))
             Thread.sleep(1_500) // let the cover settle
             // Kept for visual review of the opened player (adb shell run-as <pkg> cat files/notification_player.png)
             device.takeScreenshot(java.io.File(context.filesDir, "notification_player.png"))

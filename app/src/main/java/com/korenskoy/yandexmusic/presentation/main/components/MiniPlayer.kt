@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -161,7 +163,7 @@ fun MiniPlayer(
                             }
                         }
                         .build(),
-                    contentDescription = "Cover",
+                    contentDescription = stringResource(R.string.cd_oblozhka),
                     contentScale = if (track.isRadio) ContentScale.Fit else ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
@@ -220,7 +222,7 @@ fun MiniPlayer(
             ) {
                 Icon(
                     imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Like",
+                    contentDescription = stringResource(R.string.cd_nravitsya),
                     tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.65f),
                     modifier = Modifier.size(18.dp)
                 )
@@ -256,7 +258,7 @@ fun MiniPlayer(
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Play/Pause",
+                    contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
@@ -278,7 +280,7 @@ fun MiniPlayer(
             } else {
                 androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.LinearEasing)
             },
-            label = "mini_progress"
+            label = stringResource(R.string.mini_player_mini_progress)
         )
         
         Box(

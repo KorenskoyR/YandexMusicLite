@@ -44,6 +44,7 @@ class MainViewModel @Inject constructor(
     private val downloadManager: TrackDownloadManager,
     private val cacheManager: com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager,
     private val radioRepository: RadioRepository,
+    private val libraryRepository: com.korenskoy.yandexmusic.data.repository.LibraryRepository,
     private val updateManager: com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager
 ) : ViewModel() {
 
@@ -79,24 +80,14 @@ class MainViewModel @Inject constructor(
 
     val currentSource: StateFlow<PlaylistSource> = playbackController.currentSource
 
-    private val _tracks = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
-    val tracks: StateFlow<List<TrackDetailsDto>> = _tracks.asStateFlow()
-    
-    private val _likedTrackIds = MutableStateFlow<Set<String>>(emptySet())
-    val likedTrackIds: StateFlow<Set<String>> = _likedTrackIds.asStateFlow()
+    // Library and charts live in the process-wide LibraryRepository (single-flight, incremental sync)
+    val tracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.likedTracks
+    val likedTrackIds: StateFlow<Set<String>> = libraryRepository.likedIds
+    val weeklyHits: StateFlow<List<TrackDetailsDto>> = libraryRepository.weeklyHits
+    val trendTracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.trendTracks
+    val popularTracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.popularTracks
+    val isLoading: StateFlow<Boolean> = libraryRepository.isSyncingLikes
 
-    private val _weeklyHits = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
-    val weeklyHits: StateFlow<List<TrackDetailsDto>> = _weeklyHits.asStateFlow()
-
-    private val _trendTracks = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
-    val trendTracks: StateFlow<List<TrackDetailsDto>> = _trendTracks.asStateFlow()
-
-    private val _popularTracks = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
-    val popularTracks: StateFlow<List<TrackDetailsDto>> = _popularTracks.asStateFlow()
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-    
     private val _isDownloadingAll = MutableStateFlow(false)
     val isDownloadingAll: StateFlow<Boolean> = _isDownloadingAll.asStateFlow()
 
@@ -152,7 +143,7 @@ class MainViewModel @Inject constructor(
 
     init {
         // The controller outlives this ViewModel; give it the library for "play liked" fallbacks.
-        _tracks.onEach { playbackController.updateLibrary(it) }.launchIn(viewModelScope)
+        tracks.onEach { playbackController.updateLibrary(it) }.launchIn(viewModelScope)
 
         // Keep display name synchronized with active account
         viewModelScope.launch {
@@ -195,35 +186,11 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Instant Startup from Cache & Saved History
-        viewModelScope.launch(Dispatchers.IO) {
-            val userFolder = activeUserFolder
-            val cachedTracks = cacheManager.loadLikedTracks(userFolder)
-            val cachedHits = cacheManager.loadWeeklyHits()
-            val cachedTrends = cacheManager.loadTrendTracks()
-            val cachedPopular = cacheManager.loadPopularTracks()
-            
-            withContext(Dispatchers.Main) {
-                if (cachedTracks.isNotEmpty()) {
-                    _tracks.value = cachedTracks
-                    _likedTrackIds.value = cachedTracks.map { it.idString }.toSet()
-                }
-                if (cachedHits.isNotEmpty()) _weeklyHits.value = cachedHits
-                if (cachedTrends.isNotEmpty()) _trendTracks.value = cachedTrends
-                if (cachedPopular.isNotEmpty()) _popularTracks.value = cachedPopular
-            }
-            
-            refreshAllDataSilently()
-        }
-
-        // Reactively load data when authorization succeeds (e.g. on fresh install)
+        // Cached library instantly, then exactly one network sync per authorization
         viewModelScope.launch {
+            libraryRepository.loadCached()
             authRepository.isAuthorized().collect { isAuth ->
-                if (isAuth) {
-                    loadLikedTracks()
-                    loadPopularTracks()
-                    refreshAllDataSilently()
-                }
+                if (isAuth) syncLibrary()
             }
         }
 
@@ -239,144 +206,14 @@ class MainViewModel @Inject constructor(
         }
     }
     
-    private fun refreshAllDataSilently() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val token = authRepository.getToken()
-            if (token.isNullOrEmpty()) return@launch // DO NOT fetch if not authorized
-
-            try {
-                kotlinx.coroutines.supervisorScope {
-                    val accountStatus = try { api.getAccountStatus() } catch (e: Exception) { null }
-                    val uid = accountStatus?.result?.uidString?.takeIf { it.isNotEmpty() } ?: "me"
-                    
-                    // Silent refresh liked
-                    try {
-                        Log.d("LikedTracks", "[SilentRefresh] uid='$uid', starting getLikedTracks")
-                        val tracksResponse = try {
-                            api.getLikedTracks(uid)
-                        } catch (e: Exception) {
-                            Log.w("LikedTracks", "[SilentRefresh] getLikedTracks('$uid') failed: ${e.message}")
-                            if (uid != "me") api.getLikedTracks("me") else throw e
-                        }
-                        val resultDto = tracksResponse.result
-                        Log.d("LikedTracks", "[SilentRefresh] result null: ${resultDto == null}, error: ${tracksResponse.error?.message ?: "none"}")
-                        if (resultDto != null) {
-                            Log.d("LikedTracks", "[SilentRefresh] library null: ${resultDto.library == null}, library.tracks: ${resultDto.library?.tracks?.size ?: "N/A"}, directTracks: ${resultDto.directTracks.size}")
-                        }
-                        val libraryTracks = resultDto?.allTracks ?: emptyList()
-                        Log.d("LikedTracks", "[SilentRefresh] allTracks count = ${libraryTracks.size}")
-                        if (libraryTracks.isNotEmpty()) {
-                            val allIds = libraryTracks.mapNotNull { it.idString.takeIf { id -> id.isNotEmpty() } }.toSet()
-                            val embeddedTracks = libraryTracks.mapNotNull { it.track }
-                            
-                            val fullTracks = mutableListOf<TrackDetailsDto>()
-                            if (embeddedTracks.isNotEmpty()) {
-                                fullTracks.addAll(embeddedTracks)
-                            }
-                            
-                            val existingIds = fullTracks.map { it.idString }.toSet()
-                            val missingIds = allIds - existingIds
-                            
-                            if (missingIds.isNotEmpty()) {
-                                val chunkedIds = missingIds.chunked(100)
-                                for (chunk in chunkedIds) {
-                                    try {
-                                        var metaResponse = api.getTracksMetadata(chunk)
-                                        var meta = metaResponse.result ?: emptyList()
-                                        if (meta.isEmpty()) {
-                                            val idsString = chunk.joinToString(",")
-                                            metaResponse = api.getTracksMetadataQuery(idsString)
-                                            meta = metaResponse.result ?: emptyList()
-                                        }
-                                        fullTracks.addAll(meta)
-                                    } catch (e: Exception) {
-                                        Log.e("MainViewModel", "Silent refresh: error fetching chunk of metadata", e)
-                                        try {
-                                            val idsString = chunk.joinToString(",")
-                                            val fallback = api.getTracksMetadataQuery(idsString)
-                                            val meta = fallback.result ?: emptyList()
-                                            fullTracks.addAll(meta)
-                                        } catch (e2: Exception) {
-                                            Log.e("MainViewModel", "Silent refresh fallback also failed", e2)
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // Fallback for any IDs that still didn't receive metadata
-                            val resolvedIds = fullTracks.map { it.idString }.toSet()
-                            for (id in allIds) {
-                                if (id !in resolvedIds) {
-                                    fullTracks.add(
-                                        TrackDetailsDto(
-                                            id = kotlinx.serialization.json.JsonPrimitive(id),
-                                            title = "Трек $id"
-                                        )
-                                    )
-                                }
-                            }
-
-                            if (fullTracks.isNotEmpty()) {
-                                withContext(Dispatchers.Main) {
-                                    _tracks.value = fullTracks.distinctBy { it.idString }
-                                    _likedTrackIds.value = allIds
-                                }
-                                cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
-                            }
-                        } else {
-                            Log.d("LikedTracks", "[SilentRefresh] Library has 0 tracks, resetting state.")
-                            withContext(Dispatchers.Main) {
-                                _tracks.value = emptyList()
-                                _likedTrackIds.value = emptySet()
-                            }
-                            cacheManager.saveLikedTracks(activeUserFolder, emptyList())
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainViewModel", "Silent refresh liked failed", e)
-                    }
-                    
-                    // Silent refresh hits & trends with rotating dynamic queries
-                    try {
-                        val hitsQueries = listOf("чарт", "топ 100", "главные хиты", "популярные треки").shuffled()
-                        val trendsQueries = listOf("новинки", "премьеры", "свежие релизы", "тренды").shuffled()
-
-                        val hitsDeferred0 = async { api.search(hitsQueries[0], page = 0) }
-                        val hitsDeferred1 = async { api.search(hitsQueries[1], page = 0) }
-                        val trendsDeferred0 = async { api.search(trendsQueries[0], page = 0) }
-                        val trendsDeferred1 = async { api.search(trendsQueries[1], page = 0) }
-                        
-                        val hits0 = try { hitsDeferred0.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                        val hits1 = try { hitsDeferred1.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                        val trends0 = try { trendsDeferred0.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                        val trends1 = try { trendsDeferred1.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                        
-                        val hits = (hits0 + hits1).distinctBy { it.idString }
-                        val trends = (trends0 + trends1).distinctBy { it.idString }
-                        
-                        withContext(Dispatchers.Main) {
-                            if (hits.isNotEmpty()) _weeklyHits.value = hits
-                            if (trends.isNotEmpty()) {
-                                _trendTracks.value = trends
-                                _popularTracks.value = trends
-                            } else if (hits.isNotEmpty()) {
-                                _popularTracks.value = hits
-                            }
-                        }
-                        
-                        if (hits.isNotEmpty()) cacheManager.saveWeeklyHits(hits)
-                        if (trends.isNotEmpty()) cacheManager.saveTrendTracks(trends)
-                        if (trends.isNotEmpty() || hits.isNotEmpty()) cacheManager.savePopularTracks(if (trends.isNotEmpty()) trends else hits)
-                    } catch (e: Exception) {
-                        Log.e("MainViewModel", "Silent refresh trends failed", e)
-                    }
-
-                    // Silent prime wave queue with fresh unplayed tracks
-                    withContext(Dispatchers.Main) { playbackController.primeWave() }
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Silent refresh overall failed", e)
-            }
+    /** Likes, charts and the My Wave queue. Concurrent calls join the requests already running. */
+    private fun syncLibrary() {
+        viewModelScope.launch {
+            val likesChanged = libraryRepository.syncLikes()
+            if (likesChanged && settingsRepository.autoDownloadLikedTracks.first()) downloadAllLikedTracks()
         }
+        viewModelScope.launch { libraryRepository.refreshCharts() }
+        playbackController.primeWave()
     }
 
     fun clearMusicCache() {
@@ -396,7 +233,7 @@ class MainViewModel @Inject constructor(
             }
 
             // 3. Remove downloaded tracks belonging to active user only
-            val activeTrackIds = _tracks.value.map { it.idString }
+            val activeTrackIds = tracks.value.map { it.idString }
             for (trackId in activeTrackIds) {
                 if (!protectedTrackIds.contains(trackId)) {
                     downloadManager.removeTrack(trackId)
@@ -404,8 +241,7 @@ class MainViewModel @Inject constructor(
             }
 
             withContext(Dispatchers.Main) {
-                _tracks.value = emptyList()
-                _likedTrackIds.value = emptySet()
+                libraryRepository.resetForAccountChange()
                 playbackController.clearWaveAndHistory()
                 loadLikedTracks()
             }
@@ -457,16 +293,11 @@ class MainViewModel @Inject constructor(
             val newAccount = authRepository.getActiveAccount()
             val userFolder = newAccount?.folderName ?: "default"
             _accountName.value = newAccount?.displayName?.ifBlank { newAccount.login } ?: "Яндекс Аккаунт"
-            // Wave queue and listening history are per user
+            // Wave queue, listening history and likes are per user
             playbackController.resetForAccount(userFolder)
-
-            // Load isolated cache for this switched user immediately
-            val cachedTracks = cacheManager.loadLikedTracks(userFolder)
-            _tracks.value = cachedTracks
-            _likedTrackIds.value = cachedTracks.map { it.idString }.toSet()
-
-            // Silently refresh from API in background
-            loadLikedTracks()
+            libraryRepository.resetForAccountChange()
+            libraryRepository.loadCached()
+            syncLibrary()
         }
     }
 
@@ -491,8 +322,7 @@ class MainViewModel @Inject constructor(
             if (nextAccount != null) {
                 switchAccount(nextAccount.uid)
             } else {
-                _tracks.value = emptyList()
-                _likedTrackIds.value = emptySet()
+                libraryRepository.resetForAccountChange()
                 _accountName.value = ""
             }
         }
@@ -507,8 +337,7 @@ class MainViewModel @Inject constructor(
             }
             authRepository.clearAllAccounts()
 
-            _tracks.value = emptyList()
-            _likedTrackIds.value = emptySet()
+            libraryRepository.resetForAccountChange()
             _accountName.value = ""
         }
     }
@@ -535,318 +364,43 @@ class MainViewModel @Inject constructor(
             val userFolder = activeUserFolder
             cacheManager.clearUserCache(userFolder)
             withContext(Dispatchers.Main) {
-                _tracks.value = emptyList()
-                _likedTrackIds.value = emptySet()
+                libraryRepository.resetForAccountChange()
                 playbackController.clearWaveAndHistory()
                 loadLikedTracks()
             }
         }
     }
 
+    /** Pull-to-refresh and the Library tab: sync likes (joins a sync already running). */
     fun loadLikedTracks() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                _isLoading.value = true
-                val token = authRepository.getToken()
-                Log.d("LikedTracks", "=== loadLikedTracks START ===")
-                Log.d("LikedTracks", "token present: ${!token.isNullOrEmpty()}")
-
-                // Step 1: Get UID and profile info from account status
-                var uid: String? = null
-                for (attempt in 1..3) {
-                    try {
-                        val accountStatus = api.getAccountStatus()
-                        val resultObj = accountStatus.result
-                        Log.d("LikedTracks", "Attempt $attempt: accountStatus.result is null: ${resultObj == null}")
-                        Log.d("LikedTracks", "Attempt $attempt: accountStatus.error: ${accountStatus.error?.message ?: "none"}")
-                        if (resultObj != null) {
-                            val bestName = resultObj.displayUserName
-                            val login = resultObj.account?.login ?: ""
-                            val uidStr = resultObj.uidString
-                            var avatarUrl = resultObj.avatarUrl
-                            if (avatarUrl == null) {
-                                try {
-                                    val loginInfo = api.getYandexLoginInfo()
-                                    avatarUrl = loginInfo.avatarUrl
-                                } catch (e: Exception) {
-                                    Log.d("LikedTracks", "getYandexLoginInfo failed: ${e.message}")
-                                }
-                            }
-                            _accountName.value = bestName
-
-                            val currentToken = authRepository.getToken() ?: ""
-                            if (currentToken.isNotEmpty() && uidStr.isNotEmpty()) {
-                                authRepository.saveOrUpdateAccount(
-                                    com.korenskoy.yandexmusic.domain.model.UserAccount(
-                                        uid = uidStr,
-                                        login = login,
-                                        displayName = bestName,
-                                        token = currentToken,
-                                        avatarUrl = avatarUrl
-                                    )
-                                )
-                            }
-                        }
-                        uid = resultObj?.uidString?.takeIf { it.isNotEmpty() }
-                        if (uid != null) break
-                    } catch (e: Exception) {
-                        Log.w("LikedTracks", "Attempt $attempt failed: ${e.javaClass.simpleName}: ${e.message}")
-                        kotlinx.coroutines.delay(600L * attempt)
-                    }
-                }
-
-                val targetUid = uid ?: "me"
-                Log.d("LikedTracks", "Using targetUid = '$targetUid'")
-
-                // Step 2: Fetch liked tracks
-                val tracksResponse = try {
-                    api.getLikedTracks(targetUid)
-                } catch (e: Exception) {
-                    Log.w("LikedTracks", "getLikedTracks('$targetUid') failed: ${e.javaClass.simpleName}: ${e.message}")
-                    if (targetUid != "me") {
-                        Log.d("LikedTracks", "Retrying with uid='me'")
-                        api.getLikedTracks("me")
-                    } else throw e
-                }
-
-                // Step 3: Diagnose the response structure
-                val resultDto = tracksResponse.result
-                Log.d("LikedTracks", "tracksResponse.error: ${tracksResponse.error?.message ?: "none"}")
-                Log.d("LikedTracks", "tracksResponse.result is null: ${resultDto == null}")
-                if (resultDto != null) {
-                    Log.d("LikedTracks", "result.library is null: ${resultDto.library == null}")
-                    Log.d("LikedTracks", "result.library?.tracks?.size: ${resultDto.library?.tracks?.size ?: "N/A"}")
-                    Log.d("LikedTracks", "result.directTracks.size: ${resultDto.directTracks.size}")
-                    Log.d("LikedTracks", "result.allTracks.size: ${resultDto.allTracks.size}")
-                    Log.d("LikedTracks", "result.uid: ${resultDto.uid}")
-                    Log.d("LikedTracks", "result.revision: ${resultDto.revision}")
-                }
-
-                val libraryTracks = resultDto?.allTracks ?: emptyList()
-                Log.d("LikedTracks", "libraryTracks count = ${libraryTracks.size}")
-                
-                var allIds = libraryTracks.mapNotNull { it.idString.takeIf { id -> id.isNotEmpty() } }.toSet()
-                val embeddedTracks = libraryTracks.mapNotNull { it.track }.toMutableList()
-
-                if (allIds.isEmpty()) {
-                    Log.d("LikedTracks", "libraryTracks was empty, trying fallback 1: getPlaylistRaw(targetUid, '3')")
-                    try {
-                        val p3 = api.getPlaylistRaw(targetUid, "3")
-                        Log.d("LikedTracks", "p3 raw JSON: ${p3.result?.toString()?.take(500)}")
-                        val p3Ids = extractTrackIdsFromJson(p3.result)
-                        Log.d("LikedTracks", "p3 extracted track IDs: ${p3Ids.size}")
-                        if (p3Ids.isNotEmpty()) {
-                            allIds = p3Ids.toSet()
-                        }
-                    } catch (e: Exception) {
-                        Log.w("LikedTracks", "Fallback 1 (playlist 3) failed: ${e.message}")
-                    }
-                }
-
-                if (allIds.isNotEmpty()) {
-                    Log.d("LikedTracks", "=== Total Liked Track IDs found = ${allIds.size} ===")
-                    withContext(Dispatchers.Main) {
-                        _likedTrackIds.value = allIds
-                    }
-
-                    val fullTracks = mutableListOf<TrackDetailsDto>()
-                    if (embeddedTracks.isNotEmpty()) {
-                        fullTracks.addAll(embeddedTracks)
-                        withContext(Dispatchers.Main) {
-                            _tracks.value = fullTracks.distinctBy { it.idString }
-                        }
-                    }
-
-                    val existingIds = fullTracks.map { it.idString }.toSet()
-                    val missingIds = allIds - existingIds
-                    Log.d("LikedTracks", "missingIds (need metadata fetch) = ${missingIds.size}")
-                    
-                    if (missingIds.isNotEmpty()) {
-                        val chunkedIds = missingIds.chunked(100)
-                        for (chunk in chunkedIds) {
-                            try {
-                                var metaResponse = api.getTracksMetadata(chunk)
-                                var meta = metaResponse.result ?: emptyList()
-                                if (meta.isEmpty()) {
-                                    val idsString = chunk.joinToString(",")
-                                    metaResponse = api.getTracksMetadataQuery(idsString)
-                                    meta = metaResponse.result ?: emptyList()
-                                }
-                                Log.d("LikedTracks", "Fetched metadata for chunk: got ${meta.size} tracks")
-                                fullTracks.addAll(meta)
-                            } catch (e: Exception) {
-                                Log.e("LikedTracks", "Error fetching metadata chunk", e)
-                                try {
-                                    val idsString = chunk.joinToString(",")
-                                    val fallback = api.getTracksMetadataQuery(idsString)
-                                    val meta = fallback.result ?: emptyList()
-                                    fullTracks.addAll(meta)
-                                } catch (e2: Exception) {
-                                    Log.e("LikedTracks", "Fallback query also failed for chunk", e2)
-                                }
-                            }
-                        }
-                    }
-
-                    // Fallback for any IDs that still didn't receive metadata
-                    val resolvedIds = fullTracks.map { it.idString }.toSet()
-                    for (id in allIds) {
-                        if (id !in resolvedIds) {
-                            fullTracks.add(
-                                TrackDetailsDto(
-                                    id = kotlinx.serialization.json.JsonPrimitive(id),
-                                    title = "Трек $id"
-                                )
-                            )
-                        }
-                    }
-
-                    Log.d("LikedTracks", "=== FINAL fullTracks count = ${fullTracks.size} ===")
-                    if (fullTracks.isNotEmpty()) {
-                        withContext(Dispatchers.Main) {
-                            _tracks.value = fullTracks.distinctBy { it.idString }
-                        }
-                        cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
-                    }
-                    
-                    val autoDownload = settingsRepository.autoDownloadLikedTracks.first()
-                    if (autoDownload) {
-                        downloadAllLikedTracks()
-                    }
-                } else {
-                    Log.d("LikedTracks", "=== User has 0 liked tracks. Resetting state. ===")
-                    withContext(Dispatchers.Main) {
-                        _likedTrackIds.value = emptySet()
-                        _tracks.value = emptyList()
-                    }
-                    cacheManager.saveLikedTracks(activeUserFolder, emptyList())
-                }
-            } catch (e: Exception) {
-                Log.e("LikedTracks", "=== loadLikedTracks EXCEPTION ===", e)
-            } finally {
-                _isLoading.value = false
-                Log.d("LikedTracks", "=== loadLikedTracks END, _tracks.value.size = ${_tracks.value.size} ===")
-            }
+        viewModelScope.launch {
+            libraryRepository.loadCached()
+            val changed = libraryRepository.syncLikes()
+            if (changed && settingsRepository.autoDownloadLikedTracks.first()) downloadAllLikedTracks()
         }
     }
 
-    private fun extractTrackIdsFromJson(element: kotlinx.serialization.json.JsonElement?): List<String> {
-        if (element == null) return emptyList()
-        val ids = mutableListOf<String>()
-        
-        fun search(el: kotlinx.serialization.json.JsonElement) {
-            when (el) {
-                is kotlinx.serialization.json.JsonObject -> {
-                    val directId = el["id"] ?: el["trackId"]
-                    if (directId is kotlinx.serialization.json.JsonPrimitive && directId.content.isNotEmpty()) {
-                        val content = directId.content
-                        if (content.all { it.isDigit() || it == ':' || it == '-' } && content.length > 2) {
-                            if (el.containsKey("albums") || el.containsKey("title") || el.containsKey("albumId") || el.containsKey("timestamp") || el.containsKey("track")) {
-                                ids.add(content)
-                            }
-                        }
-                    }
-                    val trackObj = el["track"]
-                    if (trackObj is kotlinx.serialization.json.JsonObject) {
-                        val trackId = trackObj["id"]
-                        if (trackId is kotlinx.serialization.json.JsonPrimitive && trackId.content.isNotEmpty()) {
-                            ids.add(trackId.content)
-                        }
-                    }
-                    for ((_, child) in el) {
-                        search(child)
-                    }
-                }
-                is kotlinx.serialization.json.JsonArray -> {
-                    for (child in el) {
-                        if (child is kotlinx.serialization.json.JsonPrimitive && child.content.all { it.isDigit() } && child.content.length > 2) {
-                            ids.add(child.content)
-                        } else {
-                            search(child)
-                        }
-                    }
-                }
-                else -> {}
-            }
-        }
-        search(element)
-        return ids.distinct()
-    }
-
-    fun isTrackLiked(trackId: String): Boolean = _likedTrackIds.value.contains(trackId)
+    fun isTrackLiked(trackId: String): Boolean = trackId in likedTrackIds.value
 
     fun toggleLike(track: TrackDetailsDto) {
         val trackId = track.idString
-        val isCurrentlyLiked = isTrackLiked(trackId)
-        val previousLikedIds = _likedTrackIds.value
-        val previousTracks = _tracks.value
-        
-        // Optimistic UI update for likedTrackIds and library tracks
-        _likedTrackIds.value = if (isCurrentlyLiked) {
-            _likedTrackIds.value - trackId
-        } else {
-            _likedTrackIds.value + trackId
-        }
-        
-        _tracks.value = if (isCurrentlyLiked) {
-            _tracks.value.filter { it.idString != trackId }
-        } else {
-            // Add to the top of the library
-            listOf(track) + _tracks.value.filter { it.idString != trackId }
-        }
-
-        viewModelScope.launch {
-            cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
-            try {
-                val accountStatus = try { api.getAccountStatus() } catch (e: Exception) { null }
-                val uid = accountStatus?.result?.uidString?.takeIf { it.isNotEmpty() } ?: "me"
-
-                if (isCurrentlyLiked) {
-                    api.unlikeTrack(uid, trackId)
+        val like = !isTrackLiked(trackId)
+        libraryRepository.setLiked(track, like) { ok ->
+            if (!ok) return@setLiked
+            viewModelScope.launch {
+                if (!like) {
                     downloadManager.removeTrack(trackId)
-                } else {
-                    api.likeTrack(uid, trackId)
-                    val autoDownload = settingsRepository.autoDownloadLikedTracks.first()
-                    if (autoDownload) {
-                        downloadTrackBackground(trackId)
-                    }
+                } else if (settingsRepository.autoDownloadLikedTracks.first()) {
+                    downloadTrackBackground(trackId)
                 }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error toggling like", e)
-                // Full revert of both IDs and tracks on error
-                withContext(Dispatchers.Main) {
-                    _likedTrackIds.value = previousLikedIds
-                    _tracks.value = previousTracks
-                }
-                cacheManager.saveLikedTracks(activeUserFolder, previousTracks)
             }
         }
     }
 
     fun dislikeTrack(track: TrackDetailsDto) {
-        val trackId = track.idString
-        val wasLiked = isTrackLiked(trackId)
-        
-        // Optimistically remove from likes and library
-        _likedTrackIds.value = _likedTrackIds.value - trackId
-        _tracks.value = _tracks.value.filter { it.idString != trackId }
-        playbackController.onTrackDisliked(trackId)
-
-        viewModelScope.launch {
-            cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
-            try {
-                val accountStatus = try { api.getAccountStatus() } catch (e: Exception) { null }
-                val uid = accountStatus?.result?.uidString?.takeIf { it.isNotEmpty() } ?: "me"
-
-                if (wasLiked) {
-                    api.unlikeTrack(uid, trackId)
-                }
-                api.dislikeTrack(uid, trackId)
-                downloadManager.removeTrack(trackId)
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error disliking track", e)
-            }
-        }
+        libraryRepository.dislike(track)
+        playbackController.onTrackDisliked(track.idString)
+        viewModelScope.launch { downloadManager.removeTrack(track.idString) }
     }
 
     fun downloadAllLikedTracks() {
@@ -854,7 +408,7 @@ class MainViewModel @Inject constructor(
         
         downloadJob = viewModelScope.launch {
             _isDownloadingAll.value = true
-            val tracksToDownload = _tracks.value
+            val tracksToDownload = tracks.value
             val total = tracksToDownload.size
             for ((index, track) in tracksToDownload.withIndex()) {
                 val title = track.title ?: "Без названия"
@@ -918,92 +472,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private var hitsPage = 0
-    private var trendsPage = 0
-    private var isFetchingMorePopular = false
-
+    /** Charts are loaded once per session by [syncLibrary]; this only fills an empty screen. */
     fun loadPopularTracks() {
-        hitsPage = 1 // Start at 1 since we fetch 0 and 1
-        trendsPage = 1
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                kotlinx.coroutines.supervisorScope {
-                    val hitsDeferred0 = async { api.search("чарт", page = 0) }
-                    val hitsDeferred1 = async { api.search("топ 100", page = 0) }
-                    val trendsDeferred0 = async { api.search("новинки", page = 0) }
-                    val trendsDeferred1 = async { api.search("премьеры", page = 0) }
-                    
-                    val hits0 = try { hitsDeferred0.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                    val hits1 = try { hitsDeferred1.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                    
-                    val trends0 = try { trendsDeferred0.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-                    val trends1 = try { trendsDeferred1.await().result?.tracks?.results ?: emptyList() } catch (e: Exception) { emptyList() }
-
-                    val hits = (hits0 + hits1).distinctBy { it.idString }
-                    val trends = (trends0 + trends1).distinctBy { it.idString }
-                    
-                    withContext(Dispatchers.Main) {
-                        _weeklyHits.value = hits
-                        _trendTracks.value = trends
-                        _popularTracks.value = if (trends.isNotEmpty()) trends else hits
-                    }
-                    
-                    cacheManager.saveWeeklyHits(hits)
-                    cacheManager.saveTrendTracks(trends)
-                    cacheManager.savePopularTracks(if (trends.isNotEmpty()) trends else hits)
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error loading popular tracks", e)
-            }
-        }
+        viewModelScope.launch { libraryRepository.refreshCharts() }
     }
 
-    fun loadMoreHits() {
-        if (isFetchingMorePopular) return
-        isFetchingMorePopular = true
-        viewModelScope.launch {
-            try {
-                hitsPage++
-                val queries = listOf("чарт", "топ 100", "главные хиты", "суперхиты")
-                val query = queries[hitsPage % queries.size]
-                val page = hitsPage / queries.size
-                val hitsResponse = api.search(query, page = page)
-                val newHits = hitsResponse.result?.tracks?.results ?: emptyList()
-                if (newHits.isNotEmpty()) {
-                    val combined = (_weeklyHits.value + newHits).distinctBy { it.idString }
-                    _weeklyHits.value = combined
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error loading more hits", e)
-            } finally {
-                isFetchingMorePopular = false
-            }
-        }
-    }
+    fun loadMoreHits() = libraryRepository.loadMoreHits()
 
-    fun loadMoreTrends() {
-        if (isFetchingMorePopular) return
-        isFetchingMorePopular = true
-        viewModelScope.launch {
-            try {
-                trendsPage++
-                val queries = listOf("новинки", "в тренде", "горячие новинки", "премьеры")
-                val query = queries[trendsPage % queries.size]
-                val page = trendsPage / queries.size
-                val trendsResponse = api.search(query, page = page)
-                val newTrends = trendsResponse.result?.tracks?.results ?: emptyList()
-                if (newTrends.isNotEmpty()) {
-                    val combined = (_trendTracks.value + newTrends).distinctBy { it.idString }
-                    _trendTracks.value = combined
-                    _popularTracks.value = combined
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error loading more trends", e)
-            } finally {
-                isFetchingMorePopular = false
-            }
-        }
-    }
+    fun loadMoreTrends() = libraryRepository.loadMoreTrends()
 
     private var searchJob: Job? = null
 
@@ -1043,7 +519,7 @@ class MainViewModel @Inject constructor(
 
     fun shuffleLikedTracks() = playbackController.playAllLikedTracks(shuffle = true)
 
-    fun playHits(shuffle: Boolean = true) = playbackController.playHits(_weeklyHits.value, shuffle)
+    fun playHits(shuffle: Boolean = true) = playbackController.playHits(weeklyHits.value, shuffle)
 
     fun playTrack(trackId: String, playlist: List<TrackDetailsDto>, source: PlaylistSource? = null) =
         playbackController.playTrack(trackId, playlist, source)

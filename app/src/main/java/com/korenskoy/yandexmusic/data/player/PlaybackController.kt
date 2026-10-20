@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.R
 import androidx.core.net.toUri
 import android.content.Context
 import android.util.Log
@@ -217,7 +218,7 @@ class PlaybackController @Inject constructor(
                 playTrack(list.first().idString, list, PlaylistSource.VIBE)
             } else {
                 _isStarting.value = false
-                showMessage("Не удалось загрузить «Мою волну». Проверьте подключение к интернету")
+                showMessage(context.getString(R.string.msg_wave_load_failed))
             }
         }
     }
@@ -474,8 +475,7 @@ class PlaybackController @Inject constructor(
             // Keep the track on screen so Play retries it.
             restoredPositionMs.value = failure.positionMs
             showMessage(
-                if (current.isRadio) "Радиостанция недоступна"
-                else "Не удаётся воспроизвести музыку. Проверьте подключение к интернету"
+                context.getString(if (current.isRadio) R.string.msg_station_unavailable else R.string.msg_playback_failed)
             )
             return
         }

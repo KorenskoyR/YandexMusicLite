@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -97,7 +99,7 @@ fun RadioScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Radio,
-                    contentDescription = "FM Радио",
+                    contentDescription = stringResource(R.string.cd_fm_radio),
                     tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
@@ -107,14 +109,14 @@ fun RadioScreen(
 
             Column {
                 Text(
-                    text = "FM Радио",
+                    text = stringResource(R.string.cd_fm_radio),
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp
                 )
                 Text(
-                    text = "${stations.size} радиостанций",
+                    text = com.korenskoy.yandexmusic.utils.russianQuantityString(stations.size, R.string.stations_count_one, R.string.stations_count_few, R.string.stations_count_many),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 14.sp
@@ -126,7 +128,7 @@ fun RadioScreen(
         TextField(
             value = searchQuery,
             onValueChange = onQueryChange,
-            placeholder = { Text("Поиск радиостанций или жанра", color = Color.Gray) },
+            placeholder = { Text(stringResource(R.string.radio_poisk_radiostantsiy_ili_zhanra), color = Color.Gray) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color(0xFF1E1E24),
@@ -379,7 +381,7 @@ fun RadioStationCard(
         ) {
             Icon(
                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = "Favorite",
+                contentDescription = stringResource(R.string.cd_v_izbrannoe),
                 tint = if (isFavorite) Color(0xFFFF3366) else Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.size(18.dp)
             )

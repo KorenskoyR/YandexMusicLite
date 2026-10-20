@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -121,7 +123,7 @@ fun FloatingGlassBottomBar(
                     dampingRatio = 0.78f,
                     stiffness = Spring.StiffnessMediumLow
                 ),
-                label = "bottom_sliding_liquid_glass"
+                label = stringResource(R.string.bottom_navigation_bar_bottom_sliding_liquid_glass)
             )
 
             val indicatorBgBrush = if (isRadioSelected) {
@@ -235,7 +237,7 @@ fun FloatingGlassNavigationRail(
             dampingRatio = 0.78f,
             stiffness = Spring.StiffnessMediumLow
         ),
-        label = "rail_sliding_liquid_glass"
+        label = stringResource(R.string.bottom_navigation_bar_rail_sliding_liquid_glass)
     )
 
     val indicatorBgBrush = if (isRadioSelected) {

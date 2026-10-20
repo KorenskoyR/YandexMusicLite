@@ -51,6 +51,16 @@ class PlaylistCacheManager @Inject constructor(
         }
     }
 
+    /** Server revision of the likes list the cached tracks correspond to (incremental sync). */
+    suspend fun saveLikesRevision(userFolder: String, revision: Int) = withContext(Dispatchers.IO) {
+        runCatching { File(getUserCacheDir(userFolder), "likes_revision.txt").writeText(revision.toString()) }
+        Unit
+    }
+
+    suspend fun loadLikesRevision(userFolder: String): Int? = withContext(Dispatchers.IO) {
+        runCatching { File(getUserCacheDir(userFolder), "likes_revision.txt").readText().trim().toInt() }.getOrNull()
+    }
+
     suspend fun saveWaveQueue(userFolder: String, tracks: List<TrackDetailsDto>) =
         saveList(getUserCacheDir(userFolder), "wave_queue.json", tracks)
 

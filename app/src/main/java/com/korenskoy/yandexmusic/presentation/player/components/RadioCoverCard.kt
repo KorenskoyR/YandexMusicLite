@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -77,7 +79,7 @@ fun RadioCoverCard(
 
         // Live badge in top-right corner
         if (showLiveBadge) {
-            val infiniteTransitionLive = rememberInfiniteTransition(label = "live_pulse")
+            val infiniteTransitionLive = rememberInfiniteTransition(label = stringResource(R.string.radio_cover_card_live_pulse))
             val alphaLive by infiniteTransitionLive.animateFloat(
                 initialValue = 0.4f,
                 targetValue = 1f,
@@ -85,7 +87,7 @@ fun RadioCoverCard(
                     animation = tween(1000, easing = LinearEasing),
                     repeatMode = RepeatMode.Reverse
                 ),
-                label = "alpha_live"
+                label = stringResource(R.string.radio_cover_card_alpha_live)
             )
 
             Row(
@@ -106,7 +108,7 @@ fun RadioCoverCard(
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "LIVE",
+                    text = stringResource(R.string.radio_cover_card_live),
                     color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -139,7 +141,7 @@ fun RadioCoverCard(
                     .crossfade(true)
                     .browserUserAgent()
                     .build(),
-                contentDescription = "Radio Logo",
+                contentDescription = stringResource(R.string.cd_logotip_radiostantsii),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()

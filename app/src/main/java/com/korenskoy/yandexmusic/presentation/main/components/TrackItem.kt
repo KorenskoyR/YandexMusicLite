@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -99,7 +101,7 @@ fun TrackItem(
                     .data(coverUrl)
                     .crossfade(true)
                     .build(),
-                contentDescription = "Cover",
+                contentDescription = stringResource(R.string.cd_oblozhka),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -137,7 +139,7 @@ fun TrackItem(
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "HQ",
+                        text = stringResource(R.string.track_item_hq),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -157,7 +159,7 @@ fun TrackItem(
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 tint = Color(0xFF4CAF50),
-                contentDescription = "Downloaded",
+                contentDescription = stringResource(R.string.cd_skachan),
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -204,7 +206,7 @@ fun TrackItem(
             Icon(
                 imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.45f),
-                contentDescription = "Like",
+                contentDescription = stringResource(R.string.cd_nravitsya),
                 modifier = Modifier.size(17.dp)
             )
         }

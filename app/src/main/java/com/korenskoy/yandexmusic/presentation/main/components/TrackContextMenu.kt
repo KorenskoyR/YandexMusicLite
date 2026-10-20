@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,7 +55,7 @@ fun TrackContextMenu(
 
             ContextMenuItem(
                 icon = Icons.Default.SkipNext,
-                text = "Играть следующим",
+                text = stringResource(R.string.track_context_menu_igrat_sleduyuschim),
                 onClick = {
                     onPlayNext()
                     onDismiss()
@@ -61,7 +63,7 @@ fun TrackContextMenu(
             )
             ContextMenuItem(
                 icon = Icons.AutoMirrored.Filled.PlaylistAdd,
-                text = "Добавить в плейлист",
+                text = stringResource(R.string.track_context_menu_dobavit_v_pleylist),
                 onClick = {
                     onAddToPlaylist()
                     onDismiss()
@@ -69,7 +71,7 @@ fun TrackContextMenu(
             )
             ContextMenuItem(
                 icon = Icons.Default.FavoriteBorder,
-                text = "Нравится",
+                text = stringResource(R.string.cd_nravitsya),
                 onClick = {
                     onToggleLike()
                     onDismiss()
