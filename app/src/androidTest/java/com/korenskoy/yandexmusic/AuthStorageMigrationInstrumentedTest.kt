@@ -55,6 +55,16 @@ class AuthStorageMigrationInstrumentedTest {
     }
 
     @Test
+    fun savingWorksAfterTheKeystoreKeyIsLost() {
+        val prefs = KeystoreStringPreferences(context, "auth_secure", "yandex_music_lite_auth")
+        java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry("yandex_music_lite_auth")
+
+        // Used to throw KeyPermanentlyInvalidatedException, which broke signing in
+        prefs.edit().putString("yandex_token", "y0_after_reset").commit()
+        assertEquals("y0_after_reset", prefs.getString("yandex_token", null))
+    }
+
+    @Test
     fun valuesAreEncryptedAtRest() {
         val prefs = KeystoreStringPreferences(context, "auth_secure", "yandex_music_lite_auth")
         prefs.edit().putString("yandex_token", "y0_secret").commit()

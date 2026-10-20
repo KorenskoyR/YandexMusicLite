@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,6 +45,9 @@ class MainActivity : ComponentActivity() {
     // to a foreground service by itself once playback starts.
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
+    @javax.inject.Inject
+    lateinit var libraryTree: com.korenskoy.yandexmusic.data.player.MediaLibraryTree
+
     /** Incremented on each "open the player" request (notification tap); MainScreen reacts to changes. */
     private var openPlayerSignal by mutableIntStateOf(0)
 
@@ -63,6 +68,7 @@ class MainActivity : ComponentActivity() {
         }
         
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
+        if (savedInstanceState == null) intent?.let { playFromSearch(it) }
 
         enableEdgeToEdge()
         setContent {
@@ -81,6 +87,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) openPlayerSignal++
+        playFromSearch(intent)
+    }
+
+    /** Assistant request "play <query> on Yandex Music Lite": same matching as voice search in the car. */
+    private fun playFromSearch(intent: Intent) {
+        if (intent.action != android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+        val query = intent.getStringExtra(android.app.SearchManager.QUERY)
+        lifecycleScope.launch {
+            libraryTree.startAction(mediaId = "", searchQuery = query)?.invoke()
+            openPlayerSignal++
+        }
     }
 
     override fun onStart() {

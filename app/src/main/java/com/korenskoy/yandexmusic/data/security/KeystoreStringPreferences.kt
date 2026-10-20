@@ -24,7 +24,8 @@ class KeystoreStringPreferences(
 ) : SharedPreferences {
 
     private val backing: SharedPreferences = context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
-    private val secretKey: SecretKey = loadOrCreateKey()
+    @Volatile
+    private var secretKey: SecretKey = loadOrCreateKey()
 
     private fun loadOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -42,7 +43,15 @@ class KeystoreStringPreferences(
 
     internal fun encrypt(plain: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        } catch (e: java.security.InvalidKeyException) {
+            // The Keystore entry was removed or invalidated (restore, keystore reset): start over with a new
+            // key. Values sealed with the old one were unreadable already.
+            KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(keyAlias)
+            secretKey = loadOrCreateKey()
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        }
         val sealed = cipher.iv + cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
         return Base64.encodeToString(sealed, Base64.NO_WRAP)
     }

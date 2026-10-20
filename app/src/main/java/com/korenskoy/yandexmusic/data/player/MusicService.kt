@@ -9,10 +9,15 @@ import android.media.AudioManager
 import android.os.Build
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import androidx.media3.common.Player
 import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import androidx.media3.session.SessionError
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
@@ -35,12 +40,18 @@ class MusicService : MediaLibraryService() {
     @Inject
     lateinit var playbackController: PlaybackController
 
+    @Inject
+    lateinit var libraryTree: MediaLibraryTree
+
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: AudioManager? = null
     private var focusRequest: android.media.AudioFocusRequest? = null
     private var hasAudioFocus = false
     private var wasPlayingBeforeTransientLoss = false
+
+    /** Item picked in a car/browser; started by the play command that follows the selection. */
+    private var pendingStart: (() -> Unit)? = null
 
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
@@ -202,7 +213,7 @@ class MusicService : MediaLibraryService() {
                 session: MediaSession,
                 controller: MediaSession.ControllerInfo
             ): MediaSession.ConnectionResult {
-                if (controller.isTrusted || controller.packageName == packageName) {
+                if (controller.isTrusted || controller.packageName == packageName || controller.packageName in CAR_HOSTS) {
                     return super.onConnect(session, controller)
                 }
                 val transportOnly = Player.Commands.Builder()
@@ -222,6 +233,61 @@ class MusicService : MediaLibraryService() {
                     .setAvailablePlayerCommands(transportOnly)
                     .setAvailableSessionCommands(androidx.media3.session.SessionCommands.EMPTY)
                     .build()
+            }
+
+            override fun onGetLibraryRoot(
+                session: MediaLibrarySession,
+                browser: MediaSession.ControllerInfo,
+                params: LibraryParams?
+            ): ListenableFuture<LibraryResult<MediaItem>> =
+                Futures.immediateFuture(LibraryResult.ofItem(libraryTree.root(), params))
+
+            override fun onGetChildren(
+                session: MediaLibrarySession,
+                browser: MediaSession.ControllerInfo,
+                parentId: String,
+                page: Int,
+                pageSize: Int,
+                params: LibraryParams?
+            ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = libraryFuture {
+                val children = libraryTree.children(parentId)
+                    ?: return@libraryFuture LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+                val from = (page.toLong() * pageSize).coerceAtMost(children.size.toLong()).toInt()
+                val to = (from.toLong() + pageSize).coerceAtMost(children.size.toLong()).toInt()
+                LibraryResult.ofItemList(children.subList(from, to), params)
+            }
+
+            override fun onGetItem(
+                session: MediaLibrarySession,
+                browser: MediaSession.ControllerInfo,
+                mediaId: String
+            ): ListenableFuture<LibraryResult<MediaItem>> = libraryFuture {
+                libraryTree.item(mediaId)?.let { LibraryResult.ofItem(it, null) }
+                    ?: LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+            }
+
+            // A car or another browser picked an item: PlaybackController builds the real queue,
+            // the forwarding player ignores the metadata-only items it is then given.
+            override fun onSetMediaItems(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                mediaItems: MutableList<MediaItem>,
+                startIndex: Int,
+                startPositionMs: Long
+            ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+                val index = if (startIndex in mediaItems.indices) startIndex else 0
+                serviceScope.launch {
+                    val picked = mediaItems.getOrNull(index)
+                    val start = libraryTree.startAction(picked?.mediaId.orEmpty(), picked?.requestMetadata?.searchQuery)
+                    if (start != null) {
+                        pendingStart = start
+                        future.set(MediaSession.MediaItemsWithStartPosition(mediaItems, index, startPositionMs))
+                    } else {
+                        future.setException(UnsupportedOperationException("Unknown media item"))
+                    }
+                }
+                return future
             }
 
             // Headset/Bluetooth Play or the system media card when the app process is not running
@@ -254,6 +320,21 @@ class MusicService : MediaLibraryService() {
         }
     }
 
+    private fun <T : Any> libraryFuture(block: suspend () -> LibraryResult<T>): ListenableFuture<LibraryResult<T>> {
+        val future = SettableFuture.create<LibraryResult<T>>()
+        serviceScope.launch {
+            future.set(
+                try {
+                    block()
+                } catch (e: Exception) {
+                    android.util.Log.e("MusicService", "Browse request failed", e)
+                    LibraryResult.ofError(SessionError.ERROR_UNKNOWN)
+                }
+            )
+        }
+        return future
+    }
+
     /**
      * Transport commands from the notification, lock screen and headsets go through the
      * [PlaybackController], so they get the same queue, crossfade and error recovery as the app UI.
@@ -274,13 +355,14 @@ class MusicService : MediaLibraryService() {
                 availableCommands.contains(command)
 
             override fun play() {
-                playbackController.play()
+                startPendingOrPlay()
             }
             override fun pause() {
+                pendingStart = null
                 playbackController.pause()
             }
             override fun setPlayWhenReady(playWhenReady: Boolean) {
-                if (playWhenReady) playbackController.play() else playbackController.pause()
+                if (playWhenReady) startPendingOrPlay() else pause()
             }
             override fun prepare() {
                 // A failed/idle stream is re-resolved by the controller on play()
@@ -314,6 +396,12 @@ class MusicService : MediaLibraryService() {
         }
     }
 
+    private fun startPendingOrPlay() {
+        val start = pendingStart
+        pendingStart = null
+        if (start != null) start() else playbackController.play()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         return START_NOT_STICKY
@@ -345,5 +433,8 @@ class MusicService : MediaLibraryService() {
 
     companion object {
         const val PLAYBACK_CHANNEL_ID = "yandex_music_lite_playback_channel"
+
+        /** Android Auto and the Automotive OS media center: allowed to browse and pick what to play. */
+        private val CAR_HOSTS = setOf("com.google.android.projection.gearhead", "com.android.car.media")
     }
 }

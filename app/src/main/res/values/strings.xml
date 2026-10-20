@@ -133,4 +133,9 @@
     <string name="sleep_off">Выключить таймер</string>
     <string name="sleep_caption_minutes">Сон через %1$d мин</string>
     <string name="sleep_caption_end_of_track">Сон в конце трека</string>
+    <string name="auto_my_wave">Моя волна</string>
+    <string name="auto_my_wave_subtitle">Бесконечный поток под ваш вкус</string>
+    <string name="auto_liked">Мне нравится</string>
+    <string name="auto_downloaded">Скачанные</string>
+    <string name="auto_radio">Радио</string>
 </resources>
