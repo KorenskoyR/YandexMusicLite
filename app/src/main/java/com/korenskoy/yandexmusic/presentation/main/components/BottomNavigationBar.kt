@@ -123,7 +123,7 @@ fun FloatingGlassBottomBar(
                     dampingRatio = 0.78f,
                     stiffness = Spring.StiffnessMediumLow
                 ),
-                label = stringResource(R.string.bottom_navigation_bar_bottom_sliding_liquid_glass)
+                label = "bottom_sliding_liquid_glass"
             )
 
             val indicatorBgBrush = if (isRadioSelected) {
@@ -237,7 +237,7 @@ fun FloatingGlassNavigationRail(
             dampingRatio = 0.78f,
             stiffness = Spring.StiffnessMediumLow
         ),
-        label = stringResource(R.string.bottom_navigation_bar_rail_sliding_liquid_glass)
+        label = "rail_sliding_liquid_glass"
     )
 
     val indicatorBgBrush = if (isRadioSelected) {

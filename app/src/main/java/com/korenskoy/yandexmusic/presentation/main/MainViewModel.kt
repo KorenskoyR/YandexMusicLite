@@ -137,6 +137,12 @@ class MainViewModel @Inject constructor(
     private var downloadedApkFile: java.io.File? = null
 
     val isFetchingMoreQueue: StateFlow<Boolean> = playbackController.isFetchingMoreQueue
+    val streamQuality: StateFlow<String?> = playbackController.streamQuality
+    val sleepTimer: StateFlow<com.korenskoy.yandexmusic.data.player.SleepTimerState?> = playbackController.sleepTimer
+
+    fun setSleepTimer(minutes: Int) = playbackController.setSleepTimer(minutes)
+    fun setSleepAtEndOfTrack() = playbackController.setSleepAtEndOfTrack()
+    fun cancelSleepTimer() = playbackController.cancelSleepTimer()
     val playbackMessages: kotlinx.coroutines.flow.SharedFlow<String> = playbackController.messages
 
     init {

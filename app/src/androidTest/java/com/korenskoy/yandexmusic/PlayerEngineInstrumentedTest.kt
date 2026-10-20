@@ -176,6 +176,21 @@ class PlayerEngineInstrumentedTest {
         assertOnlyAudible("D")
     }
 
+    @Test
+    fun sleepFadeLowersVolumeThenPausesAndResumeIsAtFullVolume() {
+        startAndSettle("A", STREAM_A)
+        onMain { repo.fadeOutAndPause(2_000L) }
+        Thread.sleep(1_000)
+        val midVolume = onMain { listOf(playerA, playerB).single { it.isPlaying }.volume }
+        assertTrue("volume is fading, was $midVolume", midVolume in 0.2f..0.8f)
+        waitUntil(5_000, "paused after the fade") { audiblePlayers().isEmpty() }
+        assertTrue(!onMain { repo.isPlaying.value })
+
+        onMain { repo.resume() }
+        waitUntil(30_000, "resumes") { audiblePlayers().isNotEmpty() }
+        assertOnlyAudible("A")
+    }
+
     private companion object {
         const val STREAM_A = "https://radiorecord.hostingradio.ru/rr_main96.aacp"
         const val STREAM_B = "https://dfm.hostingradio.ru/dfm96.aacp"

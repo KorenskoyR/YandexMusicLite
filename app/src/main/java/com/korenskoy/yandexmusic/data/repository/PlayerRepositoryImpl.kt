@@ -179,8 +179,9 @@ class PlayerRepositoryImpl(
                     Log.d(TAG, "Player[$playerIdx] reached STATE_ENDED, crossfadeRequested=$hasEmittedTrackEndedForCurrent")
                     // When the early crossfade trigger already fired, the controller is advancing — don't skip twice.
                     if (!hasEmittedTrackEndedForCurrent) {
+                        hasEmittedTrackEndedForCurrent = true
                         wakeLockHelper.acquireTransitionLock(30_000L)
-                        triggerSkipNext()
+                        _trackEndedEvent.tryEmit(Unit)
                     }
                 }
             }
@@ -421,9 +422,29 @@ class PlayerRepositoryImpl(
     }
 
     override fun pause() {
+        fadeJob?.cancel()
         finishCrossfadeNow(restoreActiveVolume = true)
         activePlayer.pause()
         refreshPlaybackState()
+    }
+
+    private var fadeJob: Job? = null
+
+    override fun fadeOutAndPause(durationMs: Long) {
+        fadeJob?.cancel()
+        fadeJob = scope.launch {
+            finishCrossfadeNow(restoreActiveVolume = false)
+            val player = activePlayer
+            val start = logicalVolume[indexOf(player)]
+            val steps = (durationMs / FADE_STEP_MS).toInt().coerceAtLeast(1)
+            for (step in 1..steps) {
+                setVolume(player, start * (1f - step.toFloat() / steps))
+                delay(FADE_STEP_MS)
+            }
+            player.pause()
+            setVolume(player, 1f)
+            refreshPlaybackState()
+        }
     }
 
     override fun resume(): Boolean {
@@ -518,6 +539,7 @@ class PlayerRepositoryImpl(
         const val INCOMING_READY_TIMEOUT_MS = 8_000L
         const val DUCK_VOLUME = 0.2f
         const val QUICK_FADE_MS = 150L
+        private const val FADE_STEP_MS = 50L
         private const val QUICK_FADE_STEPS = 6
         private const val PROGRESS_INTERVAL_MS = 100L
         private const val IDLE_INTERVAL_MS = 500L

@@ -52,31 +52,39 @@ class NotificationOpensPlayerInstrumentedTest {
         return false
     }
 
+    /** Screenshot for visual review; /data/local/tmp survives the uninstall that wipes the app's files. */
+    private fun snap(name: String) {
+        device.executeShellCommand("screencap -p /data/local/tmp/$name.png")
+    }
+
     @Test
     fun notificationIntentOpensFullScreenPlayer() {
         androidx.test.uiautomator.Configurator.getInstance().waitForIdleTimeout = 0
         if (Build.VERSION.SDK_INT >= 33) {
             instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
         }
+        // Save the token, then start a fresh activity: recreate() would restore the auth screen when the
+        // short splash has already navigated there, which made this test flaky
+        ActivityScenario.launch(MainActivity::class.java).use { first ->
+            first.onActivity { ViewModelProvider(it)[AuthViewModel::class.java].saveToken("y0_instrumentation_fake_token") }
+        }
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         var mainVm: MainViewModel? = null
         try {
-            scenario.onActivity { ViewModelProvider(it)[AuthViewModel::class.java].saveToken("y0_instrumentation_fake_token") }
-            scenario.recreate() // authorized + saved state: straight to the main screen
             lateinit var vm: MainViewModel
             scenario.onActivity { vm = ViewModelProvider(it)[MainViewModel::class.java] }
             mainVm = vm
             // Radio list snapshot for visual review of the bundled station logos
             if (hasText("FM Радио", 15_000)) device.findObject(By.text("FM Радио")).click()
             Thread.sleep(3_000)
-            device.takeScreenshot(java.io.File(context.filesDir, "radio_list.png"))
+            snap("radio_list")
             device.findObject(By.text("Dance & Club"))?.click()
             Thread.sleep(2_000)
-            device.takeScreenshot(java.io.File(context.filesDir, "radio_dance.png"))
+            snap("radio_dance")
             device.findObject(By.text("Все"))?.click()
             device.findObject(By.clazz("android.widget.EditText"))?.text = "России"
             Thread.sleep(2_000)
-            device.takeScreenshot(java.io.File(context.filesDir, "radio_search.png"))
+            snap("radio_search")
             device.findObject(By.clazz("android.widget.EditText"))?.text = ""
             val station = vm.radioStations.value.first { it.id == "record" }
             instrumentation.runOnMainSync { vm.playRadioStation(station) }
@@ -92,9 +100,17 @@ class NotificationOpensPlayerInstrumentedTest {
                 )
             }
             assertTrue("notification tap opens the full-screen player", hasDesc("Свернуть плеер", 10_000))
+            // The sleep timer button sits in the player header
+            assertTrue("sleep timer button is shown", hasDesc("Таймер сна", 2_000))
             Thread.sleep(1_500) // let the cover settle
-            // Kept for visual review of the opened player (adb shell run-as <pkg> cat files/notification_player.png)
-            device.takeScreenshot(java.io.File(context.filesDir, "notification_player.png"))
+            // Kept for visual review of the opened player
+            snap("notification_player")
+
+            device.findObject(By.desc("Таймер сна")).click()
+            assertTrue("sleep timer menu opens", hasText("Через 15 мин", 3_000))
+            device.findObject(By.text("Через 15 мин")).click()
+            assertTrue("remaining time is shown", hasText("Сон через 15 мин", 3_000))
+            snap("sleep_timer")
 
         } finally {
             // The open full-screen player animates endlessly, so the main thread never goes idle and

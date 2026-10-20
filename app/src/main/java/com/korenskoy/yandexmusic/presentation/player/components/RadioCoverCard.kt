@@ -79,7 +79,7 @@ fun RadioCoverCard(
 
         // Live badge in top-right corner
         if (showLiveBadge) {
-            val infiniteTransitionLive = rememberInfiniteTransition(label = stringResource(R.string.radio_cover_card_live_pulse))
+            val infiniteTransitionLive = rememberInfiniteTransition(label = "live_pulse")
             val alphaLive by infiniteTransitionLive.animateFloat(
                 initialValue = 0.4f,
                 targetValue = 1f,
@@ -87,7 +87,7 @@ fun RadioCoverCard(
                     animation = tween(1000, easing = LinearEasing),
                     repeatMode = RepeatMode.Reverse
                 ),
-                label = stringResource(R.string.radio_cover_card_alpha_live)
+                label = "alpha_live"
             )
 
             Row(

@@ -5,6 +5,9 @@ enum class PlaylistSource {
     LIBRARY, VIBE, SEARCH, TRENDS, RADIO, NONE
 }
 
+/** Sleep timer: either a moment in [android.os.SystemClock.elapsedRealtime] time or "at the end of this track". */
+data class SleepTimerState(val endsAtElapsedMs: Long?, val atEndOfTrack: Boolean)
+
 /** What "next" should do for a queue position. Pure logic, unit-tested in PlaybackQueueTest. */
 sealed interface NextAction {
     data class PlayIndex(val index: Int) : NextAction

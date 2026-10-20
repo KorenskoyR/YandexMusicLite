@@ -35,6 +35,8 @@ interface PlayerRepository {
     )
     fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
     fun pause()
+    /** Lowers the volume to silence over [durationMs], then pauses (sleep timer). */
+    fun fadeOutAndPause(durationMs: Long)
     /** Resumes the loaded item. Returns false when nothing is loaded and the caller must start the track itself. */
     fun resume(): Boolean
     fun seekTo(position: Long)

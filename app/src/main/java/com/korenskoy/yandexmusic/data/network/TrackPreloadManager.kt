@@ -31,6 +31,12 @@ class TrackPreloadManager @Inject constructor(
     private val resolvedUrls = ConcurrentHashMap<String, CachedTrackUrl>()
     private val inFlightRequests = ConcurrentHashMap<String, Deferred<String?>>()
 
+    /** Codec and bitrate of the stream actually chosen for a track (shown in the player). */
+    data class StreamQuality(val codec: String, val bitrateKbps: Int)
+    private val qualities = ConcurrentHashMap<String, StreamQuality>()
+
+    fun qualityOf(trackId: String): StreamQuality? = qualities[trackId]
+
     fun getResolvedUrl(trackId: String): String? {
         val cached = resolvedUrls[trackId] ?: return null
         if (System.currentTimeMillis() - cached.fetchedAtMs > URL_TTL_MS) {
@@ -85,6 +91,7 @@ class TrackPreloadManager @Inject constructor(
                         val mp3Url = resolveXmlToMp3Url(infoUrl)
                         if (mp3Url != null) {
                             resolvedUrls[trackId] = CachedTrackUrl(mp3Url, System.currentTimeMillis())
+                            qualities[trackId] = StreamQuality(preferredInfo.codec, preferredInfo.bitrateInKbps)
                             Log.d("TrackPreloadManager", "Successfully resolved URL for track $trackId")
                             return@async mp3Url
                         }

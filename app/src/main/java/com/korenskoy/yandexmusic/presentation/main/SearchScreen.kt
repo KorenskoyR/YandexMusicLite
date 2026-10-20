@@ -424,7 +424,7 @@ fun PopularTrackCard(track: TrackDetailsDto, isLandscape: Boolean = false, onCli
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
         ),
-        label = stringResource(R.string.search_card_scale)
+        label = "card_scale"
     )
 
     val cardWidth = if (isLandscape) 150.dp else 140.dp

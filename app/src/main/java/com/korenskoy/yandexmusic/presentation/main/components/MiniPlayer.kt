@@ -280,7 +280,7 @@ fun MiniPlayer(
             } else {
                 androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.LinearEasing)
             },
-            label = stringResource(R.string.mini_player_mini_progress)
+            label = "mini_progress"
         )
         
         Box(

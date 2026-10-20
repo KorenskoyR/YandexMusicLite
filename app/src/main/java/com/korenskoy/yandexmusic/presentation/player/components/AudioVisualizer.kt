@@ -43,14 +43,14 @@ fun AudioVisualizer(
 
     // The animation runs only while playing; paused bars are static and cost nothing per frame
     val phaseState: State<Float> = if (isPlaying) {
-        rememberInfiniteTransition(label = stringResource(R.string.audio_visualizer_visualizer_transition)).animateFloat(
+        rememberInfiniteTransition(label = "visualizer_transition").animateFloat(
             initialValue = 0f,
             targetValue = 2 * Math.PI.toFloat(),
             animationSpec = infiniteRepeatable(
                 animation = tween(1200, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
-            label = stringResource(R.string.car_phase)
+            label = "phase"
         )
     } else {
         remember { mutableFloatStateOf(0f) }

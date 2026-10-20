@@ -86,6 +86,14 @@ class PlaybackController @Inject constructor(
     private val _isStarting = MutableStateFlow(false)
     val isStarting: StateFlow<Boolean> = _isStarting.asStateFlow()
 
+    private val _sleepTimer = MutableStateFlow<SleepTimerState?>(null)
+    val sleepTimer: StateFlow<SleepTimerState?> = _sleepTimer.asStateFlow()
+    private var sleepJob: Job? = null
+
+    /** Real stream quality of the current track ("MP3 · 320 кбит/с"), null for radio or while unknown. */
+    private val _streamQuality = MutableStateFlow<String?>(null)
+    val streamQuality: StateFlow<String?> = _streamQuality.asStateFlow()
+
     /** Position of a restored (not yet loaded) session, shown until the player takes over. */
     private val restoredPositionMs = MutableStateFlow(0L)
 
@@ -123,7 +131,7 @@ class PlaybackController @Inject constructor(
         get() = authRepository.getActiveAccount()?.folderName ?: "default"
 
     init {
-        playerRepository.trackEndedEvent.onEach { playNext(isAuto = true) }.launchIn(scope)
+        playerRepository.trackEndedEvent.onEach { onTrackEnded() }.launchIn(scope)
         playerRepository.prepareNextTrackEvent.onEach { prepareNextTrackInQueue() }.launchIn(scope)
         playerRepository.skipNextEvent.onEach { playNext() }.launchIn(scope)
         playerRepository.skipPrevEvent.onEach { playPrev() }.launchIn(scope)
@@ -386,6 +394,44 @@ class PlaybackController @Inject constructor(
         fetchMoreVibeTracks()
     }
 
+    /** Pause playback after [minutes] with a gentle fade, like the sleep timer in Apple Music. */
+    fun setSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        val durationMs = minutes * 60_000L
+        _sleepTimer.value = SleepTimerState(android.os.SystemClock.elapsedRealtime() + durationMs, atEndOfTrack = false)
+        sleepJob = scope.launch {
+            delay((durationMs - SLEEP_FADE_MS).coerceAtLeast(0L))
+            playerRepository.fadeOutAndPause(SLEEP_FADE_MS)
+            delay(SLEEP_FADE_MS)
+            _sleepTimer.value = null
+            persistSession()
+        }
+    }
+
+    /** Pause when the current track finishes instead of moving on. */
+    fun setSleepAtEndOfTrack() {
+        sleepJob?.cancel()
+        _sleepTimer.value = SleepTimerState(endsAtElapsedMs = null, atEndOfTrack = true)
+    }
+
+    fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        _sleepTimer.value = null
+    }
+
+    private fun onTrackEnded() {
+        if (_sleepTimer.value?.atEndOfTrack == true) {
+            _sleepTimer.value = null
+            // Fires a few seconds before the end when crossfade is on: fade out over that tail
+            playerRepository.fadeOutAndPause(
+                kotlin.math.min(com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl.CROSSFADE_DURATION_MS, SLEEP_FADE_MS)
+            )
+            scope.launch { persistSession() }
+            return
+        }
+        playNext(isAuto = true)
+    }
+
     fun persistNow() {
         scope.launch { persistSession() }
     }
@@ -422,6 +468,7 @@ class PlaybackController @Inject constructor(
         val artist = track.artists.firstOrNull()?.name
         val coverUrl = coverUrlFor(track)
         _isStarting.value = true
+        _streamQuality.value = null
 
         if (track.isRadio) {
             val station = stationFor(trackId)
@@ -443,6 +490,7 @@ class PlaybackController @Inject constructor(
         // Instant start when the file is on disk or the URL is already resolved
         val fastUrl = if (downloadManager.isKnownDownloaded(trackId)) "" else preloadManager.getResolvedUrl(trackId)
         if (fastUrl != null) {
+            publishQuality(trackId)
             playerRepository.playTrack(trackId, fastUrl, title, artist, coverUrl, crossfade, startPositionMs)
             return
         }
@@ -454,6 +502,7 @@ class PlaybackController @Inject constructor(
                     preloadManager.getOrFetchUrl(trackId)
                 }
             if (url != null) {
+                publishQuality(trackId)
                 playerRepository.playTrack(trackId, url, title, artist, coverUrl, crossfade, startPositionMs)
             } else {
                 Log.e(TAG, "Failed to resolve mp3 URL for track $trackId")
@@ -499,6 +548,16 @@ class PlaybackController @Inject constructor(
         }
         retriedTrackId = null
         playNext()
+    }
+
+    private fun publishQuality(trackId: String) {
+        _streamQuality.value = if (downloadManager.isKnownDownloaded(trackId)) {
+            context.getString(R.string.quality_offline)
+        } else {
+            preloadManager.qualityOf(trackId)?.let {
+                context.getString(R.string.quality_stream, it.codec.uppercase(), it.bitrateKbps)
+            }
+        }
     }
 
     private fun isOffline(): Boolean = !networkMonitor.isCurrentlyConnected()
@@ -717,5 +776,6 @@ class PlaybackController @Inject constructor(
         private const val URL_RETRY_DELAY_MS = 700L
         private const val SNAPSHOT_INTERVAL_MS = 15_000L
         private const val RESUMPTION_START_TIMEOUT_MS = 4_000L
+        private const val SLEEP_FADE_MS = 8_000L
     }
 }

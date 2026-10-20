@@ -502,7 +502,7 @@ fun CarControls(
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.car_pulse))
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = if (isPlaying) 1.08f else 1f,
@@ -510,7 +510,7 @@ fun CarControls(
             animation = tween(900, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = stringResource(R.string.car_pulse_anim)
+        label = "pulse_anim"
     )
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.45f,
@@ -519,7 +519,7 @@ fun CarControls(
             animation = tween(900, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = stringResource(R.string.car_glow_anim)
+        label = "glow_anim"
     )
 
     Row(
@@ -725,7 +725,7 @@ fun CarWaveformVisualizerAndTimeline(
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
     // Animated Waveform Heights using Transition
-    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.car_car_wave))
+    val infiniteTransition = rememberInfiniteTransition(label = "car_wave")
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * Math.PI).toFloat(),
@@ -733,7 +733,7 @@ fun CarWaveformVisualizerAndTimeline(
             animation = tween(2200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = stringResource(R.string.car_phase)
+        label = "phase"
     )
 
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -751,7 +751,7 @@ fun CarWaveformVisualizerAndTimeline(
         } else {
             androidx.compose.animation.core.tween(durationMillis = 150, easing = androidx.compose.animation.core.LinearEasing)
         },
-        label = stringResource(R.string.car_car_slider_progress)
+        label = "car_slider_progress"
     )
 
     val displayFraction = if (isDraggingSlider) dragFraction else animatedProgressFraction
@@ -807,7 +807,7 @@ fun CarWaveformVisualizerAndTimeline(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isRadio) "FM СТЕРЕО" else "HQ 320 KBPS",
+                        text = if (isRadio) "FM СТЕРЕО" else com.korenskoy.yandexmusic.utils.LocalStreamQuality.current.orEmpty(),
                         color = Color.White.copy(alpha = 0.75f),
                         fontSize = (10.5f * scaleFactor).sp,
                         fontWeight = FontWeight.Bold,
@@ -831,7 +831,7 @@ fun CarWaveformVisualizerAndTimeline(
             val playActivity by animateFloatAsState(
                 targetValue = if (isPlaying) 1f else 0f,
                 animationSpec = tween(350, easing = FastOutSlowInEasing),
-                label = stringResource(R.string.car_play_activity)
+                label = "play_activity"
             )
 
             Row(

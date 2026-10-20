@@ -31,7 +31,7 @@ fun DownloadProgressModal(
     val animatedProgress by animateFloatAsState(
         targetValue = progressInfo.percent,
         animationSpec = tween(durationMillis = 300),
-        label = stringResource(R.string.download_progress_modal_progressanim)
+        label = "progressAnim"
     )
 
     Dialog(

@@ -34,7 +34,7 @@ fun SplashScreen(
     val minSide = minOf(windowSize.widthDp, windowSize.heightDp)
     val scaleFactor = (minSide / 400f).coerceIn(0.7f, 1.4f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.splash_resonance))
+    val infiniteTransition = rememberInfiniteTransition(label = "Resonance")
 
     // 1. Subwoofer breath / pulse effect for the main sphere
     val sphereScale by infiniteTransition.animateFloat(
@@ -44,7 +44,7 @@ fun SplashScreen(
             animation = tween(1400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = stringResource(R.string.splash_spherepulse)
+        label = "SpherePulse"
     )
 
     // 2. Continuous expanding soundwaves (Golden / Neon)
@@ -55,7 +55,7 @@ fun SplashScreen(
             animation = tween(2200, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = stringResource(R.string.auth_waveprogress)
+        label = "WaveProgress"
     )
 
     // 3. Typography fade-in and overall fade-out transition

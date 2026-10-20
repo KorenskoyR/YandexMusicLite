@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.filled.Bedtime
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
@@ -126,7 +129,11 @@ fun FullScreenPlayer(
     onCloseAndClear: () -> Unit,
     onDislikeClick: () -> Unit,
     onLoadMoreQueue: () -> Unit = {},
-    isFetchingMoreQueue: Boolean = false
+    isFetchingMoreQueue: Boolean = false,
+    sleepTimer: com.korenskoy.yandexmusic.data.player.SleepTimerState? = null,
+    onSleepTimer: (Int) -> Unit = {},
+    onSleepAtEndOfTrack: () -> Unit = {},
+    onCancelSleepTimer: () -> Unit = {}
 ) {
     androidx.activity.compose.BackHandler(onBack = onCollapse)
 
@@ -137,7 +144,7 @@ fun FullScreenPlayer(
     val coverUrl = track.coverUri.toCoverUrl("1000x1000") ?: ""
 
     // Subtle scale animation for the cover (Live Canvas breathing effect)
-    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.full_player_cover_breath))
+    val infiniteTransition = rememberInfiniteTransition(label = "cover_breath")
     val coverScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.035f,
@@ -145,7 +152,7 @@ fun FullScreenPlayer(
             animation = tween(6000, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = stringResource(R.string.full_player_cover_scale)
+        label = "cover_scale"
     )
 
     var showQueue by remember { mutableStateOf(false) }
@@ -165,7 +172,7 @@ fun FullScreenPlayer(
         } else {
             androidx.compose.animation.core.tween(durationMillis = 150, easing = androidx.compose.animation.core.LinearEasing)
         },
-        label = stringResource(R.string.full_player_fullscreen_slider_progress)
+        label = "fullscreen_slider_progress"
     )
 
     val activeFraction = if (isDraggingSlider) sliderPosition else animatedFraction
@@ -223,44 +230,7 @@ fun FullScreenPlayer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .shadow(6.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
-                        .clip(CircleShape)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0x352A2A38), Color(0x201E1E28))
-                            )
-                        )
-                        .border(
-                            BorderStroke(
-                                1.dp,
-                                Brush.verticalGradient(
-                                    listOf(Color(0x40FFFFFF), Color(0x10FFFFFF))
-                                )
-                            ),
-                            CircleShape
-                        )
-                        .clickable { onCollapse() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.cd_svernut_pleer),
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.full_player_seychas_igraet),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        letterSpacing = 2.sp,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-                if (!track.isRadio) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -280,20 +250,72 @@ fun FullScreenPlayer(
                                 ),
                                 CircleShape
                             )
-                            .clickable { showQueue = true },
+                            .clickable { onCollapse() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = stringResource(R.string.cd_ochered),
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.cd_svernut_pleer),
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
-                } else {
-                    Spacer(modifier = Modifier.size(40.dp)) // To keep title centered
+                    // Keeps the title centred against the timer and queue buttons on the right
+                    if (!track.isRadio) Spacer(modifier = Modifier.width(48.dp))
+                }
+                Text(
+                    text = stringResource(R.string.full_player_seychas_igraet),
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SleepTimerButton(
+                        state = sleepTimer,
+                        onMinutes = onSleepTimer,
+                        onEndOfTrack = onSleepAtEndOfTrack,
+                        onCancel = onCancelSleepTimer
+                    )
+                    if (!track.isRadio) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .shadow(6.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color(0x352A2A38), Color(0x201E1E28))
+                                    )
+                                )
+                                .border(
+                                    BorderStroke(
+                                        1.dp,
+                                        Brush.verticalGradient(
+                                            listOf(Color(0x40FFFFFF), Color(0x10FFFFFF))
+                                        )
+                                    ),
+                                    CircleShape
+                                )
+                                .clickable { showQueue = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = stringResource(R.string.cd_ochered),
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                 }
             }
+
+            SleepTimerCaption(state = sleepTimer)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -301,7 +323,7 @@ fun FullScreenPlayer(
             val animatedSwipeOffset by animateFloatAsState(
                 targetValue = swipeOffset,
                 animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                label = stringResource(R.string.full_player_swipe_offset)
+                label = "swipe_offset"
             )
 
             // Album Art (Adaptive 1:1 square centered in available space)
@@ -869,7 +891,7 @@ fun BouncyIconButton(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
         ),
-        label = stringResource(R.string.full_player_bounce_scale)
+        label = "bounce_scale"
     )
 
     Box(
@@ -910,7 +932,7 @@ fun LikeHeartButton(
             stiffness = Spring.StiffnessMedium
         ),
         finishedListener = { isPulsing = false },
-        label = stringResource(R.string.full_player_heart_pop)
+        label = "heart_pop"
     )
 
     BouncyIconButton(
@@ -1004,37 +1026,27 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                 }
             }
         } else {
-            // Quality Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+            // Real stream quality (codec and bitrate the player actually uses)
+            val quality = com.korenskoy.yandexmusic.utils.LocalStreamQuality.current
+            if (quality != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = stringResource(R.string.full_player_lossless_hd),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFFFD700), // Gold color for premium feel
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.full_player_dolby_atmos),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = quality,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                    }
                 }
             }
         }
@@ -1134,7 +1146,7 @@ fun DislikeButton(
             stiffness = Spring.StiffnessMedium
         ),
         finishedListener = { isDisliked = false },
-        label = stringResource(R.string.full_player_dislike_pop)
+        label = "dislike_pop"
     )
 
     BouncyIconButton(
@@ -1173,4 +1185,77 @@ fun DislikeButton(
                 }
         )
     }
+}
+
+/** Moon button with the sleep timer choices (15/30/45/60 min, end of track, off). */
+@Composable
+private fun SleepTimerButton(
+    state: com.korenskoy.yandexmusic.data.player.SleepTimerState?,
+    onMinutes: (Int) -> Unit,
+    onEndOfTrack: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(if (state != null) Color(0x55FF3366) else Color(0x352A2A38))
+                .border(BorderStroke(1.dp, Color(0x40FFFFFF)), CircleShape)
+                .clickable { expanded = true },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Bedtime,
+                contentDescription = stringResource(R.string.cd_sleep_timer),
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            for (minutes in listOf(15, 30, 45, 60)) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sleep_minutes, minutes)) },
+                    onClick = { expanded = false; onMinutes(minutes) }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.sleep_end_of_track)) },
+                onClick = { expanded = false; onEndOfTrack() }
+            )
+            if (state != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sleep_off)) },
+                    onClick = { expanded = false; onCancel() }
+                )
+            }
+        }
+    }
+}
+
+/** "Сон через 12 мин" / "Сон в конце трека"; refreshes every 15 s while a timer runs. */
+@Composable
+private fun SleepTimerCaption(state: com.korenskoy.yandexmusic.data.player.SleepTimerState?) {
+    if (state == null) return
+    var now by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    LaunchedEffect(state) {
+        while (true) {
+            now = android.os.SystemClock.elapsedRealtime()
+            kotlinx.coroutines.delay(15_000L)
+        }
+    }
+    val text = if (state.atEndOfTrack || state.endsAtElapsedMs == null) {
+        stringResource(R.string.sleep_caption_end_of_track)
+    } else {
+        val minutes = ((state.endsAtElapsedMs - now + 59_999L) / 60_000L).coerceAtLeast(1L).toInt()
+        stringResource(R.string.sleep_caption_minutes, minutes)
+    }
+    Text(
+        text = text,
+        color = Color(0xFFFF7799),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 6.dp)
+    )
 }

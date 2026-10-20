@@ -152,7 +152,7 @@ internal fun extractTokenFromUrl(url: String): String? {
 
 @Composable
 fun WaitingForInternetScreen() {
-    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.auth_networkresonance))
+    val infiniteTransition = rememberInfiniteTransition(label = "NetworkResonance")
     val waveProgress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -160,7 +160,7 @@ fun WaitingForInternetScreen() {
             animation = tween(2200, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = stringResource(R.string.auth_waveprogress)
+        label = "WaveProgress"
     )
 
     Box(

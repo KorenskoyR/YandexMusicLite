@@ -58,7 +58,7 @@ fun HomeScreen(
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.8f, 2.0f)
 
-    val infiniteTransition = rememberInfiniteTransition(label = stringResource(R.string.home_wave_spheres))
+    val infiniteTransition = rememberInfiniteTransition(label = "wave_spheres")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -66,7 +66,7 @@ fun HomeScreen(
             animation = tween(15000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = stringResource(R.string.home_rotation)
+        label = "rotation"
     )
 
     // Make the spheres pulse slightly more aggressively if playing the wave
@@ -80,7 +80,7 @@ fun HomeScreen(
             animation = tween(scaleSpecDuration, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = stringResource(R.string.home_scale)
+        label = "scale"
     )
 
     Box(
@@ -155,7 +155,7 @@ fun HomeScreen(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessLow
                 ),
-                label = stringResource(R.string.home_button_scale)
+                label = "button_scale"
             )
 
             Box(
