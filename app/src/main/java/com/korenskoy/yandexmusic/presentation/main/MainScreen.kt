@@ -40,6 +40,8 @@ import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
 import com.korenskoy.yandexmusic.presentation.account.AccountManagementDialog
 import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.State
+import com.korenskoy.yandexmusic.data.player.PlaylistSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,9 +77,12 @@ fun MainScreen(
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
-    val currentTrackId by viewModel.playerRepository.currentTrackId.collectAsState(null)
-    val isPlaying by viewModel.playerRepository.isPlaying.collectAsState(false)
-    val progress by viewModel.playerRepository.progress.collectAsState(0L)
+    val currentTrackId by viewModel.currentTrackId.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
+    val isBuffering by viewModel.isBuffering.collectAsState()
+    // Progress ticks 10x per second: keep the State and read it only inside WithProgress,
+    // so the whole screen (lists included) is not recomposed on every tick.
+    val progressState = viewModel.progress.collectAsState()
     
     val weeklyHits by viewModel.weeklyHits.collectAsState()
     val trendTracks by viewModel.trendTracks.collectAsState()
@@ -127,14 +132,14 @@ fun MainScreen(
             when (currentTab) {
                 MainTab.HOME -> HomeScreen(
                     isPlaying = isPlaying,
-                    isWavePlaying = currentSource == MainViewModel.PlaylistSource.VIBE,
+                    isWavePlaying = currentSource == PlaylistSource.VIBE,
+                    isLoading = isBuffering && currentSource == PlaylistSource.VIBE,
                     onPlayPauseVibe = {
-                        val hasActiveTrack = currentTrack != null && currentTrackId != null
-                        when {
-                            currentSource == MainViewModel.PlaylistSource.VIBE -> viewModel.togglePlayPause()
-                            hasActiveTrack && isPlaying -> viewModel.playerRepository.pause()
-                            hasActiveTrack && !isPlaying -> viewModel.resumeOrPlayCurrent()
-                            else -> viewModel.playMyVibe(forceRestart = true)
+                        // Like Yandex Music: the wave button controls the wave; from any other context it starts the wave.
+                        if (currentSource == PlaylistSource.VIBE && currentTrack != null) {
+                            viewModel.togglePlayPause()
+                        } else {
+                            viewModel.playMyVibe()
                         }
                     }
                 )
@@ -148,7 +153,7 @@ fun MainScreen(
                     currentTrackId = currentTrackId,
                     isPlaying = isPlaying,
                     likedTrackIds = likedTrackIds,
-                    onTrackClick = { id, playlist -> viewModel.playTrack(id, playlist) },
+                    onTrackClick = { id, playlist -> viewModel.playTrack(id, playlist, PlaylistSource.SEARCH) },
                     onToggleLike = { track -> viewModel.toggleLike(track) },
                     onLoadMoreHits = { viewModel.loadMoreHits() },
                     onLoadMoreTrends = { viewModel.loadMoreTrends() },
@@ -165,7 +170,7 @@ fun MainScreen(
                     downloadedTrackIds = downloadedTrackIds,
                     cacheSizeBytes = cacheSizeBytes,
                     downloadProgress = downloadProgress,
-                    onTrackClick = { id -> viewModel.playTrack(id, tracks) },
+                    onTrackClick = { id -> viewModel.playTrack(id, tracks, PlaylistSource.LIBRARY) },
                     onPlayAllClick = { viewModel.playAllLikedTracks() },
                     onShuffleClick = { viewModel.shuffleLikedTracks() },
                     onDownloadAllClick = { viewModel.downloadAllLikedTracks() },
@@ -211,50 +216,52 @@ fun MainScreen(
                         hasActiveTrack = currentTrack != null
                     )
                 }
-                MainTab.CAR -> CarScreen(
-                    currentTrack = currentTrack,
-                    isPlaying = isPlaying,
-                    likedTrackIds = likedTrackIds,
-                    onPlayPauseClick = {
-                        viewModel.togglePlayPause()
-                    },
-                    onNextClick = { viewModel.playNext() },
-                    onPrevClick = { viewModel.playPrev() },
-                    onToggleLike = { track ->
-                        if (track.isRadio) {
-                            viewModel.toggleRadioFavorite(track.idString.removePrefix("radio_"))
-                        } else {
-                            viewModel.toggleLike(track)
-                        }
-                    },
-                    onDislikeClick = { track ->
-                        if (track.isRadio) {
-                            viewModel.removeRadioFavorite(track.idString.removePrefix("radio_"))
-                        } else {
-                            viewModel.dislikeTrack(track)
-                        }
-                    },
-                    onPlayMyVibe = { viewModel.playMyVibe(forceRestart = true) },
-                    onPlayFavorites = { viewModel.playAllLikedTracks() },
-                    onPlayHits = { viewModel.playHits(shuffle = true) },
-                    onPlayDownloaded = {
-                        val downloaded = tracks.filter { downloadedTrackIds.contains(it.idString) }
-                        if (downloaded.isNotEmpty()) {
-                            viewModel.playTrack(downloaded.first().idString, downloaded)
-                        }
-                    },
-                    onPlayRadio = {
-                        val stations = viewModel.radioStations.value
-                        if (stations.isNotEmpty()) {
-                            viewModel.playRadioStation(stations.first())
-                        }
-                    },
-                    onExit = { currentTab = MainTab.HOME },
-                    isLandscape = isLandscape,
-                    progress = progress,
-                    durationMs = currentTrack?.durationMs ?: 0L,
-                    onSeek = { viewModel.seekTo(it) }
-                )
+                MainTab.CAR -> WithProgress(progressState) { progress ->
+                    CarScreen(
+                        currentTrack = currentTrack,
+                        isPlaying = isPlaying,
+                        likedTrackIds = likedTrackIds,
+                        onPlayPauseClick = {
+                            viewModel.togglePlayPause()
+                        },
+                        onNextClick = { viewModel.playNext() },
+                        onPrevClick = { viewModel.playPrev() },
+                        onToggleLike = { track ->
+                            if (track.isRadio) {
+                                viewModel.toggleRadioFavorite(track.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.toggleLike(track)
+                            }
+                        },
+                        onDislikeClick = { track ->
+                            if (track.isRadio) {
+                                viewModel.removeRadioFavorite(track.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.dislikeTrack(track)
+                            }
+                        },
+                        onPlayMyVibe = { viewModel.playMyVibe() },
+                        onPlayFavorites = { viewModel.playAllLikedTracks() },
+                        onPlayHits = { viewModel.playHits(shuffle = true) },
+                        onPlayDownloaded = {
+                            val downloaded = tracks.filter { downloadedTrackIds.contains(it.idString) }
+                            if (downloaded.isNotEmpty()) {
+                                viewModel.playTrack(downloaded.first().idString, downloaded, PlaylistSource.LIBRARY)
+                            }
+                        },
+                        onPlayRadio = {
+                            val stations = viewModel.radioStations.value
+                            if (stations.isNotEmpty()) {
+                                viewModel.playRadioStation(stations.first())
+                            }
+                        },
+                        onExit = { currentTab = MainTab.HOME },
+                        isLandscape = isLandscape,
+                        progress = progress,
+                        durationMs = currentTrack?.durationMs ?: 0L,
+                        onSeek = { viewModel.seekTo(it) }
+                    )
+                }
             }
         }
 
@@ -280,34 +287,36 @@ fun MainScreen(
                 } else {
                     likedTrackIds.contains(currentTrack!!.idString)
                 }
-                MiniPlayer(
-                    track = currentTrack!!,
-                    isPlaying = isPlaying,
-                    isLiked = isMiniLiked,
-                    progress = progress,
-                    onPlayPauseClick = {
-                        viewModel.togglePlayPause()
-                    },
-                    onToggleLike = {
-                        if (currentTrack?.isRadio == true) {
-                            viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
-                        } else {
-                            viewModel.toggleLike(currentTrack!!)
-                        }
-                    },
-                    onClick = {
-                        isPlayerExpanded = true
-                    },
-                    onDismiss = {
-                        viewModel.stopAndClearPlayer()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 12.dp)
-                        .widthIn(max = 580.dp)
-                        .fillMaxWidth()
-                )
+                WithProgress(progressState) { progress ->
+                    MiniPlayer(
+                        track = currentTrack!!,
+                        isPlaying = isPlaying,
+                        isLiked = isMiniLiked,
+                        progress = progress,
+                        onPlayPauseClick = {
+                            viewModel.togglePlayPause()
+                        },
+                        onToggleLike = {
+                            if (currentTrack?.isRadio == true) {
+                                viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.toggleLike(currentTrack!!)
+                            }
+                        },
+                        onClick = {
+                            isPlayerExpanded = true
+                        },
+                        onDismiss = {
+                            viewModel.stopAndClearPlayer()
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 12.dp)
+                            .widthIn(max = 580.dp)
+                            .fillMaxWidth()
+                    )
+                }
             }
         } else {
             // Portrait Unified Bottom Overlay: MiniPlayer stacked cleanly above FloatingGlassBottomBar
@@ -326,28 +335,30 @@ fun MainScreen(
                         } else {
                             likedTrackIds.contains(currentTrack!!.idString)
                         }
-                        MiniPlayer(
-                            track = currentTrack!!,
-                            isPlaying = isPlaying,
-                            isLiked = isMiniLiked,
-                            progress = progress,
-                            onPlayPauseClick = {
-                                viewModel.togglePlayPause()
-                            },
-                            onToggleLike = {
-                                if (currentTrack?.isRadio == true) {
-                                    viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
-                                } else {
-                                    viewModel.toggleLike(currentTrack!!)
+                        WithProgress(progressState) { progress ->
+                            MiniPlayer(
+                                track = currentTrack!!,
+                                isPlaying = isPlaying,
+                                isLiked = isMiniLiked,
+                                progress = progress,
+                                onPlayPauseClick = {
+                                    viewModel.togglePlayPause()
+                                },
+                                onToggleLike = {
+                                    if (currentTrack?.isRadio == true) {
+                                        viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                                    } else {
+                                        viewModel.toggleLike(currentTrack!!)
+                                    }
+                                },
+                                onClick = {
+                                    isPlayerExpanded = true
+                                },
+                                onDismiss = {
+                                    viewModel.stopAndClearPlayer()
                                 }
-                            },
-                            onClick = {
-                                isPlayerExpanded = true
-                            },
-                            onDismiss = {
-                                viewModel.stopAndClearPlayer()
-                            }
-                        )
+                            )
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
@@ -371,42 +382,44 @@ fun MainScreen(
                 } else {
                     likedTrackIds.contains(currentTrack!!.idString)
                 }
-                FullScreenPlayer(
-                    track = currentTrack!!,
-                    isPlaying = isPlaying,
-                    isLiked = isPlayerLiked,
-                    progress = progress,
-                    queue = currentPlaylist,
-                    onPlayPauseClick = {
-                        viewModel.togglePlayPause()
-                    },
-                    onToggleLike = {
-                        if (currentTrack?.isRadio == true) {
-                            viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
-                        } else {
-                            viewModel.toggleLike(currentTrack!!)
-                        }
-                    },
-                    onNextClick = { viewModel.playNext() },
-                    onPrevClick = { viewModel.playPrev() },
-                    onSeekTo = { position -> viewModel.playerRepository.seekTo(position) },
-                    onTrackSelect = { id -> viewModel.playTrack(id, currentPlaylist) },
-                    onRemoveFromQueue = { id -> viewModel.removeFromQueue(id) },
-                    onCollapse = { isPlayerExpanded = false },
-                    onCloseAndClear = { 
-                        isPlayerExpanded = false
-                        viewModel.stopAndClearPlayer()
-                    },
-                    onDislikeClick = {
-                        if (currentTrack?.isRadio == true) {
-                            viewModel.removeRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
-                        } else {
-                            viewModel.dislikeTrack(currentTrack!!)
-                        }
-                    },
-                    onLoadMoreQueue = { viewModel.loadMoreQueue() },
-                    isFetchingMoreQueue = isFetchingMoreQueue
-                )
+                WithProgress(progressState) { progress ->
+                    FullScreenPlayer(
+                        track = currentTrack!!,
+                        isPlaying = isPlaying,
+                        isLiked = isPlayerLiked,
+                        progress = progress,
+                        queue = currentPlaylist,
+                        onPlayPauseClick = {
+                            viewModel.togglePlayPause()
+                        },
+                        onToggleLike = {
+                            if (currentTrack?.isRadio == true) {
+                                viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.toggleLike(currentTrack!!)
+                            }
+                        },
+                        onNextClick = { viewModel.playNext() },
+                        onPrevClick = { viewModel.playPrev() },
+                        onSeekTo = { position -> viewModel.seekTo(position) },
+                        onTrackSelect = { id -> viewModel.playTrack(id, currentPlaylist) },
+                        onRemoveFromQueue = { id -> viewModel.removeFromQueue(id) },
+                        onCollapse = { isPlayerExpanded = false },
+                        onCloseAndClear = { 
+                            isPlayerExpanded = false
+                            viewModel.stopAndClearPlayer()
+                        },
+                        onDislikeClick = {
+                            if (currentTrack?.isRadio == true) {
+                                viewModel.removeRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.dislikeTrack(currentTrack!!)
+                            }
+                        },
+                        onLoadMoreQueue = { viewModel.loadMoreQueue() },
+                        isFetchingMoreQueue = isFetchingMoreQueue
+                    )
+                }
             }
         }
 
@@ -470,4 +483,10 @@ fun MainScreen(
             )
         }
     }
+}
+
+/** Reads the progress state in its own recomposition scope so only [content] recomposes on each tick. */
+@Composable
+private fun WithProgress(progress: State<Long>, content: @Composable (Long) -> Unit) {
+    content(progress.value)
 }

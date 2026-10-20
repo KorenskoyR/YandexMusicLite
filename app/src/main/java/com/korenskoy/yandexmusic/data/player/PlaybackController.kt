@@ -1,0 +1,617 @@
+package com.korenskoy.yandexmusic.data.player
+
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
+import com.korenskoy.yandexmusic.BuildConfig
+import com.korenskoy.yandexmusic.data.cache.PlaybackSnapshot
+import com.korenskoy.yandexmusic.data.cache.PlaybackStateStore
+import com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager
+import com.korenskoy.yandexmusic.data.dto.ArtistDto
+import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
+import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
+import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
+import com.korenskoy.yandexmusic.data.network.YandexMusicApi
+import com.korenskoy.yandexmusic.data.repository.RadioRepository
+import com.korenskoy.yandexmusic.domain.model.RadioStation
+import com.korenskoy.yandexmusic.domain.repository.AuthRepository
+import com.korenskoy.yandexmusic.domain.repository.PlaybackFailure
+import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Owns the play queue and every playback decision (next/previous, My Wave refill, error recovery,
+ * session persistence). It is a process-wide singleton, so notification, headset and track-end events
+ * keep working after the Activity and its ViewModel are destroyed (e.g. the task is swiped away).
+ */
+@Singleton
+class PlaybackController @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    private val api: YandexMusicApi,
+    private val authRepository: AuthRepository,
+    private val playerRepository: PlayerRepository,
+    private val downloadManager: TrackDownloadManager,
+    private val preloadManager: TrackPreloadManager,
+    private val cacheManager: PlaylistCacheManager,
+    private val radioRepository: RadioRepository,
+    private val stateStore: PlaybackStateStore
+) {
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
+            Log.e(TAG, "Unhandled playback coroutine error", e)
+        }
+    )
+
+    private val _currentSource = MutableStateFlow(PlaylistSource.NONE)
+    val currentSource: StateFlow<PlaylistSource> = _currentSource.asStateFlow()
+
+    private val _currentPlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
+    val currentPlaylist: StateFlow<List<TrackDetailsDto>> = _currentPlaylist.asStateFlow()
+
+    private val _currentTrack = MutableStateFlow<TrackDetailsDto?>(null)
+    val currentTrack: StateFlow<TrackDetailsDto?> = _currentTrack.asStateFlow()
+
+    private val _isFetchingMoreQueue = MutableStateFlow(false)
+    val isFetchingMoreQueue: StateFlow<Boolean> = _isFetchingMoreQueue.asStateFlow()
+
+    /** Playback was requested but the stream URL is still being resolved. */
+    private val _isStarting = MutableStateFlow(false)
+    val isStarting: StateFlow<Boolean> = _isStarting.asStateFlow()
+
+    /** Position of a restored (not yet loaded) session, shown until the player takes over. */
+    private val restoredPositionMs = MutableStateFlow(0L)
+
+    /** Play/Pause icon state: true while playing, buffering, or resolving the next stream. */
+    val isPlaying: StateFlow<Boolean> = combine(playerRepository.isPlaying, _isStarting) { playing, starting ->
+        playing || starting
+    }.stateIn(scope, SharingStarted.Eagerly, false)
+
+    val isBuffering: StateFlow<Boolean> = combine(playerRepository.isBuffering, _isStarting) { buffering, starting ->
+        buffering || starting
+    }.stateIn(scope, SharingStarted.Eagerly, false)
+
+    val progress: StateFlow<Long> = combine(
+        playerRepository.progress,
+        playerRepository.currentTrackId,
+        restoredPositionMs
+    ) { position, loadedId, restored ->
+        if (loadedId == null) restored else position
+    }.stateIn(scope, SharingStarted.Eagerly, 0L)
+
+    private val wavePlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
+    private var libraryTracks: List<TrackDetailsDto> = emptyList()
+    private val recentPlayedTrackIds = ArrayDeque<String>(RECENT_LIMIT)
+
+    private var currentPlayJob: Job? = null
+    /** Incremented on every explicit start/stop so stale async callbacks can tell they were superseded. */
+    private var startRequestId = 0L
+    private var retriedTrackId: String? = null
+    private var consecutiveFailedTracks = 0
+    private val pendingFetchCallbacks = mutableListOf<(Boolean) -> Unit>()
+
+    private val activeUserFolder: String
+        get() = authRepository.getActiveAccount()?.folderName ?: "default"
+
+    init {
+        playerRepository.trackEndedEvent.onEach { playNext(isAuto = true) }.launchIn(scope)
+        playerRepository.prepareNextTrackEvent.onEach { prepareNextTrackInQueue() }.launchIn(scope)
+        playerRepository.skipNextEvent.onEach { playNext() }.launchIn(scope)
+        playerRepository.skipPrevEvent.onEach { playPrev() }.launchIn(scope)
+        playerRepository.playbackErrorEvent.onEach { onPlaybackFailure(it) }.launchIn(scope)
+
+        // A track that actually renders audio resets error recovery.
+        combine(playerRepository.isPlaying, playerRepository.isBuffering) { playing, buffering -> playing && !buffering }
+            .onEach { audible ->
+                if (audible) {
+                    _isStarting.value = false
+                    consecutiveFailedTracks = 0
+                    retriedTrackId = null
+                }
+            }
+            .launchIn(scope)
+
+        // Persist the position while playing so a killed process resumes close to where it stopped.
+        scope.launch {
+            while (true) {
+                delay(SNAPSHOT_INTERVAL_MS)
+                if (playerRepository.isPlaying.value) persistSession()
+            }
+        }
+
+        scope.launch { loadUserState(activeUserFolder, restoreSession = true) }
+    }
+
+    // region Public API
+
+    fun updateLibrary(tracks: List<TrackDetailsDto>) {
+        libraryTracks = tracks
+    }
+
+    fun playTrack(
+        trackId: String,
+        playlist: List<TrackDetailsDto>,
+        source: PlaylistSource? = null,
+        crossfade: Boolean = true,
+        startPositionMs: Long = 0L
+    ) {
+        val track = playlist.find { it.idString == trackId } ?: return
+        startRequestId++
+        source?.let { _currentSource.value = it }
+        _currentPlaylist.value = playlist
+        _currentTrack.value = track
+        restoredPositionMs.value = startPositionMs
+
+        recordTrackPlayed(trackId)
+
+        val currentIndex = playlist.indexOfFirst { it.idString == trackId }
+        val upcoming = playlist.drop(currentIndex + 1).take(3).map { it.idString }
+        if (upcoming.isNotEmpty()) preloadManager.preloadTracks(upcoming)
+        playlist.getOrNull(currentIndex + 1)?.let { prepareStandby(it) }
+
+        // Continuous queue auto-refill: fewer than 20 tracks left in My Wave
+        if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 20) {
+            fetchMoreVibeTracks()
+        }
+        if (_currentSource.value == PlaylistSource.VIBE && !track.isRadio) {
+            sendRotorFeedback("trackStarted", trackId)
+        }
+
+        resolveAndPlay(track, crossfade, startPositionMs)
+        scope.launch { persistSession() }
+    }
+
+    fun playMyVibe() {
+        _currentSource.value = PlaylistSource.VIBE
+        val waveList = wavePlaylist.value
+        val unplayed = waveList.firstOrNull { it.idString !in recentPlayedTrackIds } ?: waveList.firstOrNull()
+        if (unplayed != null) {
+            playTrack(unplayed.idString, waveList, PlaylistSource.VIBE)
+            if (waveList.size < 30) fetchMoreVibeTracks()
+            return
+        }
+
+        // Nothing cached yet (first launch): show the loading state and start once tracks arrive.
+        val request = ++startRequestId
+        _isStarting.value = true
+        fetchMoreVibeTracks { _ ->
+            if (request != startRequestId) return@fetchMoreVibeTracks
+            val list = wavePlaylist.value
+            if (list.isNotEmpty()) {
+                playTrack(list.first().idString, list, PlaylistSource.VIBE)
+            } else {
+                _isStarting.value = false
+                showMessage("Не удалось загрузить «Мою волну». Проверьте подключение к интернету")
+            }
+        }
+    }
+
+    fun playAllLikedTracks(shuffle: Boolean = false) {
+        val playlist = if (shuffle) libraryTracks.shuffled() else libraryTracks
+        if (playlist.isNotEmpty()) playTrack(playlist.first().idString, playlist, PlaylistSource.LIBRARY)
+    }
+
+    fun playHits(hits: List<TrackDetailsDto>, shuffle: Boolean = true) {
+        val hitsList = if (shuffle) hits.shuffled() else hits
+        if (hitsList.isEmpty()) return
+        val trackToPlay = hitsList.firstOrNull { it.idString !in recentPlayedTrackIds } ?: hitsList.first()
+        playTrack(trackToPlay.idString, hitsList, PlaylistSource.TRENDS)
+    }
+
+    fun playRadioStation(station: RadioStation) {
+        val radioTrack = radioTrackFor(station)
+        playTrack(radioTrack.idString, listOf(radioTrack), PlaylistSource.RADIO)
+    }
+
+    fun togglePlayPause() {
+        if (isPlaying.value) pause() else play()
+    }
+
+    fun play() {
+        val current = _currentTrack.value
+        if (current == null) {
+            playMyVibe()
+            return
+        }
+        if (playerRepository.currentTrackId.value == current.idString && playerRepository.resume()) return
+        // Nothing loaded (restored session or stopped player): start the current track where it was left.
+        resolveAndPlay(current, crossfade = false, startPositionMs = restoredPositionMs.value)
+    }
+
+    fun pause() {
+        if (_isStarting.value) {
+            // Cancel a start that hasn't produced sound yet.
+            startRequestId++
+            currentPlayJob?.cancel()
+            _isStarting.value = false
+        }
+        playerRepository.pause()
+        scope.launch { persistSession() }
+    }
+
+    fun seekTo(positionMs: Long) {
+        if (playerRepository.currentTrackId.value == null) {
+            restoredPositionMs.value = positionMs
+        } else {
+            playerRepository.seekTo(positionMs)
+        }
+    }
+
+    fun playNext(isAuto: Boolean = false) {
+        val current = _currentTrack.value
+        if (current == null) {
+            val playlist = _currentPlaylist.value
+            if (playlist.isNotEmpty()) playTrack(playlist.first().idString, playlist) else playAllLikedTracks()
+            return
+        }
+        if (current.isRadio) {
+            stepRadioStation(current, +1)
+            return
+        }
+
+        val currentId = current.idString
+        if (_currentSource.value == PlaylistSource.VIBE) {
+            val playedSeconds = progress.value / 1000.0
+            sendRotorFeedback(if (isAuto) "trackFinished" else "skip", currentId, playedSeconds)
+        }
+
+        val playlist = _currentPlaylist.value
+        val currentIndex = playlist.indexOfFirst { it.idString == currentId }
+        when (val action = PlaybackQueue.nextAction(playlist.size, currentIndex, _currentSource.value)) {
+            is NextAction.PlayIndex -> playTrack(playlist[action.index].idString, playlist)
+            NextAction.FetchMoreWave -> {
+                // End of the wave playlist: fetch more instead of stopping.
+                val request = ++startRequestId
+                fetchMoreVibeTracks { _ ->
+                    if (request != startRequestId) return@fetchMoreVibeTracks
+                    val updated = _currentPlaylist.value
+                    val newIndex = updated.indexOfFirst { it.idString == currentId }
+                    when {
+                        newIndex != -1 && newIndex + 1 < updated.size -> playTrack(updated[newIndex + 1].idString, updated)
+                        updated.isNotEmpty() -> playTrack(updated.first().idString, updated)
+                        else -> playAllLikedTracks()
+                    }
+                }
+            }
+            NextAction.FallbackLibrary -> playAllLikedTracks()
+        }
+    }
+
+    fun playPrev() {
+        val current = _currentTrack.value ?: return
+        if (current.isRadio) {
+            stepRadioStation(current, -1)
+            return
+        }
+        val playlist = _currentPlaylist.value
+        val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
+        val prevIndex = PlaybackQueue.previousIndex(currentIndex, progress.value)
+        if (prevIndex == null) seekTo(0) else playTrack(playlist[prevIndex].idString, playlist)
+    }
+
+    fun loadMoreQueue() {
+        if (_currentSource.value == PlaylistSource.VIBE) fetchMoreVibeTracks()
+    }
+
+    fun reorderQueue(from: Int, to: Int) {
+        val list = _currentPlaylist.value.toMutableList()
+        if (from !in list.indices || to !in list.indices) return
+        list.add(to, list.removeAt(from))
+        _currentPlaylist.value = list
+    }
+
+    fun removeFromQueue(trackId: String) {
+        _currentPlaylist.value = _currentPlaylist.value.filterNot { it.idString == trackId }
+    }
+
+    /** Dislike behaves like Yandex Music: the current track is skipped right away. */
+    fun onTrackDisliked(trackId: String) {
+        wavePlaylist.value = wavePlaylist.value.filterNot { it.idString == trackId }
+        if (_currentTrack.value?.idString == trackId) playNext()
+        removeFromQueue(trackId)
+    }
+
+    fun stopAndClear() {
+        startRequestId++
+        currentPlayJob?.cancel()
+        _isStarting.value = false
+        playerRepository.stop()
+        _currentTrack.value = null
+        _currentPlaylist.value = emptyList()
+        _currentSource.value = PlaylistSource.NONE
+        restoredPositionMs.value = 0L
+        scope.launch { stateStore.clear() }
+    }
+
+    /** Account switch/logout: drop the session and load the other user's wave and history. */
+    fun resetForAccount(userFolder: String?) {
+        stopAndClear()
+        recentPlayedTrackIds.clear()
+        wavePlaylist.value = emptyList()
+        libraryTracks = emptyList()
+        if (userFolder != null) scope.launch { loadUserState(userFolder, restoreSession = false) }
+    }
+
+    fun clearWaveAndHistory() {
+        wavePlaylist.value = emptyList()
+        recentPlayedTrackIds.clear()
+    }
+
+    /** Silent My Wave refresh on launch: append fresh unplayed tracks and warm their URLs. */
+    fun primeWave() {
+        fetchMoreVibeTracks()
+    }
+
+    fun persistNow() {
+        scope.launch { persistSession() }
+    }
+
+    // endregion
+
+    private fun resolveAndPlay(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
+        currentPlayJob?.cancel()
+        val trackId = track.idString
+        val title = track.title
+        val artist = track.artists.firstOrNull()?.name
+        val coverUrl = track.coverUri?.let { uri ->
+            if (uri.startsWith("http") || uri.startsWith("android.resource")) uri else "https://${uri.replace("%%", "1000x1000")}"
+        }
+        _isStarting.value = true
+
+        if (track.isRadio) {
+            val station = stationFor(trackId)
+            if (station == null) {
+                _isStarting.value = false
+                return
+            }
+            playerRepository.playTrack(trackId, station.streamUrl, title, artist, coverUrl, crossfade, 0L)
+            return
+        }
+
+        // Instant start when the file is on disk or the URL is already resolved
+        val fastUrl = if (downloadManager.isTrackDownloaded(trackId)) "" else preloadManager.getResolvedUrl(trackId)
+        if (fastUrl != null) {
+            playerRepository.playTrack(trackId, fastUrl, title, artist, coverUrl, crossfade, startPositionMs)
+            return
+        }
+
+        currentPlayJob = scope.launch {
+            val url = preloadManager.getOrFetchUrl(trackId)
+                ?: run {
+                    delay(URL_RETRY_DELAY_MS)
+                    preloadManager.getOrFetchUrl(trackId)
+                }
+            if (url != null) {
+                playerRepository.playTrack(trackId, url, title, artist, coverUrl, crossfade, startPositionMs)
+            } else {
+                Log.e(TAG, "Failed to resolve mp3 URL for track $trackId")
+                onPlaybackFailure(PlaybackFailure(trackId, startPositionMs, "URL_RESOLVE"))
+            }
+        }
+    }
+
+    /**
+     * First failure of a track: retry it once with a fresh URL from the same position (expired links
+     * after a long pause). Repeated failure: skip. Several broken tracks in a row: stop and tell the user.
+     */
+    private fun onPlaybackFailure(failure: PlaybackFailure) {
+        val current = _currentTrack.value ?: return
+        if (failure.trackId != current.idString) return // stale event from a track we already left
+
+        preloadManager.evictUrl(failure.trackId)
+        if (retriedTrackId != failure.trackId) {
+            retriedTrackId = failure.trackId
+            Log.w(TAG, "Retrying ${failure.trackId} from ${failure.positionMs} ms after ${failure.reason}")
+            resolveAndPlay(current, crossfade = false, startPositionMs = failure.positionMs)
+            return
+        }
+
+        consecutiveFailedTracks++
+        if (current.isRadio || consecutiveFailedTracks >= MAX_FAILED_TRACKS) {
+            consecutiveFailedTracks = 0
+            retriedTrackId = null
+            _isStarting.value = false
+            playerRepository.stop()
+            // Keep the track on screen so Play retries it.
+            restoredPositionMs.value = failure.positionMs
+            showMessage(
+                if (current.isRadio) "Радиостанция недоступна"
+                else "Не удаётся воспроизвести музыку. Проверьте подключение к интернету"
+            )
+            return
+        }
+        retriedTrackId = null
+        playNext()
+    }
+
+    private fun prepareNextTrackInQueue() {
+        val current = _currentTrack.value ?: return
+        if (current.isRadio) return
+        val playlist = _currentPlaylist.value
+        val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
+
+        // Proactively refill Vibe queue if remaining tracks <= 5
+        if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 5) {
+            fetchMoreVibeTracks()
+        }
+
+        val nextTrack = when (val action = PlaybackQueue.nextAction(playlist.size, currentIndex, _currentSource.value)) {
+            is NextAction.PlayIndex -> playlist[action.index]
+            else -> null
+        }
+        nextTrack?.let { prepareStandby(it) }
+    }
+
+    private fun prepareStandby(track: TrackDetailsDto) {
+        if (track.isRadio) return
+        scope.launch {
+            val nextId = track.idString
+            val downloaded = downloadManager.isTrackDownloaded(nextId)
+            val url = if (downloaded) "" else preloadManager.getOrFetchUrl(nextId) ?: return@launch
+            val cover = track.coverUri?.let { uri ->
+                if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
+            }
+            playerRepository.prepareNextTrack(nextId, url, track.title, track.artists.firstOrNull()?.name, cover)
+        }
+    }
+
+    private fun fetchMoreVibeTracks(onFetched: ((Boolean) -> Unit)? = null) {
+        onFetched?.let { pendingFetchCallbacks += it }
+        if (_isFetchingMoreQueue.value) return // the running fetch will invoke the callback
+        _isFetchingMoreQueue.value = true
+        scope.launch {
+            var hasNew = false
+            try {
+                val waveTracks = withContext(Dispatchers.IO) { fetchWaveBatch() }
+                if (waveTracks.isNotEmpty()) {
+                    val existingIds = wavePlaylist.value.map { it.idString }.toSet()
+                    // 1. Prefer tracks that are neither queued nor recently played
+                    val fresh = waveTracks.filter { it.idString !in existingIds && it.idString !in recentPlayedTrackIds }
+                        // 2. Adaptive fallback: still append anything not already queued
+                        .ifEmpty { waveTracks.filter { it.idString !in existingIds } }
+                    if (fresh.isNotEmpty()) {
+                        wavePlaylist.value = wavePlaylist.value + fresh
+                        if (_currentSource.value == PlaylistSource.VIBE) _currentPlaylist.value = wavePlaylist.value
+                        hasNew = true
+                        cacheManager.saveWaveQueue(activeUserFolder, wavePlaylist.value)
+                        preloadManager.preloadTracks(fresh.take(5).map { it.idString })
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e(TAG, "Error fetching more vibe tracks", e)
+            } finally {
+                _isFetchingMoreQueue.value = false
+                val callbacks = pendingFetchCallbacks.toList()
+                pendingFetchCallbacks.clear()
+                callbacks.forEach { it(hasNew) }
+            }
+        }
+    }
+
+    private suspend fun fetchWaveBatch(): List<TrackDetailsDto> = supervisorScope {
+        // One request continues from the last queued track, the other adds variety.
+        val lastQueued = wavePlaylist.value.lastOrNull()?.idString
+        val continued = async { api.getMyWaveTracks(queue = lastQueued).result?.sequence?.mapNotNull { it.track } }
+        val fresh = async { api.getMyWaveTracks().result?.sequence?.mapNotNull { it.track } }
+        val a = try { continued.await() ?: emptyList() } catch (e: Exception) { emptyList() }
+        val b = try { fresh.await() ?: emptyList() } catch (e: Exception) { emptyList() }
+        (a + b).distinctBy { it.idString }
+    }
+
+    private fun recordTrackPlayed(trackId: String) {
+        if (trackId.isEmpty() || trackId.startsWith("radio_") || trackId in recentPlayedTrackIds) return
+        recentPlayedTrackIds.addLast(trackId)
+        if (recentPlayedTrackIds.size > RECENT_LIMIT) recentPlayedTrackIds.removeFirst()
+        val folder = activeUserFolder
+        val snapshot = recentPlayedTrackIds.toList()
+        scope.launch { cacheManager.saveRecentTrackIds(folder, snapshot) }
+    }
+
+    private fun sendRotorFeedback(type: String, trackId: String, playedSeconds: Double? = null) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                api.sendRotorFeedback(type, trackId, totalPlayedSeconds = playedSeconds)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending rotor feedback $type", e)
+            }
+        }
+    }
+
+    private fun stepRadioStation(current: TrackDetailsDto, step: Int) {
+        val stations = radioRepository.getBuiltinStations()
+        if (stations.isEmpty()) return
+        val index = stations.indexOfFirst { "radio_${it.id}" == current.idString }
+        if (index == -1) return
+        playRadioStation(stations[(index + step + stations.size) % stations.size])
+    }
+
+    private fun stationFor(trackId: String): RadioStation? =
+        radioRepository.getBuiltinStations().firstOrNull { "radio_${it.id}" == trackId }
+
+    private fun radioTrackFor(station: RadioStation) = TrackDetailsDto(
+        id = kotlinx.serialization.json.JsonPrimitive("radio_${station.id}"),
+        title = station.name,
+        artists = listOf(ArtistDto(id = kotlinx.serialization.json.JsonPrimitive("0"), name = "Прямой эфир • ${station.frequency}")),
+        coverUri = station.iconRes?.let { "android.resource://${BuildConfig.APPLICATION_ID}/$it" } ?: station.logoUrl.ifEmpty { null },
+        durationMs = 0,
+        isRadio = true
+    )
+
+    private suspend fun persistSession() {
+        val current = _currentTrack.value ?: return
+        val queue = _currentPlaylist.value
+        val index = queue.indexOfFirst { it.idString == current.idString }
+        stateStore.save(
+            PlaybackSnapshot(
+                userFolder = activeUserFolder,
+                source = _currentSource.value.name,
+                queue = PlaybackQueue.snapshotWindow(queue, index).ifEmpty { listOf(current) },
+                currentTrackId = current.idString,
+                positionMs = progress.value
+            )
+        )
+    }
+
+    private suspend fun loadUserState(userFolder: String, restoreSession: Boolean) {
+        val savedRecent = cacheManager.loadRecentTrackIds(userFolder)
+        val cachedWave = cacheManager.loadWaveQueue(userFolder)
+        if (activeUserFolder != userFolder) return // account switched while loading
+
+        recentPlayedTrackIds.clear()
+        recentPlayedTrackIds.addAll(savedRecent.takeLast(RECENT_LIMIT))
+        if (cachedWave.isNotEmpty() && wavePlaylist.value.isEmpty()) {
+            // Filter out already played tracks to guarantee a fresh first track on launch
+            wavePlaylist.value = cachedWave.filter { it.idString !in recentPlayedTrackIds }.ifEmpty { cachedWave }
+        }
+
+        if (!restoreSession || _currentTrack.value != null || playerRepository.currentTrackId.value != null) return
+        val snapshot = stateStore.load() ?: return
+        if (snapshot.userFolder != userFolder || _currentTrack.value != null) return
+
+        val source = runCatching { PlaylistSource.valueOf(snapshot.source) }.getOrDefault(PlaylistSource.NONE)
+        // isRadio is @Transient, so it is rebuilt from the id prefix.
+        val queue = snapshot.queue.map { if (it.idString.startsWith("radio_")) it.copy(isRadio = true) else it }
+        val track = queue.firstOrNull { it.idString == snapshot.currentTrackId } ?: return
+        // Shown paused, like Apple Music: Play continues from the saved position.
+        _currentSource.value = source
+        _currentPlaylist.value = if (source == PlaylistSource.VIBE && wavePlaylist.value.isNotEmpty()) {
+            (queue + wavePlaylist.value).distinctBy { it.idString }
+        } else {
+            queue
+        }
+        _currentTrack.value = track
+        restoredPositionMs.value = if (track.isRadio) 0L else snapshot.positionMs
+    }
+
+    private fun showMessage(text: String) {
+        Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+    }
+
+    companion object {
+        private const val TAG = "PlaybackController"
+        private const val RECENT_LIMIT = 100
+        private const val MAX_FAILED_TRACKS = 3
+        private const val URL_RETRY_DELAY_MS = 700L
+        private const val SNAPSHOT_INTERVAL_MS = 15_000L
+    }
+}

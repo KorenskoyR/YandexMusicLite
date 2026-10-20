@@ -52,3 +52,24 @@ backups/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Local notes and AI-assistant workspaces (never published)
+AGENT_MEMORY.md
+CHANGELOG.md
+PLAN*.md
+.gemini/
+.claude/
+.cursor/
+
+# More secrets / signing material
+*.p12
+*.pfx
+keystore.properties
+google-services.json
+*.env
+.env*
+
+# Build / profiling artifacts
+release/
+release_artifacts/
+*.hprof

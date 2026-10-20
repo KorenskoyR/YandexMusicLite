@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   HTTPS only. The exceptions are radio stations that broadcast exclusively over plain HTTP
+   (see RadioRepository); keep this list in sync when stations change.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">hostingradio.ru</domain>
+        <domain includeSubdomains="true">cdnvideo.ru</domain>
+        <domain includeSubdomains="true">streamr.ru</domain>
+        <domain includeSubdomains="true">loveradio.ru</domain>
+        <domain includeSubdomains="true">radiodacha.ru</domain>
+        <domain includeSubdomains="false">23.105.238.4</domain>
+    </domain-config>
+</network-security-config>

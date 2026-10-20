@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Build
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
@@ -21,33 +22,46 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @AndroidEntryPoint
 class MusicService : MediaLibraryService() {
 
     @Inject
     lateinit var playerRepository: PlayerRepository
 
+    @Inject
+    lateinit var playbackController: PlaybackController
+
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
-    private var audioManager: android.media.AudioManager? = null
+    private var audioManager: AudioManager? = null
     private var focusRequest: android.media.AudioFocusRequest? = null
+    private var hasAudioFocus = false
     private var wasPlayingBeforeTransientLoss = false
 
-    private val audioFocusChangeListener = android.media.AudioManager.OnAudioFocusChangeListener { focusChange ->
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
-            android.media.AudioManager.AUDIOFOCUS_LOSS -> {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                hasAudioFocus = false
                 wasPlayingBeforeTransientLoss = false
-                playerRepository.pause()
+                playerRepository.setDucked(false)
+                playbackController.pause()
             }
-            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // Phone call, voice assistant: pause and resume afterwards
                 wasPlayingBeforeTransientLoss = playerRepository.isPlaying.value
                 playerRepository.pause()
             }
-            android.media.AudioManager.AUDIOFOCUS_GAIN -> {
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // Navigation prompt, notification sound: keep playing quieter, like Apple Music
+                playerRepository.setDucked(true)
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                hasAudioFocus = true
+                playerRepository.setDucked(false)
                 if (wasPlayingBeforeTransientLoss) {
                     wasPlayingBeforeTransientLoss = false
-                    playerRepository.resume()
+                    playbackController.play()
                 }
             }
         }
@@ -55,11 +69,11 @@ class MusicService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
-        audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
-        
+        audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "yandex_music_lite_playback_channel",
+                PLAYBACK_CHANNEL_ID,
                 "Yandex Music Lite",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
@@ -71,18 +85,23 @@ class MusicService : MediaLibraryService() {
             notificationManager?.createNotificationChannel(channel)
         }
 
-        val notificationProvider = DefaultMediaNotificationProvider(this).apply {
-            setSmallIcon(com.korenskoy.yandexmusic.R.drawable.ic_notification)
-        }
+        val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
+            .setChannelId(PLAYBACK_CHANNEL_ID)
+            .setChannelName(com.korenskoy.yandexmusic.R.string.app_name)
+            .build()
+            .apply { setSmallIcon(com.korenskoy.yandexmusic.R.drawable.ic_notification) }
         setMediaNotificationProvider(notificationProvider)
-        
+
         setupMediaSession()
 
         // Track isPlaying via StateFlow to request/abandon system audio focus without dropping it during player swaps
         serviceScope.launch {
             playerRepository.isPlaying.collect { isPlaying ->
                 if (isPlaying) {
-                    requestSystemAudioFocus()
+                    if (!hasAudioFocus && !requestSystemAudioFocus()) {
+                        // Focus denied (e.g. an active phone call): don't play over it
+                        playerRepository.pause()
+                    }
                 } else if (!wasPlayingBeforeTransientLoss) {
                     abandonSystemAudioFocus()
                 }
@@ -102,33 +121,52 @@ class MusicService : MediaLibraryService() {
         }
     }
 
-    private fun requestSystemAudioFocus() {
-        try {
+    /** Returns true when playback may proceed (focus granted now or delayed). */
+    private fun requestSystemAudioFocus(): Boolean {
+        val result = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val playbackAttributes = android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
-                focusRequest = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+                val request = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                     .setAudioAttributes(playbackAttributes)
                     .setAcceptsDelayedFocusGain(true)
+                    // Ducking is handled by us (both players must duck together)
+                    .setWillPauseWhenDucked(false)
                     .setOnAudioFocusChangeListener(audioFocusChangeListener)
                     .build()
-                focusRequest?.let { audioManager?.requestAudioFocus(it) }
+                focusRequest = request
+                audioManager?.requestAudioFocus(request)
             } else {
                 @Suppress("DEPRECATION")
                 audioManager?.requestAudioFocus(
                     audioFocusChangeListener,
-                    android.media.AudioManager.STREAM_MUSIC,
-                    android.media.AudioManager.AUDIOFOCUS_GAIN
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN
                 )
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            null
+        }
+        return when (result) {
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
+                hasAudioFocus = true
+                true
+            }
+            AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
+                // Resumes on AUDIOFOCUS_GAIN
+                wasPlayingBeforeTransientLoss = true
+                false
+            }
+            AudioManager.AUDIOFOCUS_REQUEST_FAILED -> false
+            else -> true // AudioManager unavailable: don't block playback
         }
     }
 
     private fun abandonSystemAudioFocus() {
+        hasAudioFocus = false
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
@@ -158,29 +196,55 @@ class MusicService : MediaLibraryService() {
             mediaLibrarySession = MediaLibrarySession.Builder(this, forwardingPlayer, sessionCallback)
                 .setSessionActivity(pendingIntent)
                 .build()
-                
+
             addSession(mediaLibrarySession!!)
         } else {
             mediaLibrarySession?.player = forwardingPlayer
         }
     }
-    
+
+    /**
+     * Transport commands from the notification, lock screen and headsets go through the
+     * [PlaybackController], so they get the same queue, crossfade and error recovery as the app UI.
+     */
     private fun createForwardingPlayer(activePlayer: Player): ForwardingPlayer {
         return object : ForwardingPlayer(activePlayer) {
             override fun getAvailableCommands(): Player.Commands {
                 return super.getAvailableCommands().buildUpon()
+                    .add(Player.COMMAND_PLAY_PAUSE)
                     .add(Player.COMMAND_SEEK_TO_NEXT)
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS)
                     .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
                     .build()
             }
-            
+
+            override fun isCommandAvailable(command: Int): Boolean =
+                availableCommands.contains(command)
+
+            override fun play() {
+                playbackController.play()
+            }
+            override fun pause() {
+                playbackController.pause()
+            }
+            override fun setPlayWhenReady(playWhenReady: Boolean) {
+                if (playWhenReady) playbackController.play() else playbackController.pause()
+            }
+            override fun prepare() {
+                // A failed/idle stream is re-resolved by the controller on play()
+            }
+            override fun seekTo(positionMs: Long) {
+                playbackController.seekTo(positionMs)
+            }
+            override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+                playbackController.seekTo(positionMs)
+            }
             override fun seekToNext() {
-                playerRepository.triggerSkipNext()
+                playbackController.playNext()
             }
             override fun seekToPrevious() {
-                playerRepository.triggerSkipPrev()
+                playbackController.playPrev()
             }
             override fun seekToNextMediaItem() {
                 seekToNext()
@@ -197,9 +261,9 @@ class MusicService : MediaLibraryService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val isCurrentlyPlaying = playerRepository.isPlaying.value
-        if (!isCurrentlyPlaying) {
-            playerRepository.stop()
+        playbackController.persistNow()
+        if (!playerRepository.isPlaying.value) {
+            // Paused: remove the notification but keep the session, so the app reopens on the same track.
             stopSelf()
         }
         super.onTaskRemoved(rootIntent)
@@ -218,5 +282,9 @@ class MusicService : MediaLibraryService() {
             mediaLibrarySession = null
         }
         super.onDestroy()
+    }
+
+    companion object {
+        const val PLAYBACK_CHANNEL_ID = "yandex_music_lite_playback_channel"
     }
 }

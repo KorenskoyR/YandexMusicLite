@@ -9,7 +9,8 @@ import com.korenskoy.yandexmusic.data.network.Md5Helper
 import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
-import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
+import com.korenskoy.yandexmusic.data.player.PlaybackController
+import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import com.korenskoy.yandexmusic.BuildConfig
-import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
 import com.korenskoy.yandexmusic.domain.model.RadioStation
 import com.korenskoy.yandexmusic.domain.model.RadioCategory
@@ -39,18 +39,13 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val api: YandexMusicApi,
     private val authRepository: AuthRepository,
-    val playerRepository: PlayerRepository,
+    private val playbackController: PlaybackController,
     val settingsRepository: SettingsRepository,
     private val downloadManager: TrackDownloadManager,
-    private val preloadManager: TrackPreloadManager,
     private val cacheManager: com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager,
     private val radioRepository: RadioRepository,
     private val updateManager: com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager
 ) : ViewModel() {
-
-    enum class PlaylistSource {
-        LIBRARY, VIBE, SEARCH, TRENDS, NONE
-    }
 
     val isAuthorized = authRepository.isAuthorized()
         .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.getToken() != null)
@@ -82,8 +77,7 @@ class MainViewModel @Inject constructor(
         .map { it?.avatarUrl }
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
-    private val _currentSource = MutableStateFlow(PlaylistSource.LIBRARY)
-    val currentSource: StateFlow<PlaylistSource> = _currentSource.asStateFlow()
+    val currentSource: StateFlow<PlaylistSource> = playbackController.currentSource
 
     private val _tracks = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
     val tracks: StateFlow<List<TrackDetailsDto>> = _tracks.asStateFlow()
@@ -116,15 +110,14 @@ class MainViewModel @Inject constructor(
     val downloadProgress = downloadManager.downloadProgress
 
     private var downloadJob: Job? = null
-    private var currentPlayJob: Job? = null
-
-    private val _wavePlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
-
-    private val _currentPlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
-    val currentPlaylist: StateFlow<List<TrackDetailsDto>> = _currentPlaylist.asStateFlow()
-
-    private val _currentTrack = MutableStateFlow<TrackDetailsDto?>(null)
-    val currentTrack: StateFlow<TrackDetailsDto?> = _currentTrack.asStateFlow()
+    val currentPlaylist: StateFlow<List<TrackDetailsDto>> = playbackController.currentPlaylist
+    val currentTrack: StateFlow<TrackDetailsDto?> = playbackController.currentTrack
+    val currentTrackId: StateFlow<String?> = playbackController.currentTrack
+        .map { it?.idString }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, playbackController.currentTrack.value?.idString)
+    val isPlaying: StateFlow<Boolean> = playbackController.isPlaying
+    val isBuffering: StateFlow<Boolean> = playbackController.isBuffering
+    val progress: StateFlow<Long> = playbackController.progress
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -154,49 +147,11 @@ class MainViewModel @Inject constructor(
 
     private var downloadedApkFile: java.io.File? = null
 
-    private val _isFetchingMoreQueue = MutableStateFlow(false)
-    val isFetchingMoreQueue: StateFlow<Boolean> = _isFetchingMoreQueue.asStateFlow()
-    private var isFetchingMoreVibe = false
-    private var consecutiveTrackErrors = 0
-    private val recentPlayedTrackIds = ArrayDeque<String>(100)
-    private var lastPlayNextTime = 0L
+    val isFetchingMoreQueue: StateFlow<Boolean> = playbackController.isFetchingMoreQueue
 
     init {
-        playerRepository.trackEndedEvent
-            .onEach { playNext(isAutoCrossfade = true) }
-            .launchIn(viewModelScope)
-
-        playerRepository.prepareNextTrackEvent
-            .onEach { prepareNextTrackInQueue() }
-            .launchIn(viewModelScope)
-            
-        playerRepository.skipNextEvent
-            .onEach { playNext(isAutoCrossfade = false) }
-            .launchIn(viewModelScope)
-            
-        playerRepository.skipPrevEvent
-            .onEach { playPrev() }
-            .launchIn(viewModelScope)
-
-        // Reactively synchronize _currentTrack with playerRepository.currentTrackId
-        viewModelScope.launch {
-            playerRepository.currentTrackId.collect { trackId ->
-                if (trackId == null) {
-                    if (!playerRepository.isPlaying.value) {
-                        _currentTrack.value = null
-                    }
-                } else if (_currentTrack.value?.idString != trackId) {
-                    val pool = (_currentPlaylist.value + _tracks.value + _wavePlaylist.value + _weeklyHits.value + _trendTracks.value + _popularTracks.value)
-                    val found = pool.find { it.idString == trackId }
-                    if (found != null) {
-                        _currentTrack.value = found
-                        if (_currentPlaylist.value.none { it.idString == trackId }) {
-                            _currentPlaylist.value = listOf(found) + _currentPlaylist.value
-                        }
-                    }
-                }
-            }
-        }
+        // The controller outlives this ViewModel; give it the library for "play liked" fallbacks.
+        _tracks.onEach { playbackController.updateLibrary(it) }.launchIn(viewModelScope)
 
         // Keep display name synchronized with active account
         viewModelScope.launch {
@@ -242,16 +197,10 @@ class MainViewModel @Inject constructor(
         // Instant Startup from Cache & Saved History
         viewModelScope.launch(Dispatchers.IO) {
             val userFolder = activeUserFolder
-            val savedRecent = cacheManager.loadRecentTrackIds(userFolder)
-            if (savedRecent.isNotEmpty()) {
-                recentPlayedTrackIds.addAll(savedRecent.takeLast(100))
-            }
-
             val cachedTracks = cacheManager.loadLikedTracks(userFolder)
             val cachedHits = cacheManager.loadWeeklyHits()
             val cachedTrends = cacheManager.loadTrendTracks()
             val cachedPopular = cacheManager.loadPopularTracks()
-            val cachedWave = cacheManager.loadWaveQueue(userFolder)
             
             withContext(Dispatchers.Main) {
                 if (cachedTracks.isNotEmpty()) {
@@ -261,24 +210,6 @@ class MainViewModel @Inject constructor(
                 if (cachedHits.isNotEmpty()) _weeklyHits.value = cachedHits
                 if (cachedTrends.isNotEmpty()) _trendTracks.value = cachedTrends
                 if (cachedPopular.isNotEmpty()) _popularTracks.value = cachedPopular
-                if (cachedWave.isNotEmpty()) {
-                    // Filter out already played tracks to guarantee a fresh first track on launch
-                    val freshWave = cachedWave.filter { it.idString !in recentPlayedTrackIds }
-                    _wavePlaylist.value = if (freshWave.isNotEmpty()) freshWave else cachedWave
-                }
-
-                // Restore active playing track on app open
-                val playingTrackId = playerRepository.currentTrackId.value
-                if (playingTrackId != null && _currentTrack.value == null) {
-                    val allLoaded = (_tracks.value + _wavePlaylist.value + _weeklyHits.value + _trendTracks.value + _popularTracks.value).distinctBy { it.idString }
-                    val foundTrack = allLoaded.find { it.idString == playingTrackId }
-                    if (foundTrack != null) {
-                        _currentTrack.value = foundTrack
-                        if (_currentPlaylist.value.isEmpty()) {
-                            _currentPlaylist.value = allLoaded
-                        }
-                    }
-                }
             }
             
             refreshAllDataSilently()
@@ -307,19 +238,6 @@ class MainViewModel @Inject constructor(
         }
     }
     
-    private fun recordTrackPlayed(trackId: String) {
-        if (trackId.isEmpty() || trackId.startsWith("radio_")) return
-        if (trackId !in recentPlayedTrackIds) {
-            recentPlayedTrackIds.addLast(trackId)
-            if (recentPlayedTrackIds.size > 100) {
-                recentPlayedTrackIds.removeFirst()
-            }
-            viewModelScope.launch(Dispatchers.IO) {
-                cacheManager.saveRecentTrackIds(activeUserFolder, recentPlayedTrackIds.toList())
-            }
-        }
-    }
-
     private fun refreshAllDataSilently() {
         viewModelScope.launch(Dispatchers.IO) {
             val token = authRepository.getToken()
@@ -452,43 +370,7 @@ class MainViewModel @Inject constructor(
                     }
 
                     // Silent prime wave queue with fresh unplayed tracks
-                    try {
-                        val batch1 = async { api.getMyWaveTracks() }
-                        val batch2 = async { api.getMyWaveTracks() }
-                        val batch3 = async { api.getMyWaveTracks() }
-                        val batch4 = async { api.getMyWaveTracks() }
-                        
-                        val w1 = try { batch1.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                        val w2 = try { batch2.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                        val w3 = try { batch3.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                        val w4 = try { batch4.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                        
-                        val combined = (w1 + w2 + w3 + w4).distinctBy { it.idString }
-                        if (combined.isNotEmpty()) {
-                            withContext(Dispatchers.Main) {
-                                val freshTracks = combined.filter { it.idString !in recentPlayedTrackIds }
-                                val resultList = if (freshTracks.isNotEmpty()) freshTracks else combined
-                                 
-                                if (_wavePlaylist.value.isEmpty()) {
-                                    _wavePlaylist.value = resultList
-                                } else {
-                                    val currentIds = _wavePlaylist.value.map { it.idString }.toSet()
-                                    val toAdd = resultList.filter { it.idString !in currentIds }
-                                    _wavePlaylist.value = _wavePlaylist.value + toAdd
-                                }
-                                if (_currentSource.value == PlaylistSource.VIBE) {
-                                    _currentPlaylist.value = _wavePlaylist.value
-                                }
-                            }
-                            cacheManager.saveWaveQueue(activeUserFolder, _wavePlaylist.value)
-                            
-                            // Proactively fetch top 5 MP3 URLs for instant start
-                            val top5 = _wavePlaylist.value.take(5).map { it.idString }
-                            preloadManager.preloadTracks(top5)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainViewModel", "Silent prime wave failed", e)
-                    }
+                    withContext(Dispatchers.Main) { playbackController.primeWave() }
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Silent refresh overall failed", e)
@@ -523,8 +405,7 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 _tracks.value = emptyList()
                 _likedTrackIds.value = emptySet()
-                _wavePlaylist.value = emptyList()
-                recentPlayedTrackIds.clear()
+                playbackController.clearWaveAndHistory()
                 loadLikedTracks()
             }
         }
@@ -549,10 +430,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun stopAndClearPlayer() {
-        playerRepository.stop()
-        _currentTrack.value = null
-        _currentPlaylist.value = emptyList()
-        _currentSource.value = PlaylistSource.NONE
+        playbackController.stopAndClear()
     }
 
     fun logout() {
@@ -562,8 +440,6 @@ class MainViewModel @Inject constructor(
     fun switchAccount(uid: String) {
         viewModelScope.launch {
             stopAndClearPlayer()
-            recentPlayedTrackIds.clear()
-            _wavePlaylist.value = emptyList()
 
             val switched = authRepository.switchAccount(uid)
             if (!switched) return@launch
@@ -571,22 +447,13 @@ class MainViewModel @Inject constructor(
             val newAccount = authRepository.getActiveAccount()
             val userFolder = newAccount?.folderName ?: "default"
             _accountName.value = newAccount?.displayName?.ifBlank { newAccount.login } ?: "Яндекс Аккаунт"
+            // Wave queue and listening history are per user
+            playbackController.resetForAccount(userFolder)
 
             // Load isolated cache for this switched user immediately
-            withContext(Dispatchers.IO) {
-                val cachedTracks = cacheManager.loadLikedTracks(userFolder)
-                val cachedWave = cacheManager.loadWaveQueue(userFolder)
-                val cachedRecent = cacheManager.loadRecentTrackIds(userFolder)
-
-                recentPlayedTrackIds.addAll(cachedRecent.takeLast(100))
-                withContext(Dispatchers.Main) {
-                    _tracks.value = cachedTracks
-                    _likedTrackIds.value = cachedTracks.map { it.idString }.toSet()
-                    if (cachedWave.isNotEmpty()) {
-                        _wavePlaylist.value = cachedWave
-                    }
-                }
-            }
+            val cachedTracks = cacheManager.loadLikedTracks(userFolder)
+            _tracks.value = cachedTracks
+            _likedTrackIds.value = cachedTracks.map { it.idString }.toSet()
 
             // Silently refresh from API in background
             loadLikedTracks()
@@ -599,9 +466,7 @@ class MainViewModel @Inject constructor(
             val currentUid = currentAccount?.uid
             val currentFolder = currentAccount?.folderName ?: "default"
 
-            stopAndClearPlayer()
-            recentPlayedTrackIds.clear()
-            _wavePlaylist.value = emptyList()
+            playbackController.resetForAccount(null)
 
             // Delete only this user's cache folder
             withContext(Dispatchers.IO) {
@@ -625,9 +490,7 @@ class MainViewModel @Inject constructor(
 
     fun logoutAllAccounts() {
         viewModelScope.launch {
-            stopAndClearPlayer()
-            recentPlayedTrackIds.clear()
-            _wavePlaylist.value = emptyList()
+            playbackController.resetForAccount(null)
 
             withContext(Dispatchers.IO) {
                 cacheManager.clearAllUserCaches()
@@ -664,8 +527,7 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 _tracks.value = emptyList()
                 _likedTrackIds.value = emptySet()
-                _wavePlaylist.value = emptyList()
-                recentPlayedTrackIds.clear()
+                playbackController.clearWaveAndHistory()
                 loadLikedTracks()
             }
         }
@@ -677,7 +539,7 @@ class MainViewModel @Inject constructor(
                 _isLoading.value = true
                 val token = authRepository.getToken()
                 Log.d("LikedTracks", "=== loadLikedTracks START ===")
-                Log.d("LikedTracks", "token present: ${!token.isNullOrEmpty()}, token prefix: ${token?.take(8) ?: "NULL"}")
+                Log.d("LikedTracks", "token present: ${!token.isNullOrEmpty()}")
 
                 // Step 1: Get UID and profile info from account status
                 var uid: String? = null
@@ -958,6 +820,7 @@ class MainViewModel @Inject constructor(
         // Optimistically remove from likes and library
         _likedTrackIds.value = _likedTrackIds.value - trackId
         _tracks.value = _tracks.value.filter { it.idString != trackId }
+        playbackController.onTrackDisliked(trackId)
 
         viewModelScope.launch {
             cacheManager.saveLikedTracks(activeUserFolder, _tracks.value)
@@ -1159,437 +1022,38 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun playMyVibe(forceRestart: Boolean = false) {
-        _currentSource.value = PlaylistSource.VIBE
-        
-        val waveList = _wavePlaylist.value
-        val unplayedTrack = waveList.firstOrNull { it.idString !in recentPlayedTrackIds } ?: waveList.firstOrNull()
-        
-        if (unplayedTrack != null && !forceRestart) {
-            _currentPlaylist.value = waveList
-            playTrack(unplayedTrack.idString, waveList)
-            if (waveList.size < 30) {
-                fetchMoreVibeTracks()
-            }
-            return
-        }
+    // --- Playback: delegated to the process-wide PlaybackController ---
 
-        // Instant audio playback from cache: don't let user sit in silence
-        if (waveList.isNotEmpty()) {
-            _currentPlaylist.value = waveList
-            val toPlay = unplayedTrack ?: waveList.first()
-            playTrack(toPlay.idString, waveList)
-        }
+    fun playMyVibe() = playbackController.playMyVibe()
 
-        // Fetch fresh tracks in background without blocking audio
-        fetchMoreVibeTracks(forceStartIfEmpty = waveList.isEmpty())
-    }
+    fun loadMoreQueue() = playbackController.loadMoreQueue()
 
-    private fun fetchMoreVibeTracks(
-        prefetchOnly: Boolean = false,
-        forceStartIfEmpty: Boolean = false,
-        onFetched: ((Boolean) -> Unit)? = null
-    ) {
-        if (_isFetchingMoreQueue.value) {
-            onFetched?.invoke(false)
-            return
-        }
-        _isFetchingMoreQueue.value = true
-        isFetchingMoreVibe = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                kotlinx.coroutines.supervisorScope {
-                    val batch1 = async { api.getMyWaveTracks() }
-                    val batch2 = async { api.getMyWaveTracks() }
-                    val batch3 = async { api.getMyWaveTracks() }
-                    val batch4 = async { api.getMyWaveTracks() }
+    fun playAllLikedTracks() = playbackController.playAllLikedTracks()
 
-                    val w1 = try { batch1.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                    val w2 = try { batch2.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                    val w3 = try { batch3.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
-                    val w4 = try { batch4.await().result?.sequence?.mapNotNull { it.track } ?: emptyList() } catch (e: Exception) { emptyList() }
+    fun shuffleLikedTracks() = playbackController.playAllLikedTracks(shuffle = true)
 
-                    val waveTracks = (w1 + w2 + w3 + w4).distinctBy { it.idString }
-                    var hasNew = false
-                    
-                    if (waveTracks.isNotEmpty()) {
-                        val tracksToAdd = mutableListOf<TrackDetailsDto>()
-                        withContext(Dispatchers.Main) {
-                            val newPlaylist = _wavePlaylist.value.toMutableList()
-                            val existingIds = newPlaylist.map { it.idString }.toSet()
-                            
-                            // 1. First priority: strictly fresh tracks not in existing queue and not recently played
-                            var freshTracks = waveTracks.filter { it.idString !in existingIds && it.idString !in recentPlayedTrackIds }
-                            
-                            // 2. Adaptive fallback: if all were recently played, still append any track not in active queue
-                            if (freshTracks.isEmpty()) {
-                                freshTracks = waveTracks.filter { it.idString !in existingIds }
-                            }
+    fun playHits(shuffle: Boolean = true) = playbackController.playHits(_weeklyHits.value, shuffle)
 
-                            if (freshTracks.isNotEmpty()) {
-                                tracksToAdd.addAll(freshTracks)
-                                newPlaylist.addAll(freshTracks)
-                                _wavePlaylist.value = newPlaylist
-                                if (_currentSource.value == PlaylistSource.VIBE) {
-                                    _currentPlaylist.value = newPlaylist
-                                }
-                                hasNew = true
-                            }
-                            
-                            if (forceStartIfEmpty && _currentTrack.value == null && newPlaylist.isNotEmpty()) {
-                                playTrack(newPlaylist.first().idString, newPlaylist)
-                            }
-                        }
-                        if (hasNew) {
-                            cacheManager.saveWaveQueue(activeUserFolder, _wavePlaylist.value)
-                            preloadManager.preloadTracks(tracksToAdd.take(5).map { it.idString })
-                        }
-                    }
-                    withContext(Dispatchers.Main) {
-                        onFetched?.invoke(hasNew)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error fetching more vibe tracks", e)
-                withContext(Dispatchers.Main) { onFetched?.invoke(false) }
-            } finally {
-                _isFetchingMoreQueue.value = false
-                isFetchingMoreVibe = false
-            }
-        }
-    }
-    
-    private fun preloadCoilCovers(tracks: List<TrackDetailsDto>) {
-    }
-    
-    fun loadMoreQueue() {
-        if (_currentSource.value == PlaylistSource.VIBE) {
-            fetchMoreVibeTracks()
-        }
-    }
+    fun playTrack(trackId: String, playlist: List<TrackDetailsDto>, source: PlaylistSource? = null) =
+        playbackController.playTrack(trackId, playlist, source)
 
-    fun playAllLikedTracks() {
-        _currentSource.value = PlaylistSource.LIBRARY
-        val playlist = tracks.value
-        if (playlist.isNotEmpty()) {
-            playTrack(playlist.first().idString, playlist)
-        }
-    }
+    fun playNext() = playbackController.playNext()
 
-    fun shuffleLikedTracks() {
-        _currentSource.value = PlaylistSource.LIBRARY
-        val playlist = tracks.value.shuffled()
-        if (playlist.isNotEmpty()) {
-            playTrack(playlist.first().idString, playlist)
-        }
-    }
+    fun playPrev() = playbackController.playPrev()
 
-    fun playHits(shuffle: Boolean = true) {
-        _currentSource.value = PlaylistSource.TRENDS
-        val hitsList = if (shuffle) _weeklyHits.value.shuffled() else _weeklyHits.value
-        if (hitsList.isNotEmpty()) {
-            val trackToPlay = hitsList.firstOrNull { it.idString !in recentPlayedTrackIds } ?: hitsList.first()
-            playTrack(trackToPlay.idString, hitsList)
-        }
-    }
+    fun resumeOrPlayCurrent() = playbackController.play()
 
-    fun playTrack(trackId: String, playlist: List<TrackDetailsDto>, isAutoCrossfade: Boolean = false) {
-        _currentPlaylist.value = playlist
-        val track = playlist.find { it.idString == trackId }
-        _currentTrack.value = track
-        
-        recordTrackPlayed(trackId)
-        
-        val currentIndex = playlist.indexOfFirst { it.idString == trackId }
-        if (currentIndex != -1) {
-            val upcoming = playlist.drop(currentIndex + 1).take(3).map { it.idString }
-            if (upcoming.isNotEmpty()) {
-                preloadManager.preloadTracks(upcoming)
-            }
-            
-            // Proactive preparation of the immediate next track for true 3-second overlapping crossfade
-            val nextTrack = playlist.getOrNull(currentIndex + 1)
-            if (nextTrack != null && !nextTrack.isRadio) {
-                viewModelScope.launch(Dispatchers.IO) {
-                    val nextId = nextTrack.idString
-                    val nextTitle = nextTrack.title
-                    val nextArtist = nextTrack.artists.firstOrNull()?.name
-                    val nextCover = nextTrack.coverUri?.let { uri ->
-                        if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
-                    }
-                    val nextMp3Url = if (downloadManager.isTrackDownloaded(nextId)) {
-                        ""
-                    } else {
-                        preloadManager.preloadSingleTrackPriority(nextId) ?: preloadManager.getOrFetchUrl(nextId)
-                    }
-                    if (nextMp3Url != null || downloadManager.isTrackDownloaded(nextId)) {
-                        playerRepository.prepareNextTrack(nextId, nextMp3Url ?: "", nextTitle, nextArtist, nextCover)
-                    }
-                }
-            }
-            
-            // Continuous Queue Auto-Refill
-            // If less than 20 tracks remain in the queue, quietly fetch more in the background
-            if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 20 && !_isFetchingMoreQueue.value) {
-                fetchMoreVibeTracks()
-            }
-        }
-        
-        if (_currentSource.value == PlaylistSource.VIBE && track?.isRadio != true) {
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    api.sendRotorFeedback("trackStarted", trackId)
-                } catch (e: Exception) {
-                    Log.e("MainViewModel", "Error sending rotor feedback", e)
-                }
-            }
-        }
-        
-        val title = track?.title
-        val artist = track?.artists?.firstOrNull()?.name
-        val coverUrl = track?.coverUri?.let { uri ->
-            if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
-        }
+    fun togglePlayPause() = playbackController.togglePlayPause()
 
-        // Instant play if already cached on disk or pre-resolved in memory (0ms latency for seamless crossfade)
-        if (downloadManager.isTrackDownloaded(trackId)) {
-            currentPlayJob?.cancel()
-            consecutiveTrackErrors = 0
-            playerRepository.playTrack(trackId, "", title, artist, coverUrl, isAutoCrossfade)
-            return
-        }
+    fun seekTo(positionMs: Long) = playbackController.seekTo(positionMs)
 
-        val fastResolvedUrl = preloadManager.getResolvedUrl(trackId)
-        if (fastResolvedUrl != null) {
-            currentPlayJob?.cancel()
-            consecutiveTrackErrors = 0
-            playerRepository.playTrack(trackId, fastResolvedUrl, title, artist, coverUrl, isAutoCrossfade)
-            return
-        }
+    fun reorderQueue(from: Int, to: Int) = playbackController.reorderQueue(from, to)
 
-        currentPlayJob?.cancel()
-        currentPlayJob = viewModelScope.launch {
-            try {
-                // Wait for high priority fetch of url if not loaded yet
-                val mp3Url = preloadManager.preloadSingleTrackPriority(trackId)
-                if (mp3Url != null) {
-                    consecutiveTrackErrors = 0
-                    playerRepository.playTrack(trackId, mp3Url, title, artist, coverUrl, isAutoCrossfade)
-                } else {
-                    // Fallback to on demand resolve
-                    val demandUrl = preloadManager.getOrFetchUrl(trackId)
-                    if (demandUrl != null) {
-                        consecutiveTrackErrors = 0
-                        playerRepository.playTrack(trackId, demandUrl, title, artist, coverUrl, isAutoCrossfade)
-                    } else {
-                        Log.e("MainViewModel", "Failed to resolve mp3 URL for track $trackId, auto-skipping")
-                        if (++consecutiveTrackErrors < 5) {
-                            playNext(isAutoCrossfade = false)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                Log.e("MainViewModel", "Error playing track", e)
-                // Fallback attempt to play local if network failed
-                if (downloadManager.isTrackDownloaded(trackId)) {
-                    consecutiveTrackErrors = 0
-                    playerRepository.playTrack(trackId, "", title, artist, coverUrl, isAutoCrossfade)
-                } else if (++consecutiveTrackErrors < 5) {
-                    playNext(isAutoCrossfade = false)
-                }
-            }
-        }
-    }
+    fun removeFromQueue(trackId: String) = playbackController.removeFromQueue(trackId)
 
-    private fun prepareNextTrackInQueue() {
-        val current = _currentTrack.value ?: return
-        if (current.isRadio) return
-        val playlist = _currentPlaylist.value
-        val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
+    fun playRadioStation(station: RadioStation) = playbackController.playRadioStation(station)
 
-        // Proactively refill Vibe queue if remaining tracks <= 5
-        if (_currentSource.value == PlaylistSource.VIBE && (playlist.size - currentIndex <= 5)) {
-            fetchMoreVibeTracks(prefetchOnly = true)
-        }
-
-        val nextTrack = if (currentIndex != -1 && currentIndex + 1 < playlist.size) {
-            playlist[currentIndex + 1]
-        } else if (playlist.isNotEmpty() && _currentSource.value != PlaylistSource.VIBE) {
-            // Loop wrap-around: prepare first track in playlist
-            playlist.first()
-        } else {
-            null
-        }
-
-        if (nextTrack == null || nextTrack.isRadio) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            val nextId = nextTrack.idString
-            val nextTitle = nextTrack.title
-            val nextArtist = nextTrack.artists.firstOrNull()?.name
-            val nextCover = nextTrack.coverUri?.let { uri ->
-                if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
-            }
-            val nextMp3Url = if (downloadManager.isTrackDownloaded(nextId)) {
-                ""
-            } else {
-                preloadManager.preloadSingleTrackPriority(nextId) ?: preloadManager.getOrFetchUrl(nextId)
-            }
-            if (nextMp3Url != null || downloadManager.isTrackDownloaded(nextId)) {
-                playerRepository.prepareNextTrack(nextId, nextMp3Url ?: "", nextTitle, nextArtist, nextCover)
-            }
-        }
-    }
-
-    fun playNext(isAutoCrossfade: Boolean = false) {
-        val now = System.currentTimeMillis()
-        if (now - lastPlayNextTime < 500L) {
-            Log.d("MainViewModel", "playNext debounced (call within 500ms)")
-            return
-        }
-        lastPlayNextTime = now
-
-        val currentTrack = _currentTrack.value
-        if (currentTrack == null) {
-            val playlist = _currentPlaylist.value
-            if (playlist.isNotEmpty()) {
-                playTrack(playlist.first().idString, playlist, isAutoCrossfade)
-            } else {
-                playAllLikedTracks()
-            }
-            return
-        }
-
-        if (currentTrack.isRadio) {
-            val currentRadioId = currentTrack.idString.removePrefix("radio_")
-            val stations = radioStations.value
-            if (stations.isNotEmpty()) {
-                val currentIndex = stations.indexOfFirst { it.id == currentRadioId }
-                if (currentIndex != -1) {
-                    val nextIndex = (currentIndex + 1) % stations.size
-                    playRadioStation(stations[nextIndex])
-                }
-            }
-            return
-        }
-
-        val currentId = currentTrack.idString
-        
-        // Notify Rotor track finished
-        if (_currentSource.value == PlaylistSource.VIBE) {
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    api.sendRotorFeedback("trackFinished", currentId)
-                } catch (e: Exception) {
-                    Log.e("MainViewModel", "Error sending rotor trackFinished", e)
-                }
-            }
-        }
-
-        val playlist = _currentPlaylist.value
-        val currentIndex = playlist.indexOfFirst { it.idString == currentId }
-        
-        if (currentIndex != -1 && currentIndex + 1 < playlist.size) {
-            playTrack(playlist[currentIndex + 1].idString, playlist, isAutoCrossfade)
-        } else if (_currentSource.value == PlaylistSource.VIBE) {
-            // We are at the end of the wave playlist! Don't stop.
-            // Try to play from cached library or wait for fetch.
-            fetchMoreVibeTracks(prefetchOnly = false) { success ->
-                val updatedPlaylist = _currentPlaylist.value
-                val newIndex = updatedPlaylist.indexOfFirst { it.idString == currentId }
-                if (newIndex != -1 && newIndex + 1 < updatedPlaylist.size) {
-                    playTrack(updatedPlaylist[newIndex + 1].idString, updatedPlaylist, isAutoCrossfade)
-                } else if (updatedPlaylist.isNotEmpty()) {
-                    playTrack(updatedPlaylist.first().idString, updatedPlaylist, isAutoCrossfade)
-                } else {
-                    // Fallback to library if we totally failed to get new vibe tracks
-                    playAllLikedTracks()
-                }
-            }
-        } else if (playlist.isNotEmpty()) {
-            // Wrap around: Loop playlist back to start so playback continues seamlessly
-            playTrack(playlist.first().idString, playlist, isAutoCrossfade)
-        } else {
-            playAllLikedTracks()
-        }
-    }
-
-    fun resumeOrPlayCurrent() {
-        val current = _currentTrack.value
-        val trackId = playerRepository.currentTrackId.value ?: current?.idString
-        if (trackId != null && current != null) {
-            val player = playerRepository.getPlayer()
-            if (player.mediaItemCount > 0) {
-                playerRepository.resume()
-            } else {
-                playTrack(current.idString, _currentPlaylist.value.ifEmpty { listOf(current) })
-            }
-        } else {
-            playMyVibe(forceRestart = false)
-        }
-    }
-
-    fun togglePlayPause() {
-        if (playerRepository.isPlaying.value) {
-            playerRepository.pause()
-        } else {
-            resumeOrPlayCurrent()
-        }
-    }
-
-    fun seekTo(positionMs: Long) {
-        viewModelScope.launch {
-            playerRepository.seekTo(positionMs)
-        }
-    }
-
-    fun playPrev() {
-        val currentTrack = _currentTrack.value ?: return
-        
-        // Return to start if played > 3 seconds
-        val currentProgress = playerRepository.progress.value
-        if (currentProgress > 3000L) {
-            playerRepository.seekTo(0)
-            return
-        }
-
-        if (currentTrack.isRadio) {
-            val currentRadioId = currentTrack.idString.removePrefix("radio_")
-            val stations = radioStations.value
-            if (stations.isNotEmpty()) {
-                val currentIndex = stations.indexOfFirst { it.id == currentRadioId }
-                if (currentIndex != -1) {
-                    val prevIndex = if (currentIndex - 1 < 0) stations.size - 1 else currentIndex - 1
-                    playRadioStation(stations[prevIndex])
-                }
-            }
-            return
-        }
-
-        val currentId = currentTrack.idString
-        val playlist = _currentPlaylist.value
-        val currentIndex = playlist.indexOfFirst { it.idString == currentId }
-        
-        if (currentIndex > 0) {
-            playTrack(playlist[currentIndex - 1].idString, playlist)
-        }
-    }
-    
-    fun reorderQueue(from: Int, to: Int) {
-        val currentList = _currentPlaylist.value.toMutableList()
-        val item = currentList.removeAt(from)
-        currentList.add(to, item)
-        _currentPlaylist.value = currentList
-    }
-    
-    fun removeFromQueue(trackId: String) {
-        val currentList = _currentPlaylist.value.toMutableList()
-        currentList.removeAll { it.idString == trackId }
-        _currentPlaylist.value = currentList
-    }
-
-    // --- Radio Logic ---
+    // --- Radio Favorites ---
 
     fun toggleRadioFavorite(stationId: String) {
         viewModelScope.launch {
@@ -1606,36 +1070,6 @@ class MainViewModel @Inject constructor(
     fun removeRadioFavorite(stationId: String) {
         viewModelScope.launch {
             radioRepository.removeFavorite(stationId)
-        }
-    }
-
-    fun playRadioStation(station: RadioStation) {
-        // Create virtual TrackDetailsDto for Radio
-        val radioTrack = TrackDetailsDto(
-            id = kotlinx.serialization.json.JsonPrimitive("radio_${station.id}"),
-            title = station.name,
-            artists = listOf(com.korenskoy.yandexmusic.data.dto.ArtistDto(id = kotlinx.serialization.json.JsonPrimitive("0"), name = "Прямой эфир • ${station.frequency}")),
-            coverUri = station.iconRes?.let { "android.resource://${BuildConfig.APPLICATION_ID}/$it" } ?: station.logoUrl.ifEmpty { null },
-            durationMs = 0,
-            isRadio = true
-        )
-        
-        _currentTrack.value = radioTrack
-        _currentPlaylist.value = emptyList() // Clear normal queue
-        _currentSource.value = PlaylistSource.LIBRARY // or some other source
-        
-        viewModelScope.launch {
-            try {
-                playerRepository.playTrack(
-                    trackId = radioTrack.idString,
-                    url = station.streamUrl,
-                    title = radioTrack.title,
-                    artist = radioTrack.artists?.firstOrNull()?.name,
-                    coverUrl = radioTrack.coverUri
-                )
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error playing radio station", e)
-            }
         }
     }
 

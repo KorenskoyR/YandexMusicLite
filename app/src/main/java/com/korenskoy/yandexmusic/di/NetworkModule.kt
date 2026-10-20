@@ -40,6 +40,9 @@ object NetworkModule {
     ): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.HEADERS else HttpLoggingInterceptor.Level.NONE
+            // Never print the OAuth token, even in debug logcat
+            redactHeader("Authorization")
+            redactHeader("Cookie")
         }
 
         val cacheSize = 20L * 1024 * 1024 // 20 MB

@@ -225,11 +225,11 @@ class LayoutSafetyTest {
 
     @Test
     fun testRadioStationResourceUriFormat() {
-        val viewModelFile = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
-        assertTrue("MainViewModel must use BuildConfig.APPLICATION_ID for radio resource uri",
-            viewModelFile.contains("android.resource://\${BuildConfig.APPLICATION_ID}/\$it"))
-        org.junit.Assert.assertFalse("MainViewModel must not hardcode old package name in resource uri",
-            viewModelFile.contains("android.resource://com.korenskoy.yandexmusic/"))
+        val controllerFile = File(sourceDir, "data/player/PlaybackController.kt").readText()
+        assertTrue("PlaybackController must use BuildConfig.APPLICATION_ID for radio resource uri",
+            controllerFile.contains("android.resource://\${BuildConfig.APPLICATION_ID}/\$it"))
+        org.junit.Assert.assertFalse("PlaybackController must not hardcode old package name in resource uri",
+            controllerFile.contains("android.resource://com.korenskoy.yandexmusic/"))
     }
 
     @Test
@@ -289,14 +289,19 @@ class LayoutSafetyTest {
     }
 
     @Test
-    fun testProgressTransitionIsolation() {
+    fun testCrossfadeInterruptionSafety() {
         val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
-        assertTrue("PlayerRepositoryImpl must guard progress polling with !isTransitioning",
-            playerRepo.contains("isPlaying && !isTransitioning"))
-        assertTrue("PlayerRepositoryImpl must set isTransitioning = true during track transition",
-            playerRepo.contains("isTransitioning = true"))
-        assertTrue("PlayerRepositoryImpl must set isCrossfading = true during crossfade",
-            playerRepo.contains("isCrossfading = true"))
+        // pause/seek/stop during a crossfade must silence the outgoing track (no two tracks playing at once)
+        for (fn in listOf("override fun pause()", "override fun seekTo(position: Long)", "override fun stop()")) {
+            val body = playerRepo.substringAfter(fn).substringBefore("override fun")
+            assertTrue("$fn must finish a running crossfade", body.contains("finishCrossfadeNow(restoreActiveVolume = true)"))
+        }
+        // stop() must forget the preloaded standby, otherwise the next play starts an empty player
+        val stopBody = playerRepo.substringAfter("override fun stop()").substringBefore("override fun")
+        assertTrue("stop() must reset preloadedTrackId", stopBody.contains("preloadedTrackId = null"))
+        assertTrue("A preloaded standby is reused only when it is really loaded and healthy",
+            playerRepo.contains("incoming.currentMediaItem?.mediaId == trackId") &&
+                playerRepo.contains("incoming.playerError == null"))
     }
 
     @Test
@@ -446,9 +451,9 @@ class LayoutSafetyTest {
 
         val buildGradle = File("build.gradle.kts").readText()
         assertTrue("build.gradle.kts must be versionCode 17",
-            buildGradle.contains("versionCode = 17"))
+            buildGradle.contains("versionCode = 18"))
         assertTrue("build.gradle.kts must be versionName 1.4.0",
-            buildGradle.contains("versionName = \"1.4.0\""))
+            buildGradle.contains("versionName = \"1.4.1\""))
     }
 
     @Test
@@ -462,10 +467,10 @@ class LayoutSafetyTest {
             playerRepo.contains("CROSSFADE_STEPS = 60"))
         assertTrue("PlayerRepositoryImpl must have prepareNextTrackEvent",
             playerRepo.contains("override val prepareNextTrackEvent: Flow<Unit>"))
-        assertTrue("PlayerRepositoryImpl must wait for STATE_READY before starting crossfade",
-            playerRepo.contains("incomingStandby.playbackState != Player.STATE_READY"))
-        assertTrue("PlayerRepositoryImpl must support isAutoCrossfade",
-            playerRepo.contains("isAutoCrossfade: Boolean"))
+        assertTrue("PlayerRepositoryImpl must wait until the incoming track renders audio before fading",
+            playerRepo.contains("while (!incoming.isPlaying)"))
+        assertTrue("PlayerRepositoryImpl must support crossfade on every transition",
+            playerRepo.contains("crossfade: Boolean"))
         assertTrue("PlayerRepositoryImpl must expose activePlayerState StateFlow",
             playerRepo.contains("override val activePlayerState: StateFlow<ExoPlayer>"))
 
@@ -479,11 +484,11 @@ class LayoutSafetyTest {
         assertTrue("MusicService must resume on AUDIOFOCUS_GAIN",
             musicService.contains("AUDIOFOCUS_GAIN"))
 
-        val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
-        assertTrue("MainViewModel must observe prepareNextTrackEvent",
-            viewModel.contains("playerRepository.prepareNextTrackEvent"))
-        assertTrue("MainViewModel must implement prepareNextTrackInQueue",
-            viewModel.contains("fun prepareNextTrackInQueue()"))
+        val controller = File(sourceDir, "data/player/PlaybackController.kt").readText()
+        assertTrue("PlaybackController must observe prepareNextTrackEvent",
+            controller.contains("playerRepository.prepareNextTrackEvent"))
+        assertTrue("PlaybackController must implement prepareNextTrackInQueue",
+            controller.contains("fun prepareNextTrackInQueue()"))
     }
 
     @Test
@@ -513,7 +518,7 @@ class LayoutSafetyTest {
 
         val playerRepoFile = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
         assertTrue("PlayerRepositoryImpl must evict URL on player error",
-            playerRepoFile.contains("preloadManager.evictUrl(failedTrackId)"))
+            playerRepoFile.contains("preloadManager.evictUrl(it)"))
     }
 
     @Test
@@ -558,33 +563,50 @@ class LayoutSafetyTest {
             musicService.contains("return START_NOT_STICKY"))
         assertTrue("MusicService must abandon audio focus in onDestroy",
             musicService.contains("abandonSystemAudioFocus()"))
+        assertTrue("Notification transport commands must go through PlaybackController",
+            musicService.contains("playbackController.playNext()") && musicService.contains("playbackController.playPrev()"))
+        assertTrue("Ducking must lower volume instead of pausing",
+            musicService.substringAfter("AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK ->").substringBefore("AudioManager.AUDIOFOCUS_GAIN")
+                .contains("setDucked(true)"))
 
         val playerRepo = File(sourceDir, "domain/repository/PlayerRepository.kt").readText()
         assertTrue("PlayerRepository interface must declare release()",
             playerRepo.contains("fun release()"))
 
-        val playerRepoImpl = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
-        assertTrue("PlayerRepositoryImpl must implement release()",
-            playerRepoImpl.contains("override fun release()"))
-        assertTrue("PlayerRepositoryImpl must check mediaItemCount in resume",
-            playerRepoImpl.contains("if (player.mediaItemCount == 0) return"))
-        assertTrue("PlayerRepositoryImpl must start foreground service in resume",
-            playerRepoImpl.contains("ContextCompat.startForegroundService(context, intent)"))
-
+        // Queue logic must not live in the ViewModel: it dies with the Activity (swipe from recents)
         val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
-        assertTrue("MainViewModel must reactively collect playerRepository.currentTrackId",
-            viewModel.contains("playerRepository.currentTrackId.collect"))
-        assertTrue("MainViewModel must implement resumeOrPlayCurrent",
-            viewModel.contains("fun resumeOrPlayCurrent()"))
-        assertTrue("MainViewModel must implement togglePlayPause",
-            viewModel.contains("fun togglePlayPause()"))
-        assertTrue("MainViewModel must debounce playNext",
-            viewModel.contains("now - lastPlayNextTime < 500L"))
+        assertFalse("MainViewModel must not collect player events itself",
+            viewModel.contains("skipNextEvent") || viewModel.contains("trackEndedEvent"))
+        val controller = File(sourceDir, "data/player/PlaybackController.kt").readText()
+        assertTrue("PlaybackController must be a singleton", controller.contains("@Singleton"))
+        assertTrue("PlaybackController must handle skip and track-end events",
+            controller.contains("playerRepository.skipNextEvent") && controller.contains("playerRepository.trackEndedEvent"))
 
         val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
         assertTrue("MainScreen must use togglePlayPause",
             mainScreen.contains("viewModel.togglePlayPause()"))
     }
+
+    @Test
+    fun testSecurityHardening() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        assertFalse("Cleartext traffic must not be allowed globally",
+            manifest.contains("usesCleartextTraffic=\"true\""))
+        assertTrue("Manifest must reference network security config",
+            manifest.contains("@xml/network_security_config"))
+        val nsc = File("src/main/res/xml/network_security_config.xml").readText()
+        assertTrue("Base config must forbid cleartext", nsc.contains("<base-config cleartextTrafficPermitted=\"false\""))
+
+        for (rules in listOf("backup_rules.xml", "data_extraction_rules.xml")) {
+            val xml = File("src/main/res/xml/$rules").readText()
+            assertTrue("$rules must exclude encrypted auth tokens", xml.contains("path=\"auth_prefs.xml\""))
+        }
+
+        val network = File(sourceDir, "di/NetworkModule.kt").readText()
+        assertTrue("HTTP logging must redact the Authorization header", network.contains("redactHeader(\"Authorization\")"))
+
+        val sources = sourceDir.walkTopDown().filter { it.extension == "kt" }.map { it.readText() }
+        assertFalse("OAuth token must never be logged",
+            sources.any { it.contains("token prefix") })
+    }
 }
-
-

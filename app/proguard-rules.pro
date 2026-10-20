@@ -42,6 +42,7 @@
 
 # Keep all DTO, Domain Models and Updater
 -keep class com.korenskoy.yandexmusic.data.dto.** { *; }
+-keep class com.korenskoy.yandexmusic.data.cache.PlaybackSnapshot { *; }
 -keep class com.korenskoy.yandexmusic.data.updater.** { *; }
 -keep class com.korenskoy.yandexmusic.domain.model.** { *; }
 -keep class com.korenskoy.yandexmusic.data.radio.** { *; }

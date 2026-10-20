@@ -95,7 +95,9 @@ interface YandexMusicApi {
     ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 
     @GET("rotor/station/user:onyourwave/tracks")
-    suspend fun getMyWaveTracks(): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.RotorStationTracksResponseDto>
+    suspend fun getMyWaveTracks(
+        @retrofit2.http.Query("queue") queue: String? = null
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.RotorStationTracksResponseDto>
 
     @retrofit2.http.POST("rotor/station/user:onyourwave/feedback")
     @retrofit2.http.FormUrlEncoded
@@ -103,6 +105,7 @@ interface YandexMusicApi {
         @retrofit2.http.Field("type") type: String,
         @retrofit2.http.Field("trackId") trackId: String,
         @retrofit2.http.Field("albumId") albumId: String? = null,
-        @retrofit2.http.Field("from") from: String = "radio-user-onyourwave"
+        @retrofit2.http.Field("from") from: String = "radio-user-onyourwave",
+        @retrofit2.http.Field("totalPlayedSeconds") totalPlayedSeconds: Double? = null
     ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 }

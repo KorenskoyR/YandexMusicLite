@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
@@ -26,9 +27,18 @@ import com.korenskoy.yandexmusic.presentation.main.MainScreen
 import com.korenskoy.yandexmusic.presentation.main.MainViewModel
 import com.korenskoy.yandexmusic.ui.theme.YandexMusicTheme
 import dagger.hilt.android.AndroidEntryPoint
+import android.content.ComponentName
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
+import com.korenskoy.yandexmusic.data.player.MusicService
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    // Binding a controller keeps MusicService alive while the UI is visible; media3 then promotes it
+    // to a foreground service by itself once playback starts.
+    private var controllerFuture: ListenableFuture<MediaController>? = null
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -51,18 +61,36 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    // Skip the splash when the app is re-entered with a session already on screen
+                    AppNavigation(skipSplash = savedInstanceState != null)
                 }
             }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        val token = SessionToken(this, ComponentName(this, MusicService::class.java))
+        controllerFuture = MediaController.Builder(this, token).buildAsync()
+    }
+
+    override fun onStop() {
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        controllerFuture = null
+        super.onStop()
+    }
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(skipSplash: Boolean = false) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val isAuthorized by mainViewModel.isAuthorized.collectAsState()
+    // Music is playing or a session was restored: open straight to the player UI, like Apple Music.
+    val startDestination = remember {
+        val hasSession = mainViewModel.currentTrack.value != null
+        if (isAuthorized && (skipSplash || hasSession)) "main" else "splash"
+    }
 
     androidx.compose.runtime.LaunchedEffect(isAuthorized) {
         val currentRoute = navController.currentBackStackEntry?.destination?.route
@@ -75,7 +103,7 @@ fun AppNavigation() {
 
     NavHost(
         navController = navController,
-        startDestination = "splash"
+        startDestination = startDestination
     ) {
         composable("splash") {
             com.korenskoy.yandexmusic.presentation.splash.SplashScreen(

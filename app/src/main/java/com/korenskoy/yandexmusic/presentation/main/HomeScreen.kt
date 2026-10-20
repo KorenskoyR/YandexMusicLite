@@ -48,7 +48,8 @@ import androidx.compose.ui.unit.sp
 fun HomeScreen(
     isPlaying: Boolean,
     isWavePlaying: Boolean,
-    onPlayPauseVibe: () -> Unit
+    onPlayPauseVibe: () -> Unit,
+    isLoading: Boolean = false
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -193,12 +194,21 @@ fun HomeScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isPlaying && isWavePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying && isWavePlaying) "Pause" else "Play My Vibe",
-                    modifier = Modifier.size((46 * scaleFactor).dp),
-                    tint = Color.White
-                )
+                if (isLoading) {
+                    // The wave is loading or the first track is buffering
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size((40 * scaleFactor).dp),
+                        color = Color.White,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isPlaying && isWavePlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying && isWavePlaying) "Pause" else "Play My Vibe",
+                        modifier = Modifier.size((46 * scaleFactor).dp),
+                        tint = Color.White
+                    )
+                }
             }
         }
     }

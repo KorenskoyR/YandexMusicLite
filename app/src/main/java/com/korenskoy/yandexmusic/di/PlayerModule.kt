@@ -13,6 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Module
 @InstallIn(SingletonComponent::class)
 object PlayerModule {
@@ -66,7 +67,7 @@ object PlayerModule {
         val playerA = createConfiguredExoPlayer(context)
         val playerB = createConfiguredExoPlayer(context)
         return com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl(
-            context, playerA, playerB, downloadManager, preloadManager, wakeLockHelper
+            playerA, playerB, downloadManager, preloadManager, wakeLockHelper
         )
     }
 
