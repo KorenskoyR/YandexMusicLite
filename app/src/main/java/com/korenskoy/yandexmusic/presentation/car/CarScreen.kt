@@ -213,12 +213,13 @@ fun CarScreenPortrait(
         Spacer(modifier = Modifier.weight(0.3f))
 
         // Album Art
-        val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000") ?: "https://via.placeholder.com/600"
+        val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000").orEmpty()
         val context = LocalContext.current
 
         if (currentTrack?.isRadio == true) {
             RadioCoverCard(
                 coverUrl = coverUrl,
+                stationName = currentTrack.title.orEmpty(),
                 showLiveBadge = true,
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -372,11 +373,12 @@ fun CarScreenLandscape(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000") ?: "https://via.placeholder.com/600"
+                val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000").orEmpty()
                 val context = LocalContext.current
                 if (currentTrack?.isRadio == true) {
                     RadioCoverCard(
                         coverUrl = coverUrl,
+                        stationName = currentTrack.title.orEmpty(),
                         showLiveBadge = true,
                         modifier = Modifier
                             .weight(1f, fill = false)
@@ -495,7 +497,6 @@ fun CarControls(
     onDislikeClick: () -> Unit,
     isLandscape: Boolean = false
 ) {
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
@@ -718,7 +719,6 @@ fun CarWaveformVisualizerAndTimeline(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 

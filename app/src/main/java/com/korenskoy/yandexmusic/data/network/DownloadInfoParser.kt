@@ -49,7 +49,7 @@ object DownloadInfoParser {
                 return DownloadInfoXml(host, path, ts, s)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("DownloadInfoParser", "Unexpected error", e)
         }
         return null
     }

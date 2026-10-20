@@ -44,7 +44,9 @@ fun RadioCoverCard(
     coverUrl: String,
     modifier: Modifier = Modifier,
     scale: Float = 1f,
-    showLiveBadge: Boolean = true
+    showLiveBadge: Boolean = true,
+    /** Shown as an initial when the station has no (verified) logo. */
+    stationName: String = ""
 ) {
     val context = LocalContext.current
 
@@ -141,7 +143,17 @@ fun RadioCoverCard(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(CircleShape)
+                    .clip(CircleShape),
+                error = {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stationName.take(1).uppercase(),
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 64.sp
+                        )
+                    }
+                }
             )
         }
     }

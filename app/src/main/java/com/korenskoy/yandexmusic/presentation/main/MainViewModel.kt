@@ -148,6 +148,7 @@ class MainViewModel @Inject constructor(
     private var downloadedApkFile: java.io.File? = null
 
     val isFetchingMoreQueue: StateFlow<Boolean> = playbackController.isFetchingMoreQueue
+    val playbackMessages: kotlinx.coroutines.flow.SharedFlow<String> = playbackController.messages
 
     init {
         // The controller outlives this ViewModel; give it the library for "play liked" fallbacks.

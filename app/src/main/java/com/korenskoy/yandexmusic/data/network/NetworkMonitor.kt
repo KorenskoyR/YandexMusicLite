@@ -31,7 +31,7 @@ class NetworkMonitor @Inject constructor(
             val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("NetworkMonitor", "Unexpected error", e)
             false
         }
     }
@@ -76,7 +76,7 @@ class NetworkMonitor @Inject constructor(
                 trySend(false)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("NetworkMonitor", "Unexpected error", e)
             trySend(true) // Fallback to true if we can't check
         }
 
@@ -84,7 +84,7 @@ class NetworkMonitor @Inject constructor(
             try {
                 connectivityManager.unregisterNetworkCallback(callback)
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("NetworkMonitor", "Unexpected error", e)
             }
         }
     }.distinctUntilChanged()

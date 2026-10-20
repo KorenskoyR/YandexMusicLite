@@ -36,8 +36,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 24
         targetSdk = 36
-        versionCode = 19
-        versionName = "1.4.2"
+        versionCode = 20
+        versionName = "1.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -146,6 +146,7 @@ dependencies {
     implementation(libs.androidx.palette.ktx)
     // Installs the bundled Baseline Profile on devices without Play Store (sideloaded APK)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.core.splashscreen)
     baselineProfile(project(":baselineprofile"))
     
     implementation(libs.androidx.compose.ui)
@@ -158,6 +159,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.uiautomator)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

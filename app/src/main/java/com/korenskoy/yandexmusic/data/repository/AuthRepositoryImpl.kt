@@ -30,7 +30,7 @@ class AuthRepositoryImpl @Inject constructor(
         val secure = try {
             KeystoreStringPreferences(context, SECURE_PREFS_FILE, KEYSTORE_ALIAS)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("AuthRepository", "Unexpected error", e)
             null
         }
         // Fallback to plain SharedPreferences if Keystore is broken on this device
@@ -61,7 +61,7 @@ class AuthRepositoryImpl @Inject constructor(
                     androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("AuthRepository", "Unexpected error", e)
                 null
             }
         } else {
@@ -105,7 +105,7 @@ class AuthRepositoryImpl @Inject constructor(
             try {
                 json.decodeFromString<List<UserAccount>>(accountsRaw)
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("AuthRepository", "Unexpected error", e)
                 emptyList()
             }
         } else {
@@ -146,7 +146,7 @@ class AuthRepositoryImpl @Inject constructor(
             val raw = json.encodeToString(accounts)
             sharedPreferences.edit { putString(KEY_ACCOUNTS_JSON, raw) }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("AuthRepository", "Unexpected error", e)
         }
     }
 

@@ -7,6 +7,7 @@ import com.korenskoy.yandexmusic.data.security.KeystoreStringPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +24,7 @@ class AuthStorageMigrationInstrumentedTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Before
+    @After
     fun wipe() {
         for (name in listOf("auth_secure", "auth_prefs", "auth_prefs_fallback")) {
             context.deleteSharedPreferences(name)

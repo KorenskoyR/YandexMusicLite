@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic
 
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -39,6 +43,9 @@ class MainActivity : ComponentActivity() {
     // to a foreground service by itself once playback starts.
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
+    /** Incremented on each "open the player" request (notification tap); MainScreen reacts to changes. */
+    private var openPlayerSignal by mutableIntStateOf(0)
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -46,6 +53,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -54,6 +62,8 @@ class MainActivity : ComponentActivity() {
             }
         }
         
+        if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
+
         enableEdgeToEdge()
         setContent {
             YandexMusicTheme {
@@ -62,10 +72,15 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     // Skip the splash when the app is re-entered with a session already on screen
-                    AppNavigation(skipSplash = savedInstanceState != null)
+                    AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal)
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) openPlayerSignal++
     }
 
     override fun onStart() {
@@ -79,10 +94,14 @@ class MainActivity : ComponentActivity() {
         controllerFuture = null
         super.onStop()
     }
+
+    companion object {
+        const val EXTRA_OPEN_PLAYER = "open_player"
+    }
 }
 
 @Composable
-fun AppNavigation(skipSplash: Boolean = false) {
+fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val isAuthorized by mainViewModel.isAuthorized.collectAsState()
@@ -127,6 +146,7 @@ fun AppNavigation(skipSplash: Boolean = false) {
         composable("main") {
             MainScreen(
                 viewModel = mainViewModel,
+                openPlayerSignal = openPlayerSignal,
                 onNavigateToAuth = {
                     navController.navigate("auth")
                 }

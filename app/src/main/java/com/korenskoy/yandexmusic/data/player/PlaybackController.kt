@@ -533,8 +533,9 @@ class PlaybackController @Inject constructor(
                         preloadManager.preloadTracks(fresh.take(5).map { it.idString })
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "Error fetching more vibe tracks", e)
             } finally {
                 _isFetchingMoreQueue.value = false
@@ -644,8 +645,17 @@ class PlaybackController @Inject constructor(
         if (uri.startsWith("http") || uri.startsWith("android.resource")) uri else "https://${uri.replace("%%", "1000x1000")}"
     }
 
+    /** User-facing playback errors; the visible UI shows them as a Snackbar. */
+    private val _messages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val messages: kotlinx.coroutines.flow.SharedFlow<String> = _messages
+
     private fun showMessage(text: String) {
-        Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+        // No screen is collecting (app in background): fall back to a system toast
+        if (_messages.subscriptionCount.value == 0) {
+            Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+        } else {
+            _messages.tryEmit(text)
+        }
     }
 
     companion object {

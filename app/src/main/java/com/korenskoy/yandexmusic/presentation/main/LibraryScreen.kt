@@ -101,8 +101,6 @@ fun LibraryScreen(
     
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
-    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.8f, 1.5f)
     val contentStart = if (isLandscape) 140.dp else 16.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
 

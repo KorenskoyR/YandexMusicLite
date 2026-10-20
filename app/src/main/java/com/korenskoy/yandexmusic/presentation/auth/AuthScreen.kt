@@ -137,7 +137,7 @@ internal fun extractTokenFromUrl(url: String): String? {
             }
         }
     } catch (e: Exception) {
-        e.printStackTrace()
+        android.util.Log.e("AuthScreen", "Cannot parse token URL", e)
     }
     return null
 }

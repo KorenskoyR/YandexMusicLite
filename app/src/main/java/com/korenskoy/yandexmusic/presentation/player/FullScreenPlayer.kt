@@ -334,6 +334,7 @@ fun FullScreenPlayer(
                 if (track.isRadio) {
                     RadioCoverCard(
                         coverUrl = coverUrl,
+                        stationName = track.title.orEmpty(),
                         scale = coverScale,
                         modifier = Modifier
                             .fillMaxSize()

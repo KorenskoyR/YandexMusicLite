@@ -297,11 +297,12 @@ class PlayerRepositoryImpl(
         }
     }
 
-    /** Switches the audible track. Runs synchronously on the main thread. */
-    private fun startTransition(item: MediaItem, crossfade: Boolean, startPositionMs: Long) {
+    /** Switches the audible track on the main thread. */
+    private suspend fun startTransition(item: MediaItem, crossfade: Boolean, startPositionMs: Long) {
         val trackId = item.mediaId
-        // A crossfade that is still running: drop its outgoing side, keep the current track's volume to fade from.
-        finishCrossfadeNow(restoreActiveVolume = false)
+        // A crossfade that is still running (rapid skipping): fade its outgoing side out quickly instead of
+        // cutting it, and keep the current track's volume to fade from.
+        fadeOutRunningCrossfade()
 
         hasEmittedPrepareForCurrent = false
         hasEmittedTrackEndedForCurrent = false
@@ -380,6 +381,30 @@ class PlayerRepositoryImpl(
         setVolume(outgoing, 1f)
         setVolume(incoming, 1f)
         wakeLockHelper.releaseTransitionLock()
+    }
+
+    /**
+     * The outgoing player occupies the standby slot the next track needs, so it must be released first.
+     * A [QUICK_FADE_MS] fade avoids an audible click; it is stopped even if this request is superseded.
+     */
+    private suspend fun fadeOutRunningCrossfade() {
+        val out = outgoingPlayer ?: return
+        crossfadeJob?.cancel()
+        crossfadeJob = null
+        try {
+            val startVolume = logicalVolume[indexOf(out)]
+            for (step in 1..QUICK_FADE_STEPS) {
+                setVolume(out, startVolume * (1f - step.toFloat() / QUICK_FADE_STEPS))
+                delay(QUICK_FADE_MS / QUICK_FADE_STEPS)
+            }
+        } finally {
+            if (outgoingPlayer === out) {
+                out.stop()
+                out.clearMediaItems()
+                setVolume(out, 1f)
+                outgoingPlayer = null
+            }
+        }
     }
 
     /** Ends a running crossfade immediately: the outgoing track is silenced, at most one track stays audible. */
@@ -492,6 +517,8 @@ class PlayerRepositoryImpl(
         const val PREPARE_STANDBY_THRESHOLD_MS = 15_000L
         const val INCOMING_READY_TIMEOUT_MS = 8_000L
         const val DUCK_VOLUME = 0.2f
+        const val QUICK_FADE_MS = 150L
+        private const val QUICK_FADE_STEPS = 6
         private const val PROGRESS_INTERVAL_MS = 100L
         private const val IDLE_INTERVAL_MS = 500L
         private const val EVENT_BUFFER = 16

@@ -150,7 +150,7 @@ class MusicService : MediaLibraryService() {
                 )
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("MusicService", "Unexpected error", e)
             null
         }
         return when (result) {
@@ -178,13 +178,15 @@ class MusicService : MediaLibraryService() {
                 audioManager?.abandonAudioFocus(audioFocusChangeListener)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("MusicService", "Unexpected error", e)
         }
     }
 
     private fun setupMediaSession(forwardingPlayer: ForwardingPlayer = createForwardingPlayer(playerRepository.getPlayer())) {
+        // Tapping the notification opens the full-screen player, like Apple Music
         val intent = Intent(this, com.korenskoy.yandexmusic.MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(com.korenskoy.yandexmusic.MainActivity.EXTRA_OPEN_PLAYER, true)
         }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,

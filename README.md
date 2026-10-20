@@ -87,34 +87,49 @@
 ## 🛠 Сборка из исходников
 
 Для самостоятельной компиляции проекта потребуется:
-- **JDK**: 17 или 21
-- **Android SDK**: API 35 (Android 15)
-- **Gradle**: 8.x (включен gradlew wrapper)
+- **JDK**: 17 или новее
+- **Android SDK**: API 37 (compileSdk), приложение поддерживает Android 7.0+ (API 24) и нацелено на Android 16 (API 36)
+- **Gradle**: 9.x (включён gradlew wrapper)
 
 ```bash
 # Клонирование репозитория
 git clone https://github.com/KorenskoyR/YandexMusicLite.git
 cd YandexMusicLite
 
-# Сборка релизного APK
-./gradlew assembleRelease
+# Отладочная сборка (ключ подписи не нужен)
+./gradlew assembleDebug
 
-# Готовый подписанный файл будет расположен в:
-# app/build/outputs/apk/release/app-release.apk
+# Тесты и статический анализ
+./gradlew testDebugUnitTest lintDebug
 ```
+
+Релизная сборка (`./gradlew assembleRelease`) подписывается ключом владельца: путь к keystore и пароли берутся
+из `local.properties` (`KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) или переменных окружения.
+Ключи и пароли в репозитории не хранятся.
 
 ---
 
 ## 🏗 Архитектура и стек технологий
 
-- **Архитектурный паттерн**: Clean Architecture + MVVM + MVI Events
-- **UI Framework**: Jetpack Compose (Material 3, Edge-to-Edge, WindowInsets)
+- **Архитектурный паттерн**: Clean Architecture + MVVM; воспроизведение — процессный синглтон `PlaybackController`
+- **UI Framework**: Jetpack Compose (Material 3, Edge-to-Edge, WindowInsets, predictive back)
 - **Внедрение зависимостей**: Dagger Hilt
-- **Аудио-движок**: AndroidX Media3 (ExoPlayer, MediaLibraryService, MediaSession)
-- **Сеть**: Retrofit 2, OkHttp 4, KotlinX Serialization
+- **Аудио-движок**: AndroidX Media3 (два ExoPlayer с кроссфейдом, MediaLibraryService, MediaSession, возобновление с гарнитуры)
+- **Сеть**: Retrofit 3, OkHttp 5, KotlinX Serialization
 - **Асинхронность**: Kotlin Coroutines & StateFlow / SharedFlow
-- **Кэширование**: DataStore Preferences, OkHttp Cache, Coil Image Loader
-- **Оптимизация**: R8 Compiler, ProGuard, Resource Shrinking
+- **Кэширование**: DataStore Preferences, Coil 3
+- **Оптимизация**: R8, Resource Shrinking, Baseline Profile
+
+---
+
+## 🔐 Безопасность
+
+- Токен входа хранится зашифрованным (AES-256-GCM) ключом из Android Keystore и не попадает в резервные копии и логи.
+- Сетевые запросы — только HTTPS; исключения сделаны лишь для радиостанций, которые вещают исключительно по HTTP.
+- Встроенное обновление проверяет контрольную сумму SHA-256 файла из релиза GitHub, подпись, имя пакета и версию.
+- `FALLBACK_SALT` в `Md5Helper.kt` — не секрет: это общеизвестная константа протокола загрузки треков Яндекс Музыки,
+  которая есть в открытых клиентах и в любом APK. Её можно переопределить через `YANDEX_SALT` в `local.properties`.
+- Каждый push проверяется на утечку секретов (gitleaks), тестами и lint в GitHub Actions.
 
 ---
 

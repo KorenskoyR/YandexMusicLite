@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
@@ -47,7 +48,8 @@ import com.korenskoy.yandexmusic.data.player.PlaylistSource
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
-    onNavigateToAuth: () -> Unit = {}
+    onNavigateToAuth: () -> Unit = {},
+    openPlayerSignal: Int = 0
 ) {
     val tracks by viewModel.tracks.collectAsState()
     val allAccounts by viewModel.allAccounts.collectAsState()
@@ -95,6 +97,9 @@ fun MainScreen(
 
     var currentTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(openPlayerSignal) {
+        if (openPlayerSignal > 0 && viewModel.currentTrack.value != null) isPlayerExpanded = true
+    }
     var showAccountDialog by remember { mutableStateOf(false) }
     var hasHandledStartupAccountPicker by rememberSaveable { mutableStateOf(false) }
     val showStartupAccountPicker = !hasHandledStartupAccountPicker && allAccounts.size > 1 && defaultAccountUid == null
@@ -197,7 +202,6 @@ fun MainScreen(
                 )
                 MainTab.RADIO -> {
                     val radioStations by viewModel.radioStations.collectAsState()
-                    val radioSearchQuery by remember { mutableStateOf("") }
                     var radioQueryState by remember { mutableStateOf("") }
                     var selectedCategory by remember { mutableStateOf(com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL) }
                     val favoriteStationIds by viewModel.radioFavoriteStationIds.collectAsState()
@@ -429,6 +433,23 @@ fun MainScreen(
                 }
             }
         }
+
+        // Playback errors ("no connection", "station unavailable"), above the mini-player and bottom bar
+        val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+        val messageLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        LaunchedEffect(messageLifecycleOwner) {
+            // Collect only while visible, so a message raised in the background falls back to a toast
+            messageLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                viewModel.playbackMessages.collect { snackbarHostState.showSnackbar(it) }
+            }
+        }
+        androidx.compose.material3.SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = if (shownTrack != null) 160.dp else 90.dp)
+        )
 
         // In-App Update Dialog
         if (updateCheckResult is com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable) {

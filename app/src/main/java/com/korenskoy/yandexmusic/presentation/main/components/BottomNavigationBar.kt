@@ -61,7 +61,6 @@ fun FloatingGlassBottomBar(
     onNavigate: (MainTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (windowSize.widthDp / 400f).coerceIn(0.9f, 1.2f)
 
@@ -215,7 +214,6 @@ fun FloatingGlassNavigationRail(
     onNavigate: (MainTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = (windowSize.widthDp / 800f).coerceIn(0.9f, 1.3f)
     val capsuleWidth = (92.dp * scaleFactor).coerceIn(84.dp, 110.dp)
