@@ -451,9 +451,9 @@ class LayoutSafetyTest {
 
         val buildGradle = File("build.gradle.kts").readText()
         assertTrue("build.gradle.kts must be versionCode 17",
-            buildGradle.contains("versionCode = 20"))
+            buildGradle.contains("versionCode = 21"))
         assertTrue("build.gradle.kts must be versionName 1.4.0",
-            buildGradle.contains("versionName = \"1.4.3\""))
+            buildGradle.contains("versionName = \"1.4.4\""))
     }
 
     @Test

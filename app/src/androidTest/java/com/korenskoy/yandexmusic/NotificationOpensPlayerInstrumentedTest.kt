@@ -43,6 +43,15 @@ class NotificationOpensPlayerInstrumentedTest {
         return false
     }
 
+    private fun hasText(text: String, timeoutMs: Long): Boolean {
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end) {
+            if (device.findObject(By.text(text)) != null) return true
+            Thread.sleep(200)
+        }
+        return false
+    }
+
     @Test
     fun notificationIntentOpensFullScreenPlayer() {
         androidx.test.uiautomator.Configurator.getInstance().waitForIdleTimeout = 0
@@ -57,6 +66,10 @@ class NotificationOpensPlayerInstrumentedTest {
             lateinit var vm: MainViewModel
             scenario.onActivity { vm = ViewModelProvider(it)[MainViewModel::class.java] }
             mainVm = vm
+            // Radio list snapshot for visual review of the bundled station logos
+            if (hasText("FM Радио", 15_000)) device.findObject(By.text("FM Радио")).click()
+            Thread.sleep(3_000)
+            device.takeScreenshot(java.io.File(context.filesDir, "radio_list.png"))
             val station = vm.radioStations.value.first { it.id == "record" }
             instrumentation.runOnMainSync { vm.playRadioStation(station) }
             hasDesc("Play/Pause", 10_000) // mini player is up
