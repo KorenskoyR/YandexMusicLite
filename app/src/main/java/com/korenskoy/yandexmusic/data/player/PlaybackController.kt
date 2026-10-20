@@ -61,7 +61,8 @@ class PlaybackController @Inject constructor(
     private val cacheManager: PlaylistCacheManager,
     private val radioRepository: RadioRepository,
     private val stateStore: PlaybackStateStore,
-    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository,
+    private val networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor
 ) {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
@@ -199,6 +200,10 @@ class PlaybackController @Inject constructor(
     }
 
     fun playMyVibe() {
+        if (isOffline()) {
+            playOfflineMix()
+            return
+        }
         _currentSource.value = PlaylistSource.VIBE
         val waveList = wavePlaylist.value
         val unplayed = waveList.firstOrNull { it.idString !in recentPlayedTrackIds } ?: waveList.firstOrNull()
@@ -428,6 +433,13 @@ class PlaybackController @Inject constructor(
             return
         }
 
+        // Offline: streams cannot load, so move on to music that is on the device instead of failing
+        if (isOffline() && !downloadManager.isKnownDownloaded(trackId)) {
+            _isStarting.value = false
+            skipToNextDownloaded(track)
+            return
+        }
+
         // Instant start when the file is on disk or the URL is already resolved
         val fastUrl = if (downloadManager.isKnownDownloaded(trackId)) "" else preloadManager.getResolvedUrl(trackId)
         if (fastUrl != null) {
@@ -459,6 +471,12 @@ class PlaybackController @Inject constructor(
         if (failure.trackId != current.idString) return // stale event from a track we already left
 
         preloadManager.evictUrl(failure.trackId)
+        if (isOffline() && !current.isRadio && !downloadManager.isKnownDownloaded(current.idString)) {
+            // The network dropped mid-track: not a broken track, continue with downloaded music
+            retriedTrackId = null
+            skipToNextDownloaded(current)
+            return
+        }
         if (retriedTrackId != failure.trackId) {
             retriedTrackId = failure.trackId
             Log.w(TAG, "Retrying ${failure.trackId} from ${failure.positionMs} ms after ${failure.reason}")
@@ -481,6 +499,36 @@ class PlaybackController @Inject constructor(
         }
         retriedTrackId = null
         playNext()
+    }
+
+    private fun isOffline(): Boolean = !networkMonitor.isCurrentlyConnected()
+
+    private fun downloadedLibrary(): List<TrackDetailsDto> =
+        libraryTracks.filter { downloadManager.isKnownDownloaded(it.idString) }
+
+    /** No network: play the downloaded liked tracks, shuffled, like Apple Music's offline library. */
+    private fun playOfflineMix() {
+        val offline = downloadedLibrary().shuffled()
+        if (offline.isEmpty()) {
+            _isStarting.value = false
+            showMessage(context.getString(R.string.msg_offline_no_downloads))
+            return
+        }
+        showMessage(context.getString(R.string.msg_offline_playing_downloaded))
+        playTrack(offline.first().idString, offline, PlaylistSource.LIBRARY)
+    }
+
+    /** Next downloaded track after [from] in the current queue, otherwise the offline mix. */
+    private fun skipToNextDownloaded(from: TrackDetailsDto) {
+        if (from.isRadio) {
+            playerRepository.stop()
+            showMessage(context.getString(R.string.msg_station_unavailable))
+            return
+        }
+        val queue = _currentPlaylist.value
+        val start = queue.indexOfFirst { it.idString == from.idString }
+        val next = PlaybackQueue.nextMatching(queue, start) { downloadManager.isKnownDownloaded(it.idString) }
+        if (next != null) playTrack(queue[next].idString, queue) else playOfflineMix()
     }
 
     private fun prepareNextTrackInQueue() {
@@ -512,6 +560,10 @@ class PlaybackController @Inject constructor(
     }
 
     private fun fetchMoreVibeTracks(onFetched: ((Boolean) -> Unit)? = null) {
+        if (isOffline()) {
+            onFetched?.invoke(false)
+            return
+        }
         onFetched?.let { pendingFetchCallbacks += it }
         if (_isFetchingMoreQueue.value) return // the running fetch will invoke the callback
         _isFetchingMoreQueue.value = true

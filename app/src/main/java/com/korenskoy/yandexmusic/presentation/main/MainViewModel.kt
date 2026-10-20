@@ -4,8 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
-import com.korenskoy.yandexmusic.data.network.DownloadInfoParser
-import com.korenskoy.yandexmusic.data.network.Md5Helper
 import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
@@ -45,6 +43,7 @@ class MainViewModel @Inject constructor(
     private val cacheManager: com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager,
     private val radioRepository: RadioRepository,
     private val libraryRepository: com.korenskoy.yandexmusic.data.repository.LibraryRepository,
+    private val downloadScheduler: com.korenskoy.yandexmusic.data.download.DownloadScheduler,
     private val updateManager: com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager
 ) : ViewModel() {
 
@@ -88,8 +87,8 @@ class MainViewModel @Inject constructor(
     val popularTracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.popularTracks
     val isLoading: StateFlow<Boolean> = libraryRepository.isSyncingLikes
 
-    private val _isDownloadingAll = MutableStateFlow(false)
-    val isDownloadingAll: StateFlow<Boolean> = _isDownloadingAll.asStateFlow()
+    val isDownloadingAll: StateFlow<Boolean> = downloadScheduler.isDownloadingAll
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val downloadedTrackIds: StateFlow<Set<String>> = downloadManager.downloadedTrackIds
     
@@ -100,7 +99,6 @@ class MainViewModel @Inject constructor(
 
     val downloadProgress = downloadManager.downloadProgress
 
-    private var downloadJob: Job? = null
     val currentPlaylist: StateFlow<List<TrackDetailsDto>> = playbackController.currentPlaylist
     val currentTrack: StateFlow<TrackDetailsDto?> = playbackController.currentTrack
     val currentTrackId: StateFlow<String?> = playbackController.currentTrack
@@ -403,37 +401,16 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { downloadManager.removeTrack(track.idString) }
     }
 
+    /** Offline downloads run in WorkManager: they continue after the app is closed. */
     fun downloadAllLikedTracks() {
-        if (_isDownloadingAll.value) return
-        
-        downloadJob = viewModelScope.launch {
-            _isDownloadingAll.value = true
-            val tracksToDownload = tracks.value
-            val total = tracksToDownload.size
-            for ((index, track) in tracksToDownload.withIndex()) {
-                val title = track.title ?: "Без названия"
-                val artist = track.artists.firstOrNull()?.name ?: "Неизвестно"
-                downloadManager.setDownloadProgress(
-                    com.korenskoy.yandexmusic.data.network.DownloadProgressInfo(
-                        current = index,
-                        total = total,
-                        currentTrackTitle = title,
-                        currentArtistName = artist
-                    )
-                )
-                downloadTrackBackground(track.idString)
-            }
-            downloadManager.setDownloadProgress(null)
-            _isDownloadingAll.value = false
-        }
+        viewModelScope.launch { downloadScheduler.downloadAllLiked() }
     }
-    
+
     fun cancelDownloadAll() {
-        downloadJob?.cancel()
+        downloadScheduler.cancelAll()
         downloadManager.setDownloadProgress(null)
-        _isDownloadingAll.value = false
     }
-    
+
     fun enableAutoDownloadAndStart() {
         viewModelScope.launch {
             settingsRepository.setAutoDownloadLikedTracks(true)
@@ -441,36 +418,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private suspend fun downloadTrackBackground(trackId: String) {
-        if (downloadManager.isTrackDownloaded(trackId)) return
-        try {
-            val downloadInfoResponse = api.getTrackDownloadInfo(trackId)
-            val infoList = downloadInfoResponse.result ?: emptyList()
-            val preferredInfo = infoList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
-                .maxByOrNull { it.bitrateInKbps }
-                ?: infoList.filter { !it.preview }.maxByOrNull { it.bitrateInKbps }
-                ?: infoList.firstOrNull()
-            val infoUrl = preferredInfo?.downloadInfoUrl
-            
-            if (infoUrl != null) {
-                val xmlResponse = withContext(Dispatchers.IO) {
-                    java.net.URL(infoUrl).readText()
-                }
-                val xmlData = DownloadInfoParser.parseXml(xmlResponse)
-                if (xmlData != null) {
-                    val mp3Url = Md5Helper.generateMp3Url(
-                        xmlData.host,
-                        xmlData.path,
-                        xmlData.ts,
-                        xmlData.s
-                    )
-                    downloadManager.downloadTrack(trackId, mp3Url)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("MainViewModel", "Error downloading track $trackId", e)
-        }
+    val downloadOverWifiOnly: StateFlow<Boolean> = settingsRepository.downloadOverWifiOnly
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setDownloadOverWifiOnly(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setDownloadOverWifiOnly(enabled) }
     }
+
+    private suspend fun downloadTrackBackground(trackId: String) = downloadScheduler.downloadTrack(trackId)
 
     /** Charts are loaded once per session by [syncLibrary]; this only fills an empty screen. */
     fun loadPopularTracks() {

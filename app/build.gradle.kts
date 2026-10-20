@@ -147,6 +147,7 @@ dependencies {
     // Installs the bundled Baseline Profile on devices without Play Store (sideloaded APK)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.work.runtime.ktx)
     baselineProfile(project(":baselineprofile"))
     
     implementation(libs.androidx.compose.ui)

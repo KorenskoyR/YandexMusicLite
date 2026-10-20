@@ -71,7 +71,9 @@ fun CacheMenuBottomSheet(
     onAccountManagementClick: () -> Unit = {},
     onLogout: () -> Unit = {},
     crossfadeSeconds: Int = 3,
-    onCrossfadeChange: (Int) -> Unit = {}
+    onCrossfadeChange: (Int) -> Unit = {},
+    wifiOnly: Boolean = true,
+    onWifiOnlyChange: (Boolean) -> Unit = {}
 ) {
     val cacheSizeMb = cacheSizeBytes / (1024.0 * 1024.0)
     val cacheSizeFormatted = String.format(Locale.US, "%.1f МБ", cacheSizeMb)
@@ -475,6 +477,10 @@ fun CacheMenuBottomSheet(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    WifiOnlySettingCard(enabled = wifiOnly, onChange = onWifiOnlyChange)
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     CrossfadeSettingCard(seconds = crossfadeSeconds, onChange = onCrossfadeChange)
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -728,6 +734,46 @@ fun CacheMenuBottomSheet(
     }
 }
 }
+}
+
+/** Offline downloads only on Wi-Fi (the default), like "Download over cellular" off in Apple Music. */
+@Composable
+private fun WifiOnlySettingCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(18.dp))
+            .clickable { onChange(!enabled) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.settings_wifi_only_title),
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = stringResource(R.string.settings_wifi_only_subtitle),
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 11.5.sp
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color(0xFFFF3366),
+                uncheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                uncheckedTrackColor = Color.White.copy(alpha = 0.12f),
+                uncheckedBorderColor = Color.Transparent
+            )
+        )
+    }
 }
 
 /** Crossfade between tracks, 0–12 s (0 = off), like the setting in Apple Music. */

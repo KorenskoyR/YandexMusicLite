@@ -33,6 +33,20 @@ object PlaybackQueue {
     fun previousIndex(currentIndex: Int, progressMs: Long): Int? =
         if (progressMs > RESTART_ON_PREV_THRESHOLD_MS || currentIndex <= 0) null else currentIndex - 1
 
+    /**
+     * Index of the first item after [currentIndex] (wrapping around, never [currentIndex] itself) that
+     * satisfies [accept], or null. Used offline to jump to the next downloaded track.
+     */
+    fun <T> nextMatching(queue: List<T>, currentIndex: Int, accept: (T) -> Boolean): Int? {
+        if (queue.isEmpty()) return null
+        for (step in 1..queue.size) {
+            val index = Math.floorMod(currentIndex + step, queue.size)
+            if (index == currentIndex) return null
+            if (accept(queue[index])) return index
+        }
+        return null
+    }
+
     fun <T> snapshotWindow(queue: List<T>, currentIndex: Int): List<T> {
         if (currentIndex < 0) return queue.take(SNAPSHOT_AFTER)
         val from = (currentIndex - SNAPSHOT_BEFORE).coerceAtLeast(0)

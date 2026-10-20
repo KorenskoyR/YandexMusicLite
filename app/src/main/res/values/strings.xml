@@ -151,4 +151,11 @@
     <string name="stations_count_one">%d радиостанция</string>
     <string name="stations_count_few">%d радиостанции</string>
     <string name="stations_count_many">%d радиостанций</string>
+    <string name="download_channel_name">Загрузки</string>
+    <string name="download_notification_title">Скачивание треков для офлайн-прослушивания</string>
+    <string name="download_cancel">Отменить</string>
+    <string name="settings_wifi_only_title">Скачивать только по Wi‑Fi</string>
+    <string name="settings_wifi_only_subtitle">Не расходовать мобильный трафик</string>
+    <string name="msg_offline_playing_downloaded">Нет сети — играют скачанные треки</string>
+    <string name="msg_offline_no_downloads">Нет сети, а скачанных треков пока нет</string>
 </resources>

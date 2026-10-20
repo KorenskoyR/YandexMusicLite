@@ -43,6 +43,16 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs[CROSSFADE_SECONDS_KEY] ?: SettingsRepository.DEFAULT_CROSSFADE_SECONDS
     }
 
+    private val DOWNLOAD_WIFI_ONLY_KEY = booleanPreferencesKey("download_wifi_only")
+
+    override val downloadOverWifiOnly: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[DOWNLOAD_WIFI_ONLY_KEY] ?: true
+    }
+
+    override suspend fun setDownloadOverWifiOnly(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[DOWNLOAD_WIFI_ONLY_KEY] = enabled }
+    }
+
     override suspend fun setCrossfadeSeconds(seconds: Int) {
         context.dataStore.edit { prefs ->
             prefs[CROSSFADE_SECONDS_KEY] = seconds.coerceIn(0, SettingsRepository.MAX_CROSSFADE_SECONDS)

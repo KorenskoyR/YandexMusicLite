@@ -44,6 +44,17 @@ class PlaybackQueueTest {
     }
 
     @Test
+    fun offlineSkipFindsNextDownloadedTrack() {
+        val downloaded = setOf("b", "e")
+        val queue = listOf("a", "b", "c", "d", "e")
+        assertEquals(4, PlaybackQueue.nextMatching(queue, 2) { it in downloaded })   // c -> e
+        assertEquals(1, PlaybackQueue.nextMatching(queue, 4) { it in downloaded })   // wraps: e -> b
+        assertEquals(1, PlaybackQueue.nextMatching(queue, -1) { it in downloaded })  // current not in queue
+        assertNull(PlaybackQueue.nextMatching(queue, 1) { it == "b" })               // only the current one
+        assertNull(PlaybackQueue.nextMatching(emptyList<String>(), 0) { true })
+    }
+
+    @Test
     fun snapshotKeepsWindowAroundCurrentTrack() {
         val queue = (0 until 1000).toList()
         val window = PlaybackQueue.snapshotWindow(queue, 500)

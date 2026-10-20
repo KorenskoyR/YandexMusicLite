@@ -9,12 +9,15 @@ interface SettingsRepository {
     val keepScreenOnInCarMode: Flow<Boolean>
     /** Crossfade between tracks in seconds; 0 turns it off. */
     val crossfadeSeconds: Flow<Int>
+    /** Offline downloads only on unmetered networks (Wi-Fi). */
+    val downloadOverWifiOnly: Flow<Boolean>
 
     suspend fun setDarkTheme(enabled: Boolean)
     suspend fun setAutoDownloadLikedTracks(enabled: Boolean)
     suspend fun setAutoStartCarModeVibe(enabled: Boolean)
     suspend fun setKeepScreenOnInCarMode(enabled: Boolean)
     suspend fun setCrossfadeSeconds(seconds: Int)
+    suspend fun setDownloadOverWifiOnly(enabled: Boolean)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3

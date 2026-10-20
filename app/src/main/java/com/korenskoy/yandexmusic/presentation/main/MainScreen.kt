@@ -78,6 +78,7 @@ fun MainScreen(
     val isSignatureMismatch by viewModel.isSignatureMismatch.collectAsState()
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsState()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsState()
+    val downloadOverWifiOnly by viewModel.downloadOverWifiOnly.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
     // Stable local copy: allows smart casts instead of `!!` in the blocks below
@@ -182,6 +183,8 @@ fun MainScreen(
                     },
                     crossfadeSeconds = crossfadeSeconds,
                     onCrossfadeChange = { viewModel.setCrossfadeSeconds(it) },
+                    wifiOnly = downloadOverWifiOnly,
+                    onWifiOnlyChange = { viewModel.setDownloadOverWifiOnly(it) },
                     onCancelDownload = { viewModel.cancelDownloadAll() },
                     onClearCache = { viewModel.clearMusicCache() },
                     onToggleLike = { track -> viewModel.toggleLike(track) },

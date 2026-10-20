@@ -82,6 +82,8 @@ fun LibraryScreen(
     onEnableAutoDownload: (Boolean) -> Unit,
     crossfadeSeconds: Int = 3,
     onCrossfadeChange: (Int) -> Unit = {},
+    wifiOnly: Boolean = true,
+    onWifiOnlyChange: (Boolean) -> Unit = {},
     onCancelDownload: () -> Unit,
     onClearCache: () -> Unit,
     onToggleLike: (TrackDetailsDto) -> Unit,
@@ -449,6 +451,8 @@ fun LibraryScreen(
             onEnableAutoDownload = onEnableAutoDownload,
             crossfadeSeconds = crossfadeSeconds,
             onCrossfadeChange = onCrossfadeChange,
+            wifiOnly = wifiOnly,
+            onWifiOnlyChange = onWifiOnlyChange,
             onDownloadAllClick = {
                 onDownloadAllClick()
                 showProgressModal = true
