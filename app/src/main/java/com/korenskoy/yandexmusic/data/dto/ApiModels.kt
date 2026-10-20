@@ -121,6 +121,37 @@ data class TrackDetailsDto(
         get() = if (id is kotlinx.serialization.json.JsonPrimitive) id.content else id.toString()
 }
 
+/** A user's playlist from `users/{uid}/playlists/list` (without tracks) or `playlists/{kind}` (with tracks). */
+@Serializable
+data class UserPlaylistDto(
+    @SerialName("kind") val kind: JsonElement? = null,
+    @SerialName("title") val title: String? = null,
+    @SerialName("trackCount") val trackCount: Int = 0,
+    @SerialName("revision") val revision: Int = 0,
+    @SerialName("cover") val cover: PlaylistCoverDto? = null,
+    @SerialName("ogImage") val ogImage: String? = null,
+    @SerialName("tracks") val tracks: List<PlaylistTrackDto> = emptyList()
+) {
+    val kindString: String
+        get() = (kind as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+
+    /** Cover template ("avatars.yandex.net/...%%"): the custom/first-track cover, else the mosaic's first tile. */
+    val coverUri: String?
+        get() = cover?.uri ?: cover?.itemsUri?.firstOrNull() ?: ogImage
+}
+
+@Serializable
+data class PlaylistCoverDto(
+    @SerialName("uri") val uri: String? = null,
+    @SerialName("itemsUri") val itemsUri: List<String> = emptyList()
+)
+
+@Serializable
+data class PlaylistTrackDto(
+    @SerialName("id") val id: JsonElement? = null,
+    @SerialName("track") val track: TrackDetailsDto? = null
+)
+
 @Serializable
 data class ArtistDto(
     @SerialName("id") val id: JsonElement? = null,

@@ -95,7 +95,13 @@ fun LibraryScreen(
     updateStatus: String? = null,
     onCheckForUpdates: () -> Unit = {},
     onAccountManagementClick: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    playlists: List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto> = emptyList(),
+    openedPlaylist: OpenedPlaylist? = null,
+    onOpenPlaylist: (com.korenskoy.yandexmusic.data.dto.UserPlaylistDto) -> Unit = {},
+    onClosePlaylist: () -> Unit = {},
+    onPlayPlaylist: (shuffle: Boolean) -> Unit = {},
+    onPlaylistTrackClick: (String) -> Unit = {}
 ) {
     var showCacheMenu by remember { mutableStateOf(false) }
     var showProgressModal by remember { mutableStateOf(false) }
@@ -107,6 +113,23 @@ fun LibraryScreen(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val contentStart = if (isLandscape) 140.dp else 16.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
+
+    if (openedPlaylist != null) {
+        PlaylistScreen(
+            opened = openedPlaylist,
+            currentTrackId = currentTrackId,
+            isPlaying = isPlaying,
+            likedTrackIds = likedTrackIds,
+            downloadedTrackIds = downloadedTrackIds,
+            contentBottom = contentBottom,
+            onBack = onClosePlaylist,
+            onPlay = onPlayPlaylist,
+            onTrackClick = onPlaylistTrackClick,
+            onToggleLike = onToggleLike,
+            onRetry = { onOpenPlaylist(openedPlaylist.playlist) }
+        )
+        return
+    }
 
     Box(
         modifier = Modifier
@@ -352,6 +375,13 @@ fun LibraryScreen(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else if (filteredTracks.isEmpty()) {
+            if (playlists.isNotEmpty() && !showOnlyDownloaded) {
+                PlaylistsRow(
+                    playlists = playlists,
+                    onOpen = onOpenPlaylist,
+                    modifier = Modifier.padding(start = contentStart, end = 16.dp, top = 4.dp, bottom = 8.dp)
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -406,6 +436,15 @@ fun LibraryScreen(
                     .background(Color(0x1AFFFFFF)) // Glassmorphism container
                     .padding(8.dp)
             ) {
+                if (playlists.isNotEmpty() && !showOnlyDownloaded) {
+                    item(key = "playlists") {
+                        PlaylistsRow(
+                            playlists = playlists,
+                            onOpen = onOpenPlaylist,
+                            modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 12.dp)
+                        )
+                    }
+                }
                 if (isLandscape) {
                     items(filteredTracks.chunked(2), key = { row -> row.joinToString("|") { it.idString } }) { rowItems ->
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

@@ -12,6 +12,8 @@ import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.repository.LibraryRepository
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
+import com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
+import com.korenskoy.yandexmusic.utils.toCoverUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,7 +30,8 @@ class MediaLibraryTree @Inject constructor(
     private val radioRepository: RadioRepository,
     private val downloadManager: TrackDownloadManager,
     private val playbackController: PlaybackController,
-    private val api: YandexMusicApi
+    private val api: YandexMusicApi,
+    private val playlistsRepository: UserPlaylistsRepository
 ) {
     fun root(): MediaItem = folder(ROOT_ID, context.getString(R.string.app_name), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         .withExtras(Bundle().apply {
@@ -40,6 +43,11 @@ class MediaLibraryTree @Inject constructor(
     /** Children of [parentId], or null for an unknown node. Reads the cached library when nothing is loaded yet. */
     suspend fun children(parentId: String): List<MediaItem>? {
         if (parentId == LIKED_ID || parentId == DOWNLOADED_ID) libraryRepository.loadCached()
+        if (parentId == PLAYLISTS_ID) playlistsRepository.loadCached()
+        if (parentId.startsWith(PLAYLIST_PREFIX)) {
+            val kind = parentId.removePrefix(PLAYLIST_PREFIX)
+            return playlistTracks(kind)?.map { trackItem("$PLAYLIST_TRACK_PREFIX$kind/", it) }
+        }
         return when (parentId) {
             ROOT_ID -> listOf(
                 playable(
@@ -48,11 +56,16 @@ class MediaLibraryTree @Inject constructor(
                 ),
                 folder(LIKED_ID, context.getString(R.string.auto_liked), MediaMetadata.MEDIA_TYPE_PLAYLIST),
                 folder(DOWNLOADED_ID, context.getString(R.string.auto_downloaded), MediaMetadata.MEDIA_TYPE_PLAYLIST),
+                folder(PLAYLISTS_ID, context.getString(R.string.auto_playlists), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
                 folder(RADIO_ID, context.getString(R.string.auto_radio), MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS)
                     .withExtras(Bundle().apply { putInt(CONTENT_STYLE_PLAYABLE_HINT, CONTENT_STYLE_GRID) })
             )
             LIKED_ID -> libraryRepository.likedTracks.value.map { trackItem(LIKED_PREFIX, it) }
             DOWNLOADED_ID -> downloaded().map { trackItem(DOWNLOADED_PREFIX, it) }
+            PLAYLISTS_ID -> playlistsRepository.playlists.value.map { playlist ->
+                folder(PLAYLIST_PREFIX + playlist.kindString, playlist.title.orEmpty(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+                    .withArtwork(playlist.coverUri.toCoverUrl("400x400"))
+            }
             RADIO_ID -> radioRepository.getBuiltinStations().map { station ->
                 playable(
                     RADIO_PREFIX + station.id, station.name, station.frequency,
@@ -67,6 +80,9 @@ class MediaLibraryTree @Inject constructor(
     suspend fun item(mediaId: String): MediaItem? {
         if (mediaId == ROOT_ID) return root()
         val parent = when {
+            mediaId.startsWith(PLAYLIST_TRACK_PREFIX) ->
+                PLAYLIST_PREFIX + mediaId.removePrefix(PLAYLIST_TRACK_PREFIX).substringBefore('/')
+            mediaId.startsWith(PLAYLIST_PREFIX) -> PLAYLISTS_ID
             mediaId.startsWith(LIKED_PREFIX) -> LIKED_ID
             mediaId.startsWith(DOWNLOADED_PREFIX) -> DOWNLOADED_ID
             mediaId.startsWith(RADIO_PREFIX) -> RADIO_ID
@@ -89,6 +105,10 @@ class MediaLibraryTree @Inject constructor(
             mediaId.isEmpty() || mediaId == WAVE_ID -> ({ playbackController.playMyVibe() })
             mediaId.startsWith(LIKED_PREFIX) -> queueAction(mediaId.removePrefix(LIKED_PREFIX), liked, liked)
             mediaId.startsWith(DOWNLOADED_PREFIX) -> queueAction(mediaId.removePrefix(DOWNLOADED_PREFIX), downloaded(), liked)
+            mediaId.startsWith(PLAYLIST_TRACK_PREFIX) -> {
+                val (kind, trackId) = mediaId.removePrefix(PLAYLIST_TRACK_PREFIX).split('/', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                queueAction(trackId, playlistTracks(kind).orEmpty(), liked)
+            }
             mediaId.startsWith(RADIO_PREFIX) -> radioRepository.getBuiltinStations()
                 .firstOrNull { it.id == mediaId.removePrefix(RADIO_PREFIX) }
                 ?.let { station -> { playbackController.playRadioStation(station) } }
@@ -121,6 +141,20 @@ class MediaLibraryTree @Inject constructor(
         }
     }
 
+    /** Tracks of a playlist (cached per revision); null for an unknown playlist or a failed load. */
+    private suspend fun playlistTracks(kind: String): List<TrackDetailsDto>? {
+        playlistsRepository.loadCached()
+        val playlist = playlistsRepository.playlists.value.firstOrNull { it.kindString == kind } ?: return null
+        return try {
+            playlistsRepository.tracks(playlist)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("MediaLibraryTree", "Playlist $kind failed to load", e)
+            null
+        }
+    }
+
     private fun downloaded(): List<TrackDetailsDto> =
         libraryRepository.likedTracks.value.filter { downloadManager.isKnownDownloaded(it.idString) }
 
@@ -128,9 +162,7 @@ class MediaLibraryTree @Inject constructor(
         prefix + track.idString,
         track.title.orEmpty(),
         track.artists.joinToString(", ") { it.name.orEmpty() },
-        artwork = track.coverUri?.let { uri ->
-            Uri.parse(if (uri.startsWith("http")) uri else "https://" + uri.replace("%%", "400x400"))
-        },
+        artwork = track.coverUri.toCoverUrl("400x400")?.let(Uri::parse),
         mediaType = MediaMetadata.MEDIA_TYPE_MUSIC
     )
 
@@ -161,6 +193,9 @@ class MediaLibraryTree @Inject constructor(
             )
             .build()
 
+    private fun MediaItem.withArtwork(url: String?): MediaItem =
+        if (url == null) this else buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setArtworkUri(Uri.parse(url)).build()).build()
+
     private fun MediaItem.withExtras(extras: Bundle): MediaItem =
         buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setExtras(extras).build()).build()
 
@@ -172,6 +207,9 @@ class MediaLibraryTree @Inject constructor(
         const val LIKED_ID = "liked"
         const val DOWNLOADED_ID = "downloaded"
         const val RADIO_ID = "radio"
+        const val PLAYLISTS_ID = "playlists"
+        private const val PLAYLIST_PREFIX = "playlist/"
+        private const val PLAYLIST_TRACK_PREFIX = "pltrack/"
         private const val LIKED_PREFIX = "liked/"
         private const val DOWNLOADED_PREFIX = "downloaded/"
         private const val RADIO_PREFIX = "radio/"

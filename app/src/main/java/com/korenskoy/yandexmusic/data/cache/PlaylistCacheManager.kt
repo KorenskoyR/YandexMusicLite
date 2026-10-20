@@ -61,6 +61,32 @@ class PlaylistCacheManager @Inject constructor(
         runCatching { File(getUserCacheDir(userFolder), "likes_revision.txt").readText().trim().toInt() }.getOrNull()
     }
 
+    suspend fun saveUserPlaylists(userFolder: String, playlists: List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>) =
+        withContext(Dispatchers.IO) {
+            runCatching { File(getUserCacheDir(userFolder), "user_playlists.json").writeText(json.encodeToString(playlists)) }
+            Unit
+        }
+
+    suspend fun loadUserPlaylists(userFolder: String): List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val file = File(getUserCacheDir(userFolder), "user_playlists.json")
+                if (file.exists()) json.decodeFromString<List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>>(file.readText()) else emptyList()
+            }.getOrDefault(emptyList())
+        }
+
+    /** Tracks of one playlist, stored with the revision they belong to. */
+    suspend fun savePlaylistTracks(userFolder: String, kind: String, revision: Int, tracks: List<TrackDetailsDto>) {
+        val dir = getUserCacheDir(userFolder)
+        val prefix = "playlist_${sanitizeUserFolder(kind)}_"
+        // Older revisions of this playlist are stale
+        withContext(Dispatchers.IO) { dir.listFiles { f -> f.name.startsWith(prefix) }?.forEach { it.delete() } }
+        saveList(dir, "$prefix$revision.json", tracks)
+    }
+
+    suspend fun loadPlaylistTracks(userFolder: String, kind: String, revision: Int): List<TrackDetailsDto> =
+        loadList(getUserCacheDir(userFolder), "playlist_${sanitizeUserFolder(kind)}_$revision.json")
+
     suspend fun saveWaveQueue(userFolder: String, tracks: List<TrackDetailsDto>) =
         saveList(getUserCacheDir(userFolder), "wave_queue.json", tracks)
 

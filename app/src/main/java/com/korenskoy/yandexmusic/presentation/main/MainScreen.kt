@@ -80,6 +80,8 @@ fun MainScreen(
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsState()
     val streamQuality by viewModel.streamQuality.collectAsState()
     val sleepTimer by viewModel.sleepTimer.collectAsState()
+    val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val openedPlaylist by viewModel.openedPlaylist.collectAsState()
     val downloadOverWifiOnly by viewModel.downloadOverWifiOnly.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
@@ -199,7 +201,13 @@ fun MainScreen(
                         updateStatus = updateStatusMessage,
                         onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
                         onAccountManagementClick = { showAccountDialog = true },
-                        onLogout = { showAccountDialog = true }
+                        onLogout = { showAccountDialog = true },
+                        playlists = userPlaylists,
+                        openedPlaylist = openedPlaylist,
+                        onOpenPlaylist = { viewModel.openPlaylist(it) },
+                        onClosePlaylist = { viewModel.closePlaylist() },
+                        onPlayPlaylist = { viewModel.playOpenedPlaylist(it) },
+                        onPlaylistTrackClick = { viewModel.playOpenedPlaylistTrack(it) }
                     )
                     MainTab.RADIO -> {
                         val radioStations by viewModel.radioStations.collectAsState()

@@ -43,6 +43,7 @@ class MainViewModel @Inject constructor(
     private val cacheManager: com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager,
     private val radioRepository: RadioRepository,
     private val libraryRepository: com.korenskoy.yandexmusic.data.repository.LibraryRepository,
+    private val playlistsRepository: com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository,
     private val downloadScheduler: com.korenskoy.yandexmusic.data.download.DownloadScheduler,
     private val updateManager: com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager
 ) : ViewModel() {
@@ -193,6 +194,7 @@ class MainViewModel @Inject constructor(
         // Cached library instantly, then exactly one network sync per authorization
         viewModelScope.launch {
             libraryRepository.loadCached()
+            playlistsRepository.loadCached()
             authRepository.isAuthorized().collect { isAuth ->
                 if (isAuth) syncLibrary()
             }
@@ -217,8 +219,53 @@ class MainViewModel @Inject constructor(
             if (likesChanged && settingsRepository.autoDownloadLikedTracks.first()) downloadAllLikedTracks()
         }
         viewModelScope.launch { libraryRepository.refreshCharts() }
+        viewModelScope.launch {
+            playlistsRepository.loadCached()
+            playlistsRepository.refresh()
+        }
         playbackController.primeWave()
     }
+
+    // region User playlists
+
+    val userPlaylists: StateFlow<List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>> = playlistsRepository.playlists
+
+    private val _openedPlaylist = MutableStateFlow<OpenedPlaylist?>(null)
+    val openedPlaylist: StateFlow<OpenedPlaylist?> = _openedPlaylist.asStateFlow()
+    private var playlistJob: kotlinx.coroutines.Job? = null
+
+    fun openPlaylist(playlist: com.korenskoy.yandexmusic.data.dto.UserPlaylistDto) {
+        playlistJob?.cancel()
+        _openedPlaylist.value = OpenedPlaylist(playlist)
+        playlistJob = viewModelScope.launch {
+            val loaded = try {
+                OpenedPlaylist(playlist, playlistsRepository.tracks(playlist), isLoading = false)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Playlist load failed", e)
+                OpenedPlaylist(playlist, isLoading = false, failed = true)
+            }
+            if (_openedPlaylist.value?.playlist?.kindString == playlist.kindString) _openedPlaylist.value = loaded
+        }
+    }
+
+    fun closePlaylist() {
+        playlistJob?.cancel()
+        _openedPlaylist.value = null
+    }
+
+    fun playOpenedPlaylist(shuffle: Boolean) {
+        val tracks = _openedPlaylist.value?.tracks.orEmpty().let { if (shuffle) it.shuffled() else it }
+        tracks.firstOrNull()?.let { playbackController.playTrack(it.idString, tracks, PlaylistSource.LIBRARY) }
+    }
+
+    fun playOpenedPlaylistTrack(trackId: String) {
+        val tracks = _openedPlaylist.value?.tracks ?: return
+        playbackController.playTrack(trackId, tracks, PlaylistSource.LIBRARY)
+    }
+
+    // endregion
 
     fun clearMusicCache() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -246,6 +293,8 @@ class MainViewModel @Inject constructor(
 
             withContext(Dispatchers.Main) {
                 libraryRepository.resetForAccountChange()
+                playlistsRepository.resetForAccountChange()
+                closePlaylist()
                 playbackController.clearWaveAndHistory()
                 loadLikedTracks()
             }
@@ -300,6 +349,8 @@ class MainViewModel @Inject constructor(
             // Wave queue, listening history and likes are per user
             playbackController.resetForAccount(userFolder)
             libraryRepository.resetForAccountChange()
+            playlistsRepository.resetForAccountChange()
+            closePlaylist()
             libraryRepository.loadCached()
             syncLibrary()
         }
@@ -327,6 +378,8 @@ class MainViewModel @Inject constructor(
                 switchAccount(nextAccount.uid)
             } else {
                 libraryRepository.resetForAccountChange()
+                playlistsRepository.resetForAccountChange()
+                closePlaylist()
                 _accountName.value = ""
             }
         }
@@ -342,6 +395,8 @@ class MainViewModel @Inject constructor(
             authRepository.clearAllAccounts()
 
             libraryRepository.resetForAccountChange()
+            playlistsRepository.resetForAccountChange()
+            closePlaylist()
             _accountName.value = ""
         }
     }
@@ -369,6 +424,8 @@ class MainViewModel @Inject constructor(
             cacheManager.clearUserCache(userFolder)
             withContext(Dispatchers.Main) {
                 libraryRepository.resetForAccountChange()
+                playlistsRepository.resetForAccountChange()
+                closePlaylist()
                 playbackController.clearWaveAndHistory()
                 loadLikedTracks()
             }
@@ -600,3 +657,11 @@ class MainViewModel @Inject constructor(
         _isSignatureMismatch.value = false
     }
 }
+
+/** A playlist opened from the library, with its tracks once loaded. */
+data class OpenedPlaylist(
+    val playlist: com.korenskoy.yandexmusic.data.dto.UserPlaylistDto,
+    val tracks: List<TrackDetailsDto> = emptyList(),
+    val isLoading: Boolean = true,
+    val failed: Boolean = false
+)

@@ -51,6 +51,17 @@ interface YandexMusicApi {
         @Path("userId") userId: String
     ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 
+    @GET("users/{userId}/playlists/list")
+    suspend fun getUserPlaylists(
+        @Path("userId") userId: String
+    ): ResponseWrapper<List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>>
+
+    @GET("users/{userId}/playlists/{kind}")
+    suspend fun getUserPlaylist(
+        @Path("userId") userId: String,
+        @Path("kind") kind: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
+
     @GET("tracks/{trackId}/download-info")
     suspend fun getTrackDownloadInfo(
         @Path("trackId") trackId: String

@@ -138,4 +138,9 @@
     <string name="auto_liked">Мне нравится</string>
     <string name="auto_downloaded">Скачанные</string>
     <string name="auto_radio">Радио</string>
+    <string name="library_playlists">Плейлисты</string>
+    <string name="playlist_load_failed">Не удалось загрузить плейлист</string>
+    <string name="playlist_empty">В плейлисте нет треков</string>
+    <string name="playlist_retry">Повторить</string>
+    <string name="auto_playlists">Плейлисты</string>
 </resources>

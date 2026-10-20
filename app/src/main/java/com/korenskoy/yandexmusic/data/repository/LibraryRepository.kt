@@ -150,7 +150,7 @@ class LibraryRepository @Inject constructor(
         }
     }
 
-    private suspend fun fetchMetadata(ids: List<String>): List<TrackDetailsDto> {
+    internal suspend fun fetchMetadata(ids: List<String>): List<TrackDetailsDto> {
         val out = mutableListOf<TrackDetailsDto>()
         for (chunk in ids.chunked(METADATA_CHUNK)) {
             val meta = runCatching { api.getTracksMetadata(chunk).result.orEmpty() }.getOrDefault(emptyList())
@@ -164,7 +164,7 @@ class LibraryRepository @Inject constructor(
      * The account UID needed by the likes endpoints. Taken from the saved account; asks the server only
      * once for an account that was saved before its UID was known.
      */
-    private suspend fun resolveUid(): String {
+    internal suspend fun resolveUid(): String {
         val account = authRepository.getActiveAccount()
         account?.uid?.takeIf { it.isNotBlank() && it != "me" }?.let { return it }
         val status = runCatching { api.getAccountStatus().result }.getOrNull() ?: return "me"

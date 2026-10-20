@@ -63,7 +63,7 @@ class AndroidAutoBrowseInstrumentedTest {
         val root = call { getLibraryRoot(null) }.value
         assertNotNull(root)
         val children = call { getChildren(root!!.mediaId, 0, 100, null) }.value.orEmpty()
-        assertEquals(listOf("wave", "liked", "downloaded", "radio"), children.map { it.mediaId })
+        assertEquals(listOf("wave", "liked", "downloaded", "playlists", "radio"), children.map { it.mediaId })
         assertEquals(true, children.first().mediaMetadata.isPlayable)
         assertTrue(children.drop(1).all { it.mediaMetadata.isBrowsable == true })
     }
