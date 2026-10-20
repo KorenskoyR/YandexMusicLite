@@ -30,6 +30,22 @@ class RadioLogosTest {
         }
     }
 
+    /**
+     * Logos are drawn on a rounded tile with a shadow; a transparent logo leaves only the shadow visible,
+     * which looks like an empty square on the card. Every logo must be a solid tile.
+     */
+    @Test
+    fun everyLogoIsAnOpaqueTile() {
+        for ((station, icon) in stationIcons()) {
+            val image = javax.imageio.ImageIO.read(File(drawables, "$icon.png"))
+            if (!image.colorModel.hasAlpha()) continue
+            val transparent = (0 until image.width step 4).sumOf { x ->
+                (0 until image.height step 4).count { y -> (image.getRGB(x, y) ushr 24) < 250 }
+            }
+            assertEquals("$station: logo has transparent pixels", 0, transparent)
+        }
+    }
+
     @Test
     fun noTwoStationsShareTheSameLogoImage() {
         val md5 = MessageDigest.getInstance("MD5")
