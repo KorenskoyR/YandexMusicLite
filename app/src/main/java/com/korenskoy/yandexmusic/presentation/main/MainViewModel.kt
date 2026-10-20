@@ -317,7 +317,7 @@ class MainViewModel @Inject constructor(
 
                             if (fullTracks.isNotEmpty()) {
                                 withContext(Dispatchers.Main) {
-                                    _tracks.value = fullTracks
+                                    _tracks.value = fullTracks.distinctBy { it.idString }
                                     _likedTrackIds.value = allIds
                                 }
                                 cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
@@ -420,6 +420,15 @@ class MainViewModel @Inject constructor(
     fun setAutoStartCarModeVibe(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setAutoStartCarModeVibe(enabled)
+        }
+    }
+
+    val crossfadeSeconds: StateFlow<Int> = settingsRepository.crossfadeSeconds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_CROSSFADE_SECONDS)
+
+    fun setCrossfadeSeconds(seconds: Int) {
+        viewModelScope.launch {
+            settingsRepository.setCrossfadeSeconds(seconds)
         }
     }
 
@@ -643,7 +652,7 @@ class MainViewModel @Inject constructor(
                     if (embeddedTracks.isNotEmpty()) {
                         fullTracks.addAll(embeddedTracks)
                         withContext(Dispatchers.Main) {
-                            _tracks.value = fullTracks.toList()
+                            _tracks.value = fullTracks.distinctBy { it.idString }
                         }
                     }
 
@@ -694,7 +703,7 @@ class MainViewModel @Inject constructor(
                     Log.d("LikedTracks", "=== FINAL fullTracks count = ${fullTracks.size} ===")
                     if (fullTracks.isNotEmpty()) {
                         withContext(Dispatchers.Main) {
-                            _tracks.value = fullTracks
+                            _tracks.value = fullTracks.distinctBy { it.idString }
                         }
                         cacheManager.saveLikedTracks(activeUserFolder, fullTracks)
                     }
@@ -848,7 +857,7 @@ class MainViewModel @Inject constructor(
             val total = tracksToDownload.size
             for ((index, track) in tracksToDownload.withIndex()) {
                 val title = track.title ?: "Без названия"
-                val artist = track.artists?.firstOrNull()?.name ?: "Неизвестно"
+                val artist = track.artists.firstOrNull()?.name ?: "Неизвестно"
                 downloadManager.setDownloadProgress(
                     com.korenskoy.yandexmusic.data.network.DownloadProgressInfo(
                         current = index,
@@ -1007,7 +1016,8 @@ class MainViewModel @Inject constructor(
                     delay(300L)
                     _isSearching.value = true
                     val response = api.search(trimmed)
-                    _searchResults.value = response.result?.tracks?.results ?: emptyList()
+                    // Lazy lists key items by id, so duplicates from the API must not reach the UI
+                    _searchResults.value = (response.result?.tracks?.results ?: emptyList()).distinctBy { it.idString }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -1095,7 +1105,10 @@ class MainViewModel @Inject constructor(
             _updateDownloadProgress.value = 0f
             _updateStatusMessage.value = null
             _isSignatureMismatch.value = false
-            val result = updateManager.downloadApk(apkUrl) { progress ->
+            val expectedSha256 = (_updateCheckResult.value as? com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable)
+                ?.takeIf { it.apkDownloadUrl == apkUrl }
+                ?.apkSha256
+            val result = updateManager.downloadApk(apkUrl, expectedSha256) { progress ->
                 _updateDownloadProgress.value = progress
             }
             result.onSuccess { file ->
@@ -1112,16 +1125,17 @@ class MainViewModel @Inject constructor(
     fun installDownloadedUpdate(forceSystemInstall: Boolean = false) {
         val file = downloadedApkFile ?: return
 
-        if (!forceSystemInstall) {
-            val preCheck = updateManager.checkApkCompatibility(file)
-            if (preCheck is com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck.SignatureMismatch) {
-                _isSignatureMismatch.value = true
-                _updateStatusMessage.value = "Обновление готово! Требуется разовая чистая переустановка из-за смены ключа подписи на официальный."
-                return
-            } else if (preCheck is com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck.CorruptedApk) {
-                _updateStatusMessage.value = "Ошибка пакета: ${preCheck.reason}"
-                return
-            }
+        // A broken, foreign or older package is never installed; forceSystemInstall only lets the
+        // system installer handle a signing-key change (it will ask the user to reinstall)
+        val preCheck = updateManager.checkApkCompatibility(file)
+        if (preCheck is com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck.CorruptedApk) {
+            _updateStatusMessage.value = "Ошибка пакета: ${preCheck.reason}"
+            return
+        }
+        if (!forceSystemInstall && preCheck is com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck.SignatureMismatch) {
+            _isSignatureMismatch.value = true
+            _updateStatusMessage.value = "Обновление готово! Требуется разовая чистая переустановка из-за смены ключа подписи на официальный."
+            return
         }
 
         val result = updateManager.installApk(file)

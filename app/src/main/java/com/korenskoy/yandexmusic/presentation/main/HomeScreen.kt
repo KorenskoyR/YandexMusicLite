@@ -53,7 +53,8 @@ fun HomeScreen(
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val scaleFactor = (minOf(configuration.screenWidthDp, configuration.screenHeightDp) / 400f).coerceIn(0.8f, 2.0f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.8f, 2.0f)
 
     val infiniteTransition = rememberInfiniteTransition(label = "wave_spheres")
     val rotation by infiniteTransition.animateFloat(

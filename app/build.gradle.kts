@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.baselineprofile)
 }
 
 val localProperties = Properties()
@@ -34,9 +35,9 @@ android {
     defaultConfig {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 18
-        versionName = "1.4.1"
+        targetSdk = 36
+        versionCode = 19
+        versionName = "1.4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -75,11 +76,14 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (hasValidSigning) {
-                signingConfigs.getByName("release")
-            } else {
+            // Only a requested release build needs the production keystore; tests and lint run without it (CI)
+            val releaseRequested = gradle.startParameter.taskNames.any {
+                it.contains("Release", ignoreCase = true) && !it.contains("UnitTest", ignoreCase = true)
+            }
+            if (!hasValidSigning && releaseRequested) {
                 throw GradleException("Cannot build release APK without production keystore! Missing valid release.keystore or signing credentials.")
             }
+            signingConfig = if (hasValidSigning) signingConfigs.getByName("release") else null
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -116,6 +120,7 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     // Retrofit & OkHttp
     implementation(libs.retrofit)
@@ -136,8 +141,12 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.palette.ktx)
+    // Installs the bundled Baseline Profile on devices without Play Store (sideloaded APK)
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

@@ -92,8 +92,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.utils.browserUserAgent
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.player.components.AudioVisualizer
 import com.korenskoy.yandexmusic.presentation.player.components.FluidBackground
@@ -388,7 +390,7 @@ fun FullScreenPlayer(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = track.artists?.joinToString(", ") { it.name ?: "" } ?: "Неизвестный исполнитель",
+                    text = track.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.65f),
                     textAlign = TextAlign.Center,
@@ -783,7 +785,7 @@ fun QueueDialogCard(
                             .crossfade(true)
                             .apply {
                                 if (item.isRadio) {
-                                    addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                                    browserUserAgent()
                                 }
                             }
                             .build(),
@@ -806,7 +808,7 @@ fun QueueDialogCard(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = item.artists?.joinToString { it.name ?: "" } ?: "",
+                            text = item.artists.joinToString { it.name ?: "" },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                             color = Color.White.copy(alpha = 0.6f),
                             maxLines = 1,
@@ -1075,7 +1077,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                         .crossfade(true)
                         .apply {
                             if (nextTrack.isRadio) {
-                                addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                                browserUserAgent()
                             }
                         }
                         .build(),
@@ -1084,8 +1086,8 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                     modifier = Modifier
                         .size(36.dp)
                         .clip(RoundedCornerShape(8.dp)),
-                    loading = { if (nextTrack.isRadio) fallbackBadgeNext() else null },
-                    error = { if (nextTrack.isRadio) fallbackBadgeNext() else null }
+                    loading = { if (nextTrack.isRadio) fallbackBadgeNext() },
+                    error = { if (nextTrack.isRadio) fallbackBadgeNext() }
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {

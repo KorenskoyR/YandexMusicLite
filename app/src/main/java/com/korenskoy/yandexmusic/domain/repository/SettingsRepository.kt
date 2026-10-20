@@ -7,9 +7,17 @@ interface SettingsRepository {
     val autoDownloadLikedTracks: Flow<Boolean>
     val autoStartCarModeVibe: Flow<Boolean>
     val keepScreenOnInCarMode: Flow<Boolean>
+    /** Crossfade between tracks in seconds; 0 turns it off. */
+    val crossfadeSeconds: Flow<Int>
 
     suspend fun setDarkTheme(enabled: Boolean)
     suspend fun setAutoDownloadLikedTracks(enabled: Boolean)
     suspend fun setAutoStartCarModeVibe(enabled: Boolean)
     suspend fun setKeepScreenOnInCarMode(enabled: Boolean)
+    suspend fun setCrossfadeSeconds(seconds: Int)
+
+    companion object {
+        const val DEFAULT_CROSSFADE_SECONDS = 3
+        const val MAX_CROSSFADE_SECONDS = 12
+    }
 }

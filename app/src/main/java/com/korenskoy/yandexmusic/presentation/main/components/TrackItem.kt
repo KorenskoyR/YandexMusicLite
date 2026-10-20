@@ -46,8 +46,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 
 import androidx.compose.material.icons.filled.CheckCircle
@@ -144,7 +145,7 @@ fun TrackItem(
             }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = track.artists?.joinToString { it.name ?: "" } ?: "Неизвестный исполнитель",
+                text = track.artists.joinToString { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

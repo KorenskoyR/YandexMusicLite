@@ -70,6 +70,6 @@ google-services.json
 .env*
 
 # Build / profiling artifacts
-release/
-release_artifacts/
+/release/
+/release_artifacts/
 *.hprof

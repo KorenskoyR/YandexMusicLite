@@ -8,6 +8,9 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
 import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.MediaItem
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import androidx.media3.common.Player
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaLibraryService
@@ -189,15 +192,61 @@ class MusicService : MediaLibraryService() {
         )
 
         val sessionCallback = object : MediaLibrarySession.Callback {
-            // Can implement browsing callbacks here for Android Auto / WearOS
+            /**
+             * The service is exported, so any installed app may connect. The system, Bluetooth and this
+             * app are trusted; other apps (widgets, watch/car launchers) get transport controls only.
+             */
+            override fun onConnect(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo
+            ): MediaSession.ConnectionResult {
+                if (controller.isTrusted || controller.packageName == packageName) {
+                    return super.onConnect(session, controller)
+                }
+                val transportOnly = Player.Commands.Builder()
+                    .addAll(
+                        Player.COMMAND_PLAY_PAUSE,
+                        Player.COMMAND_SEEK_TO_NEXT,
+                        Player.COMMAND_SEEK_TO_PREVIOUS,
+                        Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+                        Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+                        Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
+                        Player.COMMAND_GET_METADATA,
+                        Player.COMMAND_GET_TIMELINE
+                    )
+                    .build()
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                    .setAvailablePlayerCommands(transportOnly)
+                    .setAvailableSessionCommands(androidx.media3.session.SessionCommands.EMPTY)
+                    .build()
+            }
+
+            // Headset/Bluetooth Play or the system media card when the app process is not running
+            override fun onPlaybackResumption(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                isForPlayback: Boolean
+            ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+                serviceScope.launch {
+                    val resumable = playbackController.prepareResumption(startPlayback = isForPlayback)
+                    if (resumable == null) {
+                        future.setException(UnsupportedOperationException("No saved session to resume"))
+                    } else {
+                        future.set(MediaSession.MediaItemsWithStartPosition(listOf(resumable.first), 0, resumable.second))
+                    }
+                }
+                return future
+            }
         }
 
         if (mediaLibrarySession == null) {
-            mediaLibrarySession = MediaLibrarySession.Builder(this, forwardingPlayer, sessionCallback)
+            val session = MediaLibrarySession.Builder(this, forwardingPlayer, sessionCallback)
                 .setSessionActivity(pendingIntent)
                 .build()
-
-            addSession(mediaLibrarySession!!)
+            mediaLibrarySession = session
+            addSession(session)
         } else {
             mediaLibrarySession?.player = forwardingPlayer
         }
@@ -234,6 +283,14 @@ class MusicService : MediaLibraryService() {
             override fun prepare() {
                 // A failed/idle stream is re-resolved by the controller on play()
             }
+            // The queue belongs to PlaybackController; external controllers (resumption, system UI)
+            // must not replace the loaded stream with metadata-only items.
+            override fun setMediaItem(mediaItem: MediaItem) = Unit
+            override fun setMediaItem(mediaItem: MediaItem, startPositionMs: Long) = Unit
+            override fun setMediaItem(mediaItem: MediaItem, resetPosition: Boolean) = Unit
+            override fun setMediaItems(mediaItems: MutableList<MediaItem>) = Unit
+            override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) = Unit
+            override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) = Unit
             override fun seekTo(positionMs: Long) {
                 playbackController.seekTo(positionMs)
             }

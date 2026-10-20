@@ -62,6 +62,9 @@ class TrackDownloadManager @Inject constructor(
         return getLocalTrackFile(trackId) != null
     }
 
+    /** Main-thread friendly check against the in-memory index (no disk access). */
+    fun isKnownDownloaded(trackId: String): Boolean = trackId in _downloadedTrackIds.value
+
     suspend fun downloadTrack(trackId: String, url: String): Boolean = withContext(Dispatchers.IO) {
         if (isTrackDownloaded(trackId)) return@withContext true
 
@@ -72,7 +75,7 @@ class TrackDownloadManager @Inject constructor(
             val request = Request.Builder().url(url).build()
             val isSuccess = okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use false
-                val body = response.body ?: return@use false
+                val body = response.body
                 
                 FileOutputStream(tempFile).use { fos ->
                     body.byteStream().use { inputStream ->

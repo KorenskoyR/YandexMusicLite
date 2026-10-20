@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
@@ -30,6 +31,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -54,7 +59,8 @@ class PlaybackController @Inject constructor(
     private val preloadManager: TrackPreloadManager,
     private val cacheManager: PlaylistCacheManager,
     private val radioRepository: RadioRepository,
-    private val stateStore: PlaybackStateStore
+    private val stateStore: PlaybackStateStore,
+    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 ) {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
@@ -108,6 +114,8 @@ class PlaybackController @Inject constructor(
     private var retriedTrackId: String? = null
     private var consecutiveFailedTracks = 0
     private val pendingFetchCallbacks = mutableListOf<(Boolean) -> Unit>()
+    /** Completes once the saved session (if any) has been loaded from disk. */
+    private val sessionRestored = kotlinx.coroutines.CompletableDeferred<Unit>()
 
     private val activeUserFolder: String
         get() = authRepository.getActiveAccount()?.folderName ?: "default"
@@ -118,6 +126,9 @@ class PlaybackController @Inject constructor(
         playerRepository.skipNextEvent.onEach { playNext() }.launchIn(scope)
         playerRepository.skipPrevEvent.onEach { playPrev() }.launchIn(scope)
         playerRepository.playbackErrorEvent.onEach { onPlaybackFailure(it) }.launchIn(scope)
+        settingsRepository.crossfadeSeconds
+            .onEach { playerRepository.setCrossfadeDuration(it * 1000L) }
+            .launchIn(scope)
 
         // A track that actually renders audio resets error recovery.
         combine(playerRepository.isPlaying, playerRepository.isBuffering) { playing, buffering -> playing && !buffering }
@@ -138,7 +149,13 @@ class PlaybackController @Inject constructor(
             }
         }
 
-        scope.launch { loadUserState(activeUserFolder, restoreSession = true) }
+        scope.launch {
+            try {
+                loadUserState(activeUserFolder, restoreSession = true)
+            } finally {
+                sessionRestored.complete(Unit)
+            }
+        }
     }
 
     // region Public API
@@ -232,6 +249,8 @@ class PlaybackController @Inject constructor(
             playMyVibe()
             return
         }
+        // A start is already in flight (e.g. a second Play from a headset): don't restart it
+        if (_isStarting.value) return
         if (playerRepository.currentTrackId.value == current.idString && playerRepository.resume()) return
         // Nothing loaded (restored session or stopped player): start the current track where it was left.
         resolveAndPlay(current, crossfade = false, startPositionMs = restoredPositionMs.value)
@@ -365,6 +384,29 @@ class PlaybackController @Inject constructor(
         scope.launch { persistSession() }
     }
 
+    /**
+     * Playback resumption (headset/Bluetooth Play or the system media card after the process died):
+     * waits for the saved session, optionally starts it, and returns its metadata for the system UI.
+     */
+    suspend fun prepareResumption(startPlayback: Boolean): Pair<MediaItem, Long>? {
+        sessionRestored.await()
+        val track = _currentTrack.value ?: return null
+        if (startPlayback) {
+            play()
+            withTimeoutOrNull(RESUMPTION_START_TIMEOUT_MS) { playerRepository.isPlaying.first { it } }
+        }
+        val metadata = MediaMetadata.Builder()
+            .setTitle(track.title)
+            .setArtist(track.artists.firstOrNull()?.name)
+            .setArtworkUri(coverUrlFor(track)?.toUri())
+            .build()
+        val item = MediaItem.Builder()
+            .setMediaId(track.idString)
+            .setMediaMetadata(metadata)
+            .build()
+        return item to progress.value
+    }
+
     // endregion
 
     private fun resolveAndPlay(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
@@ -372,9 +414,7 @@ class PlaybackController @Inject constructor(
         val trackId = track.idString
         val title = track.title
         val artist = track.artists.firstOrNull()?.name
-        val coverUrl = track.coverUri?.let { uri ->
-            if (uri.startsWith("http") || uri.startsWith("android.resource")) uri else "https://${uri.replace("%%", "1000x1000")}"
-        }
+        val coverUrl = coverUrlFor(track)
         _isStarting.value = true
 
         if (track.isRadio) {
@@ -388,7 +428,7 @@ class PlaybackController @Inject constructor(
         }
 
         // Instant start when the file is on disk or the URL is already resolved
-        val fastUrl = if (downloadManager.isTrackDownloaded(trackId)) "" else preloadManager.getResolvedUrl(trackId)
+        val fastUrl = if (downloadManager.isKnownDownloaded(trackId)) "" else preloadManager.getResolvedUrl(trackId)
         if (fastUrl != null) {
             playerRepository.playTrack(trackId, fastUrl, title, artist, coverUrl, crossfade, startPositionMs)
             return
@@ -465,12 +505,9 @@ class PlaybackController @Inject constructor(
         if (track.isRadio) return
         scope.launch {
             val nextId = track.idString
-            val downloaded = downloadManager.isTrackDownloaded(nextId)
+            val downloaded = downloadManager.isKnownDownloaded(nextId)
             val url = if (downloaded) "" else preloadManager.getOrFetchUrl(nextId) ?: return@launch
-            val cover = track.coverUri?.let { uri ->
-                if (uri.startsWith("http")) uri else "https://${uri.replace("%%", "1000x1000")}"
-            }
-            playerRepository.prepareNextTrack(nextId, url, track.title, track.artists.firstOrNull()?.name, cover)
+            playerRepository.prepareNextTrack(nextId, url, track.title, track.artists.firstOrNull()?.name, coverUrlFor(track))
         }
     }
 
@@ -603,6 +640,10 @@ class PlaybackController @Inject constructor(
         restoredPositionMs.value = if (track.isRadio) 0L else snapshot.positionMs
     }
 
+    private fun coverUrlFor(track: TrackDetailsDto): String? = track.coverUri?.let { uri ->
+        if (uri.startsWith("http") || uri.startsWith("android.resource")) uri else "https://${uri.replace("%%", "1000x1000")}"
+    }
+
     private fun showMessage(text: String) {
         Toast.makeText(context, text, Toast.LENGTH_LONG).show()
     }
@@ -613,5 +654,6 @@ class PlaybackController @Inject constructor(
         private const val MAX_FAILED_TRACKS = 3
         private const val URL_RETRY_DELAY_MS = 700L
         private const val SNAPSHOT_INTERVAL_MS = 15_000L
+        private const val RESUMPTION_START_TIMEOUT_MS = 4_000L
     }
 }

@@ -39,6 +39,8 @@ interface PlayerRepository {
     fun resume(): Boolean
     fun seekTo(position: Long)
     fun setDucked(ducked: Boolean)
+    /** 0 disables crossfading: tracks switch immediately and play to their natural end. */
+    fun setCrossfadeDuration(durationMs: Long)
     fun triggerSkipNext()
     fun triggerSkipPrev()
     fun stop()

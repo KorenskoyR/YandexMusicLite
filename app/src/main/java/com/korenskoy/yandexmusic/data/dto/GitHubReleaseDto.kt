@@ -21,5 +21,7 @@ data class GitHubAssetDto(
     @SerialName("browser_download_url")
     val browserDownloadUrl: String = "",
     @SerialName("content_type")
-    val contentType: String? = null
+    val contentType: String? = null,
+    /** "sha256:<hex>", published by GitHub for every release asset. */
+    val digest: String? = null
 )

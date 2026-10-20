@@ -446,14 +446,14 @@ class LayoutSafetyTest {
             updateManagerFile.contains("fun checkApkCompatibility("))
 
         val manifestFile = File("src/main/AndroidManifest.xml").readText()
-        assertTrue("AndroidManifest must declare autoRevokePermissions discouraged",
-            manifestFile.contains("android:autoRevokePermissions=\"discouraged\""))
+        assertTrue("Manifest must declare package-installer visibility for the in-app updater (Android 11+)",
+            manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
         assertTrue("build.gradle.kts must be versionCode 17",
-            buildGradle.contains("versionCode = 18"))
+            buildGradle.contains("versionCode = 19"))
         assertTrue("build.gradle.kts must be versionName 1.4.0",
-            buildGradle.contains("versionName = \"1.4.1\""))
+            buildGradle.contains("versionName = \"1.4.2\""))
     }
 
     @Test

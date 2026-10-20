@@ -30,8 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.player.components.RadioCoverCard
@@ -253,7 +254,7 @@ fun CarScreenPortrait(
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" } ?: "-",
+            text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" }?.ifEmpty { "-" } ?: "-",
             fontSize = 16.sp,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
@@ -408,7 +409,7 @@ fun CarScreenLandscape(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" } ?: "-",
+                    text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" }?.ifEmpty { "-" } ?: "-",
                     fontSize = 16.sp,
                     color = Color.White.copy(alpha = 0.6f),
                     maxLines = 1,
@@ -495,7 +496,8 @@ fun CarControls(
     isLandscape: Boolean = false
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val scaleFactor = (minOf(configuration.screenWidthDp, configuration.screenHeightDp) / 400f).coerceIn(0.85f, 1.25f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -589,15 +591,14 @@ fun CarControls(
             modifier = Modifier
                 .size((if (isLandscape) 82.dp else 72.dp) * scaleFactor)
                 .graphicsLayer {
+                    // Pulse and glow are read in the draw phase: no recomposition per animation frame
                     scaleX = pulseScale
                     scaleY = pulseScale
+                    shadowElevation = (if (isPlaying) 28.dp else 16.dp).toPx()
+                    shape = CircleShape
+                    spotShadowColor = Color(0xFFFF3366).copy(alpha = glowAlpha)
+                    ambientShadowColor = Color(0xFFFF8833).copy(alpha = 0.5f)
                 }
-                .shadow(
-                    elevation = if (isPlaying) 28.dp else 16.dp,
-                    shape = CircleShape,
-                    spotColor = Color(0xFFFF3366).copy(alpha = glowAlpha),
-                    ambientColor = Color(0xFFFF8833).copy(alpha = 0.5f)
-                )
                 .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
@@ -718,7 +719,8 @@ fun CarWaveformVisualizerAndTimeline(
     modifier: Modifier = Modifier
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val scaleFactor = (minOf(configuration.screenWidthDp, configuration.screenHeightDp) / 400f).coerceIn(0.85f, 1.25f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
 
     // Animated Waveform Heights using Transition
     val infiniteTransition = rememberInfiniteTransition(label = "car_wave")
@@ -838,29 +840,15 @@ fun CarWaveformVisualizerAndTimeline(
                 verticalAlignment = Alignment.Bottom
             ) {
                 val barCount = 26
+                val passedBarBrush = remember { Brush.verticalGradient(listOf(Color(0xFFFF3366), Color(0xFFFF9900))) }
+                val idleBarBrush = remember { Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x22FFFFFF))) }
                 for (i in 0 until barCount) {
                     // Integer harmonics: 1x, 2x, 3x, 4x guaranteed to be 100% periodic at 2*PI
-                    val h1 = sin(phase * 1f + (i * 0.28f)) * 0.32f
-                    val h2 = sin(phase * 2f + (i * 0.56f)) * 0.28f
-                    val h3 = cos(phase * 3f - (i * 0.42f)) * 0.22f
-                    val h4 = sin(phase * 4f + (i * 0.84f)) * 0.12f
-
-                    val combined = h1 + h2 + h3 + h4
                     val normI = i.toFloat() / (barCount - 1)
                     val eqEnvelope = 0.65f + 0.35f * sin((normI * Math.PI).toFloat())
-                    val rawHeight = (0.22f + (combined + 0.94f) * 0.42f * eqEnvelope).coerceIn(0.14f, 1.0f)
-                    val barScale = 0.12f + (rawHeight - 0.12f) * playActivity
 
                     val isBarPassed = if (!isRadio && durationMs > 0) (i.toFloat() / barCount) <= displayFraction else isPlaying
-                    val barColor = if (isBarPassed) {
-                        Brush.verticalGradient(
-                            listOf(Color(0xFFFF3366), Color(0xFFFF9900))
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(Color(0x55FFFFFF), Color(0x22FFFFFF))
-                        )
-                    }
+                    val barColor = if (isBarPassed) passedBarBrush else idleBarBrush
 
                     Box(
                         modifier = Modifier
@@ -868,8 +856,16 @@ fun CarWaveformVisualizerAndTimeline(
                             .padding(horizontal = 1.2.dp)
                             .fillMaxHeight()
                             .graphicsLayer {
+                                // Animated values are read here, in the draw phase, so the wave
+                                // does not recompose the whole row on every frame
+                                val h1 = sin(phase * 1f + (i * 0.28f)) * 0.32f
+                                val h2 = sin(phase * 2f + (i * 0.56f)) * 0.28f
+                                val h3 = cos(phase * 3f - (i * 0.42f)) * 0.22f
+                                val h4 = sin(phase * 4f + (i * 0.84f)) * 0.12f
+                                val combined = h1 + h2 + h3 + h4
+                                val rawHeight = (0.22f + (combined + 0.94f) * 0.42f * eqEnvelope).coerceIn(0.14f, 1.0f)
                                 transformOrigin = TransformOrigin(0.5f, 1.0f) // Scale upwards from bottom baseline
-                                scaleY = barScale
+                                scaleY = 0.12f + (rawHeight - 0.12f) * playActivity
                             }
                             .clip(RoundedCornerShape(3.dp))
                             .background(barColor)
@@ -1039,7 +1035,7 @@ fun CarTimeWidget() {
 
     LaunchedEffect(Unit) {
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val dateFormat = SimpleDateFormat("dd MMM, E", Locale("ru"))
+        val dateFormat = SimpleDateFormat("dd MMM, E", Locale.forLanguageTag("ru"))
         while (true) {
             val calendar = Calendar.getInstance()
             currentTime = timeFormat.format(calendar.time)

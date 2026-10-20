@@ -60,8 +60,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 
@@ -85,7 +86,8 @@ fun SearchScreen(
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    val scaleFactor = (configuration.screenWidthDp / 800f).coerceIn(0.85f, 1.25f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (windowSize.widthDp / 800f).coerceIn(0.85f, 1.25f)
     val contentStart = if (isLandscape) 140.dp else 16.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
 
@@ -249,7 +251,7 @@ fun SearchScreen(
                                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    items(hits) { track ->
+                                    items(hits, key = { it.idString }) { track ->
                                         Box(
                                             modifier = Modifier
                                                 .width(135.dp)
@@ -288,7 +290,7 @@ fun SearchScreen(
                                                 )
                                                 
                                                 Text(
-                                                    text = track.artists?.joinToString { it.name ?: "" } ?: "",
+                                                    text = track.artists.joinToString { it.name ?: "" },
                                                     color = Color.White.copy(alpha = 0.6f),
                                                     fontSize = 11.sp,
                                                     maxLines = 1,
@@ -316,7 +318,7 @@ fun SearchScreen(
                             )
                         }
                         if (isLandscape) {
-                            items(trends.chunked(2)) { rowItems ->
+                            items(trends.chunked(2), key = { row -> row.joinToString("|") { it.idString } }) { rowItems ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -373,7 +375,7 @@ fun SearchScreen(
                         .navigationBarsPadding()
                 ) {
                     if (isLandscape) {
-                        items(results.chunked(2)) { rowItems ->
+                        items(results.chunked(2), key = { row -> row.joinToString("|") { it.idString } }) { rowItems ->
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 rowItems.forEach { track ->
                                     Box(modifier = Modifier.weight(1f)) {

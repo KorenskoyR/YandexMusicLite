@@ -117,7 +117,7 @@ class TrackPreloadManager @Inject constructor(
             val request = Request.Builder().url(infoUrl).build()
             val xmlData = okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null
-                val xmlResponse = response.body?.string() ?: return@use null
+                val xmlResponse = response.body.string().ifEmpty { return@use null }
                 DownloadInfoParser.parseXml(xmlResponse)
             }
             if (xmlData != null) {

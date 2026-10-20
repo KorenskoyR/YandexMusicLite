@@ -32,6 +32,10 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import java.util.Locale
 
 @Composable
@@ -63,7 +67,9 @@ fun CacheMenuBottomSheet(
     updateStatus: String? = null,
     onCheckForUpdates: () -> Unit = {},
     onAccountManagementClick: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    crossfadeSeconds: Int = 3,
+    onCrossfadeChange: (Int) -> Unit = {}
 ) {
     val cacheSizeMb = cacheSizeBytes / (1024.0 * 1024.0)
     val cacheSizeFormatted = String.format(Locale.US, "%.1f МБ", cacheSizeMb)
@@ -71,7 +77,8 @@ fun CacheMenuBottomSheet(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val screenHeight = configuration.screenHeightDp.dp
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val screenHeight = windowSize.heightDp.dp
     val maxModalHeight = if (isLandscape) {
         (screenHeight * 0.94f).coerceAtLeast(340.dp)
     } else {
@@ -466,6 +473,10 @@ fun CacheMenuBottomSheet(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    CrossfadeSettingCard(seconds = crossfadeSeconds, onChange = onCrossfadeChange)
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     // Action Button: Download All Collection
                     Row(
                         modifier = Modifier
@@ -717,3 +728,52 @@ fun CacheMenuBottomSheet(
 }
 }
 
+/** Crossfade between tracks, 0–12 s (0 = off), like the setting in Apple Music. */
+@Composable
+private fun CrossfadeSettingCard(seconds: Int, onChange: (Int) -> Unit) {
+    // Local state keeps the slider smooth; the value is saved when the finger is lifted
+    var value by remember(seconds) { mutableFloatStateOf(seconds.toFloat()) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Кроссфейд",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Плавный переход между треками",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 11.5.sp
+                )
+            }
+            val shown = value.roundToInt()
+            Text(
+                text = if (shown == 0) "Выкл." else "$shown с",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = { value = it },
+            onValueChangeFinished = { onChange(value.roundToInt()) },
+            valueRange = 0f..12f,
+            steps = 11,
+            colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Color(0xFFFF3366),
+                inactiveTrackColor = Color.White.copy(alpha = 0.12f)
+            )
+        )
+    }
+}

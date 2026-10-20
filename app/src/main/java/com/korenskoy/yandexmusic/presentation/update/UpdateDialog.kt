@@ -194,7 +194,7 @@ fun UpdateDialog(
 
                 if (updateInfo.apkSizeBytes > 0) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    val sizeMb = String.format("%.2f", updateInfo.apkSizeBytes / (1024f * 1024f))
+                    val sizeMb = String.format(java.util.Locale.US, "%.2f", updateInfo.apkSizeBytes / (1024f * 1024f))
                     Text(
                         text = "Размер файла: ~$sizeMb МБ",
                         color = Color.White.copy(alpha = 0.45f),

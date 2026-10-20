@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import androidx.core.net.toUri
 import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.MediaItem
@@ -100,6 +101,7 @@ class PlayerRepositoryImpl(
     // Volume requested by the crossfade, before ducking is applied.
     private val logicalVolume = floatArrayOf(1f, 1f)
     private var duckFactor = 1f
+    private var crossfadeDurationMs = CROSSFADE_DURATION_MS
 
     private var lastSeekTimestamp = 0L
     private var pendingSeekPosition = -1L
@@ -151,7 +153,7 @@ class PlayerRepositoryImpl(
         }
 
         // 2. Early trigger so the crossfade overlaps the last seconds of the track
-        if (remaining in 1L..CROSSFADE_DURATION_MS && !hasEmittedTrackEndedForCurrent) {
+        if (crossfadeDurationMs > 0L && remaining in 1L..crossfadeDurationMs && !hasEmittedTrackEndedForCurrent) {
             hasEmittedTrackEndedForCurrent = true
             wakeLockHelper.acquireTransitionLock(30_000L)
             _trackEndedEvent.tryEmit(Unit)
@@ -247,7 +249,7 @@ class PlayerRepositoryImpl(
             .setTitle(title ?: "Unknown Track")
             .setDisplayTitle(title ?: "Unknown Track")
             .setArtist(artist ?: "Unknown Artist")
-            .setArtworkUri(coverUrl?.let { android.net.Uri.parse(it) })
+            .setArtworkUri(coverUrl?.toUri())
             .build()
         return MediaItem.Builder()
             .setMediaId(trackId)
@@ -328,7 +330,7 @@ class PlayerRepositoryImpl(
         activePlayerIndex = 1 - activePlayerIndex
         _activePlayerState.value = incoming
 
-        if (crossfade && isCurrentAudible) {
+        if (crossfade && isCurrentAudible && crossfadeDurationMs > 0L) {
             wakeLockHelper.acquireTransitionLock(30_000L)
             outgoingPlayer = current
             setVolume(incoming, 0f)
@@ -362,9 +364,11 @@ class PlayerRepositoryImpl(
         }
 
         val outStartVolume = logicalVolume[indexOf(outgoing)]
-        val stepDelay = CROSSFADE_DURATION_MS / CROSSFADE_STEPS
-        for (step in 1..CROSSFADE_STEPS) {
-            val angle = step.toDouble() / CROSSFADE_STEPS * (PI / 2.0)
+        // ~50 ms per volume step whatever the duration (60 steps for the default 3 s)
+        val steps = (crossfadeDurationMs / (CROSSFADE_DURATION_MS / CROSSFADE_STEPS)).toInt().coerceAtLeast(1)
+        val stepDelay = crossfadeDurationMs / steps
+        for (step in 1..steps) {
+            val angle = step.toDouble() / steps * (PI / 2.0)
             setVolume(outgoing, (outStartVolume * cos(angle)).toFloat().coerceIn(0f, 1f))
             setVolume(incoming, sin(angle).toFloat().coerceIn(0f, 1f))
             delay(stepDelay)
@@ -451,7 +455,7 @@ class PlayerRepositoryImpl(
         p.seekTo(position)
         // Seeking back out of the crossfade window must allow the triggers to fire again.
         val duration = p.duration
-        if (duration > 0L && duration - position > CROSSFADE_DURATION_MS) hasEmittedTrackEndedForCurrent = false
+        if (duration > 0L && duration - position > crossfadeDurationMs) hasEmittedTrackEndedForCurrent = false
         if (duration > 0L && duration - position > PREPARE_STANDBY_THRESHOLD_MS) hasEmittedPrepareForCurrent = false
     }
 
@@ -459,6 +463,10 @@ class PlayerRepositoryImpl(
         duckFactor = if (ducked) DUCK_VOLUME else 1f
         playerA.volume = logicalVolume[0] * duckFactor
         playerB.volume = logicalVolume[1] * duckFactor
+    }
+
+    override fun setCrossfadeDuration(durationMs: Long) {
+        crossfadeDurationMs = durationMs.coerceAtLeast(0L)
     }
 
     private fun indexOf(player: ExoPlayer) = if (player === playerA) 0 else 1

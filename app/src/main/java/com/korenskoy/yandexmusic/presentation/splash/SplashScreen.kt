@@ -29,7 +29,8 @@ fun SplashScreen(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val minSide = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val minSide = minOf(windowSize.widthDp, windowSize.heightDp)
     val scaleFactor = (minSide / 400f).coerceIn(0.7f, 1.4f)
 
     val infiniteTransition = rememberInfiniteTransition(label = "Resonance")

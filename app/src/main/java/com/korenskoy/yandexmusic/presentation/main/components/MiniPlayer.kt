@@ -32,8 +32,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.utils.browserUserAgent
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
@@ -155,7 +157,7 @@ fun MiniPlayer(
                         .crossfade(true)
                         .apply {
                             if (track.isRadio) {
-                                addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                                browserUserAgent()
                             }
                         }
                         .build(),
@@ -178,7 +180,7 @@ fun MiniPlayer(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = track.artists?.joinToString { it.name ?: "" } ?: "Неизвестный исполнитель",
+                    text = track.artists.joinToString { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f),
                     maxLines = 1,

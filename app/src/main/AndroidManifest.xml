@@ -10,22 +10,30 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Android 11+ package visibility: lets the in-app updater find the system package installer -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
     <application
         android:name=".YandexMusicApp"
         android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="true"
-        android:autoRevokePermissions="discouraged"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33"
         android:supportsRtl="true"
         android:theme="@style/Theme.YandexMusic">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.YandexMusic"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -34,15 +42,27 @@
             </intent-filter>
         </activity>
 
+        <!-- Exported so the system, Bluetooth and other controllers can reach the media session;
+             MusicService.onConnect limits untrusted apps to transport controls -->
         <service
             android:name=".data.player.MusicService"
             android:exported="true"
+            tools:ignore="ExportedService"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="androidx.media3.session.MediaLibraryService" />
             </intent-filter>
         </service>
+
+        <!-- Headset/Bluetooth Play after the process died: resumes the saved session -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

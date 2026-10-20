@@ -77,7 +77,9 @@ fun LibraryScreen(
     onPlayAllClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onDownloadAllClick: () -> Unit,
-    onEnableAutoDownload: () -> Unit,
+    onEnableAutoDownload: (Boolean) -> Unit,
+    crossfadeSeconds: Int = 3,
+    onCrossfadeChange: (Int) -> Unit = {},
     onCancelDownload: () -> Unit,
     onClearCache: () -> Unit,
     onToggleLike: (TrackDetailsDto) -> Unit,
@@ -99,7 +101,8 @@ fun LibraryScreen(
     
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val scaleFactor = (minOf(configuration.screenWidthDp, configuration.screenHeightDp) / 400f).coerceIn(0.8f, 1.5f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.8f, 1.5f)
     val contentStart = if (isLandscape) 140.dp else 16.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
 
@@ -402,7 +405,7 @@ fun LibraryScreen(
                     .padding(8.dp)
             ) {
                 if (isLandscape) {
-                    items(filteredTracks.chunked(2)) { rowItems ->
+                    items(filteredTracks.chunked(2), key = { row -> row.joinToString("|") { it.idString } }) { rowItems ->
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             rowItems.forEach { track ->
                                 Box(modifier = Modifier.weight(1f)) {
@@ -442,10 +445,10 @@ fun LibraryScreen(
             onDismiss = { showCacheMenu = false },
             cacheSizeBytes = cacheSizeBytes,
             autoDownloadEnabled = autoDownloadEnabled,
-            onEnableAutoDownload = {
-                onEnableAutoDownload()
-                // Wait to let them see switch but keep menu open
-            },
+            // The switch value is passed through, so auto-download can be turned off again
+            onEnableAutoDownload = onEnableAutoDownload,
+            crossfadeSeconds = crossfadeSeconds,
+            onCrossfadeChange = onCrossfadeChange,
             onDownloadAllClick = {
                 onDownloadAllClick()
                 showProgressModal = true

@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -57,42 +57,43 @@ fun AuthScreen(
                 clearHistory()
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                
+                // The login page never needs local files
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
+
+                var tokenHandled = false
+                // The token is returned in the URL fragment: #access_token=...
+                fun handleTokenUrl(url: String): Boolean {
+                    if (tokenHandled || !isTrustedYandexUrl(url)) return false
+                    val token = extractTokenFromUrl(url) ?: return false
+                    tokenHandled = true
+                    viewModel.saveToken(token)
+                    onAuthSuccess()
+                    return true
+                }
+
                 webViewClient = object : WebViewClient() {
                     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                         super.onPageStarted(view, url, favicon)
-                        url?.let {
-                            // The token is returned in the URL fragment: #access_token=...
-                            if (it.contains("access_token=")) {
-                                val token = extractTokenFromUrl(it)
-                                if (token != null) {
-                                    viewModel.saveToken(token)
-                                    onAuthSuccess()
-                                }
-                            }
-                        }
+                        url?.let { handleTokenUrl(it) }
                     }
 
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                        val url = request?.url?.toString() ?: ""
-                        if (url.contains("access_token=")) {
-                            val token = extractTokenFromUrl(url)
-                            if (token != null) {
-                                viewModel.saveToken(token)
-                                onAuthSuccess()
-                                return true
-                            }
-                        }
-                        return super.shouldOverrideUrlLoading(view, request)
+                        val uri = request?.url ?: return true
+                        if (handleTokenUrl(uri.toString())) return true
+                        // Only HTTPS pages may load inside the login screen (no intent://, file://, http://)
+                        return uri.scheme != "https"
                     }
 
                     override fun onReceivedError(
                         view: WebView?,
-                        errorCode: Int,
-                        description: String?,
-                        failingUrl: String?
+                        request: android.webkit.WebResourceRequest?,
+                        error: android.webkit.WebResourceError?
                     ) {
-                        super.onReceivedError(view, errorCode, description, failingUrl)
+                        super.onReceivedError(view, request, error)
+                        // Sub-resource failures (images, analytics) must not replace the login page
+                        if (request?.isForMainFrame != true) return
+                        val failingUrl = request.url?.toString()
                         // If DNS isn't quite ready right after network connects, retry in 1.5s
                         view?.loadData(
                             "<html><body style='background-color:#0A0A0E;'><div style='color:#AAAAAA; text-align:center; padding-top:40%; font-family:sans-serif;'>Подключение к Яндексу...</div></body></html>",
@@ -114,7 +115,16 @@ fun AuthScreen(
     }
 }
 
-private fun extractTokenFromUrl(url: String): String? {
+/** The token is only accepted from Yandex's own pages, never from a third-party redirect. */
+internal fun isTrustedYandexUrl(url: String): Boolean {
+    val uri = try { java.net.URI(url) } catch (e: Exception) { return false }
+    if (uri.scheme != "https") return false
+    val host = uri.host?.lowercase() ?: return false
+    val trustedRoots = listOf("yandex.ru", "yandex.com", "yandex.by", "yandex.kz", "ya.ru")
+    return trustedRoots.any { host == it || host.endsWith(".$it") }
+}
+
+internal fun extractTokenFromUrl(url: String): String? {
     try {
         val fragment = url.substringAfter("#", "")
         if (fragment.isNotEmpty()) {

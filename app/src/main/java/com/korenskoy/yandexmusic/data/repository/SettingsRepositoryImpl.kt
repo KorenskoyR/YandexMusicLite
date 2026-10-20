@@ -21,6 +21,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val AUTO_DOWNLOAD_KEY = booleanPreferencesKey("auto_download_liked")
     private val AUTO_START_CAR_MODE_VIBE_KEY = booleanPreferencesKey("auto_start_car_mode_vibe")
     private val KEEP_SCREEN_ON_IN_CAR_MODE_KEY = booleanPreferencesKey("keep_screen_on_in_car_mode")
+    private val CROSSFADE_SECONDS_KEY = androidx.datastore.preferences.core.intPreferencesKey("crossfade_seconds")
 
     override val isDarkTheme: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[DARK_THEME_KEY] ?: true
@@ -36,6 +37,16 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val keepScreenOnInCarMode: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[KEEP_SCREEN_ON_IN_CAR_MODE_KEY] ?: true
+    }
+
+    override val crossfadeSeconds: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[CROSSFADE_SECONDS_KEY] ?: SettingsRepository.DEFAULT_CROSSFADE_SECONDS
+    }
+
+    override suspend fun setCrossfadeSeconds(seconds: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[CROSSFADE_SECONDS_KEY] = seconds.coerceIn(0, SettingsRepository.MAX_CROSSFADE_SECONDS)
+        }
     }
 
     override suspend fun setDarkTheme(enabled: Boolean) {

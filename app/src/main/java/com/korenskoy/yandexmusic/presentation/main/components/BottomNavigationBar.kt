@@ -62,7 +62,8 @@ fun FloatingGlassBottomBar(
     modifier: Modifier = Modifier
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val scaleFactor = (configuration.screenWidthDp / 400f).coerceIn(0.9f, 1.2f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (windowSize.widthDp / 400f).coerceIn(0.9f, 1.2f)
 
     val tabs = MainTab.entries
     val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
@@ -136,7 +137,7 @@ fun FloatingGlassBottomBar(
                 modifier = Modifier
                     .width(tabWidth)
                     .height(tabHeight)
-                    .offset(x = indicatorOffsetX)
+                    .offset { androidx.compose.ui.unit.IntOffset(indicatorOffsetX.roundToPx(), 0) }
                     .clip(RoundedCornerShape(innerRadius))
                     .background(indicatorBgBrush)
                     .border(
@@ -215,7 +216,8 @@ fun FloatingGlassNavigationRail(
     modifier: Modifier = Modifier
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val scaleFactor = (configuration.screenWidthDp / 800f).coerceIn(0.9f, 1.3f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (windowSize.widthDp / 800f).coerceIn(0.9f, 1.3f)
     val capsuleWidth = (92.dp * scaleFactor).coerceIn(84.dp, 110.dp)
 
     val tabs = MainTab.entries
@@ -284,7 +286,7 @@ fun FloatingGlassNavigationRail(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(tabHeight)
-                .offset(y = indicatorOffsetY)
+                .offset { androidx.compose.ui.unit.IntOffset(0, indicatorOffsetY.roundToPx()) }
                 .clip(RoundedCornerShape(innerRadius))
                 .background(indicatorBgBrush)
                 .border(

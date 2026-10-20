@@ -75,8 +75,11 @@ fun MainScreen(
     val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
     val isSignatureMismatch by viewModel.isSignatureMismatch.collectAsState()
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsState()
+    val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
+    // Stable local copy: allows smart casts instead of `!!` in the blocks below
+    val shownTrack = currentTrack
     val currentTrackId by viewModel.currentTrackId.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isBuffering by viewModel.isBuffering.collectAsState()
@@ -174,7 +177,11 @@ fun MainScreen(
                     onPlayAllClick = { viewModel.playAllLikedTracks() },
                     onShuffleClick = { viewModel.shuffleLikedTracks() },
                     onDownloadAllClick = { viewModel.downloadAllLikedTracks() },
-                    onEnableAutoDownload = { viewModel.enableAutoDownloadAndStart() },
+                    onEnableAutoDownload = { enabled ->
+                        if (enabled) viewModel.enableAutoDownloadAndStart() else viewModel.setAutoDownloadLikedTracks(false)
+                    },
+                    crossfadeSeconds = crossfadeSeconds,
+                    onCrossfadeChange = { viewModel.setCrossfadeSeconds(it) },
                     onCancelDownload = { viewModel.cancelDownloadAll() },
                     onClearCache = { viewModel.clearMusicCache() },
                     onToggleLike = { track -> viewModel.toggleLike(track) },
@@ -281,15 +288,15 @@ fun MainScreen(
             }
 
             // Landscape MiniPlayer in Bottom Right (hidden in CAR mode)
-            if (currentTrack != null && currentTab != MainTab.CAR) {
+            if (shownTrack != null && currentTab != MainTab.CAR) {
                 val isMiniLiked = if (currentTrack?.isRadio == true) {
-                    favoriteStationIds.contains(currentTrack!!.idString.removePrefix("radio_"))
+                    favoriteStationIds.contains(shownTrack.idString.removePrefix("radio_"))
                 } else {
-                    likedTrackIds.contains(currentTrack!!.idString)
+                    likedTrackIds.contains(shownTrack.idString)
                 }
                 WithProgress(progressState) { progress ->
                     MiniPlayer(
-                        track = currentTrack!!,
+                        track = shownTrack,
                         isPlaying = isPlaying,
                         isLiked = isMiniLiked,
                         progress = progress,
@@ -298,9 +305,9 @@ fun MainScreen(
                         },
                         onToggleLike = {
                             if (currentTrack?.isRadio == true) {
-                                viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                                viewModel.toggleRadioFavorite(shownTrack.idString.removePrefix("radio_"))
                             } else {
-                                viewModel.toggleLike(currentTrack!!)
+                                viewModel.toggleLike(shownTrack)
                             }
                         },
                         onClick = {
@@ -329,15 +336,15 @@ fun MainScreen(
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (currentTrack != null) {
+                    if (shownTrack != null) {
                         val isMiniLiked = if (currentTrack?.isRadio == true) {
-                            favoriteStationIds.contains(currentTrack!!.idString.removePrefix("radio_"))
+                            favoriteStationIds.contains(shownTrack.idString.removePrefix("radio_"))
                         } else {
-                            likedTrackIds.contains(currentTrack!!.idString)
+                            likedTrackIds.contains(shownTrack.idString)
                         }
                         WithProgress(progressState) { progress ->
                             MiniPlayer(
-                                track = currentTrack!!,
+                                track = shownTrack,
                                 isPlaying = isPlaying,
                                 isLiked = isMiniLiked,
                                 progress = progress,
@@ -346,9 +353,9 @@ fun MainScreen(
                                 },
                                 onToggleLike = {
                                     if (currentTrack?.isRadio == true) {
-                                        viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                                        viewModel.toggleRadioFavorite(shownTrack.idString.removePrefix("radio_"))
                                     } else {
-                                        viewModel.toggleLike(currentTrack!!)
+                                        viewModel.toggleLike(shownTrack)
                                     }
                                 },
                                 onClick = {
@@ -376,15 +383,15 @@ fun MainScreen(
             exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(300)),
             modifier = Modifier.fillMaxSize()
         ) {
-            if (currentTrack != null) {
+            if (shownTrack != null) {
                 val isPlayerLiked = if (currentTrack?.isRadio == true) {
-                    favoriteStationIds.contains(currentTrack!!.idString.removePrefix("radio_"))
+                    favoriteStationIds.contains(shownTrack.idString.removePrefix("radio_"))
                 } else {
-                    likedTrackIds.contains(currentTrack!!.idString)
+                    likedTrackIds.contains(shownTrack.idString)
                 }
                 WithProgress(progressState) { progress ->
                     FullScreenPlayer(
-                        track = currentTrack!!,
+                        track = shownTrack,
                         isPlaying = isPlaying,
                         isLiked = isPlayerLiked,
                         progress = progress,
@@ -394,9 +401,9 @@ fun MainScreen(
                         },
                         onToggleLike = {
                             if (currentTrack?.isRadio == true) {
-                                viewModel.toggleRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                                viewModel.toggleRadioFavorite(shownTrack.idString.removePrefix("radio_"))
                             } else {
-                                viewModel.toggleLike(currentTrack!!)
+                                viewModel.toggleLike(shownTrack)
                             }
                         },
                         onNextClick = { viewModel.playNext() },
@@ -411,9 +418,9 @@ fun MainScreen(
                         },
                         onDislikeClick = {
                             if (currentTrack?.isRadio == true) {
-                                viewModel.removeRadioFavorite(currentTrack!!.idString.removePrefix("radio_"))
+                                viewModel.removeRadioFavorite(shownTrack.idString.removePrefix("radio_"))
                             } else {
-                                viewModel.dislikeTrack(currentTrack!!)
+                                viewModel.dislikeTrack(shownTrack)
                             }
                         },
                         onLoadMoreQueue = { viewModel.loadMoreQueue() },

@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Yandex Music"
 include(":app")
+include(":baselineprofile")
  

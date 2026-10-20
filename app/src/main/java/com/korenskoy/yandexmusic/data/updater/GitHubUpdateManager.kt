@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.updater
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
@@ -38,7 +39,9 @@ sealed class UpdateCheckResult {
         val title: String,
         val changelog: String,
         val apkDownloadUrl: String,
-        val apkSizeBytes: Long
+        val apkSizeBytes: Long,
+        /** Expected SHA-256 (hex) of the APK from the GitHub asset digest; null for old releases. */
+        val apkSha256: String? = null
     ) : UpdateCheckResult()
 
     data class UpToDate(val currentVersion: String) : UpdateCheckResult()
@@ -76,7 +79,7 @@ class GitHubUpdateManager @Inject constructor(
                     return@withContext UpdateCheckResult.Error("HTTP ${response.code}: ${response.message}")
                 }
 
-                val body = response.body?.string() ?: return@withContext UpdateCheckResult.Error("Пустой ответ от GitHub API")
+                val body = response.body.string().ifEmpty { return@withContext UpdateCheckResult.Error("Пустой ответ от GitHub API") }
                 json.decodeFromString<GitHubReleaseDto>(body)
             }
 
@@ -92,7 +95,8 @@ class GitHubUpdateManager @Inject constructor(
                     title = release.name ?: "Yandex Music Lite v$remoteVersion",
                     changelog = cleanChangelog(release.body ?: ""),
                     apkDownloadUrl = apkAsset.browserDownloadUrl,
-                    apkSizeBytes = apkAsset.size
+                    apkSizeBytes = apkAsset.size,
+                    apkSha256 = apkAsset.digest?.removePrefix("sha256:")?.lowercase()
                 )
             } else {
                 UpdateCheckResult.UpToDate(BuildConfig.VERSION_NAME)
@@ -134,7 +138,7 @@ class GitHubUpdateManager @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(settingsIntent)
@@ -149,8 +153,12 @@ class GitHubUpdateManager @Inject constructor(
      */
     suspend fun downloadApk(
         downloadUrl: String,
+        expectedSha256: String?,
         onProgress: (Float) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
+        if (!isTrustedDownloadUrl(downloadUrl)) {
+            return@withContext Result.failure(SecurityException("Обновление можно скачать только с GitHub по HTTPS"))
+        }
         val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
         val tempFile = File(updatesDir, "YandexMusicLite_download.tmp")
         val targetFile = File(updatesDir, "YandexMusicLite.apk")
@@ -170,9 +178,10 @@ class GitHubUpdateManager @Inject constructor(
                     return@withContext Result.failure(Exception("HTTP ${response.code} при скачивании обновления"))
                 }
 
-                val responseBody = response.body ?: return@withContext Result.failure(Exception("Пустое тело ответа"))
+                val responseBody = response.body
                 val contentLength = responseBody.contentLength()
 
+                val sha256 = MessageDigest.getInstance("SHA-256")
                 responseBody.byteStream().use { input ->
                     FileOutputStream(tempFile).use { output ->
                         val buffer = ByteArray(8 * 1024)
@@ -181,6 +190,7 @@ class GitHubUpdateManager @Inject constructor(
 
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)
+                            sha256.update(buffer, 0, bytesRead)
                             totalRead += bytesRead
                             if (contentLength > 0) {
                                 val progress = (totalRead.toFloat() / contentLength).coerceIn(0f, 1f)
@@ -194,6 +204,11 @@ class GitHubUpdateManager @Inject constructor(
                 if (contentLength > 0 && tempFile.length() != contentLength) {
                     tempFile.delete()
                     return@withContext Result.failure(Exception("Загрузка прервана: получено ${tempFile.length()} из $contentLength байт"))
+                }
+                val actualSha256 = sha256.digest().joinToString("") { "%02x".format(it) }
+                if (expectedSha256 != null && !actualSha256.equals(expectedSha256, ignoreCase = true)) {
+                    tempFile.delete()
+                    return@withContext Result.failure(SecurityException("Контрольная сумма обновления не совпадает с опубликованной на GitHub"))
                 }
                 true
             }
@@ -245,6 +260,9 @@ class GitHubUpdateManager @Inject constructor(
             if (packageArchiveInfo == null) {
                 return ApkInstallPreCheck.CorruptedApk("Файл поврежден или не является корректным пакетом APK")
             }
+            if (packageArchiveInfo.packageName != context.packageName) {
+                return ApkInstallPreCheck.CorruptedApk("Файл не является обновлением Yandex Music Lite")
+            }
 
             val currentPackageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 context.packageManager.getPackageInfo(
@@ -259,25 +277,33 @@ class GitHubUpdateManager @Inject constructor(
                 )
             }
 
+            if (versionCodeOf(packageArchiveInfo) <= versionCodeOf(currentPackageInfo)) {
+                return ApkInstallPreCheck.CorruptedApk("Скачанная версия не новее установленной")
+            }
+
             val currentDigests = extractSignatures(currentPackageInfo)
             val newDigests = extractSignatures(packageArchiveInfo)
-
-            if (currentDigests.isNotEmpty() && newDigests.isNotEmpty()) {
-                val hasMatchingSignature = currentDigests.any { it in newDigests }
-                if (!hasMatchingSignature) {
-                    return ApkInstallPreCheck.SignatureMismatch(
-                        currentSignatureDigest = currentDigests.first(),
-                        newSignatureDigest = newDigests.first()
-                    )
-                }
+            if (newDigests.isEmpty()) {
+                return ApkInstallPreCheck.CorruptedApk("Файл обновления не подписан")
+            }
+            if (currentDigests.none { it in newDigests }) {
+                return ApkInstallPreCheck.SignatureMismatch(
+                    currentSignatureDigest = currentDigests.firstOrNull().orEmpty(),
+                    newSignatureDigest = newDigests.first()
+                )
             }
 
             ApkInstallPreCheck.Compatible
         } catch (e: Exception) {
             Log.e(TAG, "Error checking APK compatibility", e)
-            ApkInstallPreCheck.Compatible
+            // Fail closed: never install what could not be verified
+            ApkInstallPreCheck.CorruptedApk("Не удалось проверить файл обновления")
         }
     }
+
+    @Suppress("DEPRECATION")
+    private fun versionCodeOf(info: PackageInfo): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
 
     private fun extractSignatures(packageInfo: PackageInfo): List<String> {
         val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -408,6 +434,13 @@ class GitHubUpdateManager @Inject constructor(
         /**
          * Compares two semantic version strings (e.g. "1.2.0" vs "1.1.1").
          */
+        /** Release assets are served from github.com and redirected to GitHub's object storage. */
+        fun isTrustedDownloadUrl(url: String): Boolean {
+            val uri = try { java.net.URI(url) } catch (e: Exception) { return false }
+            val host = uri.host?.lowercase() ?: return false
+            return uri.scheme == "https" && (host == "github.com" || host.endsWith(".githubusercontent.com"))
+        }
+
         fun isVersionNewer(remoteVersion: String, localVersion: String): Boolean {
             val rParts = remoteVersion.removePrefix("v").split(".", "-", "_").mapNotNull { it.toIntOrNull() }
             val lParts = localVersion.removePrefix("v").split(".", "-", "_").mapNotNull { it.toIntOrNull() }

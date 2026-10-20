@@ -17,10 +17,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.graphics.drawable.toBitmap
+import coil3.toBitmap
 import androidx.palette.graphics.Palette
-import coil.ImageLoader
-import coil.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.SingletonImageLoader
+import coil3.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -47,14 +48,15 @@ fun FluidBackground(
         if (coverUrl.isEmpty()) return@LaunchedEffect
         
         withContext(Dispatchers.IO) {
-            val loader = ImageLoader(context)
+            // Shared loader: reuses the memory/disk cache of the cover already shown on screen
+            val loader = SingletonImageLoader.get(context)
             val request = ImageRequest.Builder(context)
                 .data(coverUrl)
                 .allowHardware(false)
                 .build()
             
             val result = loader.execute(request)
-            val bitmap = result.drawable?.toBitmap()
+            val bitmap = result.image?.toBitmap()
             if (bitmap != null) {
                 val palette = Palette.from(bitmap).generate()
                 dominantColor = palette.getDominantColor(0xFF121212.toInt()).let { Color(it) }

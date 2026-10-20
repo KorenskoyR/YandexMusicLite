@@ -33,8 +33,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.utils.browserUserAgent
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import com.korenskoy.yandexmusic.domain.model.RadioCategory
 import com.korenskoy.yandexmusic.domain.model.RadioStation
@@ -52,12 +54,13 @@ fun RadioScreen(
     favoriteStationIds: Set<String>,
     onStationClick: (RadioStation) -> Unit,
     onToggleFavorite: (String) -> Unit,
-    hasActiveTrack: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasActiveTrack: Boolean = false
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val scaleFactor = (configuration.screenWidthDp / 800f).coerceIn(0.85f, 1.25f)
+    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val scaleFactor = (windowSize.widthDp / 800f).coerceIn(0.85f, 1.25f)
     val contentStart = if (isLandscape) 140.dp else 16.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
 
@@ -318,7 +321,7 @@ fun RadioStationCard(
                 model = ImageRequest.Builder(context)
                     .data(station.iconRes ?: station.logoUrl)
                     .crossfade(true)
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .browserUserAgent()
                     .build(),
                 contentDescription = station.name,
                 contentScale = ContentScale.Fit,

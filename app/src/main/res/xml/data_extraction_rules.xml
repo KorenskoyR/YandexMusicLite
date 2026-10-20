@@ -5,6 +5,7 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="auth_secure.xml" />
         <exclude domain="sharedpref" path="auth_prefs.xml" />
         <exclude domain="sharedpref" path="auth_prefs_fallback.xml" />
         <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs__.xml" />
@@ -12,6 +13,7 @@
         <exclude domain="file" path="playback_state.json" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="auth_secure.xml" />
         <exclude domain="sharedpref" path="auth_prefs.xml" />
         <exclude domain="sharedpref" path="auth_prefs_fallback.xml" />
         <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs__.xml" />

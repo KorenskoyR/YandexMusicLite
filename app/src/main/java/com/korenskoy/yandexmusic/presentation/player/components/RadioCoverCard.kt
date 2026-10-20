@@ -34,8 +34,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.utils.browserUserAgent
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 
 @Composable
 fun RadioCoverCard(
@@ -133,7 +135,7 @@ fun RadioCoverCard(
                 model = ImageRequest.Builder(context)
                     .data(coverUrl)
                     .crossfade(true)
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .browserUserAgent()
                     .build(),
                 contentDescription = "Radio Logo",
                 contentScale = ContentScale.Fit,

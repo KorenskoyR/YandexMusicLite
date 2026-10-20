@@ -1,9 +1,9 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import androidx.core.content.edit
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import com.korenskoy.yandexmusic.data.security.KeystoreStringPreferences
 import com.korenskoy.yandexmusic.domain.model.UserAccount
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow
@@ -24,21 +24,62 @@ class AuthRepositoryImpl @Inject constructor(
         isLenient = true
     }
 
-    private val sharedPreferences: SharedPreferences = try {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            "auth_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (e: Exception) {
-        e.printStackTrace()
+    private val sharedPreferences: SharedPreferences = createSecurePreferences(context)
+
+    private fun createSecurePreferences(context: Context): SharedPreferences {
+        val secure = try {
+            KeystoreStringPreferences(context, SECURE_PREFS_FILE, KEYSTORE_ALIAS)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
         // Fallback to plain SharedPreferences if Keystore is broken on this device
-        context.getSharedPreferences("auth_prefs_fallback", Context.MODE_PRIVATE)
+        if (secure == null) return context.getSharedPreferences(FALLBACK_PREFS_FILE, Context.MODE_PRIVATE)
+        migrateLegacyStorage(context, secure)
+        return secure
+    }
+
+    /**
+     * One-time move of accounts from the deprecated androidx.security EncryptedSharedPreferences
+     * (and the plain fallback file) into [KeystoreStringPreferences]. The old file is deleted only
+     * after the copy has been written and read back, so a failure never signs the user out.
+     */
+    @Suppress("DEPRECATION")
+    private fun migrateLegacyStorage(context: Context, target: SharedPreferences) {
+        if (MIGRATED_KEYS.any { target.contains(it) }) return
+        val legacyFile = java.io.File(context.applicationInfo.dataDir, "shared_prefs/$LEGACY_PREFS_FILE.xml")
+        val legacyEncrypted = if (legacyFile.exists()) {
+            try {
+                val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                androidx.security.crypto.EncryptedSharedPreferences.create(
+                    context,
+                    LEGACY_PREFS_FILE,
+                    masterKey,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        } else {
+            null
+        }
+        val legacyPlain = context.getSharedPreferences(FALLBACK_PREFS_FILE, Context.MODE_PRIVATE)
+
+        for (source in listOfNotNull(legacyEncrypted, legacyPlain)) {
+            val values = MIGRATED_KEYS.mapNotNull { key -> source.getString(key, null)?.let { key to it } }
+            if (values.isEmpty()) continue
+            target.edit(commit = true) { values.forEach { (key, value) -> putString(key, value) } }
+            val copied = values.all { (key, value) -> target.getString(key, null) == value }
+            if (copied) {
+                source.edit(commit = true) { clear() }
+                if (source === legacyEncrypted) context.deleteSharedPreferences(LEGACY_PREFS_FILE)
+            }
+            return
+        }
     }
 
     private val _allAccounts = MutableStateFlow<List<UserAccount>>(emptyList())
@@ -83,7 +124,7 @@ class AuthRepositoryImpl @Inject constructor(
             )
             loadedAccounts.add(migratedAccount)
             persistAccounts(loadedAccounts)
-            sharedPreferences.edit().putString(KEY_ACTIVE_UID, "me").apply()
+            sharedPreferences.edit { putString(KEY_ACTIVE_UID, "me") }
         }
 
         val defaultUid = sharedPreferences.getString(KEY_DEFAULT_ACCOUNT_UID, null)
@@ -103,7 +144,7 @@ class AuthRepositoryImpl @Inject constructor(
     private fun persistAccounts(accounts: List<UserAccount>) {
         try {
             val raw = json.encodeToString(accounts)
-            sharedPreferences.edit().putString(KEY_ACCOUNTS_JSON, raw).apply()
+            sharedPreferences.edit { putString(KEY_ACCOUNTS_JSON, raw) }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -116,7 +157,7 @@ class AuthRepositoryImpl @Inject constructor(
     @Synchronized
     override fun saveToken(token: String) {
         if (token.isBlank()) return
-        sharedPreferences.edit().putString(KEY_LEGACY_TOKEN, token).apply()
+        sharedPreferences.edit { putString(KEY_LEGACY_TOKEN, token) }
 
         // Check if an existing account already has this token
         val currentAccounts = _allAccounts.value.toMutableList()
@@ -141,7 +182,7 @@ class AuthRepositoryImpl @Inject constructor(
             active = newAccount
         }
 
-        sharedPreferences.edit().putString(KEY_ACTIVE_UID, active.uid).apply()
+        sharedPreferences.edit { putString(KEY_ACTIVE_UID, active.uid) }
         persistAccounts(currentAccounts)
 
         _allAccounts.value = currentAccounts.sortedByDescending { it.lastActiveTimestamp }
@@ -184,10 +225,10 @@ class AuthRepositoryImpl @Inject constructor(
             currentAccounts.add(updated)
         }
 
-        sharedPreferences.edit()
-            .putString(KEY_ACTIVE_UID, updated.uid)
-            .putString(KEY_LEGACY_TOKEN, updated.token)
-            .apply()
+        sharedPreferences.edit {
+            putString(KEY_ACTIVE_UID, updated.uid)
+            putString(KEY_LEGACY_TOKEN, updated.token)
+        }
         persistAccounts(currentAccounts)
 
         _allAccounts.value = currentAccounts.sortedByDescending { it.lastActiveTimestamp }
@@ -204,10 +245,10 @@ class AuthRepositoryImpl @Inject constructor(
         val target = currentAccounts[targetIndex].copy(lastActiveTimestamp = System.currentTimeMillis())
         currentAccounts[targetIndex] = target
 
-        sharedPreferences.edit()
-            .putString(KEY_ACTIVE_UID, target.uid)
-            .putString(KEY_LEGACY_TOKEN, target.token)
-            .apply()
+        sharedPreferences.edit {
+            putString(KEY_ACTIVE_UID, target.uid)
+            putString(KEY_LEGACY_TOKEN, target.token)
+        }
         persistAccounts(currentAccounts)
 
         _allAccounts.value = currentAccounts.sortedByDescending { it.lastActiveTimestamp }
@@ -227,7 +268,7 @@ class AuthRepositoryImpl @Inject constructor(
 
         if (newActive?.uid == uid) {
             newActive = currentAccounts.maxByOrNull { it.lastActiveTimestamp }
-            sharedPreferences.edit().apply {
+            sharedPreferences.edit {
                 if (newActive != null) {
                     putString(KEY_ACTIVE_UID, newActive.uid)
                     putString(KEY_LEGACY_TOKEN, newActive.token)
@@ -235,7 +276,7 @@ class AuthRepositoryImpl @Inject constructor(
                     remove(KEY_ACTIVE_UID)
                     remove(KEY_LEGACY_TOKEN)
                 }
-            }.apply()
+            }
         }
 
         if (_defaultAccountUid.value == uid) {
@@ -251,12 +292,12 @@ class AuthRepositoryImpl @Inject constructor(
 
     @Synchronized
     override fun clearAllAccounts() {
-        sharedPreferences.edit()
-            .remove(KEY_ACCOUNTS_JSON)
-            .remove(KEY_ACTIVE_UID)
-            .remove(KEY_DEFAULT_ACCOUNT_UID)
-            .remove(KEY_LEGACY_TOKEN)
-            .apply()
+        sharedPreferences.edit {
+            remove(KEY_ACCOUNTS_JSON)
+            remove(KEY_ACTIVE_UID)
+            remove(KEY_DEFAULT_ACCOUNT_UID)
+            remove(KEY_LEGACY_TOKEN)
+        }
 
         _defaultAccountUid.value = null
         _allAccounts.value = emptyList()
@@ -270,13 +311,13 @@ class AuthRepositoryImpl @Inject constructor(
 
     @Synchronized
     override fun setDefaultAccountUid(uid: String?) {
-        sharedPreferences.edit().apply {
+        sharedPreferences.edit {
             if (uid != null) {
                 putString(KEY_DEFAULT_ACCOUNT_UID, uid)
             } else {
                 remove(KEY_DEFAULT_ACCOUNT_UID)
             }
-        }.apply()
+        }
         _defaultAccountUid.value = uid
     }
 
@@ -294,5 +335,12 @@ class AuthRepositoryImpl @Inject constructor(
         private const val KEY_ACCOUNTS_JSON = "accounts_list_json"
         private const val KEY_ACTIVE_UID = "active_account_uid"
         private const val KEY_DEFAULT_ACCOUNT_UID = "default_account_uid"
+        private val MIGRATED_KEYS = listOf(KEY_ACCOUNTS_JSON, KEY_LEGACY_TOKEN, KEY_ACTIVE_UID, KEY_DEFAULT_ACCOUNT_UID)
+
+        private const val SECURE_PREFS_FILE = "auth_secure"
+        private const val KEYSTORE_ALIAS = "yandex_music_lite_auth"
+        // Deprecated androidx.security storage used up to 1.4.1; only read once for migration
+        private const val LEGACY_PREFS_FILE = "auth_prefs"
+        private const val FALLBACK_PREFS_FILE = "auth_prefs_fallback"
     }
 }
