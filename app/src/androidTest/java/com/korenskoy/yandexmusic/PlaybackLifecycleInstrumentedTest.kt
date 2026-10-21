@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.korenskoy.yandexmusic.data.player.MusicService
 import com.korenskoy.yandexmusic.presentation.main.MainViewModel
+import com.korenskoy.yandexmusic.presentation.radio.RadioViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,6 +42,12 @@ class PlaybackLifecycleInstrumentedTest {
         return vm
     }
 
+    private fun radioOf(scenario: ActivityScenario<MainActivity>): RadioViewModel {
+        lateinit var vm: RadioViewModel
+        scenario.onActivity { vm = ViewModelProvider(it)[RadioViewModel::class.java] }
+        return vm
+    }
+
     @Test
     fun notificationControlsWorkAfterActivityIsDestroyed() {
         if (Build.VERSION.SDK_INT >= 33) {
@@ -50,11 +57,12 @@ class PlaybackLifecycleInstrumentedTest {
         // 1. Start a station from the UI layer
         val first = ActivityScenario.launch(MainActivity::class.java)
         val vm = viewModelOf(first)
-        val stations = vm.radioStations.value
+        val radio = radioOf(first)
+        val stations = radio.stations.value
         val startIndex = stations.indexOfFirst { it.id == "record" }
         val start = stations[startIndex]
         val next = stations[(startIndex + 1) % stations.size]
-        instrumentation.runOnMainSync { vm.playRadioStation(start) }
+        instrumentation.runOnMainSync { radio.play(start) }
         waitUntil(30_000, "station starts") { vm.isPlaying.value && !vm.isBuffering.value }
 
         // 2. Destroy the Activity and its ViewModel, as swiping the task from recents does

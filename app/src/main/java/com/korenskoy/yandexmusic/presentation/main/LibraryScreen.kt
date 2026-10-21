@@ -84,6 +84,11 @@ fun LibraryScreen(
     onCrossfadeChange: (Int) -> Unit = {},
     wifiOnly: Boolean = true,
     onWifiOnlyChange: (Boolean) -> Unit = {},
+    economyOnMobile: Boolean = false,
+    onEconomyOnMobileChange: (Boolean) -> Unit = {},
+    onUpgradeDownloads: () -> Unit = {},
+    crashReports: Int = 0,
+    onOpenCrashLog: () -> Unit = {},
     onCancelDownload: () -> Unit,
     onClearCache: () -> Unit,
     onToggleLike: (TrackDetailsDto) -> Unit,
@@ -101,7 +106,12 @@ fun LibraryScreen(
     onOpenPlaylist: (com.korenskoy.yandexmusic.data.dto.UserPlaylistDto) -> Unit = {},
     onClosePlaylist: () -> Unit = {},
     onPlayPlaylist: (shuffle: Boolean) -> Unit = {},
-    onPlaylistTrackClick: (String) -> Unit = {}
+    onPlaylistTrackClick: (String) -> Unit = {},
+    onCreatePlaylist: (String) -> Unit = {},
+    onRenamePlaylist: (com.korenskoy.yandexmusic.data.dto.UserPlaylistDto, String) -> Unit = { _, _ -> },
+    onDeletePlaylist: (com.korenskoy.yandexmusic.data.dto.UserPlaylistDto) -> Unit = {},
+    onReorderPlaylist: (com.korenskoy.yandexmusic.data.dto.UserPlaylistDto, List<String>, List<String>) -> Unit = { _, _, _ -> },
+    onSetPlaylistPublic: (com.korenskoy.yandexmusic.data.dto.UserPlaylistDto, Boolean) -> Unit = { _, _ -> }
 ) {
     var showCacheMenu by remember { mutableStateOf(false) }
     var showProgressModal by remember { mutableStateOf(false) }
@@ -126,7 +136,11 @@ fun LibraryScreen(
             onPlay = onPlayPlaylist,
             onTrackClick = onPlaylistTrackClick,
             onToggleLike = onToggleLike,
-            onRetry = { onOpenPlaylist(openedPlaylist.playlist) }
+            onRetry = { onOpenPlaylist(openedPlaylist.playlist) },
+            onRename = { onRenamePlaylist(openedPlaylist.playlist, it) },
+            onDelete = { onDeletePlaylist(openedPlaylist.playlist) },
+            onReorder = { shown, new -> onReorderPlaylist(openedPlaylist.playlist, shown, new) },
+            onSetPublic = { onSetPlaylistPublic(openedPlaylist.playlist, it) }
         )
         return
     }
@@ -375,10 +389,11 @@ fun LibraryScreen(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else if (filteredTracks.isEmpty()) {
-            if (playlists.isNotEmpty() && !showOnlyDownloaded) {
+            if (!showOnlyDownloaded) {
                 PlaylistsRow(
                     playlists = playlists,
                     onOpen = onOpenPlaylist,
+                    onCreate = onCreatePlaylist,
                     modifier = Modifier.padding(start = contentStart, end = 16.dp, top = 4.dp, bottom = 8.dp)
                 )
             }
@@ -436,11 +451,12 @@ fun LibraryScreen(
                     .background(Color(0x1AFFFFFF)) // Glassmorphism container
                     .padding(8.dp)
             ) {
-                if (playlists.isNotEmpty() && !showOnlyDownloaded) {
+                if (!showOnlyDownloaded) {
                     item(key = "playlists") {
                         PlaylistsRow(
                             playlists = playlists,
                             onOpen = onOpenPlaylist,
+                            onCreate = onCreatePlaylist,
                             modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 12.dp)
                         )
                     }
@@ -492,6 +508,11 @@ fun LibraryScreen(
             onCrossfadeChange = onCrossfadeChange,
             wifiOnly = wifiOnly,
             onWifiOnlyChange = onWifiOnlyChange,
+            economyOnMobile = economyOnMobile,
+            onEconomyOnMobileChange = onEconomyOnMobileChange,
+            onUpgradeDownloads = onUpgradeDownloads,
+            crashReports = crashReports,
+            onOpenCrashLog = onOpenCrashLog,
             onDownloadAllClick = {
                 onDownloadAllClick()
                 showProgressModal = true

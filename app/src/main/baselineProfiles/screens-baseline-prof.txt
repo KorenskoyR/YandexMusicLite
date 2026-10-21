@@ -1,0 +1,12 @@
+# Hand-written rules, merged with the generated profile (src/release/generated/baselineProfiles).
+# The generator installs the app fresh, so it never gets past the sign-in screen: without these rules the
+# tabs, lists, player and playlist screens run interpreted for their first seconds after every update.
+HSPLcom/korenskoy/yandexmusic/presentation/**->**(**)**
+Lcom/korenskoy/yandexmusic/presentation/**;
+HSPLcom/korenskoy/yandexmusic/data/**->**(**)**
+Lcom/korenskoy/yandexmusic/data/**;
+# Scrolling lists and images on them
+HSPLandroidx/compose/foundation/lazy/**->**(**)**
+Landroidx/compose/foundation/lazy/**;
+HSPLcoil3/**->**(**)**
+Lcoil3/**;

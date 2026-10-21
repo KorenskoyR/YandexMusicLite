@@ -1,6 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material.icons.filled.Bedtime
 import com.korenskoy.yandexmusic.R
@@ -133,7 +134,9 @@ fun FullScreenPlayer(
     sleepTimer: com.korenskoy.yandexmusic.data.player.SleepTimerState? = null,
     onSleepTimer: (Int) -> Unit = {},
     onSleepAtEndOfTrack: () -> Unit = {},
-    onCancelSleepTimer: () -> Unit = {}
+    onCancelSleepTimer: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {},
+    onQualityClick: () -> Unit = {}
 ) {
     androidx.activity.compose.BackHandler(onBack = onCollapse)
 
@@ -399,29 +402,45 @@ fun FullScreenPlayer(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Track Info
-            Column(
+            // Track Info, with "add to playlist" on the right (balanced on the left to keep the title centred)
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = track.title ?: "Без названия",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = track.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.65f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (!track.isRadio) Spacer(modifier = Modifier.width(44.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = track.title ?: "Без названия",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = track.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.65f),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (!track.isRadio) {
+                    IconButton(onClick = onAddToPlaylist, modifier = Modifier.size(44.dp)) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                            contentDescription = stringResource(R.string.track_context_menu_dobavit_v_pleylist),
+                            tint = Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -434,7 +453,7 @@ fun FullScreenPlayer(
             val currentIndex = queue.indexOfFirst { it.idString == track.idString }
             val nextTrack = if (currentIndex != -1 && currentIndex + 1 < queue.size) queue[currentIndex + 1] else null
             
-            PlayerMetadataAndUpNext(track = track, nextTrack = nextTrack)
+            PlayerMetadataAndUpNext(track = track, nextTrack = nextTrack, onQualityClick = onQualityClick)
 
             Spacer(modifier = Modifier.weight(0.2f))
 
@@ -997,7 +1016,7 @@ private fun formatTime(timeMs: Long): String {
 }
 
 @Composable
-fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?) {
+fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?, onQualityClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1033,10 +1052,12 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?)
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
+                    // Tap: what plays and every variant the server offered
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color.White.copy(alpha = 0.12f))
+                            .clickable(onClickLabel = stringResource(R.string.quality_details_title), onClick = onQualityClick)
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(

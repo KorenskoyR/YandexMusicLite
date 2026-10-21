@@ -67,11 +67,40 @@
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
 
+        <!-- WorkManager is initialized on demand by YandexMusicApp (Configuration.Provider) -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <!-- Offline downloads run as a WorkManager foreground job -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- Home screen widget: the current track with play/pause and skip -->
+        <receiver
+            android:name=".widget.NowPlayingWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_playing_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WidgetSkipReceiver"
+            android:exported="false" />
 
         <!-- Headset/Bluetooth Play after the process died: resumes the saved session -->
         <receiver

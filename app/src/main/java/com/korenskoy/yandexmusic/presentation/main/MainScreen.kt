@@ -49,40 +49,53 @@ import com.korenskoy.yandexmusic.data.player.PlaylistSource
 fun MainScreen(
     viewModel: MainViewModel,
     onNavigateToAuth: () -> Unit = {},
-    openPlayerSignal: Int = 0
+    openPlayerSignal: Int = 0,
+    accountVm: com.korenskoy.yandexmusic.presentation.account.AccountViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    searchVm: SearchViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    playlistsVm: PlaylistsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    radioVm: com.korenskoy.yandexmusic.presentation.radio.RadioViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    updateVm: com.korenskoy.yandexmusic.presentation.update.UpdateViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    catalogVm: com.korenskoy.yandexmusic.presentation.catalog.CatalogViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    crashVm: com.korenskoy.yandexmusic.presentation.crash.CrashLogViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
 ) {
     val tracks by viewModel.tracks.collectAsState()
-    val allAccounts by viewModel.allAccounts.collectAsState()
-    val activeAccount by viewModel.activeAccount.collectAsState()
+    val allAccounts by accountVm.allAccounts.collectAsState()
+    val activeAccount by accountVm.activeAccount.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isDownloadingAll by viewModel.isDownloadingAll.collectAsState()
     val autoDownloadEnabled by viewModel.autoDownloadEnabled.collectAsState()
     val likedTrackIds by viewModel.likedTrackIds.collectAsState()
     val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsState()
-    val favoriteStationIds by viewModel.radioFavoriteStationIds.collectAsState()
+    val favoriteStationIds by radioVm.favoriteStationIds.collectAsState()
     
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
-    val isSearching by viewModel.isSearching.collectAsState()
+    val searchQuery by searchVm.query.collectAsState()
+    val searchResults by searchVm.results.collectAsState()
+    val isSearching by searchVm.isSearching.collectAsState()
+    val searchFound by searchVm.found.collectAsState()
+    val searchHistory by searchVm.history.collectAsState()
+    val catalogStack by catalogVm.stack.collectAsState()
+    val crashReports by crashVm.reports.collectAsState()
+    var showCrashLog by remember { mutableStateOf(false) }
     
     val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
-    val accountName by viewModel.accountName.collectAsState()
-    val accountAvatarUrl by viewModel.accountAvatarUrl.collectAsState()
-    val defaultAccountUid by viewModel.defaultAccountUid.collectAsState()
-    val defaultAccountName by viewModel.defaultAccountName.collectAsState()
+    val accountName by accountVm.accountName.collectAsState()
+    val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsState()
+    val defaultAccountUid by accountVm.defaultAccountUid.collectAsState()
+    val defaultAccountName by accountVm.defaultAccountName.collectAsState()
 
-    val updateCheckResult by viewModel.updateCheckResult.collectAsState()
-    val updateDownloadProgress by viewModel.updateDownloadProgress.collectAsState()
-    val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
-    val isSignatureMismatch by viewModel.isSignatureMismatch.collectAsState()
+    val updateCheckResult by updateVm.checkResult.collectAsState()
+    val updateDownloadProgress by updateVm.downloadProgress.collectAsState()
+    val updateStatusMessage by updateVm.statusMessage.collectAsState()
+    val isSignatureMismatch by updateVm.isSignatureMismatch.collectAsState()
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsState()
     val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsState()
     val streamQuality by viewModel.streamQuality.collectAsState()
     val sleepTimer by viewModel.sleepTimer.collectAsState()
-    val userPlaylists by viewModel.userPlaylists.collectAsState()
-    val openedPlaylist by viewModel.openedPlaylist.collectAsState()
+    val userPlaylists by playlistsVm.playlists.collectAsState()
+    val openedPlaylist by playlistsVm.opened.collectAsState()
     val downloadOverWifiOnly by viewModel.downloadOverWifiOnly.collectAsState()
+    val economyOnMobile by viewModel.economyOnMobileData.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
     // Stable local copy: allows smart casts instead of `!!` in the blocks below
@@ -94,8 +107,8 @@ fun MainScreen(
     // so the whole screen (lists included) is not recomposed on every tick.
     val progressState = viewModel.progress.collectAsState()
     
-    val weeklyHits by viewModel.weeklyHits.collectAsState()
-    val trendTracks by viewModel.trendTracks.collectAsState()
+    val weeklyHits by searchVm.weeklyHits.collectAsState()
+    val trendTracks by searchVm.trendTracks.collectAsState()
     val popularTracks by viewModel.popularTracks.collectAsState()
     val currentPlaylist by viewModel.currentPlaylist.collectAsState()
     val currentSource by viewModel.currentSource.collectAsState()
@@ -106,6 +119,26 @@ fun MainScreen(
         if (openPlayerSignal > 0 && viewModel.currentTrack.value != null) isPlayerExpanded = true
     }
     var showAccountDialog by remember { mutableStateOf(false) }
+    var qualityDetails by remember { mutableStateOf<com.korenskoy.yandexmusic.data.player.PlaybackController.QualityDetails?>(null) }
+    // Track menu ("⋮" on any track, or the player's "add to playlist")
+    var trackMenu by remember { mutableStateOf<TrackMenuRequest?>(null) }
+    val trackMenuLauncher = remember {
+        com.korenskoy.yandexmusic.presentation.main.components.TrackMenuLauncher { track, playlist ->
+            trackMenu = TrackMenuRequest(track, playlist, pickPlaylist = false)
+        }
+    }
+    val catalogActions = remember(catalogVm, viewModel) {
+        com.korenskoy.yandexmusic.presentation.catalog.CatalogActions(
+            onBack = { catalogVm.back() },
+            onRetry = { catalogVm.retry() },
+            onOpenArtist = { id, name -> catalogVm.openArtist(id, name) },
+            onOpenAlbum = { id, title -> catalogVm.openAlbum(id, title) },
+            onPlay = { tracks, trackId, shuffle -> catalogVm.play(tracks, trackId, shuffle) },
+            onToggleLike = { viewModel.toggleLike(it) }
+        )
+    }
+    // Another tab: the catalog pages belong to where they were opened
+    LaunchedEffect(currentTab) { catalogVm.closeAll() }
     var hasHandledStartupAccountPicker by rememberSaveable { mutableStateOf(false) }
     val showStartupAccountPicker = !hasHandledStartupAccountPicker && allAccounts.size > 1 && defaultAccountUid == null
 
@@ -113,8 +146,8 @@ fun MainScreen(
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                if (updateDownloadProgress >= 2f && viewModel.canRequestPackageInstalls) {
-                    viewModel.installDownloadedUpdate()
+                if (updateVm.downloadProgress.value >= 2f && updateVm.canRequestPackageInstalls) {
+                    updateVm.installDownloaded()
                 }
             }
         }
@@ -133,12 +166,26 @@ fun MainScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    androidx.compose.runtime.CompositionLocalProvider(com.korenskoy.yandexmusic.utils.LocalStreamQuality provides streamQuality) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.korenskoy.yandexmusic.utils.LocalStreamQuality provides streamQuality,
+        com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu provides trackMenuLauncher
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Layer 0: Full-bleed Edge-to-Edge Content Area
             // In landscape, offset content to the right to avoid NavigationRail overlap
             Box(modifier = Modifier.fillMaxSize()) {
-                when (currentTab) {
+                // An artist or album page covers the tab until Back (or another tab) closes it
+                val catalogTop = catalogStack.lastOrNull()
+                if (catalogTop != null && currentTab != MainTab.CAR) {
+                    com.korenskoy.yandexmusic.presentation.catalog.CatalogPageScreen(
+                        state = catalogTop,
+                        currentTrackId = currentTrackId,
+                        isPlaying = isPlaying,
+                        likedTrackIds = likedTrackIds,
+                        contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp,
+                        actions = catalogActions
+                    )
+                } else when (currentTab) {
                     MainTab.HOME -> HomeScreen(
                         isPlaying = isPlaying,
                         isWavePlaying = currentSource == PlaylistSource.VIBE,
@@ -154,7 +201,7 @@ fun MainScreen(
                     )
                     MainTab.SEARCH -> SearchScreen(
                         query = searchQuery,
-                        onQueryChange = { viewModel.onSearchQueryChange(it) },
+                        onQueryChange = { searchVm.onQueryChange(it) },
                         results = searchResults,
                         weeklyHits = weeklyHits,
                         trendTracks = trendTracks,
@@ -162,11 +209,28 @@ fun MainScreen(
                         currentTrackId = currentTrackId,
                         isPlaying = isPlaying,
                         likedTrackIds = likedTrackIds,
-                        onTrackClick = { id, playlist -> viewModel.playTrack(id, playlist, PlaylistSource.SEARCH) },
+                        onTrackClick = { id, playlist ->
+                            searchVm.rememberQuery()
+                            viewModel.playTrack(id, playlist, PlaylistSource.SEARCH)
+                        },
                         onToggleLike = { track -> viewModel.toggleLike(track) },
-                        onLoadMoreHits = { viewModel.loadMoreHits() },
-                        onLoadMoreTrends = { viewModel.loadMoreTrends() },
-                        hasActiveTrack = currentTrack != null
+                        onLoadMoreHits = { searchVm.loadMoreHits() },
+                        onLoadMoreTrends = { searchVm.loadMoreTrends() },
+                        hasActiveTrack = currentTrack != null,
+                        artists = searchFound.artists,
+                        albums = searchFound.albums,
+                        history = searchHistory,
+                        onArtistClick = { artist ->
+                            searchVm.rememberQuery()
+                            catalogVm.openArtist(artist.idString!!, artist.name.orEmpty())
+                        },
+                        onAlbumClick = { album ->
+                            searchVm.rememberQuery()
+                            catalogVm.openAlbum(album.idString!!, album.title.orEmpty())
+                        },
+                        onRemoveFromHistory = { searchVm.removeFromHistory(it) },
+                        onClearHistory = { searchVm.clearHistory() },
+                        onSubmit = { searchVm.rememberQuery() }
                     )
                     MainTab.LIBRARY -> LibraryScreen(
                         tracks = tracks,
@@ -190,6 +254,11 @@ fun MainScreen(
                         onCrossfadeChange = { viewModel.setCrossfadeSeconds(it) },
                         wifiOnly = downloadOverWifiOnly,
                         onWifiOnlyChange = { viewModel.setDownloadOverWifiOnly(it) },
+                        economyOnMobile = economyOnMobile,
+                        onEconomyOnMobileChange = { viewModel.setEconomyOnMobileData(it) },
+                        onUpgradeDownloads = { viewModel.upgradeDownloadedQuality() },
+                        crashReports = crashReports.size,
+                        onOpenCrashLog = { showCrashLog = true },
                         onCancelDownload = { viewModel.cancelDownloadAll() },
                         onClearCache = { viewModel.clearMusicCache() },
                         onToggleLike = { track -> viewModel.toggleLike(track) },
@@ -199,21 +268,26 @@ fun MainScreen(
                         avatarUrl = accountAvatarUrl,
                         defaultAccountName = defaultAccountName,
                         updateStatus = updateStatusMessage,
-                        onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
+                        onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
                         onAccountManagementClick = { showAccountDialog = true },
                         onLogout = { showAccountDialog = true },
                         playlists = userPlaylists,
                         openedPlaylist = openedPlaylist,
-                        onOpenPlaylist = { viewModel.openPlaylist(it) },
-                        onClosePlaylist = { viewModel.closePlaylist() },
-                        onPlayPlaylist = { viewModel.playOpenedPlaylist(it) },
-                        onPlaylistTrackClick = { viewModel.playOpenedPlaylistTrack(it) }
+                        onOpenPlaylist = { playlistsVm.open(it) },
+                        onClosePlaylist = { playlistsVm.close() },
+                        onPlayPlaylist = { playlistsVm.play(it) },
+                        onPlaylistTrackClick = { playlistsVm.playTrack(it) },
+                        onCreatePlaylist = { playlistsVm.create(it) },
+                        onRenamePlaylist = { playlist, title -> playlistsVm.rename(playlist, title) },
+                        onDeletePlaylist = { playlistsVm.delete(it) },
+                        onReorderPlaylist = { playlist, shown, new -> playlistsVm.reorder(playlist, shown, new) },
+                        onSetPlaylistPublic = { playlist, public -> playlistsVm.setPublic(playlist, public) }
                     )
                     MainTab.RADIO -> {
-                        val radioStations by viewModel.radioStations.collectAsState()
+                        val radioStations by radioVm.stations.collectAsState()
                         var radioQueryState by remember { mutableStateOf("") }
                         var selectedCategory by remember { mutableStateOf(com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL) }
-                        val favoriteStationIds by viewModel.radioFavoriteStationIds.collectAsState()
+                        val favoriteStationIds by radioVm.favoriteStationIds.collectAsState()
                     
                         val filteredStations = radioStations.filter {
                             (selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL || 
@@ -231,8 +305,8 @@ fun MainScreen(
                             currentStationId = currentTrack?.idString?.removePrefix("radio_"),
                             isPlaying = isPlaying,
                             favoriteStationIds = favoriteStationIds,
-                            onStationClick = { viewModel.playRadioStation(it) },
-                            onToggleFavorite = { viewModel.toggleRadioFavorite(it) },
+                            onStationClick = { radioVm.play(it) },
+                            onToggleFavorite = { radioVm.toggleFavorite(it) },
                             hasActiveTrack = currentTrack != null
                         )
                     }
@@ -248,14 +322,14 @@ fun MainScreen(
                             onPrevClick = { viewModel.playPrev() },
                             onToggleLike = { track ->
                                 if (track.isRadio) {
-                                    viewModel.toggleRadioFavorite(track.idString.removePrefix("radio_"))
+                                    radioVm.toggleFavorite(track.idString.removePrefix("radio_"))
                                 } else {
                                     viewModel.toggleLike(track)
                                 }
                             },
                             onDislikeClick = { track ->
                                 if (track.isRadio) {
-                                    viewModel.removeRadioFavorite(track.idString.removePrefix("radio_"))
+                                    radioVm.removeFavorite(track.idString.removePrefix("radio_"))
                                 } else {
                                     viewModel.dislikeTrack(track)
                                 }
@@ -270,9 +344,9 @@ fun MainScreen(
                                 }
                             },
                             onPlayRadio = {
-                                val stations = viewModel.radioStations.value
+                                val stations = radioVm.stations.value
                                 if (stations.isNotEmpty()) {
-                                    viewModel.playRadioStation(stations.first())
+                                    radioVm.play(stations.first())
                                 }
                             },
                             onExit = { currentTab = MainTab.HOME },
@@ -318,7 +392,7 @@ fun MainScreen(
                             },
                             onToggleLike = {
                                 if (currentTrack?.isRadio == true) {
-                                    viewModel.toggleRadioFavorite(shownTrack.idString.removePrefix("radio_"))
+                                    radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
                                 } else {
                                     viewModel.toggleLike(shownTrack)
                                 }
@@ -366,7 +440,7 @@ fun MainScreen(
                                     },
                                     onToggleLike = {
                                         if (currentTrack?.isRadio == true) {
-                                            viewModel.toggleRadioFavorite(shownTrack.idString.removePrefix("radio_"))
+                                            radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
                                         } else {
                                             viewModel.toggleLike(shownTrack)
                                         }
@@ -414,7 +488,7 @@ fun MainScreen(
                             },
                             onToggleLike = {
                                 if (currentTrack?.isRadio == true) {
-                                    viewModel.toggleRadioFavorite(shownTrack.idString.removePrefix("radio_"))
+                                    radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
                                 } else {
                                     viewModel.toggleLike(shownTrack)
                                 }
@@ -431,7 +505,7 @@ fun MainScreen(
                             },
                             onDislikeClick = {
                                 if (currentTrack?.isRadio == true) {
-                                    viewModel.removeRadioFavorite(shownTrack.idString.removePrefix("radio_"))
+                                    radioVm.removeFavorite(shownTrack.idString.removePrefix("radio_"))
                                 } else {
                                     viewModel.dislikeTrack(shownTrack)
                                 }
@@ -441,7 +515,9 @@ fun MainScreen(
                             sleepTimer = sleepTimer,
                             onSleepTimer = { viewModel.setSleepTimer(it) },
                             onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
-                            onCancelSleepTimer = { viewModel.cancelSleepTimer() }
+                            onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                            onAddToPlaylist = { trackMenu = TrackMenuRequest(shownTrack, null, pickPlaylist = true) },
+                            onQualityClick = { qualityDetails = viewModel.qualityDetails() }
                         )
                     }
                 }
@@ -453,7 +529,8 @@ fun MainScreen(
             LaunchedEffect(messageLifecycleOwner) {
                 // Collect only while visible, so a message raised in the background falls back to a toast
                 messageLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                    viewModel.playbackMessages.collect { snackbarHostState.showSnackbar(it) }
+                    kotlinx.coroutines.flow.merge(viewModel.playbackMessages, playlistsVm.messages)
+                        .collect { snackbarHostState.showSnackbar(it) }
                 }
             }
             androidx.compose.material3.SnackbarHost(
@@ -464,6 +541,53 @@ fun MainScreen(
                     .padding(bottom = if (shownTrack != null) 160.dp else 90.dp)
             )
 
+            if (showCrashLog) {
+                com.korenskoy.yandexmusic.presentation.crash.CrashLogDialog(
+                    reports = crashReports,
+                    onSend = { crashVm.send() },
+                    onClear = { crashVm.clear() },
+                    onDismiss = { showCrashLog = false }
+                )
+            }
+
+            qualityDetails?.let { details ->
+                com.korenskoy.yandexmusic.presentation.player.QualityDetailsDialog(details) { qualityDetails = null }
+            }
+
+            trackMenu?.let { request ->
+                val playNextDone = androidx.compose.ui.res.stringResource(com.korenskoy.yandexmusic.R.string.track_menu_play_next_done)
+                val menuScope = androidx.compose.runtime.rememberCoroutineScope()
+                com.korenskoy.yandexmusic.presentation.main.components.TrackContextMenu(
+                    track = request.track,
+                    inPlaylist = request.playlist,
+                    playlists = userPlaylists,
+                    isLiked = likedTrackIds.contains(request.track.idString),
+                    startWithPlaylists = request.pickPlaylist,
+                    onDismiss = { trackMenu = null },
+                    onPlayNext = {
+                        viewModel.enqueueNext(request.track)
+                        menuScope.launch { snackbarHostState.showSnackbar(playNextDone) }
+                    },
+                    onToggleLike = { viewModel.toggleLike(request.track) },
+                    onAddTo = { playlistsVm.addTrack(it, request.track) },
+                    onCreatePlaylist = { playlistsVm.create(it, thenAdd = request.track) },
+                    onRemoveFromPlaylist = { request.playlist?.let { playlistsVm.removeTrack(it, request.track.idString) } },
+                    onOpenArtist = request.track.artists.firstOrNull { it.idString != null }?.let { artist ->
+                        {
+                            isPlayerExpanded = false
+                            catalogVm.openArtist(artist.idString!!, artist.name.orEmpty())
+                        }
+                    },
+                    onOpenAlbum = request.track.albums.firstOrNull()?.let { album ->
+                        val albumId = (album.id as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@let null
+                        {
+                            isPlayerExpanded = false
+                            catalogVm.openAlbum(albumId, album.title.orEmpty())
+                        }
+                    }
+                )
+            }
+
             // In-App Update Dialog
             if (updateCheckResult is com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable) {
                 val updateAvailable = updateCheckResult as com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable
@@ -471,20 +595,20 @@ fun MainScreen(
                     updateInfo = updateAvailable,
                     downloadProgress = updateDownloadProgress,
                     statusMessage = updateStatusMessage,
-                    hasInstallPermission = viewModel.canRequestPackageInstalls,
+                    hasInstallPermission = updateVm.canRequestPackageInstalls,
                     isSignatureMismatch = isSignatureMismatch,
-                    onRequestPermission = { viewModel.openInstallPermissionSettings() },
+                    onRequestPermission = { updateVm.openInstallPermissionSettings() },
                     onStartDownload = {
-                        viewModel.startUpdateDownload(updateAvailable.apkDownloadUrl)
+                        updateVm.startDownload(updateAvailable.apkDownloadUrl)
                     },
                     onInstall = {
-                        viewModel.installDownloadedUpdate(forceSystemInstall = true)
+                        updateVm.installDownloaded(forceSystemInstall = true)
                     },
                     onShareOrSave = {
-                        viewModel.shareOrSaveDownloadedApk()
+                        updateVm.shareOrSaveDownloadedApk()
                     },
                     onDismiss = {
-                        viewModel.dismissUpdateDialog()
+                        updateVm.dismiss()
                     }
                 )
             }
@@ -495,12 +619,12 @@ fun MainScreen(
                     accounts = allAccounts,
                     activeAccount = activeAccount,
                     defaultAccountUid = defaultAccountUid,
-                    onSetDefaultAccount = { uid -> viewModel.setDefaultAccount(uid) },
-                    onSwitchAccount = { uid -> viewModel.switchAccount(uid) },
-                    onRemoveAccount = { uid -> viewModel.removeAccount(uid) },
+                    onSetDefaultAccount = { uid -> accountVm.setDefaultAccount(uid) },
+                    onSwitchAccount = { uid -> accountVm.switchAccount(uid) },
+                    onRemoveAccount = { uid -> accountVm.removeAccount(uid) },
                     onAddNewAccount = { onNavigateToAuth() },
-                    onLogoutCurrent = { viewModel.logoutCurrentAccount() },
-                    onLogoutAll = { viewModel.logoutAllAccounts() },
+                    onLogoutCurrent = { accountVm.logoutCurrentAccount() },
+                    onLogoutAll = { accountVm.logoutAllAccounts() },
                     onDismiss = { showAccountDialog = false }
                 )
             }
@@ -511,9 +635,9 @@ fun MainScreen(
                     accounts = allAccounts,
                     activeAccount = activeAccount,
                     onSelectAccount = { uid, rememberAsDefault ->
-                        viewModel.switchAccount(uid)
+                        accountVm.switchAccount(uid)
                         if (rememberAsDefault) {
-                            viewModel.setDefaultAccount(uid)
+                            accountVm.setDefaultAccount(uid)
                         }
                         hasHandledStartupAccountPicker = true
                     },
@@ -532,3 +656,10 @@ fun MainScreen(
 private fun WithProgress(progress: State<Long>, content: @Composable (Long) -> Unit) {
     content(progress.value)
 }
+
+/** What the track menu was opened for; [pickPlaylist] goes straight to the playlist picker. */
+private data class TrackMenuRequest(
+    val track: com.korenskoy.yandexmusic.data.dto.TrackDetailsDto,
+    val playlist: com.korenskoy.yandexmusic.data.dto.UserPlaylistDto?,
+    val pickPlaylist: Boolean
+)

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.filled.HighQuality
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import android.content.res.Configuration
@@ -73,7 +74,12 @@ fun CacheMenuBottomSheet(
     crossfadeSeconds: Int = 3,
     onCrossfadeChange: (Int) -> Unit = {},
     wifiOnly: Boolean = true,
-    onWifiOnlyChange: (Boolean) -> Unit = {}
+    onWifiOnlyChange: (Boolean) -> Unit = {},
+    economyOnMobile: Boolean = false,
+    onEconomyOnMobileChange: (Boolean) -> Unit = {},
+    onUpgradeDownloads: () -> Unit = {},
+    crashReports: Int = 0,
+    onOpenCrashLog: () -> Unit = {}
 ) {
     val cacheSizeMb = cacheSizeBytes / (1024.0 * 1024.0)
     val cacheSizeFormatted = String.format(Locale.US, "%.1f МБ", cacheSizeMb)
@@ -477,7 +483,38 @@ fun CacheMenuBottomSheet(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    WifiOnlySettingCard(enabled = wifiOnly, onChange = onWifiOnlyChange)
+                    SwitchSettingCard(
+                        title = stringResource(R.string.settings_wifi_only_title),
+                        subtitle = stringResource(R.string.settings_wifi_only_subtitle),
+                        enabled = wifiOnly,
+                        onChange = onWifiOnlyChange
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    SwitchSettingCard(
+                        title = stringResource(R.string.settings_economy_mobile),
+                        subtitle = stringResource(R.string.settings_economy_mobile_hint),
+                        enabled = economyOnMobile,
+                        onChange = onEconomyOnMobileChange
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    ActionSettingCard(
+                        title = stringResource(R.string.settings_upgrade_downloads),
+                        subtitle = stringResource(R.string.settings_upgrade_downloads_hint),
+                        onClick = onUpgradeDownloads
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    ActionSettingCard(
+                        title = stringResource(R.string.crash_log_title),
+                        subtitle = if (crashReports == 0) stringResource(R.string.crash_log_none)
+                        else stringResource(R.string.crash_log_count, crashReports),
+                        onClick = onOpenCrashLog
+                    )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -738,7 +775,7 @@ fun CacheMenuBottomSheet(
 
 /** Offline downloads only on Wi-Fi (the default), like "Download over cellular" off in Apple Music. */
 @Composable
-private fun WifiOnlySettingCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
+private fun SwitchSettingCard(title: String, subtitle: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -751,13 +788,13 @@ private fun WifiOnlySettingCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.settings_wifi_only_title),
+                text = title,
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = stringResource(R.string.settings_wifi_only_subtitle),
+                text = subtitle,
                 color = Color.White.copy(alpha = 0.5f),
                 fontSize = 11.5.sp
             )
@@ -772,6 +809,31 @@ private fun WifiOnlySettingCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
                 uncheckedTrackColor = Color.White.copy(alpha = 0.12f),
                 uncheckedBorderColor = Color.Transparent
             )
+        )
+    }
+}
+
+/** A one-off action in the settings (it runs in the background, progress is in the notification). */
+@Composable
+private fun ActionSettingCard(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = subtitle, color = Color.White.copy(alpha = 0.5f), fontSize = 11.5.sp)
+        }
+        Icon(
+            imageVector = androidx.compose.material.icons.Icons.Default.HighQuality,
+            contentDescription = null,
+            tint = Color(0xFFFF3366)
         )
     }
 }

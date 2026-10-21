@@ -8,7 +8,6 @@ import androidx.media3.common.MediaMetadata
 import com.korenskoy.yandexmusic.BuildConfig
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
-import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.repository.LibraryRepository
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
@@ -30,7 +29,7 @@ class MediaLibraryTree @Inject constructor(
     private val radioRepository: RadioRepository,
     private val downloadManager: TrackDownloadManager,
     private val playbackController: PlaybackController,
-    private val api: YandexMusicApi,
+    private val searchRepository: com.korenskoy.yandexmusic.data.repository.SearchRepository,
     private val playlistsRepository: UserPlaylistsRepository
 ) {
     fun root(): MediaItem = folder(ROOT_ID, context.getString(R.string.app_name), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
@@ -122,7 +121,7 @@ class MediaLibraryTree @Inject constructor(
             return { playbackController.playRadioStation(station) }
         }
         val found = try {
-            api.search(query).result?.tracks?.results.orEmpty().distinctBy { it.idString }
+            searchRepository.searchTracks(query)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {

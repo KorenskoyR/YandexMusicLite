@@ -352,6 +352,19 @@ class PlaybackController @Inject constructor(
         _currentPlaylist.value = list
     }
 
+    /** Puts [track] right after the current one; with nothing (or radio) playing it just starts. */
+    fun enqueueNext(track: TrackDetailsDto) {
+        val current = _currentTrack.value
+        if (current == null || current.isRadio) {
+            playTrack(track.idString, listOf(track))
+            return
+        }
+        if (current.idString == track.idString) return
+        val queue = _currentPlaylist.value.filterNot { it.idString == track.idString }.toMutableList()
+        queue.add(queue.indexOfFirst { it.idString == current.idString } + 1, track)
+        _currentPlaylist.value = queue
+    }
+
     fun removeFromQueue(trackId: String) {
         _currentPlaylist.value = _currentPlaylist.value.filterNot { it.idString == trackId }
     }
@@ -550,9 +563,20 @@ class PlaybackController @Inject constructor(
         playNext()
     }
 
+    /** What plays now and what the server offered, for the player's quality details. */
+    data class QualityDetails(val playing: String?, val offered: String?, val economy: Boolean)
+
+    fun qualityDetails(): QualityDetails? {
+        val track = _currentTrack.value?.takeIf { !it.isRadio } ?: return null
+        val id = track.idString
+        return QualityDetails(_streamQuality.value, preloadManager.offeredOf(id), !downloadManager.isKnownDownloaded(id) && preloadManager.isCapped(id))
+    }
+
     private fun publishQuality(trackId: String) {
         _streamQuality.value = if (downloadManager.isKnownDownloaded(trackId)) {
-            context.getString(R.string.quality_offline)
+            downloadManager.downloadedQuality(trackId)
+                ?.let { context.getString(R.string.quality_offline_known, it.codec.uppercase(), it.bitrateKbps) }
+                ?: context.getString(R.string.quality_offline)
         } else {
             preloadManager.qualityOf(trackId)?.let {
                 context.getString(R.string.quality_stream, it.codec.uppercase(), it.bitrateKbps)

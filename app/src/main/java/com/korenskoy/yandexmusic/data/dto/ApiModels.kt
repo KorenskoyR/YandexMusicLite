@@ -115,11 +115,22 @@ data class TrackDetailsDto(
     @SerialName("artists") val artists: List<ArtistDto> = emptyList(),
     @SerialName("coverUri") val coverUri: String? = null,
     @SerialName("durationMs") val durationMs: Long? = null,
-    @kotlinx.serialization.Transient val isRadio: Boolean = false
+    @kotlinx.serialization.Transient val isRadio: Boolean = false,
+    @SerialName("albums") val albums: List<TrackAlbumDto> = emptyList()
 ) {
     val idString: String
         get() = if (id is kotlinx.serialization.json.JsonPrimitive) id.content else id.toString()
+
+    /** Playlist edits address a track by the id + album pair. */
+    val albumId: String?
+        get() = (albums.firstOrNull()?.id as? kotlinx.serialization.json.JsonPrimitive)?.content
 }
+
+@Serializable
+data class TrackAlbumDto(
+    @SerialName("id") val id: JsonElement? = null,
+    @SerialName("title") val title: String? = null
+)
 
 /** A user's playlist from `users/{uid}/playlists/list` (without tracks) or `playlists/{kind}` (with tracks). */
 @Serializable
@@ -130,8 +141,12 @@ data class UserPlaylistDto(
     @SerialName("revision") val revision: Int = 0,
     @SerialName("cover") val cover: PlaylistCoverDto? = null,
     @SerialName("ogImage") val ogImage: String? = null,
+    @SerialName("visibility") val visibility: String? = null,
     @SerialName("tracks") val tracks: List<PlaylistTrackDto> = emptyList()
 ) {
+    val isPublic: Boolean
+        get() = visibility == "public"
+
     val kindString: String
         get() = (kind as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
 
@@ -149,13 +164,54 @@ data class PlaylistCoverDto(
 @Serializable
 data class PlaylistTrackDto(
     @SerialName("id") val id: JsonElement? = null,
+    @SerialName("albumId") val albumId: JsonElement? = null,
     @SerialName("track") val track: TrackDetailsDto? = null
-)
+) {
+    val trackId: String?
+        get() = track?.idString ?: (id as? kotlinx.serialization.json.JsonPrimitive)?.content
+
+    val albumIdString: String?
+        get() = (albumId as? kotlinx.serialization.json.JsonPrimitive)?.content ?: track?.albumId
+}
 
 @Serializable
 data class ArtistDto(
     @SerialName("id") val id: JsonElement? = null,
-    @SerialName("name") val name: String? = null
+    @SerialName("name") val name: String? = null,
+    @SerialName("cover") val cover: PlaylistCoverDto? = null,
+    @SerialName("ogImage") val ogImage: String? = null
+) {
+    val idString: String?
+        get() = (id as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "0" }
+
+    val coverUri: String?
+        get() = cover?.uri ?: ogImage
+}
+
+/** An album page: `albums/{id}/with-tracks` (tracks in volumes, i.e. discs), or an album in a list. */
+@Serializable
+data class AlbumDto(
+    @SerialName("id") val id: JsonElement? = null,
+    @SerialName("title") val title: String? = null,
+    @SerialName("coverUri") val coverUri: String? = null,
+    @SerialName("year") val year: Int? = null,
+    @SerialName("trackCount") val trackCount: Int = 0,
+    @SerialName("artists") val artists: List<ArtistDto> = emptyList(),
+    @SerialName("volumes") val volumes: List<List<TrackDetailsDto>> = emptyList()
+) {
+    val idString: String?
+        get() = (id as? kotlinx.serialization.json.JsonPrimitive)?.content
+
+    val tracks: List<TrackDetailsDto>
+        get() = volumes.flatten()
+}
+
+/** `artists/{id}/brief-info`: the artist, popular tracks and albums. */
+@Serializable
+data class ArtistBriefDto(
+    @SerialName("artist") val artist: ArtistDto? = null,
+    @SerialName("popularTracks") val popularTracks: List<TrackDetailsDto> = emptyList(),
+    @SerialName("albums") val albums: List<AlbumDto> = emptyList()
 )
 
 @Serializable
@@ -200,15 +256,27 @@ data class LibraryTrackDto(
 data class DownloadInfoResponseDto(
     @SerialName("codec") val codec: String,
     @SerialName("bitrateInKbps") val bitrateInKbps: Int,
-    @SerialName("gain") val gain: Boolean,
-    @SerialName("preview") val preview: Boolean,
+    @SerialName("gain") val gain: Boolean = false,
+    @SerialName("preview") val preview: Boolean = false,
     @SerialName("downloadInfoUrl") val downloadInfoUrl: String,
-    @SerialName("direct") val direct: Boolean
+    @SerialName("direct") val direct: Boolean = false
 )
 
 @Serializable
 data class SearchResponseDto(
-    @SerialName("tracks") val tracks: SearchTracksResultDto? = null
+    @SerialName("tracks") val tracks: SearchTracksResultDto? = null,
+    @SerialName("artists") val artists: SearchArtistsResultDto? = null,
+    @SerialName("albums") val albums: SearchAlbumsResultDto? = null
+)
+
+@Serializable
+data class SearchArtistsResultDto(
+    @SerialName("results") val results: List<ArtistDto> = emptyList()
+)
+
+@Serializable
+data class SearchAlbumsResultDto(
+    @SerialName("results") val results: List<AlbumDto> = emptyList()
 )
 
 @Serializable

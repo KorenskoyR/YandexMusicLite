@@ -30,12 +30,26 @@ class DownloadScheduler @Inject constructor(
         .getWorkInfosForUniqueWorkFlow(ALL_WORK)
         .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED } }
 
+    /** True while saved tracks are being re-downloaded in a better quality. */
+    val isUpgradingQuality: Flow<Boolean> = WorkManager.getInstance(context)
+        .getWorkInfosForUniqueWorkFlow(UPGRADE_WORK)
+        .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED } }
+
     suspend fun downloadAllLiked() {
         val request = OneTimeWorkRequestBuilder<LikedTracksDownloadWorker>()
             .setConstraints(constraints())
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .build()
         workManager.enqueueUniqueWork(ALL_WORK, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /** Re-downloads saved liked tracks the server now offers in a better quality. */
+    suspend fun upgradeDownloadedQuality() {
+        val request = OneTimeWorkRequestBuilder<LikedTracksDownloadWorker>()
+            .setConstraints(constraints())
+            .setInputData(workDataOf(LikedTracksDownloadWorker.KEY_UPGRADE to true))
+            .build()
+        workManager.enqueueUniqueWork(UPGRADE_WORK, ExistingWorkPolicy.KEEP, request)
     }
 
     suspend fun downloadTrack(trackId: String) {
@@ -48,6 +62,7 @@ class DownloadScheduler @Inject constructor(
 
     fun cancelAll() {
         workManager.cancelUniqueWork(ALL_WORK)
+        workManager.cancelUniqueWork(UPGRADE_WORK)
     }
 
     private suspend fun constraints(): Constraints = Constraints.Builder()
@@ -60,5 +75,6 @@ class DownloadScheduler @Inject constructor(
     private companion object {
         const val ALL_WORK = "download_liked_tracks"
         const val TRACK_WORK_PREFIX = "download_track_"
+        const val UPGRADE_WORK = "upgrade_downloaded_quality"
     }
 }

@@ -21,14 +21,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   test:
-    name: Unit tests & lint
+    name: Unit tests, screenshots & lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21' # Robolectric screenshot tests for SDK 35 need Java 21
           distribution: 'temurin'
           cache: gradle
       - run: chmod +x gradlew
-      - run: ./gradlew testDebugUnitTest lintDebug --no-daemon
+      # verifyRoborazziDebug runs all unit tests and compares the screens with app/src/test/screenshots
+      - run: ./gradlew verifyRoborazziDebug lintDebug --no-daemon
+      - name: Screenshot differences
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-diffs
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: ignore

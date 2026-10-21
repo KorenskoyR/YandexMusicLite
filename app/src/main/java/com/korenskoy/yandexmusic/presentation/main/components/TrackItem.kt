@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,7 +68,10 @@ fun TrackItem(
     onLongClick: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
-    
+    val menu = LocalTrackMenu.current
+    val menuPlaylist = LocalTrackMenuPlaylist.current
+    val openMenu: (() -> Unit)? = menu?.let { { it.open(track, menuPlaylist) } }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -79,9 +83,11 @@ fun TrackItem(
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLongClick()
+                    openMenu?.invoke()
                 }
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            // The menu button carries its own touch padding
+            .padding(start = 16.dp, end = if (openMenu != null) 4.dp else 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val context = LocalContext.current
@@ -195,6 +201,18 @@ fun TrackItem(
                 contentDescription = stringResource(R.string.cd_nravitsya),
                 modifier = Modifier.size(17.dp)
             )
+        }
+
+        if (openMenu != null) {
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(onClick = openMenu, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.cd_track_menu),
+                    tint = Color.White.copy(alpha = 0.55f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

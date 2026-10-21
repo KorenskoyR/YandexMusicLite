@@ -9,6 +9,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,9 +20,18 @@ import okhttp3.Request
 class TrackPreloadManager @Inject constructor(
     private val api: YandexMusicApi,
     private val downloadManager: TrackDownloadManager,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository,
+    private val networkMonitor: NetworkMonitor
 ) {
-    private data class CachedTrackUrl(val url: String, val fetchedAtMs: Long)
+    /** [capKbps]: the bitrate limit the link was chosen under (null — best quality). */
+    private data class CachedTrackUrl(val url: String, val fetchedAtMs: Long, val capKbps: Int?)
+
+    /**
+     * A playable link and what it is. [bestMp3] is the best MP3 offered: what a file downloaded before 1.6
+     * holds, as those always took the best MP3.
+     */
+    data class ResolvedStream(val url: String, val quality: StreamQuality, val bestMp3: StreamQuality? = null)
 
     companion object {
         const val URL_TTL_MS = 45 * 60 * 1000L // 45 минут
@@ -37,6 +47,13 @@ class TrackPreloadManager @Inject constructor(
 
     fun qualityOf(trackId: String): StreamQuality? = qualities[trackId]
 
+    /** Every variant the server offered for a track ("AAC 192 · MP3 192 · …"), for the player's quality details. */
+    private val offered = ConcurrentHashMap<String, String>()
+    fun offeredOf(trackId: String): String? = offered[trackId]
+
+    /** True when the track's current link was chosen under the economy cap. */
+    fun isCapped(trackId: String): Boolean = resolvedUrls[trackId]?.capKbps != null
+
     fun getResolvedUrl(trackId: String): String? {
         val cached = resolvedUrls[trackId] ?: return null
         if (System.currentTimeMillis() - cached.fetchedAtMs > URL_TTL_MS) {
@@ -44,6 +61,41 @@ class TrackPreloadManager @Inject constructor(
             return null
         }
         return cached.url
+    }
+
+    /** Economy on mobile data: the bitrate cap for streaming now, or null for the best quality. */
+    private suspend fun playbackCapKbps(): Int? =
+        if (networkMonitor.isMetered() && settingsRepository.economyOnMobileData.first())
+            com.korenskoy.yandexmusic.domain.repository.SettingsRepository.ECONOMY_BITRATE_KBPS
+        else null
+
+    /**
+     * The best stream for keeping offline, ignoring any copy already downloaded and the economy cap.
+     * Null when the track has no playable stream or the network failed.
+     */
+    suspend fun resolveForDownload(trackId: String): ResolvedStream? = withContext(Dispatchers.IO) {
+        try {
+            resolveBest(trackId, capKbps = null)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("TrackPreloadManager", "Error resolving download for $trackId", e)
+            null
+        }
+    }
+
+    /** Tries the offered variants from the best down until one gives a link. */
+    private suspend fun resolveBest(trackId: String, capKbps: Int?): ResolvedStream? {
+        val offeredList = api.getTrackDownloadInfo(trackId).result.orEmpty()
+        offered[trackId] = StreamVariants.describe(offeredList)
+        Log.i("TrackPreloadManager", "Track $trackId offered: ${offered[trackId]}")
+        val bestMp3 = offeredList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
+            .maxByOrNull { it.bitrateInKbps }?.let { StreamQuality(it.codec, it.bitrateInKbps) }
+        for (variant in StreamVariants.ranked(offeredList, capKbps)) {
+            val url = resolveXmlToStreamUrl(variant.downloadInfoUrl, variant.codec) ?: continue
+            return ResolvedStream(url, StreamQuality(variant.codec, variant.bitrateInKbps), bestMp3)
+        }
+        return null
     }
 
     fun evictUrl(trackId: String) {
@@ -65,38 +117,22 @@ class TrackPreloadManager @Inject constructor(
         return fetchOrAwait(trackId)
     }
 
-    suspend fun getOrFetchUrl(trackId: String): String? {
-        val cached = getResolvedUrl(trackId)
-        if (cached != null) return cached
-        return fetchOrAwait(trackId)
-    }
+    suspend fun getOrFetchUrl(trackId: String): String? = fetchOrAwait(trackId)
 
     private suspend fun fetchOrAwait(trackId: String): String? {
         if (trackId.startsWith("radio_")) return null
         if (downloadManager.isTrackDownloaded(trackId)) return null
-        getResolvedUrl(trackId)?.let { return it }
+        val cap = playbackCapKbps()
+        // A link chosen under another cap (Wi-Fi ↔ mobile data) is chosen again
+        resolvedUrls[trackId]?.takeIf { it.capKbps == cap }?.let { getResolvedUrl(trackId)?.let { url -> return url } }
 
         val deferred = inFlightRequests.computeIfAbsent(trackId) {
             scope.async(Dispatchers.IO) {
                 try {
-                    val downloadInfoResponse = api.getTrackDownloadInfo(trackId)
-                    val infoList = downloadInfoResponse.result ?: emptyList()
-                    val preferredInfo = infoList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
-                        .maxByOrNull { it.bitrateInKbps }
-                        ?: infoList.filter { !it.preview }.maxByOrNull { it.bitrateInKbps }
-                        ?: infoList.firstOrNull()
-                    val infoUrl = preferredInfo?.downloadInfoUrl
-                    
-                    if (infoUrl != null) {
-                        val mp3Url = resolveXmlToMp3Url(infoUrl)
-                        if (mp3Url != null) {
-                            resolvedUrls[trackId] = CachedTrackUrl(mp3Url, System.currentTimeMillis())
-                            qualities[trackId] = StreamQuality(preferredInfo.codec, preferredInfo.bitrateInKbps)
-                            Log.d("TrackPreloadManager", "Successfully resolved URL for track $trackId")
-                            return@async mp3Url
-                        }
-                    }
-                    null
+                    val stream = resolveBest(trackId, cap) ?: return@async null
+                    resolvedUrls[trackId] = CachedTrackUrl(stream.url, System.currentTimeMillis(), cap)
+                    qualities[trackId] = stream.quality
+                    stream.url
                 } catch (e: Exception) {
                     Log.e("TrackPreloadManager", "Error resolving URL for track $trackId", e)
                     null
@@ -119,7 +155,7 @@ class TrackPreloadManager @Inject constructor(
         inFlightRequests.clear()
     }
     
-    private suspend fun resolveXmlToMp3Url(infoUrl: String): String? = withContext(Dispatchers.IO) {
+    private suspend fun resolveXmlToStreamUrl(infoUrl: String, codec: String): String? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url(infoUrl).build()
             val xmlData = okHttpClient.newCall(request).execute().use { response ->
@@ -128,11 +164,12 @@ class TrackPreloadManager @Inject constructor(
                 DownloadInfoParser.parseXml(xmlResponse)
             }
             if (xmlData != null) {
-                return@withContext Md5Helper.generateMp3Url(
+                return@withContext Md5Helper.generateStreamUrl(
                     xmlData.host,
                     xmlData.path,
                     xmlData.ts,
-                    xmlData.s
+                    xmlData.s,
+                    codec
                 )
             }
             null

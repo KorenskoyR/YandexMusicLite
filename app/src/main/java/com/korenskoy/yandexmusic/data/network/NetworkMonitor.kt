@@ -36,6 +36,13 @@ class NetworkMonitor @Inject constructor(
         }
     }
 
+    /** Mobile data or another network the system marks as paid by the amount used. */
+    fun isMetered(): Boolean = try {
+        connectivityManager.isActiveNetworkMetered
+    } catch (e: Exception) {
+        false
+    }
+
     val isConnectedFlow: Flow<Boolean> = callbackFlow {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {

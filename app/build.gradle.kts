@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.baselineprofile)
+    alias(libs.plugins.roborazzi)
 }
 
 val localProperties = Properties()
@@ -36,8 +37,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 24
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.5.0"
+        versionCode = 24
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -107,6 +108,20 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        // Robolectric screenshot tests render with the app's real resources
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Reference screenshots live in git: ./gradlew recordRoborazziDebug to update, verifyRoborazziDebug to compare
+roborazzi {
+    outputDir.set(file("src/test/screenshots"))
+}
+
+// Room schemas are versioned in git, so each future migration can be checked against the previous schema
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -148,6 +163,10 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     baselineProfile(project(":baselineprofile"))
     
     implementation(libs.androidx.compose.ui)
@@ -156,6 +175,13 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+    testImplementation(libs.androidx.glance.appwidget.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

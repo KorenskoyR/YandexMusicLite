@@ -59,4 +59,21 @@ class PlaylistDtoTest {
         assertNull("metadata is fetched separately", playlist.tracks[1].track)
         assertEquals("222", (playlist.tracks[1].id as kotlinx.serialization.json.JsonPrimitive).content)
     }
+
+    @Test
+    fun albumIdComesFromTheItemOrItsTrack() {
+        val body = """
+            {"result":{"kind":1003,"revision":8,"tracks":[
+              {"id":111,"albumId":11,"track":{"id":"111","albums":[{"id":11,"title":"A"}]}},
+              {"id":222,"albumId":22},
+              {"id":333,"track":{"id":"333","albums":[{"id":33}]}}
+            ]}}
+        """.trimIndent()
+
+        val tracks = json.decodeFromString<ResponseWrapper<UserPlaylistDto>>(body).result!!.tracks
+
+        assertEquals(listOf("111", "222", "333"), tracks.map { it.trackId })
+        assertEquals(listOf("11", "22", "33"), tracks.map { it.albumIdString })
+        assertEquals("11", tracks[0].track?.albumId)
+    }
 }

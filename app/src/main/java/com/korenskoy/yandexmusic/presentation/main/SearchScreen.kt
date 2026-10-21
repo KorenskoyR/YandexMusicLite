@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.material.icons.filled.History
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.Spring
@@ -83,7 +84,15 @@ fun SearchScreen(
     onToggleLike: (TrackDetailsDto) -> Unit,
     onLoadMoreHits: () -> Unit = {},
     onLoadMoreTrends: () -> Unit = {},
-    hasActiveTrack: Boolean = false
+    hasActiveTrack: Boolean = false,
+    artists: List<com.korenskoy.yandexmusic.data.dto.ArtistDto> = emptyList(),
+    albums: List<com.korenskoy.yandexmusic.data.dto.AlbumDto> = emptyList(),
+    history: List<String> = emptyList(),
+    onArtistClick: (com.korenskoy.yandexmusic.data.dto.ArtistDto) -> Unit = {},
+    onAlbumClick: (com.korenskoy.yandexmusic.data.dto.AlbumDto) -> Unit = {},
+    onRemoveFromHistory: (String) -> Unit = {},
+    onClearHistory: () -> Unit = {},
+    onSubmit: () -> Unit = {}
 ) {
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -189,7 +198,7 @@ fun SearchScreen(
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { /* Execute search */ })
+                    keyboardActions = KeyboardActions(onSearch = { onSubmit() })
                 )
             }
         }
@@ -233,6 +242,17 @@ fun SearchScreen(
                         .fillMaxSize()
                         .navigationBarsPadding()
                 ) {
+                    if (history.isNotEmpty()) {
+                        item(key = "history") {
+                            RecentSearches(
+                                history = history,
+                                onClick = onQueryChange,
+                                onRemove = onRemoveFromHistory,
+                                onClear = onClearHistory,
+                                modifier = Modifier.padding(start = contentStart, end = 16.dp, bottom = 16.dp)
+                            )
+                        }
+                    }
                     // Weekly Hits Section
                     if (hits.isNotEmpty()) {
                         item {
@@ -374,6 +394,22 @@ fun SearchScreen(
                         .fillMaxSize()
                         .navigationBarsPadding()
                 ) {
+                    if (artists.isNotEmpty()) {
+                        item(key = "artists") {
+                            Column(Modifier.padding(bottom = 12.dp)) {
+                                SearchSectionTitle(stringResource(R.string.search_artists))
+                                com.korenskoy.yandexmusic.presentation.catalog.ArtistsRow(artists, onArtistClick, PaddingValues(0.dp))
+                            }
+                        }
+                    }
+                    if (albums.isNotEmpty()) {
+                        item(key = "albums") {
+                            Column(Modifier.padding(bottom = 12.dp)) {
+                                SearchSectionTitle(stringResource(R.string.search_albums))
+                                com.korenskoy.yandexmusic.presentation.catalog.AlbumsRow(albums, onAlbumClick, PaddingValues(0.dp))
+                            }
+                        }
+                    }
                     if (isLandscape) {
                         items(results.chunked(2), key = { row -> row.joinToString("|") { it.idString } }) { rowItems ->
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -513,6 +549,65 @@ fun PopularTrackCard(track: TrackDetailsDto, isLandscape: Boolean = false, onCli
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+private fun SearchSectionTitle(text: String) {
+    Text(
+        text = text,
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        fontSize = 17.sp,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+}
+
+/** The last searches: tap to search again, ✕ to forget one, "Clear" to forget all. */
+@Composable
+private fun RecentSearches(
+    history: List<String>,
+    onClick: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.search_recent),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = stringResource(R.string.search_clear_history),
+                color = Color(0xFFFF3366),
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onClear)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+        history.forEach { query ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onClick(query) }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.History, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(query, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                IconButton(onClick = { onRemove(query) }) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_remove_from_history), tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                }
+            }
         }
     }
 }

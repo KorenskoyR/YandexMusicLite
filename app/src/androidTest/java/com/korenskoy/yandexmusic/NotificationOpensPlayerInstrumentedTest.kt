@@ -10,7 +10,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import com.korenskoy.yandexmusic.presentation.auth.AuthViewModel
+import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
 import com.korenskoy.yandexmusic.presentation.main.MainViewModel
+import com.korenskoy.yandexmusic.presentation.radio.RadioViewModel
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,9 +72,15 @@ class NotificationOpensPlayerInstrumentedTest {
         }
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         var mainVm: MainViewModel? = null
+        var accountVm: AccountViewModel? = null
         try {
             lateinit var vm: MainViewModel
-            scenario.onActivity { vm = ViewModelProvider(it)[MainViewModel::class.java] }
+            lateinit var radio: RadioViewModel
+            scenario.onActivity {
+                vm = ViewModelProvider(it)[MainViewModel::class.java]
+                radio = ViewModelProvider(it)[RadioViewModel::class.java]
+                accountVm = ViewModelProvider(it)[AccountViewModel::class.java]
+            }
             mainVm = vm
             // Radio list snapshot for visual review of the bundled station logos
             if (hasText("FM Радио", 15_000)) device.findObject(By.text("FM Радио")).click()
@@ -86,8 +94,8 @@ class NotificationOpensPlayerInstrumentedTest {
             Thread.sleep(2_000)
             snap("radio_search")
             device.findObject(By.clazz("android.widget.EditText"))?.text = ""
-            val station = vm.radioStations.value.first { it.id == "record" }
-            instrumentation.runOnMainSync { vm.playRadioStation(station) }
+            val station = radio.stations.value.first { it.id == "record" }
+            instrumentation.runOnMainSync { radio.play(station) }
             hasDesc("Воспроизведение или пауза", 10_000) // mini player is up
             assertFalse("full player must be closed before the tap", hasDesc("Свернуть плеер", 1_000))
 
@@ -115,7 +123,10 @@ class NotificationOpensPlayerInstrumentedTest {
         } finally {
             // The open full-screen player animates endlessly, so the main thread never goes idle and
             // ActivityScenario calls would wait forever: stop playback and collapse it first
-            mainVm?.let { vm -> instrumentation.runOnMainSync { vm.stopAndClearPlayer(); vm.logoutAllAccounts() } }
+            instrumentation.runOnMainSync {
+                mainVm?.stopAndClearPlayer()
+                accountVm?.logoutAllAccounts()
+            }
             device.pressBack()
             scenario.close()
         }

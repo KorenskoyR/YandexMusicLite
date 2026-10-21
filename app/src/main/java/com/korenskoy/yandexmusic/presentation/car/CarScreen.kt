@@ -68,6 +68,8 @@ fun CarScreen(
     onSeek: (Long) -> Unit = {}
 ) {
     val isLiked = currentTrack?.let { likedTrackIds.contains(it.idString) } == true
+    // System back leaves car mode like the screen's own arrow, instead of closing the app
+    androidx.activity.compose.BackHandler(onBack = onExit)
 
     val view = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(Unit) {
@@ -1030,16 +1032,20 @@ fun CarActionTile(modifier: Modifier = Modifier, title: String, accentColor: Col
     }
 }
 
+/** Time source of [CarTimeWidget]; screenshot tests pin it. */
+val LocalCarClock = androidx.compose.runtime.staticCompositionLocalOf<() -> Long> { System::currentTimeMillis }
+
 @Composable
 fun CarTimeWidget() {
     var currentTime by remember { mutableStateOf("") }
     var currentDate by remember { mutableStateOf("") }
+    val clock = LocalCarClock.current
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(clock) {
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         val dateFormat = SimpleDateFormat("dd MMM, E", Locale.forLanguageTag("ru"))
         while (true) {
-            val calendar = Calendar.getInstance()
+            val calendar = Calendar.getInstance().apply { timeInMillis = clock() }
             currentTime = timeFormat.format(calendar.time)
             currentDate = dateFormat.format(calendar.time)
             delay(1000)

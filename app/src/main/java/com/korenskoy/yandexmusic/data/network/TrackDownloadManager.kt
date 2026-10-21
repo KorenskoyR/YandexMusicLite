@@ -43,8 +43,18 @@ class TrackDownloadManager @Inject constructor(
         updateCacheStats()
     }
 
+    @Volatile
+    private var savedQualities: Map<String, TrackPreloadManager.StreamQuality> = emptyMap()
+
     private fun updateCacheStats() {
-        val files = tracksDir.listFiles()?.filter { it.extension == "mp3" && it.length() > 0 } ?: emptyList()
+        val all = tracksDir.listFiles()?.toList().orEmpty()
+        val files = all.filter { it.extension == "mp3" && it.length() > 0 }
+        savedQualities = all.filter { it.extension == "quality" }.mapNotNull { file ->
+            runCatching {
+                val (codec, kbps) = file.readText().split(':')
+                file.nameWithoutExtension to TrackPreloadManager.StreamQuality(codec, kbps.trim().toInt())
+            }.getOrNull()
+        }.toMap()
         _downloadedTrackIds.value = files.map { it.nameWithoutExtension }.toSet()
         _cacheSizeBytes.value = files.sumOf { it.length() }
     }
@@ -65,8 +75,21 @@ class TrackDownloadManager @Inject constructor(
     /** Main-thread friendly check against the in-memory index (no disk access). */
     fun isKnownDownloaded(trackId: String): Boolean = trackId in _downloadedTrackIds.value
 
-    suspend fun downloadTrack(trackId: String, url: String): Boolean = withContext(Dispatchers.IO) {
-        if (isTrackDownloaded(trackId)) return@withContext true
+    /** Codec and bitrate a downloaded file was saved in; null for files from before 1.6 (the best MP3 then). */
+    fun downloadedQuality(trackId: String): TrackPreloadManager.StreamQuality? = savedQualities[trackId]
+
+    /**
+     * Saves the track for offline listening. With [replace] an existing copy is swapped for the new one
+     * only once the new file is complete (a better quality), so the track stays playable meanwhile.
+     * The file keeps the `.mp3` name whatever the codec: the player detects the format from its content.
+     */
+    suspend fun downloadTrack(
+        trackId: String,
+        url: String,
+        quality: TrackPreloadManager.StreamQuality? = null,
+        replace: Boolean = false
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!replace && isTrackDownloaded(trackId)) return@withContext true
 
         val file = File(tracksDir, "$trackId.mp3")
         val tempFile = File(tracksDir, "$trackId.tmp")
@@ -97,6 +120,8 @@ class TrackDownloadManager @Inject constructor(
                 tempFile.copyTo(file, overwrite = true)
                 tempFile.delete()
             }
+            val qualityFile = File(tracksDir, "$trackId.quality")
+            if (quality != null) qualityFile.writeText("${quality.codec}:${quality.bitrateKbps}") else qualityFile.delete()
             updateCacheStats()
             return@withContext true
         } catch (e: Exception) {
@@ -108,6 +133,7 @@ class TrackDownloadManager @Inject constructor(
     
     suspend fun removeTrack(trackId: String) = withContext(Dispatchers.IO) {
         val file = File(tracksDir, "$trackId.mp3")
+        File(tracksDir, "$trackId.quality").delete()
         if (file.exists()) {
             file.delete()
             updateCacheStats()

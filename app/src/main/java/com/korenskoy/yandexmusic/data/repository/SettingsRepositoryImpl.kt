@@ -49,6 +49,16 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs[DOWNLOAD_WIFI_ONLY_KEY] ?: true
     }
 
+    private val ECONOMY_ON_MOBILE_KEY = booleanPreferencesKey("economy_on_mobile_data")
+    // Off by default: the owner wants the best quality everywhere
+    override val economyOnMobileData: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ECONOMY_ON_MOBILE_KEY] ?: false
+    }
+
+    override suspend fun setEconomyOnMobileData(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[ECONOMY_ON_MOBILE_KEY] = enabled }
+    }
+
     override suspend fun setDownloadOverWifiOnly(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[DOWNLOAD_WIFI_ONLY_KEY] = enabled }
     }

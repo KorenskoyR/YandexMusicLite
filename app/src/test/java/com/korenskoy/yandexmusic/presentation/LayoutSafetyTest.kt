@@ -7,47 +7,15 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Automated Architecture & Layout Safety Test Suite.
- * Prevents regressions in:
- * 1. Status bar insets (statusBarsPadding) on all screen headers.
- * 2. Navigation bar insets (navigationBarsPadding) on bottom bars.
- * 3. Coordinated bottom stack (MiniPlayer above FloatingGlassBottomBar) in portrait mode.
- * 4. Isolation of Car mode (MainTab.CAR) so global navigation/miniplayer never overlap car controls.
+ * Source-level guards for invariants that are hard to observe from outside: parsing quirks, security
+ * settings, player and sync architecture, and the main screen's bottom stack.
+ *
+ * Layout is checked for real elsewhere: system-bar insets in ScreenInsetsInstrumentedTest, car mode in
+ * CarModeInstrumentedTest, and the look of screens and components in ScreenshotTest (reference images).
  */
 class LayoutSafetyTest {
 
     private val sourceDir = File("src/main/java/com/korenskoy/yandexmusic")
-
-    @Test
-    fun testAllScreensHaveStatusBarsPadding() {
-        val searchScreen = File(sourceDir, "presentation/main/SearchScreen.kt").readText()
-        assertTrue("SearchScreen must contain statusBarsPadding() for its header", searchScreen.contains("statusBarsPadding()"))
-
-        val libraryScreen = File(sourceDir, "presentation/main/LibraryScreen.kt").readText()
-        assertTrue("LibraryScreen must contain statusBarsPadding() for its hero banner", libraryScreen.contains("statusBarsPadding()"))
-
-        val radioScreen = File(sourceDir, "presentation/radio/RadioScreen.kt").readText()
-        assertTrue("RadioScreen must contain statusBarsPadding() for its header", radioScreen.contains("statusBarsPadding()"))
-
-        val homeScreen = File(sourceDir, "presentation/main/HomeScreen.kt").readText()
-        assertTrue("HomeScreen must contain statusBarsPadding()", homeScreen.contains("statusBarsPadding()"))
-
-        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
-        assertTrue("CarScreen must contain statusBarsPadding()", carScreen.contains("statusBarsPadding()"))
-    }
-
-    @Test
-    fun testCarScreenHasNavigationBarsPadding() {
-        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
-        assertTrue("CarScreen must contain navigationBarsPadding()", carScreen.contains("navigationBarsPadding()"))
-    }
-
-    @Test
-    fun testMainScreenHidesGlobalBarsInCarMode() {
-        val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
-        assertTrue("MainScreen must check currentTab != MainTab.CAR for portrait bottom overlay", 
-            mainScreen.contains("currentTab != MainTab.CAR"))
-    }
 
     @Test
     fun testPortraitBottomOverlayIsCoordinatedColumn() {
@@ -62,35 +30,6 @@ class LayoutSafetyTest {
         val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
         assertTrue("MainScreen landscape MiniPlayer must be aligned to BottomCenter",
             mainScreen.contains(".align(Alignment.BottomCenter)"))
-    }
-
-    @Test
-    fun testCarTimeWidgetPresent() {
-        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
-        assertTrue("CarScreen must declare CarTimeWidget", carScreen.contains("fun CarTimeWidget("))
-        assertTrue("CarScreenPortrait must use CarTimeWidget", carScreen.contains("CarTimeWidget()"))
-    }
-
-    @Test
-    fun testCarScreenActionTilesHaveExplicitHeights() {
-        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
-        assertTrue("CarScreen landscape must set height(48.dp) on preset rows", carScreen.contains("height(48.dp)"))
-        assertTrue("CarScreen portrait must set height(50.dp) on preset rows", carScreen.contains("height(50.dp)"))
-    }
-
-    @Test
-    fun testLibraryScreenHasLiquidGlassHeaderCapsule() {
-        val libraryScreen = File(sourceDir, "presentation/main/LibraryScreen.kt").readText()
-        assertTrue("LibraryScreen must accept onRefresh callback", libraryScreen.contains("onRefresh: () -> Unit"))
-        assertTrue("LibraryScreen must contain Liquid Glass header capsule", libraryScreen.contains("Liquid Glass Header Toolbar Capsule"))
-        assertTrue("LibraryScreen must render refresh action in header", libraryScreen.contains("Icons.Default.Refresh"))
-        assertTrue("LibraryScreen must render settings action in header", libraryScreen.contains("Icons.Default.Settings"))
-    }
-
-    @Test
-    fun testCarScreenLandscapePresetsGroupedAtBottom() {
-        val carScreen = File(sourceDir, "presentation/car/CarScreen.kt").readText()
-        assertTrue("CarScreen landscape presets must be grouped in a column", carScreen.contains("Presets Block (Grouped together at bottom like in portrait mode)"))
     }
 
     @Test
@@ -174,13 +113,6 @@ class LayoutSafetyTest {
         org.junit.Assert.assertNotNull("Parsed direct tracks must not be null", tracks)
         org.junit.Assert.assertEquals("Parsed direct tracks count must be 1", 1, tracks?.size)
         org.junit.Assert.assertEquals("Track ID must match", "776655", tracks?.get(0)?.idString)
-    }
-
-    @Test
-    fun testFloatingGlassBottomBarConcentricCorners() {
-        val bottomBar = File(sourceDir, "presentation/main/components/BottomNavigationBar.kt").readText()
-        assertTrue("FloatingGlassBottomBar must use outerRadius shell", bottomBar.contains("val outerRadius = 26.dp") || bottomBar.contains("shape = RoundedCornerShape(outerRadius)"))
-        assertTrue("FloatingGlassBottomBar must declare concentric innerRadius", bottomBar.contains("val innerRadius = 20.dp"))
     }
 
     @Test
@@ -306,8 +238,8 @@ class LayoutSafetyTest {
 
     @Test
     fun testStartupUpdateCheck5SecondsDelay() {
-        val viewModel = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
-        assertTrue("MainViewModel must delay 5000ms before silent update check",
+        val viewModel = File(sourceDir, "presentation/update/UpdateViewModel.kt").readText()
+        assertTrue("UpdateViewModel must delay 5000ms before silent update check",
             viewModel.contains("delay(5000L)"))
     }
 
@@ -381,7 +313,8 @@ class LayoutSafetyTest {
         assertTrue("AuthRepositoryImpl must implement clearAllAccounts", authRepoFile.contains("fun clearAllAccounts()"))
 
         val cacheManagerFile = File(sourceDir, "data/cache/PlaylistCacheManager.kt").readText()
-        assertTrue("PlaylistCacheManager must contain getUserCacheDir", cacheManagerFile.contains("getUserCacheDir("))
+        // Per-account isolation itself is checked on a device by PlaylistCacheInstrumentedTest.accountsAreIsolated
+        assertTrue("PlaylistCacheManager must key lists by the account folder", cacheManagerFile.contains("sanitizeUserFolder(userFolder)"))
         assertTrue("PlaylistCacheManager must contain clearUserCache", cacheManagerFile.contains("fun clearUserCache("))
 
         val dialogFile = File(sourceDir, "presentation/account/AccountManagementDialog.kt").readText()
@@ -450,10 +383,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 23",
-            buildGradle.contains("versionCode = 23"))
-        assertTrue("build.gradle.kts must be versionName 1.5.0",
-            buildGradle.contains("versionName = \"1.5.0\""))
+        assertTrue("build.gradle.kts must be versionCode 24",
+            buildGradle.contains("versionCode = 24"))
+        assertTrue("build.gradle.kts must be versionName 1.6.0",
+            buildGradle.contains("versionName = \"1.6.0\""))
     }
 
     @Test
@@ -554,12 +487,12 @@ class LayoutSafetyTest {
 
     @Test
     fun testSearchDebounceAndJobCancellation() {
-        val viewModelFile = File(sourceDir, "presentation/main/MainViewModel.kt").readText()
-        assertTrue("MainViewModel must declare searchJob",
+        val viewModelFile = File(sourceDir, "presentation/main/SearchViewModel.kt").readText()
+        assertTrue("SearchViewModel must declare searchJob",
             viewModelFile.contains("private var searchJob: Job? = null"))
-        assertTrue("MainViewModel must cancel obsolete searchJob on query change",
+        assertTrue("SearchViewModel must cancel obsolete searchJob on query change",
             viewModelFile.contains("searchJob?.cancel()"))
-        assertTrue("MainViewModel must implement 300ms debounce delay",
+        assertTrue("SearchViewModel must implement 300ms debounce delay",
             viewModelFile.contains("delay(300L)"))
     }
 

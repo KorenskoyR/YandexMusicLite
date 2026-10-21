@@ -51,7 +51,11 @@ class PlayerEngineInstrumentedTest {
         val okHttp = OkHttpClient()
         val api = retrofit2.Retrofit.Builder().baseUrl("https://localhost/").build().create(YandexMusicApi::class.java)
         val downloads = TrackDownloadManager(context, okHttp)
-        val preload = TrackPreloadManager(api, downloads, okHttp)
+        val preload = TrackPreloadManager(
+            api, downloads, okHttp,
+            com.korenskoy.yandexmusic.data.repository.SettingsRepositoryImpl(context),
+            com.korenskoy.yandexmusic.data.network.NetworkMonitor(context)
+        )
         onMain {
             playerA = newPlayer()
             playerB = newPlayer()

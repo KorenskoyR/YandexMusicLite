@@ -62,6 +62,47 @@ interface YandexMusicApi {
         @Path("kind") kind: String
     ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
 
+    @retrofit2.http.POST("users/{userId}/playlists/create")
+    @retrofit2.http.FormUrlEncoded
+    suspend fun createPlaylist(
+        @Path("userId") userId: String,
+        @retrofit2.http.Field("title") title: String,
+        @retrofit2.http.Field("visibility") visibility: String = "private"
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
+
+    @retrofit2.http.POST("users/{userId}/playlists/{kind}/name")
+    @retrofit2.http.FormUrlEncoded
+    suspend fun renamePlaylist(
+        @Path("userId") userId: String,
+        @Path("kind") kind: String,
+        @retrofit2.http.Field("value") title: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
+
+    /** [value]: "public" or "private". */
+    @retrofit2.http.POST("users/{userId}/playlists/{kind}/visibility")
+    @retrofit2.http.FormUrlEncoded
+    suspend fun setPlaylistVisibility(
+        @Path("userId") userId: String,
+        @Path("kind") kind: String,
+        @retrofit2.http.Field("value") value: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
+
+    @retrofit2.http.POST("users/{userId}/playlists/{kind}/delete")
+    suspend fun deletePlaylist(
+        @Path("userId") userId: String,
+        @Path("kind") kind: String
+    ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
+
+    /** [diff] is a JSON list of insert/delete operations against [revision] (see `PlaylistDiff`). */
+    @retrofit2.http.POST("users/{userId}/playlists/{kind}/change-relative")
+    @retrofit2.http.FormUrlEncoded
+    suspend fun changePlaylist(
+        @Path("userId") userId: String,
+        @Path("kind") kind: String,
+        @retrofit2.http.Field("diff") diff: String,
+        @retrofit2.http.Field("revision") revision: Int
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
+
     @GET("tracks/{trackId}/download-info")
     suspend fun getTrackDownloadInfo(
         @Path("trackId") trackId: String
@@ -69,6 +110,16 @@ interface YandexMusicApi {
 
     @GET
     suspend fun getRawUrl(@retrofit2.http.Url url: String): ResponseWrapper<kotlinx.serialization.json.JsonElement>
+
+    @GET("artists/{artistId}/brief-info")
+    suspend fun getArtistBriefInfo(
+        @Path("artistId") artistId: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.ArtistBriefDto>
+
+    @GET("albums/{albumId}/with-tracks")
+    suspend fun getAlbumWithTracks(
+        @Path("albumId") albumId: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.AlbumDto>
 
     @GET("search")
     suspend fun search(
