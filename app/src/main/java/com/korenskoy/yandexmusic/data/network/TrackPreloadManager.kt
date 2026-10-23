@@ -106,7 +106,8 @@ class TrackPreloadManager @Inject constructor(
         val losslessErr = lastLosslessError[trackId]
         val desc = if (!losslessErr.isNullOrBlank()) {
             val userFriendly = when {
-                losslessErr.contains("not-allowed", ignoreCase = true) -> {
+                losslessErr.contains("превью", ignoreCase = true) -> "нужен Яндекс Плюс (превью)"
+                losslessErr.contains("not-allowed", ignoreCase = true) || losslessErr.contains("no-rights", ignoreCase = true) -> {
                     if (authRepository.getActiveAccount()?.hasPlus != true) {
                         "нужен Яндекс Плюс"
                     } else {
@@ -114,7 +115,13 @@ class TrackPreloadManager @Inject constructor(
                     }
                 }
                 losslessErr.contains("bad-signature", ignoreCase = true) -> "ошибка подписи"
-                losslessErr.contains("403") -> "доступ ограничен (403)"
+                losslessErr.contains("403") -> {
+                    if (authRepository.getActiveAccount()?.hasPlus != true) {
+                        "нужен Яндекс Плюс (403)"
+                    } else {
+                        "доступ ограничен (403)"
+                    }
+                }
                 else -> losslessErr
             }
             "$baseDesc (Lossless: $userFriendly)"
@@ -128,6 +135,26 @@ class TrackPreloadManager @Inject constructor(
         for (variant in StreamVariants.ranked(offeredList, capKbps)) {
             val url = resolveXmlToStreamUrl(variant.downloadInfoUrl, variant.codec) ?: continue
             return ResolvedStream(url, StreamQuality(variant.codec, variant.bitrateInKbps), bestMp3)
+        }
+        return null
+    }
+
+    private fun extractServerError(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        if (body.contains("not-allowed", ignoreCase = true)) return "not-allowed"
+        if (body.contains("bad-signature", ignoreCase = true)) return "bad-signature"
+        if (body.contains("no-rights", ignoreCase = true)) return "no-rights"
+        val messageRegex = """"message"\s*:\s*"([^"]+)"""".toRegex()
+        val match = messageRegex.find(body)
+        if (match != null) {
+            val msg = match.groupValues[1]
+            if (msg.isNotBlank()) return msg
+        }
+        val nameRegex = """"name"\s*:\s*"([^"]+)"""".toRegex()
+        val nameMatch = nameRegex.find(body)
+        if (nameMatch != null) {
+            val name = nameMatch.groupValues[1]
+            if (name.isNotBlank()) return name
         }
         return null
     }
@@ -161,6 +188,12 @@ class TrackPreloadManager @Inject constructor(
                 )
                 val downloadInfo = response.activeDownloadInfo
                 if (downloadInfo != null && downloadInfo.streamUrls.isNotEmpty()) {
+                    if (downloadInfo.isPreview) {
+                        finalError = "требуется Яндекс Плюс (сервер выдал превью)"
+                        Log.w("TrackPreloadManager", "get-file-info (${strategy.name}) returned preview for $trackId")
+                        continue
+                    }
+
                     val directUrl = downloadInfo.streamUrls.first()
                     val encrawKey = downloadInfo.key
                     val playableUrl = if (!encrawKey.isNullOrBlank() && strategy.transport == "encraw") {
@@ -190,8 +223,10 @@ class TrackPreloadManager @Inject constructor(
                     Log.w("TrackPreloadManager", "get-file-info (${strategy.name}) returned no stream for $trackId: $err")
                 }
             } catch (e: Exception) {
-                finalError = e.message ?: e.javaClass.simpleName
-                Log.w("TrackPreloadManager", "get-file-info (${strategy.name}) failed for $trackId: ${e.message}")
+                val httpErrorBody = (e as? retrofit2.HttpException)?.response()?.errorBody()?.string()
+                val parsed = extractServerError(httpErrorBody)
+                finalError = parsed ?: e.message ?: e.javaClass.simpleName
+                Log.w("TrackPreloadManager", "get-file-info (${strategy.name}) failed for $trackId: $finalError")
             }
         }
 

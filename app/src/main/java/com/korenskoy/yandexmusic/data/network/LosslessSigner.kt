@@ -42,7 +42,7 @@ object LosslessSigner {
 
     // Backward-compatible aliases
     const val CODECS = DEFAULT_CODECS
-    const val TRANSPORT = "encraw"
+    const val TRANSPORT = "raw"
 
     data class ClientStrategy(
         val name: String,
@@ -54,22 +54,25 @@ object LosslessSigner {
     )
 
     val STRATEGIES: List<ClientStrategy> = listOf(
+        // Primary: Official Android client with raw direct CDN transport
         ClientStrategy(
             name = "Android",
             clientHeader = ANDROID_CLIENT,
             userAgent = ANDROID_USER_AGENT,
             key = ANDROID_SIGN_KEY,
             codecs = DEFAULT_CODECS,
-            transport = "encraw"
+            transport = "raw"
         ),
+        // Fallback 1: Desktop client with raw direct CDN transport
         ClientStrategy(
             name = "Desktop",
-            clientHeader = DESKTOP_CLIENT,
-            userAgent = DESKTOP_USER_AGENT,
+            clientHeader = "YandexMusicDesktopAppWindows/5.13.2",
+            userAgent = "YandexMusicDesktopAppWindows/5.13.2",
             key = DESKTOP_SIGN_KEY,
             codecs = DEFAULT_CODECS,
-            transport = "encraw"
+            transport = "raw"
         ),
+        // Fallback 2: Web Next client with raw direct CDN transport
         ClientStrategy(
             name = "Web",
             clientHeader = WEB_CLIENT,
@@ -77,6 +80,15 @@ object LosslessSigner {
             key = WEB_SIGN_KEY,
             codecs = WEB_CODECS,
             transport = "raw"
+        ),
+        // Fallback 3: Android encrypted transport (in case CDN requires encraw for certain tracks)
+        ClientStrategy(
+            name = "Android-encraw",
+            clientHeader = ANDROID_CLIENT,
+            userAgent = ANDROID_USER_AGENT,
+            key = ANDROID_SIGN_KEY,
+            codecs = DEFAULT_CODECS,
+            transport = "encraw"
         )
     )
 
@@ -95,7 +107,7 @@ object LosslessSigner {
      * Signs a `/get-file-info` request for [numericTrackId] and [quality] (default: "lossless").
      *
      * The signature message format is: "$ts$numericTrackId$quality$codecsWithoutCommas$transport"
-     * Digested via HMAC-SHA256, encoded as Base64, and the last trailing character is dropped.
+     * Digested via HMAC-SHA256, encoded as Base64, and the trailing '=' padding character is stripped.
      */
     fun signFileInfo(
         numericTrackId: Long,
@@ -115,7 +127,8 @@ object LosslessSigner {
         // Portable Base64 via Okio (safe on Android API 24+ and desktop JVM)
         val base64String = digest.toByteString().base64()
 
-        val truncated = if (base64String.isNotEmpty()) base64String.dropLast(1) else base64String
-        return FileInfoSign(ts = tsSeconds, sign = truncated)
+        // Yandex signature validator requires Base64 without trailing '=' padding
+        val sign = if (base64String.endsWith("=")) base64String.dropLast(1) else base64String
+        return FileInfoSign(ts = tsSeconds, sign = sign)
     }
 }

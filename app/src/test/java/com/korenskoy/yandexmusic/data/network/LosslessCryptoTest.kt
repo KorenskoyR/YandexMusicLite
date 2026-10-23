@@ -23,7 +23,20 @@ class LosslessCryptoTest {
 
     @Test
     fun signatureMatchesReferenceVector() {
-        // Android client test vector
+        // Android client test vector (raw transport)
+        val androidRawSign = LosslessSigner.signFileInfo(
+            numericTrackId = 42L,
+            quality = "lossless",
+            codecs = LosslessSigner.DEFAULT_CODECS,
+            transport = "raw",
+            tsSeconds = 1_700_000_000L,
+            key = LosslessSigner.ANDROID_SIGN_KEY
+        )
+        assertEquals(1_700_000_000L, androidRawSign.ts)
+        assertEquals("tv/EHLaxrxuAL3idCVvfQ7lhE6jB3oBWY4c9naW7PW0", androidRawSign.sign)
+        assertEquals(43, androidRawSign.sign.length)
+
+        // Android client test vector (encraw transport)
         val androidSign = LosslessSigner.signFileInfo(
             numericTrackId = 42L,
             quality = "lossless",
@@ -168,5 +181,21 @@ class LosslessCryptoTest {
         org.junit.Assert.assertNotNull(nestedInfo)
         assertTrue(nestedInfo!!.isLossless)
         assertEquals("raw", nestedInfo.transport)
+
+        // 5. Preview response detection (when user lacks Plus)
+        val previewBody = """{"result": {
+            "downloadInfo": {
+                "quality": "preview",
+                "codec": "mp3",
+                "bitrate": 128,
+                "transport": "raw",
+                "urls": ["https://cdn.example.com/preview.mp3"]
+            }
+        }}"""
+        val previewResponse = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto>(previewBody)
+        val previewInfo = previewResponse.activeDownloadInfo
+        org.junit.Assert.assertNotNull(previewInfo)
+        assertTrue(previewInfo!!.isPreview)
+        assertEquals("preview", previewInfo.quality)
     }
 }

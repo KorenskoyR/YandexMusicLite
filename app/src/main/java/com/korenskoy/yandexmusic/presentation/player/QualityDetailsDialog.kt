@@ -31,6 +31,14 @@ fun QualityDetailsDialog(details: PlaybackController.QualityDetails, onDismiss: 
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(R.string.quality_details_offered, it), color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
                 }
+                details.hasPlus?.let { hasPlus ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(if (hasPlus) R.string.quality_details_plus_active else R.string.quality_details_plus_inactive),
+                        color = if (hasPlus) Color(0xFF4CAF50) else Color(0xFFFF9900),
+                        fontSize = 13.sp
+                    )
+                }
                 if (details.economy) {
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(R.string.quality_details_economy), color = Color(0xFFFF9900), fontSize = 13.sp)

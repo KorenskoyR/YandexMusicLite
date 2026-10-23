@@ -315,6 +315,7 @@ data class FileInfoResponseDto(
     @SerialName("error") val error: ErrorDto? = null,
     @SerialName("name") val errorName: String? = null,
     @SerialName("message") val errorMessage: String? = null,
+    @SerialName("quality") val directQuality: String? = null,
     @SerialName("codec") val directCodec: String? = null,
     @SerialName("bitrate") val directBitrate: Int? = null,
     @SerialName("transport") val directTransport: String? = null,
@@ -328,6 +329,7 @@ data class FileInfoResponseDto(
     val activeDownloadInfo: LosslessDownloadInfoDto?
         get() = downloadInfo ?: downloadInfoSnake ?: result?.activeDownloadInfo ?: if (!directCodec.isNullOrBlank()) {
             LosslessDownloadInfoDto(
+                quality = directQuality,
                 codec = directCodec,
                 bitrate = directBitrate,
                 transport = directTransport,
@@ -348,6 +350,7 @@ data class FileInfoResponseDto(
 data class FileInfoResultDto(
     @SerialName("downloadInfo") val downloadInfo: LosslessDownloadInfoDto? = null,
     @SerialName("download_info") val downloadInfoSnake: LosslessDownloadInfoDto? = null,
+    @SerialName("quality") val directQuality: String? = null,
     @SerialName("codec") val directCodec: String? = null,
     @SerialName("bitrate") val directBitrate: Int? = null,
     @SerialName("transport") val directTransport: String? = null,
@@ -363,6 +366,7 @@ data class FileInfoResultDto(
     val activeDownloadInfo: LosslessDownloadInfoDto?
         get() = downloadInfo ?: downloadInfoSnake ?: if (!directCodec.isNullOrBlank()) {
             LosslessDownloadInfoDto(
+                quality = directQuality,
                 codec = directCodec,
                 bitrate = directBitrate,
                 transport = directTransport,
@@ -378,6 +382,7 @@ data class FileInfoResultDto(
 
 @Serializable
 data class LosslessDownloadInfoDto(
+    @SerialName("quality") val quality: String? = null,
     @SerialName("codec") val codec: String? = null,
     @SerialName("bitrate") val bitrate: Int? = null,
     @SerialName("transport") val transport: String? = null,
@@ -390,6 +395,9 @@ data class LosslessDownloadInfoDto(
 ) {
     val isLossless: Boolean
         get() = codec?.lowercase() in listOf("flac", "flac-mp4")
+
+    val isPreview: Boolean
+        get() = quality.equals("preview", ignoreCase = true) || quality.equals("smart_preview", ignoreCase = true)
 
     val streamUrls: List<String>
         get() {

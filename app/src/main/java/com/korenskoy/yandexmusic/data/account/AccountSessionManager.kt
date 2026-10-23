@@ -55,6 +55,7 @@ class AccountSessionManager @Inject constructor(
 
     /** Likes, charts, playlists and the My Wave queue. Concurrent calls join the requests already running. */
     fun syncAll() {
+        scope.launch { refreshAccountStatus() }
         scope.launch { syncLikes() }
         scope.launch { libraryRepository.refreshCharts() }
         scope.launch {
@@ -71,27 +72,30 @@ class AccountSessionManager @Inject constructor(
         if (changed && settingsRepository.autoDownloadLikedTracks.first()) downloadScheduler.downloadAllLiked()
     }
 
-    /** Fills in the name and avatar of an account saved before they were known. */
-    suspend fun refreshProfileIfIncomplete() = withContext(Dispatchers.IO) {
+    /** Refreshes account subscription status (hasPlus) and profile info from the server. */
+    suspend fun refreshAccountStatus() = withContext(Dispatchers.IO) {
         if (authRepository.getToken().isNullOrEmpty()) return@withContext
         val active = authRepository.getActiveAccount() ?: return@withContext
-        if (!active.avatarUrl.isNullOrEmpty() && active.displayName.isNotBlank() && !active.displayName.startsWith("UID:")) {
-            return@withContext
-        }
         try {
             val status = api.getAccountStatus().result ?: return@withContext
             val avatar = status.avatarUrl ?: runCatching { api.getYandexLoginInfo().avatarUrl }.getOrNull()
             authRepository.saveOrUpdateAccount(
                 active.copy(
-                    displayName = status.displayUserName,
+                    displayName = status.displayUserName.ifBlank { active.displayName },
                     login = status.account?.login?.ifBlank { active.login } ?: active.login,
                     avatarUrl = avatar ?: active.avatarUrl,
                     hasPlus = status.hasPlus
                 )
             )
+            Log.i(TAG, "Account status refreshed: hasPlus=${status.hasPlus}")
         } catch (e: Exception) {
-            Log.d(TAG, "Profile refresh: ${e.message}")
+            Log.d(TAG, "Account status refresh: ${e.message}")
         }
+    }
+
+    /** Fills in the name and avatar of an account saved before they were known. */
+    suspend fun refreshProfileIfIncomplete() = withContext(Dispatchers.IO) {
+        refreshAccountStatus()
     }
 
     suspend fun switchAccount(uid: String) {

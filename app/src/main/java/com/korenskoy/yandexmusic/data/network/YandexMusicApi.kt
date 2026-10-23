@@ -115,7 +115,7 @@ interface YandexMusicApi {
         @retrofit2.http.Query("trackId") trackId: String,
         @retrofit2.http.Query("quality") quality: String = "lossless",
         @retrofit2.http.Query("codecs") codecs: String = LosslessSigner.DEFAULT_CODECS,
-        @retrofit2.http.Query("transports") transports: String = "encraw",
+        @retrofit2.http.Query("transports") transports: String = "raw",
         @retrofit2.http.Query("ts") ts: Long,
         @retrofit2.http.Query("sign") sign: String
     ): com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto

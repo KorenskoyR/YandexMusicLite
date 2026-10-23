@@ -170,6 +170,8 @@
     <string name="quality_details_title">Качество звука</string>
     <string name="quality_details_playing">Играет: %1$s</string>
     <string name="quality_details_offered">Сервер предложил: %1$s</string>
+    <string name="quality_details_plus_active">Подписка Яндекс Плюс: активна</string>
+    <string name="quality_details_plus_inactive">Подписка Яндекс Плюс: не обнаружена (для Lossless/FLAC требуется активный Плюс)</string>
     <string name="quality_details_economy">Включена экономия трафика в мобильной сети — играет не лучший вариант.</string>
     <string name="quality_details_ok">Понятно</string>
     <string name="settings_economy_mobile">Экономия трафика в мобильной сети</string>

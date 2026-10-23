@@ -564,12 +564,23 @@ class PlaybackController @Inject constructor(
     }
 
     /** What plays now and what the server offered, for the player's quality details. */
-    data class QualityDetails(val playing: String?, val offered: String?, val economy: Boolean)
+    data class QualityDetails(
+        val playing: String?,
+        val offered: String?,
+        val economy: Boolean,
+        val hasPlus: Boolean? = null
+    )
 
     fun qualityDetails(): QualityDetails? {
         val track = _currentTrack.value?.takeIf { !it.isRadio } ?: return null
         val id = track.idString
-        return QualityDetails(_streamQuality.value, preloadManager.offeredOf(id), !downloadManager.isKnownDownloaded(id) && preloadManager.isCapped(id))
+        val hasPlus = authRepository.getActiveAccount()?.hasPlus
+        return QualityDetails(
+            _streamQuality.value,
+            preloadManager.offeredOf(id),
+            !downloadManager.isKnownDownloaded(id) && preloadManager.isCapped(id),
+            hasPlus
+        )
     }
 
     private fun publishQuality(trackId: String) {
