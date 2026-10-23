@@ -383,10 +383,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 25",
-            buildGradle.contains("versionCode = 25"))
-        assertTrue("build.gradle.kts must be versionName 1.6.1",
-            buildGradle.contains("versionName = \"1.6.1\""))
+        assertTrue("build.gradle.kts must be versionCode 26",
+            buildGradle.contains("versionCode = 26"))
+        assertTrue("build.gradle.kts must be versionName 1.6.2",
+            buildGradle.contains("versionName = \"1.6.2\""))
     }
 
     @Test

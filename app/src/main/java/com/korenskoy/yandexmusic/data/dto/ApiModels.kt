@@ -309,8 +309,35 @@ data class PlusInfoDto(
 
 @Serializable
 data class FileInfoResultDto(
-    @SerialName("downloadInfo") val downloadInfo: LosslessDownloadInfoDto? = null
-)
+    @SerialName("downloadInfo") val downloadInfo: LosslessDownloadInfoDto? = null,
+    @SerialName("download_info") val downloadInfoSnake: LosslessDownloadInfoDto? = null,
+    @SerialName("codec") val directCodec: String? = null,
+    @SerialName("bitrate") val directBitrate: Int? = null,
+    @SerialName("transport") val directTransport: String? = null,
+    @SerialName("key") val directKey: String? = null,
+    @SerialName("urls") val directUrls: List<String> = emptyList(),
+    @SerialName("url") val directUrl: String? = null,
+    @SerialName("size") val directSize: Long? = null,
+    @SerialName("gain") val directGain: Boolean = false,
+    @SerialName("trackId") val directTrackId: String? = null,
+    @SerialName("name") val errorName: String? = null,
+    @SerialName("message") val errorMessage: String? = null
+) {
+    val activeDownloadInfo: LosslessDownloadInfoDto?
+        get() = downloadInfo ?: downloadInfoSnake ?: if (!directCodec.isNullOrBlank()) {
+            LosslessDownloadInfoDto(
+                codec = directCodec,
+                bitrate = directBitrate,
+                transport = directTransport,
+                key = directKey,
+                urls = directUrls,
+                url = directUrl,
+                size = directSize,
+                gain = directGain,
+                trackId = directTrackId
+            )
+        } else null
+}
 
 @Serializable
 data class LosslessDownloadInfoDto(

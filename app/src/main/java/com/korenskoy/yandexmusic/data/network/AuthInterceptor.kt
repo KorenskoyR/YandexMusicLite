@@ -11,8 +11,12 @@ class AuthInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val requestBuilder = originalRequest.newBuilder()
-            .header("User-Agent", "YandexMusic/2024.01.0 (Android)")
-            .header("X-Yandex-Music-Client", "YandexMusicAndroid/2024.01.0")
+        if (originalRequest.header("User-Agent") == null) {
+            requestBuilder.header("User-Agent", "YandexMusic/2024.01.0 (Android)")
+        }
+        if (originalRequest.header("X-Yandex-Music-Client") == null) {
+            requestBuilder.header("X-Yandex-Music-Client", "YandexMusicAndroid/2024.01.0")
+        }
 
         val token = authRepository.getToken()
         if (!token.isNullOrEmpty()) {

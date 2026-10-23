@@ -46,8 +46,9 @@ class TrackPreloadManager @Inject constructor(
     private val resolvedUrls = ConcurrentHashMap<String, CachedTrackUrl>()
     private val inFlightRequests = ConcurrentHashMap<String, Deferred<String?>>()
 
-    /** Codec and bitrate of the stream actually chosen for a track (shown in the player). */
-    data class StreamQuality(val codec: String, val bitrateKbps: Int)
+    data class StreamQuality(val codec: String, val bitrateKbps: Int) {
+        val isLossless: Boolean get() = codec.startsWith("flac", ignoreCase = true)
+    }
     private val qualities = ConcurrentHashMap<String, StreamQuality>()
 
     fun qualityOf(trackId: String): StreamQuality? = qualities[trackId]
@@ -120,12 +121,14 @@ class TrackPreloadManager @Inject constructor(
                 ts = sign.ts,
                 sign = sign.sign
             )
-            val downloadInfo = response.result?.downloadInfo
-            if (downloadInfo != null && downloadInfo.isLossless && downloadInfo.streamUrls.isNotEmpty()) {
+            val downloadInfo = response.result?.activeDownloadInfo
+            if (downloadInfo != null && downloadInfo.streamUrls.isNotEmpty()) {
                 val directUrl = downloadInfo.streamUrls.first()
                 val encrawKey = downloadInfo.key
                 val playableUrl = if (!encrawKey.isNullOrBlank()) "$directUrl#encraw_key=$encrawKey" else directUrl
-                val quality = StreamQuality("flac", downloadInfo.bitrate ?: 1411)
+                val codec = downloadInfo.codec?.lowercase() ?: "mp3"
+                val defaultBitrate = if (codec.startsWith("flac")) 1411 else if (codec == "aac") 256 else 320
+                val quality = StreamQuality(codec, downloadInfo.bitrate ?: defaultBitrate)
 
                 val offeredList = try {
                     api.getTrackDownloadInfo(trackId).result.orEmpty()
@@ -134,15 +137,17 @@ class TrackPreloadManager @Inject constructor(
                 }
                 val bestMp3 = offeredList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
                     .maxByOrNull { it.bitrateInKbps }?.let { StreamQuality(it.codec, it.bitrateInKbps) }
-                val desc = "FLAC Lossless" + if (offeredList.isNotEmpty()) " · " + StreamVariants.describe(offeredList) else ""
+                val label = if (quality.isLossless) "FLAC Lossless" else "${quality.codec.uppercase()} ${quality.bitrateKbps}"
+                val desc = label + if (offeredList.isNotEmpty()) " · " + StreamVariants.describe(offeredList) else ""
                 offered[trackId] = desc
-                Log.i("TrackPreloadManager", "Track $trackId resolved Lossless: $desc")
+                Log.i("TrackPreloadManager", "Track $trackId resolved via get-file-info: $desc")
                 ResolvedStream(playableUrl, quality, bestMp3, encrawKey)
             } else {
+                Log.w("TrackPreloadManager", "get-file-info returned no stream for $trackId (error: ${response.result?.errorName ?: response.error?.message})")
                 null
             }
         } catch (e: Exception) {
-            Log.d("TrackPreloadManager", "Lossless unavailable for $trackId, falling back: ${e.message}")
+            Log.w("TrackPreloadManager", "get-file-info failed for $trackId, falling back: ${e.message}")
             null
         }
     }

@@ -108,6 +108,7 @@ interface YandexMusicApi {
         @Path("trackId") trackId: String
     ): ResponseWrapper<List<DownloadInfoResponseDto>>
 
+    @retrofit2.http.Headers("X-Yandex-Music-Client: YandexMusicDesktopAppWindows/5.95.0")
     @GET("get-file-info")
     suspend fun getFileInfo(
         @retrofit2.http.Query("trackId") trackId: String,

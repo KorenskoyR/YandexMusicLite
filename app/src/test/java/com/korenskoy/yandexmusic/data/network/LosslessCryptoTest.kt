@@ -30,11 +30,11 @@ class LosslessCryptoTest {
             codecs = LosslessSigner.CODECS,
             transport = LosslessSigner.TRANSPORT,
             tsSeconds = 1_700_000_000L,
-            key = LosslessSigner.DEFAULT_SIGN_KEY
+            key = LosslessSigner.DESKTOP_SIGN_KEY
         )
 
         assertEquals(1_700_000_000L, signResult.ts)
-        assertEquals("5Xma89MBvxVhn4bCHIDRA/W8OGjHoibkEZj5b0DbRp8", signResult.sign)
+        assertEquals("UCJdGuN5+kPF/GnUhResm2pqZURJ6Rl7xaCwIuB130o", signResult.sign)
         assertEquals(43, signResult.sign.length)
     }
 
