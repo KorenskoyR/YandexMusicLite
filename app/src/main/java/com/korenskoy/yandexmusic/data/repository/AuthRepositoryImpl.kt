@@ -214,7 +214,9 @@ class AuthRepositoryImpl @Inject constructor(
                 token = account.token.ifBlank { currentAccounts[existingIndex].token },
                 avatarUrl = account.avatarUrl ?: currentAccounts[existingIndex].avatarUrl,
                 lastActiveTimestamp = System.currentTimeMillis(),
-                hasPlus = account.hasPlus || currentAccounts[existingIndex].hasPlus
+                // Trust the fresh value: both callers set it from getAccountStatus, so an expired
+                // Plus now clears instead of sticking true forever.
+                hasPlus = account.hasPlus
             )
         } else {
             account.copy(lastActiveTimestamp = System.currentTimeMillis())
