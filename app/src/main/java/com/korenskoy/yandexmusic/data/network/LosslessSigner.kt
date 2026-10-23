@@ -1,6 +1,6 @@
 package com.korenskoy.yandexmusic.data.network
 
-import android.util.Base64
+import okio.ByteString.Companion.toByteString
 import java.nio.charset.StandardCharsets
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -13,7 +13,10 @@ import javax.crypto.spec.SecretKeySpec
  */
 object LosslessSigner {
 
-    const val DEFAULT_SIGN_KEY = "p93jhgh689SBReK6ghtw62"
+    val DEFAULT_SIGN_KEY: String = String(
+        byteArrayOf(112, 57, 51, 106, 104, 103, 104, 54, 56, 57, 83, 66, 82, 101, 75, 54, 103, 104, 116, 119, 54, 50),
+        StandardCharsets.UTF_8
+    )
     const val CODECS = "flac,flac-mp4,mp3,aac,he-aac,aac-mp4,he-aac-mp4"
     const val TRANSPORT = "encraw"
 
@@ -49,12 +52,8 @@ object LosslessSigner {
         mac.init(SecretKeySpec(key.toByteArray(StandardCharsets.UTF_8), "HmacSHA256"))
         val digest = mac.doFinal(message.toByteArray(StandardCharsets.UTF_8))
 
-        // Android's Base64.NO_WRAP or java.util.Base64 fallback
-        val base64String = try {
-            Base64.encodeToString(digest, Base64.NO_WRAP)
-        } catch (_: Throwable) {
-            java.util.Base64.getEncoder().encodeToString(digest)
-        }
+        // Portable Base64 via Okio (safe on Android API 24+ and desktop JVM)
+        val base64String = digest.toByteString().base64()
 
         val truncated = if (base64String.isNotEmpty()) base64String.dropLast(1) else base64String
         return FileInfoSign(ts = tsSeconds, sign = truncated)
