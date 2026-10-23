@@ -108,6 +108,16 @@ interface YandexMusicApi {
         @Path("trackId") trackId: String
     ): ResponseWrapper<List<DownloadInfoResponseDto>>
 
+    @GET("get-file-info")
+    suspend fun getFileInfo(
+        @retrofit2.http.Query("trackId") trackId: String,
+        @retrofit2.http.Query("quality") quality: String = "lossless",
+        @retrofit2.http.Query("codecs") codecs: String = LosslessSigner.CODECS,
+        @retrofit2.http.Query("transports") transports: String = LosslessSigner.TRANSPORT,
+        @retrofit2.http.Query("ts") ts: Long,
+        @retrofit2.http.Query("sign") sign: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.FileInfoResultDto>
+
     @GET
     suspend fun getRawUrl(@retrofit2.http.Url url: String): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 

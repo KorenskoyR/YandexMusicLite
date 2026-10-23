@@ -213,7 +213,8 @@ class AuthRepositoryImpl @Inject constructor(
                 displayName = account.displayName.ifBlank { currentAccounts[existingIndex].displayName },
                 token = account.token.ifBlank { currentAccounts[existingIndex].token },
                 avatarUrl = account.avatarUrl ?: currentAccounts[existingIndex].avatarUrl,
-                lastActiveTimestamp = System.currentTimeMillis()
+                lastActiveTimestamp = System.currentTimeMillis(),
+                hasPlus = account.hasPlus || currentAccounts[existingIndex].hasPlus
             )
         } else {
             account.copy(lastActiveTimestamp = System.currentTimeMillis())

@@ -32,5 +32,6 @@ object StreamVariants {
         offered.sortedWith(compareByDescending<DownloadInfoResponseDto> { it.bitrateInKbps }.thenBy { rank(it.codec) })
             .joinToString(" · ") { "${it.codec.uppercase()} ${it.bitrateInKbps}" + if (it.preview) " (фрагмент)" else "" }
 
-    private fun rank(codec: String) = SUPPORTED.indexOf(codec.lowercase()).let { if (it < 0) SUPPORTED.size else it }
+    private val CODEC_PREFERENCE = listOf("flac", "aac", "mp3")
+    private fun rank(codec: String) = CODEC_PREFERENCE.indexOf(codec.lowercase()).let { if (it < 0) CODEC_PREFERENCE.size else it }
 }

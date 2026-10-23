@@ -178,7 +178,8 @@ class LibraryRepository @Inject constructor(
                     login = status.account?.login.orEmpty(),
                     displayName = status.displayUserName,
                     token = token,
-                    avatarUrl = avatar ?: account?.avatarUrl
+                    avatarUrl = avatar ?: account?.avatarUrl,
+                    hasPlus = status.hasPlus
                 )
             )
         }

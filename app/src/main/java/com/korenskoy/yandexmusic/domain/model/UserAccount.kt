@@ -9,7 +9,8 @@ data class UserAccount(
     val displayName: String = "",
     val token: String,
     val avatarUrl: String? = null,
-    val lastActiveTimestamp: Long = System.currentTimeMillis()
+    val lastActiveTimestamp: Long = System.currentTimeMillis(),
+    val hasPlus: Boolean = false
 ) {
     /**
      * Sanitized user folder name suitable for directory paths in Android filesystem:

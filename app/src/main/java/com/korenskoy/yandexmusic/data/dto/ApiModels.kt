@@ -27,8 +27,12 @@ data class ErrorDto(
 data class AccountStatusResponseDto(
     @SerialName("account") val account: AccountDto? = null,
     @SerialName("uid") val directUid: JsonElement? = null,
-    @SerialName("default_avatar_id") val defaultAvatarId: String? = null
+    @SerialName("default_avatar_id") val defaultAvatarId: String? = null,
+    @SerialName("plus") val plus: PlusInfoDto? = null
 ) {
+    val hasPlus: Boolean
+        get() = plus?.hasPlus == true
+
     val uidLong: Long?
         get() = account?.uidLong ?: when (directUid) {
             is kotlinx.serialization.json.JsonPrimitive -> directUid.content.toLongOrNull()
@@ -296,3 +300,40 @@ data class RotorSequenceItemDto(
     @SerialName("track") val track: TrackDetailsDto? = null,
     @SerialName("liked") val liked: Boolean? = null
 )
+
+@Serializable
+data class PlusInfoDto(
+    @SerialName("hasPlus") val hasPlus: Boolean = false,
+    @SerialName("isTutorialCompleted") val isTutorialCompleted: Boolean = false
+)
+
+@Serializable
+data class FileInfoResultDto(
+    @SerialName("downloadInfo") val downloadInfo: LosslessDownloadInfoDto? = null
+)
+
+@Serializable
+data class LosslessDownloadInfoDto(
+    @SerialName("codec") val codec: String? = null,
+    @SerialName("bitrate") val bitrate: Int? = null,
+    @SerialName("transport") val transport: String? = null,
+    @SerialName("key") val key: String? = null,
+    @SerialName("urls") val urls: List<String> = emptyList(),
+    @SerialName("url") val url: String? = null,
+    @SerialName("size") val size: Long? = null,
+    @SerialName("gain") val gain: Boolean = false,
+    @SerialName("trackId") val trackId: String? = null
+) {
+    val isLossless: Boolean
+        get() = codec?.lowercase() in listOf("flac", "flac-mp4")
+
+    val streamUrls: List<String>
+        get() {
+            val list = mutableListOf<String>()
+            for (u in urls) {
+                if (u.isNotBlank() && u !in list) list.add(u)
+            }
+            url?.takeIf { it.isNotBlank() && it !in list }?.let { list.add(it) }
+            return list
+        }
+}

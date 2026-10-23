@@ -85,7 +85,8 @@ class AccountSessionManager @Inject constructor(
                 active.copy(
                     displayName = status.displayUserName,
                     login = status.account?.login?.ifBlank { active.login } ?: active.login,
-                    avatarUrl = avatar ?: active.avatarUrl
+                    avatarUrl = avatar ?: active.avatarUrl,
+                    hasPlus = status.hasPlus
                 )
             )
         } catch (e: Exception) {

@@ -42,14 +42,19 @@ object PlayerModule {
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
 
+        val encrawDataSourceFactory = com.korenskoy.yandexmusic.data.player.EncrawDataSourceFactory(context)
+        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(encrawDataSourceFactory)
+
         return try {
             ExoPlayer.Builder(context, renderersFactory)
+                .setMediaSourceFactory(mediaSourceFactory)
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
                 .setHandleAudioBecomingNoisy(true)
                 .setWakeMode(C.WAKE_MODE_LOCAL)
                 .build()
         } catch (e: Exception) {
             ExoPlayer.Builder(context, renderersFactory)
+                .setMediaSourceFactory(mediaSourceFactory)
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
                 .setHandleAudioBecomingNoisy(true)
                 .build()

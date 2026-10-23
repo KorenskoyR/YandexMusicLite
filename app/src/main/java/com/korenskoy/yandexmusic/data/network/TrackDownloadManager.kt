@@ -93,16 +93,23 @@ class TrackDownloadManager @Inject constructor(
 
         val file = File(tracksDir, "$trackId.mp3")
         val tempFile = File(tracksDir, "$trackId.tmp")
+
+        val encrawKey = if (url.contains("#encraw_key=")) {
+            url.substringAfter("#encraw_key=").takeIf { it.isNotBlank() }
+        } else null
+        val cleanUrl = if (encrawKey != null) url.substringBefore("#encraw_key=") else url
         
         try {
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder().url(cleanUrl).build()
             val isSuccess = okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use false
                 val body = response.body
                 
                 FileOutputStream(tempFile).use { fos ->
-                    body.byteStream().use { inputStream ->
-                        inputStream.copyTo(fos)
+                    val rawStream = body.byteStream()
+                    val inputStream = if (encrawKey != null) EncrawDecryptor.wrapInputStream(rawStream, encrawKey) else rawStream
+                    inputStream.use { input ->
+                        input.copyTo(fos)
                     }
                 }
                 true

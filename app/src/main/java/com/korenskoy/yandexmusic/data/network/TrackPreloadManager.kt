@@ -29,9 +29,14 @@ class TrackPreloadManager @Inject constructor(
 
     /**
      * A playable link and what it is. [bestMp3] is the best MP3 offered: what a file downloaded before 1.6
-     * holds, as those always took the best MP3.
+     * holds, as those always took the best MP3. [encrawKey] is the AES-CTR decryption key for lossless streams.
      */
-    data class ResolvedStream(val url: String, val quality: StreamQuality, val bestMp3: StreamQuality? = null)
+    data class ResolvedStream(
+        val url: String,
+        val quality: StreamQuality,
+        val bestMp3: StreamQuality? = null,
+        val encrawKey: String? = null
+    )
 
     companion object {
         const val URL_TTL_MS = 45 * 60 * 1000L // 45 минут
@@ -86,6 +91,11 @@ class TrackPreloadManager @Inject constructor(
 
     /** Tries the offered variants from the best down until one gives a link. */
     private suspend fun resolveBest(trackId: String, capKbps: Int?): ResolvedStream? {
+        if (capKbps == null) {
+            val losslessStream = tryResolveLossless(trackId)
+            if (losslessStream != null) return losslessStream
+        }
+
         val offeredList = api.getTrackDownloadInfo(trackId).result.orEmpty()
         offered[trackId] = StreamVariants.describe(offeredList)
         Log.i("TrackPreloadManager", "Track $trackId offered: ${offered[trackId]}")
@@ -96,6 +106,45 @@ class TrackPreloadManager @Inject constructor(
             return ResolvedStream(url, StreamQuality(variant.codec, variant.bitrateInKbps), bestMp3)
         }
         return null
+    }
+
+    private suspend fun tryResolveLossless(trackId: String): ResolvedStream? {
+        val numericId = LosslessSigner.parseNumericTrackId(trackId) ?: return null
+        return try {
+            val sign = LosslessSigner.signFileInfo(numericId, quality = "lossless")
+            val response = api.getFileInfo(
+                trackId = numericId.toString(),
+                quality = "lossless",
+                codecs = LosslessSigner.CODECS,
+                transports = LosslessSigner.TRANSPORT,
+                ts = sign.ts,
+                sign = sign.sign
+            )
+            val downloadInfo = response.result?.downloadInfo
+            if (downloadInfo != null && downloadInfo.isLossless && downloadInfo.streamUrls.isNotEmpty()) {
+                val directUrl = downloadInfo.streamUrls.first()
+                val encrawKey = downloadInfo.key
+                val playableUrl = if (!encrawKey.isNullOrBlank()) "$directUrl#encraw_key=$encrawKey" else directUrl
+                val quality = StreamQuality("flac", downloadInfo.bitrate ?: 1411)
+
+                val offeredList = try {
+                    api.getTrackDownloadInfo(trackId).result.orEmpty()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                val bestMp3 = offeredList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
+                    .maxByOrNull { it.bitrateInKbps }?.let { StreamQuality(it.codec, it.bitrateInKbps) }
+                val desc = "FLAC Lossless" + if (offeredList.isNotEmpty()) " · " + StreamVariants.describe(offeredList) else ""
+                offered[trackId] = desc
+                Log.i("TrackPreloadManager", "Track $trackId resolved Lossless: $desc")
+                ResolvedStream(playableUrl, quality, bestMp3, encrawKey)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.d("TrackPreloadManager", "Lossless unavailable for $trackId, falling back: ${e.message}")
+            null
+        }
     }
 
     fun evictUrl(trackId: String) {

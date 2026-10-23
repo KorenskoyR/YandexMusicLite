@@ -574,12 +574,17 @@ class PlaybackController @Inject constructor(
 
     private fun publishQuality(trackId: String) {
         _streamQuality.value = if (downloadManager.isKnownDownloaded(trackId)) {
-            downloadManager.downloadedQuality(trackId)
-                ?.let { context.getString(R.string.quality_offline_known, it.codec.uppercase(), it.bitrateKbps) }
-                ?: context.getString(R.string.quality_offline)
+            val q = downloadManager.downloadedQuality(trackId)
+            if (q != null) {
+                if (q.codec.equals("flac", ignoreCase = true)) "FLAC · ОФЛАЙН"
+                else context.getString(R.string.quality_offline_known, q.codec.uppercase(), q.bitrateKbps)
+            } else {
+                context.getString(R.string.quality_offline)
+            }
         } else {
             preloadManager.qualityOf(trackId)?.let {
-                context.getString(R.string.quality_stream, it.codec.uppercase(), it.bitrateKbps)
+                if (it.codec.equals("flac", ignoreCase = true)) "FLAC · LOSSLESS"
+                else context.getString(R.string.quality_stream, it.codec.uppercase(), it.bitrateKbps)
             }
         }
     }
