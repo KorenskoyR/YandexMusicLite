@@ -65,7 +65,8 @@ class LibraryRepository @Inject constructor(
     private var loadedFolder: String? = null
     private var hitsPage = 1
     private var trendsPage = 1
-    private var isLoadingMoreCharts = false
+    private val loadingMoreHits = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val loadingMoreTrends = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val activeFolder: String
         get() = authRepository.getActiveAccount()?.folderName ?: "default"
@@ -258,26 +259,31 @@ class LibraryRepository @Inject constructor(
     private suspend fun searchTracks(query: String, page: Int): List<TrackDetailsDto> =
         runCatching { api.search(query, page = page).result?.tracks?.results.orEmpty() }.getOrDefault(emptyList())
 
-    fun loadMoreHits() = loadMore(HITS_QUERIES, { ++hitsPage }) { more ->
+    fun loadMoreHits() = loadMore(loadingMoreHits, HITS_QUERIES, { ++hitsPage }) { more ->
         _weeklyHits.value = (_weeklyHits.value + more).distinctBy { it.idString }
     }
 
-    fun loadMoreTrends() = loadMore(TRENDS_QUERIES, { ++trendsPage }) { more ->
+    fun loadMoreTrends() = loadMore(loadingMoreTrends, TRENDS_QUERIES, { ++trendsPage }) { more ->
         val combined = (_trendTracks.value + more).distinctBy { it.idString }
         _trendTracks.value = combined
         _popularTracks.value = combined
     }
 
-    private fun loadMore(queries: List<String>, nextPage: () -> Int, append: (List<TrackDetailsDto>) -> Unit) {
-        if (isLoadingMoreCharts) return
-        isLoadingMoreCharts = true
+    private fun loadMore(
+        gate: java.util.concurrent.atomic.AtomicBoolean,
+        queries: List<String>,
+        nextPage: () -> Int,
+        append: (List<TrackDetailsDto>) -> Unit
+    ) {
+        // Hits and trends have their own gate, so one paging does not block the other.
+        if (!gate.compareAndSet(false, true)) return
         val page = nextPage()
         scope.launch {
             try {
                 val more = searchTracks(queries[page % queries.size], page / queries.size)
                 if (more.isNotEmpty()) append(more)
             } finally {
-                isLoadingMoreCharts = false
+                gate.set(false)
             }
         }
     }

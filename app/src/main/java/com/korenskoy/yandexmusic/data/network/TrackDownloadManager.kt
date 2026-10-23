@@ -40,6 +40,8 @@ class TrackDownloadManager @Inject constructor(
     val downloadProgress = _downloadProgress.asStateFlow()
 
     init {
+        // Remove leftover temp files from a download the previous process did not finish.
+        tracksDir.listFiles()?.filter { it.extension == "tmp" }?.forEach { it.delete() }
         updateCacheStats()
     }
 
