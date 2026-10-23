@@ -383,10 +383,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 28",
-            buildGradle.contains("versionCode = 28"))
-        assertTrue("build.gradle.kts must be versionName 1.6.4",
-            buildGradle.contains("versionName = \"1.6.4\""))
+        assertTrue("build.gradle.kts must be versionCode 29",
+            buildGradle.contains("versionCode = 29"))
+        assertTrue("build.gradle.kts must be versionName 1.6.5",
+            buildGradle.contains("versionName = \"1.6.5\""))
     }
 
     @Test
@@ -428,11 +428,11 @@ class LayoutSafetyTest {
     fun testMd5HelperFallbackSaltArchitecture() {
         val md5HelperFile = File(sourceDir, "data/network/Md5Helper.kt").readText()
         assertTrue("Md5Helper must define FALLBACK_SALT",
-            md5HelperFile.contains("const val FALLBACK_SALT = \"XGR3485624001b979\""))
+            md5HelperFile.contains("const val FALLBACK_SALT = \"XGRlBW9FXlekgbPrRHuSiA\""))
         assertTrue("Md5Helper must fallback if BuildConfig.YANDEX_SALT is blank",
             md5HelperFile.contains("if (BuildConfig.YANDEX_SALT.isNotBlank()) BuildConfig.YANDEX_SALT else FALLBACK_SALT"))
         assertEquals("Md5Helper.FALLBACK_SALT must match standard production salt",
-            "XGR3485624001b979", com.korenskoy.yandexmusic.data.network.Md5Helper.FALLBACK_SALT)
+            "XGRlBW9FXlekgbPrRHuSiA", com.korenskoy.yandexmusic.data.network.Md5Helper.FALLBACK_SALT)
         assertTrue("Md5Helper.SALT must not be blank",
             com.korenskoy.yandexmusic.data.network.Md5Helper.SALT.isNotBlank())
     }

@@ -52,6 +52,18 @@ class StreamVariantsTest {
     @Test
     fun betterDecidesWhetherADownloadIsUpgraded() {
         val q = TrackPreloadManager::StreamQuality
+        // Lossless beats any lossy stream
+        assertTrue(StreamVariants.isBetter(q("flac", 1411), q("mp3", 320)))
+        assertTrue(StreamVariants.isBetter(q("flac-mp4", 0), q("mp3", 320)))
+        assertTrue(StreamVariants.isBetter(q("flac", 1411), q("aac", 256)))
+        assertFalse(StreamVariants.isBetter(q("mp3", 320), q("flac", 1411)))
+        assertFalse(StreamVariants.isBetter(q("mp3", 320), q("flac-mp4", 0)))
+
+        // HQ 320 beats 192
+        assertTrue(StreamVariants.isBetter(q("mp3", 320), q("mp3", 192)))
+        assertTrue(StreamVariants.isBetter(q("mp3", 320), q("aac", 192)))
+
+        // AAC vs MP3
         assertTrue(StreamVariants.isBetter(q("aac", 256), q("mp3", 192)))
         assertTrue(StreamVariants.isBetter(q("aac", 192), q("mp3", 192)))
         assertFalse(StreamVariants.isBetter(q("mp3", 192), q("mp3", 192)))

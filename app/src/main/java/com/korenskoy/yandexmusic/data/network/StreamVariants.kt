@@ -24,7 +24,9 @@ object StreamVariants {
 
     /** True when [candidate] is a better stream than [current] (what a downloaded file has). */
     fun isBetter(candidate: TrackPreloadManager.StreamQuality, current: TrackPreloadManager.StreamQuality): Boolean =
-        candidate.bitrateKbps > current.bitrateKbps ||
+        if (candidate.isLossless && !current.isLossless) true
+        else if (!candidate.isLossless && current.isLossless) false
+        else candidate.bitrateKbps > current.bitrateKbps ||
             (candidate.bitrateKbps == current.bitrateKbps && rank(candidate.codec) < rank(current.codec))
 
     /** "AAC 192 · MP3 192 · MP3 128" — what the server offered, best first. */
@@ -32,6 +34,6 @@ object StreamVariants {
         offered.sortedWith(compareByDescending<DownloadInfoResponseDto> { it.bitrateInKbps }.thenBy { rank(it.codec) })
             .joinToString(" · ") { "${it.codec.uppercase()} ${it.bitrateInKbps}" + if (it.preview) " (фрагмент)" else "" }
 
-    private val CODEC_PREFERENCE = listOf("flac", "aac", "mp3")
+    private val CODEC_PREFERENCE = listOf("flac", "flac-mp4", "aac", "mp3")
     private fun rank(codec: String) = CODEC_PREFERENCE.indexOf(codec.lowercase()).let { if (it < 0) CODEC_PREFERENCE.size else it }
 }

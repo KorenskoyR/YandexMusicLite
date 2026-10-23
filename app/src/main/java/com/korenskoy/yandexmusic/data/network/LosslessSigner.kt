@@ -37,7 +37,9 @@ object LosslessSigner {
     const val WEB_CLIENT = "YandexMusicWebNext/1.0.0"
     const val WEB_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-    const val DEFAULT_CODECS = "flac,flac-mp4,mp3,aac,he-aac,aac-mp4,he-aac-mp4"
+    const val CODECS_FLAC = "flac-mp4,flac"
+    const val CODECS_HQ_MP3 = "mp3"
+    const val DEFAULT_CODECS = CODECS_FLAC
     const val WEB_CODECS = "flac,aac,he-aac,mp3,flac-mp4,aac-mp4,he-aac-mp4"
 
     // Backward-compatible aliases
@@ -53,44 +55,80 @@ object LosslessSigner {
         val transport: String
     )
 
-    val STRATEGIES: List<ClientStrategy> = listOf(
-        // Primary: Official Android client with raw direct CDN transport
-        ClientStrategy(
-            name = "Android",
-            clientHeader = ANDROID_CLIENT,
-            userAgent = ANDROID_USER_AGENT,
-            key = ANDROID_SIGN_KEY,
-            codecs = DEFAULT_CODECS,
-            transport = "raw"
-        ),
-        // Fallback 1: Desktop client with raw direct CDN transport
-        ClientStrategy(
-            name = "Desktop",
-            clientHeader = "YandexMusicDesktopAppWindows/5.13.2",
-            userAgent = "YandexMusicDesktopAppWindows/5.13.2",
-            key = DESKTOP_SIGN_KEY,
-            codecs = DEFAULT_CODECS,
-            transport = "raw"
-        ),
-        // Fallback 2: Web Next client with raw direct CDN transport
+    /**
+     * Primary strategies targeting FLAC Lossless streams first:
+     * 1. Web Next (direct unencrypted raw CDN flac-mp4 streams)
+     * 2. Desktop Windows (official desktop app raw FLAC streams)
+     * 3. Android encraw (AES-CTR decrypted streams for tracks requiring encryption)
+     * 4. Android raw (direct CDN stream fallback)
+     */
+    val LOSSLESS_STRATEGIES: List<ClientStrategy> = listOf(
         ClientStrategy(
             name = "Web",
             clientHeader = WEB_CLIENT,
             userAgent = WEB_USER_AGENT,
             key = WEB_SIGN_KEY,
-            codecs = WEB_CODECS,
+            codecs = CODECS_FLAC,
             transport = "raw"
         ),
-        // Fallback 3: Android encrypted transport (in case CDN requires encraw for certain tracks)
+        ClientStrategy(
+            name = "Desktop",
+            clientHeader = DESKTOP_CLIENT,
+            userAgent = DESKTOP_USER_AGENT,
+            key = DESKTOP_SIGN_KEY,
+            codecs = "flac,flac-mp4",
+            transport = "raw"
+        ),
         ClientStrategy(
             name = "Android-encraw",
             clientHeader = ANDROID_CLIENT,
             userAgent = ANDROID_USER_AGENT,
             key = ANDROID_SIGN_KEY,
-            codecs = DEFAULT_CODECS,
+            codecs = CODECS_FLAC,
             transport = "encraw"
+        ),
+        ClientStrategy(
+            name = "Android",
+            clientHeader = ANDROID_CLIENT,
+            userAgent = ANDROID_USER_AGENT,
+            key = ANDROID_SIGN_KEY,
+            codecs = CODECS_FLAC,
+            transport = "raw"
         )
     )
+
+    /**
+     * Strategies targeting High Quality (HQ) MP3 320 kbps when FLAC is unavailable for a track.
+     */
+    val HQ_STRATEGIES: List<ClientStrategy> = listOf(
+        ClientStrategy(
+            name = "Web-HQ",
+            clientHeader = WEB_CLIENT,
+            userAgent = WEB_USER_AGENT,
+            key = WEB_SIGN_KEY,
+            codecs = CODECS_HQ_MP3,
+            transport = "raw"
+        ),
+        ClientStrategy(
+            name = "Desktop-HQ",
+            clientHeader = DESKTOP_CLIENT,
+            userAgent = DESKTOP_USER_AGENT,
+            key = DESKTOP_SIGN_KEY,
+            codecs = CODECS_HQ_MP3,
+            transport = "raw"
+        ),
+        ClientStrategy(
+            name = "Android-HQ",
+            clientHeader = ANDROID_CLIENT,
+            userAgent = ANDROID_USER_AGENT,
+            key = ANDROID_SIGN_KEY,
+            codecs = CODECS_HQ_MP3,
+            transport = "raw"
+        )
+    )
+
+    // Backward-compatible alias
+    val STRATEGIES: List<ClientStrategy> get() = LOSSLESS_STRATEGIES
 
     data class FileInfoSign(
         val ts: Long,
@@ -128,7 +166,7 @@ object LosslessSigner {
         val base64String = digest.toByteString().base64()
 
         // Yandex signature validator requires Base64 without trailing '=' padding
-        val sign = if (base64String.endsWith("=")) base64String.dropLast(1) else base64String
+        val sign = base64String.trimEnd('=')
         return FileInfoSign(ts = tsSeconds, sign = sign)
     }
 }

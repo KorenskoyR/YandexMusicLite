@@ -2,6 +2,7 @@ package com.korenskoy.yandexmusic.data.network
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -23,7 +24,7 @@ class LosslessCryptoTest {
 
     @Test
     fun signatureMatchesReferenceVector() {
-        // Android client test vector (raw transport)
+        // Android client test vector (raw transport with CODECS_FLAC)
         val androidRawSign = LosslessSigner.signFileInfo(
             numericTrackId = 42L,
             quality = "lossless",
@@ -33,33 +34,32 @@ class LosslessCryptoTest {
             key = LosslessSigner.ANDROID_SIGN_KEY
         )
         assertEquals(1_700_000_000L, androidRawSign.ts)
-        assertEquals("tv/EHLaxrxuAL3idCVvfQ7lhE6jB3oBWY4c9naW7PW0", androidRawSign.sign)
+        assertEquals("FDtlLeRsk/tNAMLE4cVj8kk54UPHnPAprEUVnS7FwSE", androidRawSign.sign)
         assertEquals(43, androidRawSign.sign.length)
 
-        // Android client test vector (encraw transport)
-        val androidSign = LosslessSigner.signFileInfo(
+        // Web client test vector (raw transport with CODECS_FLAC)
+        val webFlacSign = LosslessSigner.signFileInfo(
             numericTrackId = 42L,
             quality = "lossless",
-            codecs = LosslessSigner.DEFAULT_CODECS,
-            transport = "encraw",
+            codecs = LosslessSigner.CODECS_FLAC,
+            transport = "raw",
             tsSeconds = 1_700_000_000L,
-            key = LosslessSigner.ANDROID_SIGN_KEY
+            key = LosslessSigner.WEB_SIGN_KEY
         )
-        assertEquals(1_700_000_000L, androidSign.ts)
-        assertEquals("5Xma89MBvxVhn4bCHIDRA/W8OGjHoibkEZj5b0DbRp8", androidSign.sign)
-        assertEquals(43, androidSign.sign.length)
+        assertEquals(1_700_000_000L, webFlacSign.ts)
+        assertEquals(43, webFlacSign.sign.length)
 
-        // Desktop client test vector
-        val desktopSign = LosslessSigner.signFileInfo(
+        // Desktop client test vector (raw transport with CODECS_FLAC)
+        val desktopFlacSign = LosslessSigner.signFileInfo(
             numericTrackId = 42L,
             quality = "lossless",
-            codecs = LosslessSigner.DEFAULT_CODECS,
-            transport = "encraw",
+            codecs = LosslessSigner.CODECS_FLAC,
+            transport = "raw",
             tsSeconds = 1_700_000_000L,
             key = LosslessSigner.DESKTOP_SIGN_KEY
         )
-        assertEquals("uUF/8xrx+OhWOrFZJdnuxs4/T+R4xGd2WSzIc3OhVsE", desktopSign.sign)
-        assertEquals(43, desktopSign.sign.length)
+        assertEquals(1_700_000_000L, desktopFlacSign.ts)
+        assertEquals(43, desktopFlacSign.sign.length)
 
         // Web client test vector
         val webSign = LosslessSigner.signFileInfo(
@@ -197,5 +197,42 @@ class LosslessCryptoTest {
         org.junit.Assert.assertNotNull(previewInfo)
         assertTrue(previewInfo!!.isPreview)
         assertEquals("preview", previewInfo.quality)
+
+        // 6. AAC-MP4 response (must NOT be detected as lossless)
+        val aacMp4Body = """{"result": {
+            "downloadInfo": {
+                "codec": "aac-mp4",
+                "bitrate": 192,
+                "transport": "raw",
+                "urls": ["https://cdn.example.com/stream.mp4"]
+            }
+        }}"""
+        val aacMp4Response = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto>(aacMp4Body)
+        val aacInfo = aacMp4Response.activeDownloadInfo
+        org.junit.Assert.assertNotNull(aacInfo)
+        assertFalse(aacInfo!!.isLossless)
+        assertEquals("aac-mp4", aacInfo.codec)
+    }
+
+    @Test
+    fun strategyArchitecturePrioritizesWebAndDesktop() {
+        val losslessStrategies = LosslessSigner.LOSSLESS_STRATEGIES
+        assertEquals(4, losslessStrategies.size)
+        assertEquals("Web", losslessStrategies[0].name)
+        assertEquals(LosslessSigner.WEB_CLIENT, losslessStrategies[0].clientHeader)
+        assertEquals(LosslessSigner.CODECS_FLAC, losslessStrategies[0].codecs)
+        assertEquals("raw", losslessStrategies[0].transport)
+
+        assertEquals("Desktop", losslessStrategies[1].name)
+        assertEquals(LosslessSigner.DESKTOP_CLIENT, losslessStrategies[1].clientHeader)
+        assertEquals("raw", losslessStrategies[1].transport)
+
+        assertEquals("Android-encraw", losslessStrategies[2].name)
+        assertEquals("encraw", losslessStrategies[2].transport)
+
+        val hqStrategies = LosslessSigner.HQ_STRATEGIES
+        assertEquals(3, hqStrategies.size)
+        assertEquals("mp3", hqStrategies[0].codecs)
+        assertEquals("raw", hqStrategies[0].transport)
     }
 }
