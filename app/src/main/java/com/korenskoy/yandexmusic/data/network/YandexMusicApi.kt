@@ -108,16 +108,17 @@ interface YandexMusicApi {
         @Path("trackId") trackId: String
     ): ResponseWrapper<List<DownloadInfoResponseDto>>
 
-    @retrofit2.http.Headers("X-Yandex-Music-Client: YandexMusicDesktopAppWindows/5.95.0")
     @GET("get-file-info")
     suspend fun getFileInfo(
+        @retrofit2.http.Header("X-Yandex-Music-Client") clientHeader: String,
+        @retrofit2.http.Header("User-Agent") userAgent: String,
         @retrofit2.http.Query("trackId") trackId: String,
         @retrofit2.http.Query("quality") quality: String = "lossless",
-        @retrofit2.http.Query("codecs") codecs: String = LosslessSigner.CODECS,
-        @retrofit2.http.Query("transports") transports: String = LosslessSigner.TRANSPORT,
+        @retrofit2.http.Query("codecs") codecs: String = LosslessSigner.DEFAULT_CODECS,
+        @retrofit2.http.Query("transports") transports: String = "encraw",
         @retrofit2.http.Query("ts") ts: Long,
         @retrofit2.http.Query("sign") sign: String
-    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.FileInfoResultDto>
+    ): com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto
 
     @GET
     suspend fun getRawUrl(@retrofit2.http.Url url: String): ResponseWrapper<kotlinx.serialization.json.JsonElement>

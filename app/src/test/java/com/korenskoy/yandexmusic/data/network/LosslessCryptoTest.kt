@@ -23,19 +23,42 @@ class LosslessCryptoTest {
 
     @Test
     fun signatureMatchesReferenceVector() {
-        // Test vector computed and verified in official clients / yamuse
-        val signResult = LosslessSigner.signFileInfo(
+        // Android client test vector
+        val androidSign = LosslessSigner.signFileInfo(
             numericTrackId = 42L,
             quality = "lossless",
-            codecs = LosslessSigner.CODECS,
-            transport = LosslessSigner.TRANSPORT,
+            codecs = LosslessSigner.DEFAULT_CODECS,
+            transport = "encraw",
+            tsSeconds = 1_700_000_000L,
+            key = LosslessSigner.ANDROID_SIGN_KEY
+        )
+        assertEquals(1_700_000_000L, androidSign.ts)
+        assertEquals("5Xma89MBvxVhn4bCHIDRA/W8OGjHoibkEZj5b0DbRp8", androidSign.sign)
+        assertEquals(43, androidSign.sign.length)
+
+        // Desktop client test vector
+        val desktopSign = LosslessSigner.signFileInfo(
+            numericTrackId = 42L,
+            quality = "lossless",
+            codecs = LosslessSigner.DEFAULT_CODECS,
+            transport = "encraw",
             tsSeconds = 1_700_000_000L,
             key = LosslessSigner.DESKTOP_SIGN_KEY
         )
+        assertEquals("uUF/8xrx+OhWOrFZJdnuxs4/T+R4xGd2WSzIc3OhVsE", desktopSign.sign)
+        assertEquals(43, desktopSign.sign.length)
 
-        assertEquals(1_700_000_000L, signResult.ts)
-        assertEquals("UCJdGuN5+kPF/GnUhResm2pqZURJ6Rl7xaCwIuB130o", signResult.sign)
-        assertEquals(43, signResult.sign.length)
+        // Web client test vector
+        val webSign = LosslessSigner.signFileInfo(
+            numericTrackId = 42L,
+            quality = "lossless",
+            codecs = LosslessSigner.WEB_CODECS,
+            transport = "raw",
+            tsSeconds = 1_700_000_000L,
+            key = LosslessSigner.WEB_SIGN_KEY
+        )
+        assertEquals("cCwFRBMi2D2huielRq3OYanS2DVnIm5pirsaaPesA/E", webSign.sign)
+        assertEquals(43, webSign.sign.length)
     }
 
     @Test
@@ -81,9 +104,11 @@ class LosslessCryptoTest {
     }
 
     @Test
-    fun parsesLosslessFileInfoResult() {
+    fun parsesLosslessFileInfoResultRootAndNested() {
         val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
-        val body = """{"result": {
+
+        // 1. Root-level downloadInfo (standard Yandex Music response)
+        val rootBody = """{
             "downloadInfo": {
                 "codec": "flac",
                 "bitrate": 1411,
@@ -91,16 +116,57 @@ class LosslessCryptoTest {
                 "key": "000102030405060708090a0b0c0d0e0f",
                 "urls": ["https://cdn.example.com/stream1.flac", "https://cdn.example.com/stream2.flac"]
             }
+        }"""
+        val rootResponse = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto>(rootBody)
+        val rootInfo = rootResponse.activeDownloadInfo
+        org.junit.Assert.assertNotNull(rootInfo)
+        assertTrue(rootInfo!!.isLossless)
+        assertEquals("flac", rootInfo.codec)
+        assertEquals(1411, rootInfo.bitrate)
+        assertEquals("encraw", rootInfo.transport)
+        assertEquals("000102030405060708090a0b0c0d0e0f", rootInfo.key)
+        assertEquals(2, rootInfo.streamUrls.size)
+        assertEquals("https://cdn.example.com/stream1.flac", rootInfo.streamUrls.first())
+
+        // 2. Snake_case download_info
+        val snakeBody = """{
+            "download_info": {
+                "codec": "flac-mp4",
+                "bitrate": 0,
+                "transport": "encraw",
+                "key": "abcdef",
+                "url": "https://cdn.example.com/stream.mp4"
+            }
+        }"""
+        val snakeResponse = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto>(snakeBody)
+        val snakeInfo = snakeResponse.activeDownloadInfo
+        org.junit.Assert.assertNotNull(snakeInfo)
+        assertTrue(snakeInfo!!.isLossless)
+        assertEquals("flac-mp4", snakeInfo.codec)
+        assertEquals("abcdef", snakeInfo.key)
+
+        // 3. Error response (not-allowed)
+        val errorBody = """{
+            "name": "track-download-info-error",
+            "message": "not-allowed"
+        }"""
+        val errorResponse = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto>(errorBody)
+        assertNull(errorResponse.activeDownloadInfo)
+        assertEquals("not-allowed", errorResponse.failureReason)
+
+        // 4. Backward-compatible nested result
+        val nestedBody = """{"result": {
+            "downloadInfo": {
+                "codec": "flac",
+                "bitrate": 1411,
+                "transport": "raw",
+                "urls": ["https://cdn.example.com/stream.flac"]
+            }
         }}"""
-        val response = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.FileInfoResultDto>>(body)
-        val info = response.result?.downloadInfo
-        org.junit.Assert.assertNotNull(info)
-        assertTrue(info!!.isLossless)
-        assertEquals("flac", info.codec)
-        assertEquals(1411, info.bitrate)
-        assertEquals("encraw", info.transport)
-        assertEquals("000102030405060708090a0b0c0d0e0f", info.key)
-        assertEquals(2, info.streamUrls.size)
-        assertEquals("https://cdn.example.com/stream1.flac", info.streamUrls.first())
+        val nestedResponse = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.FileInfoResponseDto>(nestedBody)
+        val nestedInfo = nestedResponse.activeDownloadInfo
+        org.junit.Assert.assertNotNull(nestedInfo)
+        assertTrue(nestedInfo!!.isLossless)
+        assertEquals("raw", nestedInfo.transport)
     }
 }

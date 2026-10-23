@@ -308,6 +308,43 @@ data class PlusInfoDto(
 )
 
 @Serializable
+data class FileInfoResponseDto(
+    @SerialName("downloadInfo") val downloadInfo: LosslessDownloadInfoDto? = null,
+    @SerialName("download_info") val downloadInfoSnake: LosslessDownloadInfoDto? = null,
+    @SerialName("result") val result: FileInfoResultDto? = null,
+    @SerialName("error") val error: ErrorDto? = null,
+    @SerialName("name") val errorName: String? = null,
+    @SerialName("message") val errorMessage: String? = null,
+    @SerialName("codec") val directCodec: String? = null,
+    @SerialName("bitrate") val directBitrate: Int? = null,
+    @SerialName("transport") val directTransport: String? = null,
+    @SerialName("key") val directKey: String? = null,
+    @SerialName("urls") val directUrls: List<String> = emptyList(),
+    @SerialName("url") val directUrl: String? = null,
+    @SerialName("size") val directSize: Long? = null,
+    @SerialName("gain") val directGain: Boolean = false,
+    @SerialName("trackId") val directTrackId: String? = null
+) {
+    val activeDownloadInfo: LosslessDownloadInfoDto?
+        get() = downloadInfo ?: downloadInfoSnake ?: result?.activeDownloadInfo ?: if (!directCodec.isNullOrBlank()) {
+            LosslessDownloadInfoDto(
+                codec = directCodec,
+                bitrate = directBitrate,
+                transport = directTransport,
+                key = directKey,
+                urls = directUrls,
+                url = directUrl,
+                size = directSize,
+                gain = directGain,
+                trackId = directTrackId
+            )
+        } else null
+
+    val failureReason: String?
+        get() = errorMessage ?: errorName ?: error?.message ?: result?.errorMessage ?: result?.errorName
+}
+
+@Serializable
 data class FileInfoResultDto(
     @SerialName("downloadInfo") val downloadInfo: LosslessDownloadInfoDto? = null,
     @SerialName("download_info") val downloadInfoSnake: LosslessDownloadInfoDto? = null,
