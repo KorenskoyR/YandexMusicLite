@@ -10,6 +10,10 @@ import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
 import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
 import com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl
+import com.korenskoy.yandexmusic.domain.model.UserAccount
+import com.korenskoy.yandexmusic.domain.repository.AuthRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -54,7 +58,8 @@ class PlayerEngineInstrumentedTest {
         val preload = TrackPreloadManager(
             api, downloads, okHttp,
             com.korenskoy.yandexmusic.data.repository.SettingsRepositoryImpl(context),
-            com.korenskoy.yandexmusic.data.network.NetworkMonitor(context)
+            com.korenskoy.yandexmusic.data.network.NetworkMonitor(context),
+            NoAuth()
         )
         onMain {
             playerA = newPlayer()
@@ -201,4 +206,23 @@ class PlayerEngineInstrumentedTest {
         const val STREAM_C = "https://maximum.hostingradio.ru/maximum96.aacp"
         const val STREAM_D = "https://nashe1.hostingradio.ru/nashe-128.mp3"
     }
+}
+
+/** No account: this engine test drives live radio streams, so stream resolution never asks about auth. */
+private class NoAuth : AuthRepository {
+    override val activeAccount = MutableStateFlow<UserAccount?>(null)
+    override val allAccounts = MutableStateFlow<List<UserAccount>>(emptyList())
+    override val defaultAccountUid = MutableStateFlow<String?>(null)
+    override fun getToken(): String? = null
+    override fun saveToken(token: String) {}
+    override fun isAuthorized() = flowOf(false)
+    override fun clearToken() {}
+    override fun getActiveAccount(): UserAccount? = null
+    override fun getAllAccounts(): List<UserAccount> = emptyList()
+    override fun saveOrUpdateAccount(account: UserAccount) {}
+    override fun switchAccount(uid: String): Boolean = false
+    override fun removeAccount(uid: String): UserAccount? = null
+    override fun clearAllAccounts() {}
+    override fun getDefaultAccountUid(): String? = null
+    override fun setDefaultAccountUid(uid: String?) {}
 }
