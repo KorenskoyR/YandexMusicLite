@@ -177,11 +177,9 @@
     <string name="settings_economy_mobile">Экономия трафика в мобильной сети</string>
     <string name="settings_economy_mobile_hint">До 128 кбит/с, когда нет Wi‑Fi. Выключено — всегда лучшее качество.</string>
     <string name="settings_steering_side_title">Расположение в режиме «В авто»</string>
-    <string name="settings_steering_side_hint">Кнопки — ближе к рулю, обложка — с дальней стороны</string>
     <string name="settings_steering_left">Левый руль</string>
     <string name="settings_steering_right">Правый руль</string>
     <string name="settings_ui_scale_title">Масштаб интерфейса</string>
-    <string name="settings_ui_scale_hint">Для экранов, где система занижает или завышает плотность (частая беда автоэкранов).</string>
     <string name="settings_ui_scale_auto">Авто</string>
     <string name="settings_ui_scale_manual">Вручную</string>
     <string name="settings_ui_scale_auto_info">Экран %1$d×%2$d · система %3$d dpi · физически ≈ %4$s dpi → %5$d%%</string>

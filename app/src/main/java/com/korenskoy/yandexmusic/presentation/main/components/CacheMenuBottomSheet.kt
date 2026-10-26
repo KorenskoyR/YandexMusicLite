@@ -933,11 +933,6 @@ private fun SteeringSideSettingCard(onLeft: Boolean, onChange: (Boolean) -> Unit
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold
         )
-        Text(
-            text = stringResource(R.string.settings_steering_side_hint),
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 11.5.sp
-        )
         Spacer(modifier = Modifier.height(12.dp))
         Row(
             modifier = Modifier
@@ -1031,11 +1026,6 @@ private fun UiScaleSettingCard(auto: Boolean, onAutoChange: (Boolean) -> Unit, m
             color = Color.White,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold
-        )
-        Text(
-            text = stringResource(R.string.settings_ui_scale_hint),
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 11.5.sp
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(
