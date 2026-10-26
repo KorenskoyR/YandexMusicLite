@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
@@ -325,6 +327,19 @@ class ScreenshotTest {
     fun carLandscapeRightHandDrive() {
         show { car(isLandscape = true, steeringWheelOnLeft = false) }
         snap("car_landscape_right_wheel")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carLandscapeUiScaled() {
+        // Enlarged UI, as the global density override produces for a low-reported-density screen.
+        show {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density * 1.4f, base.fontScale)) {
+                car(isLandscape = true)
+            }
+        }
+        snap("car_landscape_scaled")
     }
 
     @Composable

@@ -64,6 +64,10 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val steeringWheelOnLeft: StateFlow<Boolean> = settingsRepository.steeringWheelOnLeft
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT)
+    val uiScaleAuto: StateFlow<Boolean> = settingsRepository.uiScaleAuto
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_UI_SCALE_AUTO)
+    val uiScaleManual: StateFlow<Float> = settingsRepository.uiScaleManual
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_UI_SCALE)
     val crossfadeSeconds: StateFlow<Int> = settingsRepository.crossfadeSeconds
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_CROSSFADE_SECONDS)
 
@@ -161,6 +165,14 @@ class MainViewModel @Inject constructor(
 
     fun setSteeringWheelOnLeft(onLeft: Boolean) {
         viewModelScope.launch { settingsRepository.setSteeringWheelOnLeft(onLeft) }
+    }
+
+    fun setUiScaleAuto(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setUiScaleAuto(enabled) }
+    }
+
+    fun setUiScaleManual(scale: Float) {
+        viewModelScope.launch { settingsRepository.setUiScaleManual(scale) }
     }
 
     /** Re-downloads saved tracks the server now offers in a better quality (in the background). */

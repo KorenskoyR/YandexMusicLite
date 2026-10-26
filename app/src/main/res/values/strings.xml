@@ -180,6 +180,12 @@
     <string name="settings_steering_side_hint">Кнопки — ближе к рулю, обложка — с дальней стороны</string>
     <string name="settings_steering_left">Левый руль</string>
     <string name="settings_steering_right">Правый руль</string>
+    <string name="settings_ui_scale_title">Масштаб интерфейса</string>
+    <string name="settings_ui_scale_hint">Для экранов, где система занижает или завышает плотность (частая беда автоэкранов).</string>
+    <string name="settings_ui_scale_auto">Авто</string>
+    <string name="settings_ui_scale_manual">Вручную</string>
+    <string name="settings_ui_scale_auto_info">Экран %1$d×%2$d · система %3$d dpi · физически ≈ %4$s dpi → %5$d%%</string>
+    <string name="settings_ui_scale_manual_value">%1$d%% · ≈ %2$d dpi</string>
     <string name="settings_upgrade_downloads">Улучшить качество скачанных</string>
     <string name="settings_upgrade_downloads_hint">Перекачать треки, для которых сервер теперь даёт лучшее качество</string>
     <string name="playlist_reorder">Изменить порядок</string>

@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.SubcomposeAsyncImage
+import com.korenskoy.yandexmusic.utils.DisplayScale
 import java.util.Locale
 
 @Composable
@@ -80,6 +82,10 @@ fun CacheMenuBottomSheet(
     onEconomyOnMobileChange: (Boolean) -> Unit = {},
     steeringWheelOnLeft: Boolean = true,
     onSteeringWheelChange: (Boolean) -> Unit = {},
+    uiScaleAuto: Boolean = true,
+    onUiScaleAutoChange: (Boolean) -> Unit = {},
+    uiScaleManual: Float = 1f,
+    onUiScaleManualChange: (Float) -> Unit = {},
     onUpgradeDownloads: () -> Unit = {},
     crashReports: Int = 0,
     onOpenCrashLog: () -> Unit = {}
@@ -507,6 +513,15 @@ fun CacheMenuBottomSheet(
                     SteeringSideSettingCard(
                         onLeft = steeringWheelOnLeft,
                         onChange = onSteeringWheelChange
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    UiScaleSettingCard(
+                        auto = uiScaleAuto,
+                        onAutoChange = onUiScaleAutoChange,
+                        manualScale = uiScaleManual,
+                        onManualChange = onUiScaleManualChange
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -948,9 +963,15 @@ private fun SteeringSideSettingCard(onLeft: Boolean, onChange: (Boolean) -> Unit
     }
 }
 
-/** One pill of the steering-side segmented control; the selected one carries the accent gradient. */
+/** One pill of a segmented control; the selected one carries the accent gradient. */
 @Composable
-private fun SteeringSideOption(modifier: Modifier, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun SegmentedPill(
+    modifier: Modifier,
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     val background = if (selected) {
         Brush.horizontalGradient(listOf(Color(0xFFFF3366), Color(0xFFFF9900)))
     } else {
@@ -965,18 +986,123 @@ private fun SteeringSideOption(modifier: Modifier, label: String, selected: Bool
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.DirectionsCar,
-            contentDescription = null,
-            tint = if (selected) Color.White else Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) Color.White else Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+        }
         Text(
             text = label,
             color = if (selected) Color.White else Color.White.copy(alpha = 0.65f),
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
         )
+    }
+}
+
+/** One pill of the steering-side segmented control. */
+@Composable
+private fun SteeringSideOption(modifier: Modifier, label: String, selected: Boolean, onClick: () -> Unit) =
+    SegmentedPill(modifier, label, Icons.Default.DirectionsCar, selected, onClick)
+
+/**
+ * UI scale for screens whose reported density is wrong (dense car head units). "Авто" lets the app pick
+ * the scale from the screen metrics; "Вручную" exposes a 50–200% slider. Applied globally in MainActivity.
+ */
+@Composable
+private fun UiScaleSettingCard(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualScale: Float, onManualChange: (Float) -> Unit) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val info = remember(configuration) { DisplayScale.analyze(context.resources.displayMetrics) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.settings_ui_scale_title),
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = stringResource(R.string.settings_ui_scale_hint),
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 11.5.sp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.06f))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            SegmentedPill(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.settings_ui_scale_auto),
+                icon = null,
+                selected = auto,
+                onClick = { onAutoChange(true) }
+            )
+            SegmentedPill(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.settings_ui_scale_manual),
+                icon = null,
+                selected = !auto,
+                onClick = { onAutoChange(false) }
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        if (auto) {
+            val physical = if (info.physicalDpi > 0) info.physicalDpi.toString() else "—"
+            Text(
+                text = stringResource(
+                    R.string.settings_ui_scale_auto_info,
+                    info.widthPx, info.heightPx, info.reportedDpi, physical, (info.autoScale * 100).roundToInt()
+                ),
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 11.5.sp
+            )
+        } else {
+            var value by remember(manualScale) { mutableFloatStateOf(manualScale) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.settings_ui_scale_manual),
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = stringResource(
+                        R.string.settings_ui_scale_manual_value,
+                        (value * 100).roundToInt(), (info.reportedDpi * value).roundToInt()
+                    ),
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Slider(
+                value = value,
+                onValueChange = { value = it },
+                onValueChangeFinished = { onManualChange(value) },
+                valueRange = 0.5f..2.0f,
+                steps = 29,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color(0xFFFF3366),
+                    inactiveTrackColor = Color.White.copy(alpha = 0.12f)
+                )
+            )
+        }
     }
 }

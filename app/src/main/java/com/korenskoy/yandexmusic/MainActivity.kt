@@ -18,7 +18,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import com.korenskoy.yandexmusic.utils.DisplayScale
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -48,6 +55,9 @@ class MainActivity : ComponentActivity() {
     @javax.inject.Inject
     lateinit var libraryTree: com.korenskoy.yandexmusic.data.player.MediaLibraryTree
 
+    @javax.inject.Inject
+    lateinit var settingsRepository: SettingsRepository
+
     /** Incremented on each "open the player" request (notification tap); MainScreen reacts to changes. */
     private var openPlayerSignal by mutableIntStateOf(0)
 
@@ -72,13 +82,28 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            YandexMusicTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    // Skip the splash when the app is re-entered with a session already on screen
-                    AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal)
+            // Scale the whole UI for screens whose reported density is wrong (dense car head units):
+            // the app cannot change the system density, so it overrides its own instead.
+            val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsState(initial = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
+            val uiScaleManual by settingsRepository.uiScaleManual.collectAsState(initial = SettingsRepository.DEFAULT_UI_SCALE)
+            val context = LocalContext.current
+            val configuration = LocalConfiguration.current
+            val baseDensity = LocalDensity.current
+            val uiScale = remember(uiScaleAuto, uiScaleManual, configuration) {
+                val info = DisplayScale.analyze(context.resources.displayMetrics)
+                DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
+            }
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale)
+            ) {
+                YandexMusicTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        // Skip the splash when the app is re-entered with a session already on screen
+                        AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal)
+                    }
                 }
             }
         }

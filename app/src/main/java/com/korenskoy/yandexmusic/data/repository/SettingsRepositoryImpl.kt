@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
@@ -66,6 +67,27 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setSteeringWheelOnLeft(onLeft: Boolean) {
         context.dataStore.edit { prefs -> prefs[STEERING_WHEEL_ON_LEFT_KEY] = onLeft }
+    }
+
+    private val UI_SCALE_AUTO_KEY = booleanPreferencesKey("ui_scale_auto")
+    override val uiScaleAuto: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[UI_SCALE_AUTO_KEY] ?: SettingsRepository.DEFAULT_UI_SCALE_AUTO
+    }
+
+    override suspend fun setUiScaleAuto(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[UI_SCALE_AUTO_KEY] = enabled }
+    }
+
+    private val UI_SCALE_MANUAL_KEY = floatPreferencesKey("ui_scale_manual")
+    override val uiScaleManual: Flow<Float> = context.dataStore.data.map { prefs ->
+        (prefs[UI_SCALE_MANUAL_KEY] ?: SettingsRepository.DEFAULT_UI_SCALE)
+            .coerceIn(SettingsRepository.MIN_UI_SCALE, SettingsRepository.MAX_UI_SCALE)
+    }
+
+    override suspend fun setUiScaleManual(scale: Float) {
+        context.dataStore.edit { prefs ->
+            prefs[UI_SCALE_MANUAL_KEY] = scale.coerceIn(SettingsRepository.MIN_UI_SCALE, SettingsRepository.MAX_UI_SCALE)
+        }
     }
 
     override suspend fun setDownloadOverWifiOnly(enabled: Boolean) {
