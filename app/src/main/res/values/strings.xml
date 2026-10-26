@@ -176,6 +176,10 @@
     <string name="quality_details_ok">Понятно</string>
     <string name="settings_economy_mobile">Экономия трафика в мобильной сети</string>
     <string name="settings_economy_mobile_hint">До 128 кбит/с, когда нет Wi‑Fi. Выключено — всегда лучшее качество.</string>
+    <string name="settings_steering_side_title">Расположение в режиме «В авто»</string>
+    <string name="settings_steering_side_hint">Кнопки — ближе к рулю, обложка — с дальней стороны</string>
+    <string name="settings_steering_left">Левый руль</string>
+    <string name="settings_steering_right">Правый руль</string>
     <string name="settings_upgrade_downloads">Улучшить качество скачанных</string>
     <string name="settings_upgrade_downloads_hint">Перекачать треки, для которых сервер теперь даёт лучшее качество</string>
     <string name="playlist_reorder">Изменить порядок</string>

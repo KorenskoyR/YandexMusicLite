@@ -62,6 +62,8 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val economyOnMobileData: StateFlow<Boolean> = settingsRepository.economyOnMobileData
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val steeringWheelOnLeft: StateFlow<Boolean> = settingsRepository.steeringWheelOnLeft
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT)
     val crossfadeSeconds: StateFlow<Int> = settingsRepository.crossfadeSeconds
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_CROSSFADE_SECONDS)
 
@@ -155,6 +157,10 @@ class MainViewModel @Inject constructor(
 
     fun setEconomyOnMobileData(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setEconomyOnMobileData(enabled) }
+    }
+
+    fun setSteeringWheelOnLeft(onLeft: Boolean) {
+        viewModelScope.launch { settingsRepository.setSteeringWheelOnLeft(onLeft) }
     }
 
     /** Re-downloads saved tracks the server now offers in a better quality (in the background). */

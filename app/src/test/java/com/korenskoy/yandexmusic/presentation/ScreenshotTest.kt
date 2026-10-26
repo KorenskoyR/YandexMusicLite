@@ -320,11 +320,18 @@ class ScreenshotTest {
         snap("car_landscape")
     }
 
+    @Test
+    @Config(qualifiers = "+land")
+    fun carLandscapeRightHandDrive() {
+        show { car(isLandscape = true, steeringWheelOnLeft = false) }
+        snap("car_landscape_right_wheel")
+    }
+
     @Composable
-    private fun car(isLandscape: Boolean) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
+    private fun car(isLandscape: Boolean, steeringWheelOnLeft: Boolean = true) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
         currentTrack = tracks[0], isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
         onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
-        onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, progress = 60_000, durationMs = 215_000
+        onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = steeringWheelOnLeft, progress = 60_000, durationMs = 215_000
     ) }
 
     private companion object {

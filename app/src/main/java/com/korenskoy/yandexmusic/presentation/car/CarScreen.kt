@@ -63,6 +63,7 @@ fun CarScreen(
     onPlayRadio: () -> Unit,
     onExit: () -> Unit,
     isLandscape: Boolean = false,
+    steeringWheelOnLeft: Boolean = true,
     progress: Long = 0L,
     durationMs: Long = 0L,
     onSeek: (Long) -> Unit = {}
@@ -116,6 +117,7 @@ fun CarScreen(
 
         if (isLandscape) {
             CarScreenLandscape(
+                steeringWheelOnLeft = steeringWheelOnLeft,
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
                 isLiked = isLiked,
@@ -309,6 +311,7 @@ fun CarScreenPortrait(
 
 @Composable
 fun CarScreenLandscape(
+    steeringWheelOnLeft: Boolean = true,
     currentTrack: TrackDetailsDto?,
     isPlaying: Boolean,
     isLiked: Boolean,
@@ -362,129 +365,205 @@ fun CarScreenLandscape(
             CarTimeWidget()
         }
 
-        // Two-column dashboard content below top bar
+        // Two-column dashboard. Controls sit on the driver's side (near the wheel) and the cover on the
+        // far side, so left-hand drive gets controls-left/cover-right and right-hand drive mirrors it.
         Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left Column: Art + Track Info (cleanly centered without clock clutter)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000").orEmpty()
-                val context = LocalContext.current
-                if (currentTrack?.isRadio == true) {
-                    RadioCoverCard(
-                        coverUrl = coverUrl,
-                        stationName = currentTrack.title.orEmpty(),
-                        showLiveBadge = true,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .aspectRatio(1f)
-                            .widthIn(max = 280.dp)
-                    )
-                } else {
-                    SubcomposeAsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(coverUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .aspectRatio(1f)
-                            .widthIn(max = 280.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .shadow(32.dp, RoundedCornerShape(20.dp), spotColor = Color(0x66FF3366))
-                    )
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = currentTrack?.title ?: "Неизвестный трек",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" }?.ifEmpty { "-" } ?: "-",
-                    fontSize = 16.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Right Column: Controls + Dynamic Waveform Timeline + Presets
-            Column(
-                modifier = Modifier
-                    .weight(1.2f)
-                    .fillMaxHeight()
-                    .padding(start = 24.dp, bottom = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Spacer(modifier = Modifier.weight(0.1f))
-
-                // 1. Redesigned Liquid Glass Controls
-                CarControls(
+            if (steeringWheelOnLeft) {
+                CarControlsColumn(
+                    currentTrack = currentTrack,
                     isPlaying = isPlaying,
                     isLiked = isLiked,
                     onPlayPauseClick = onPlayPauseClick,
                     onNextClick = onNextClick,
                     onPrevClick = onPrevClick,
-                    onToggleLike = { currentTrack?.let { onToggleLike(it) } },
-                    onDislikeClick = { currentTrack?.let { onDislikeClick(it) } },
-                    isLandscape = true
-                )
-
-                Spacer(modifier = Modifier.weight(0.2f))
-
-                // 2. Interactive Waveform Visualizer & Timeline Widget (Fills the previous empty space!)
-                CarWaveformVisualizerAndTimeline(
+                    onToggleLike = onToggleLike,
+                    onDislikeClick = onDislikeClick,
+                    onPlayMyVibe = onPlayMyVibe,
+                    onPlayFavorites = onPlayFavorites,
+                    onPlayHits = onPlayHits,
+                    onPlayDownloaded = onPlayDownloaded,
+                    onPlayRadio = onPlayRadio,
                     progress = progress,
-                    durationMs = if (durationMs > 0) durationMs else (currentTrack?.durationMs ?: 0L),
-                    isPlaying = isPlaying,
-                    isRadio = currentTrack?.isRadio == true,
+                    durationMs = durationMs,
                     onSeek = onSeek,
-                    modifier = Modifier.fillMaxWidth()
+                    gapOnStart = false
                 )
+                CarArtColumn(currentTrack = currentTrack)
+            } else {
+                CarArtColumn(currentTrack = currentTrack)
+                CarControlsColumn(
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    isLiked = isLiked,
+                    onPlayPauseClick = onPlayPauseClick,
+                    onNextClick = onNextClick,
+                    onPrevClick = onPrevClick,
+                    onToggleLike = onToggleLike,
+                    onDislikeClick = onDislikeClick,
+                    onPlayMyVibe = onPlayMyVibe,
+                    onPlayFavorites = onPlayFavorites,
+                    onPlayHits = onPlayHits,
+                    onPlayDownloaded = onPlayDownloaded,
+                    onPlayRadio = onPlayRadio,
+                    progress = progress,
+                    durationMs = durationMs,
+                    onSeek = onSeek,
+                    gapOnStart = true
+                )
+            }
+        }
+    }
+}
 
-                Spacer(modifier = Modifier.weight(0.2f))
+/** Art + track info column of the landscape car dashboard. */
+@Composable
+private fun RowScope.CarArtColumn(currentTrack: TrackDetailsDto?) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000").orEmpty()
+        val context = LocalContext.current
+        if (currentTrack?.isRadio == true) {
+            RadioCoverCard(
+                coverUrl = coverUrl,
+                stationName = currentTrack.title.orEmpty(),
+                showLiveBadge = true,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .aspectRatio(1f)
+                    .widthIn(max = 280.dp)
+            )
+        } else {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(coverUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .aspectRatio(1f)
+                    .widthIn(max = 280.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .shadow(32.dp, RoundedCornerShape(20.dp), spotColor = Color(0x66FF3366))
+            )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = currentTrack?.title ?: "Неизвестный трек",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" }?.ifEmpty { "-" } ?: "-",
+            fontSize = 16.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
 
-                // 3. Presets Block (Grouped together at bottom like in portrait mode)
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CarActionTile(Modifier.weight(1f), "Моя Волна", Color(0xFFFF3366), Icons.Default.Waves) { onPlayMyVibe() }
-                        CarActionTile(Modifier.weight(1f), "Любимое", Color(0xFFFF5252), Icons.Default.Favorite) { onPlayFavorites() }
-                        CarActionTile(Modifier.weight(1f), "Радио", Color(0xFFFF9800), Icons.Default.Radio) { onPlayRadio() }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CarActionTile(Modifier.weight(1f), "Хиты", Color(0xFF00B4DB), Icons.AutoMirrored.Filled.TrendingUp) { onPlayHits() }
-                        CarActionTile(Modifier.weight(1f), "Скачанные", Color(0xFF4CAF50), Icons.Default.DownloadDone) { onPlayDownloaded() }
-                    }
-                }
+/**
+ * Controls + waveform timeline + presets column of the landscape car dashboard.
+ * [gapOnStart] puts the gap to the art column on the correct side for the current wheel side.
+ */
+@Composable
+private fun RowScope.CarControlsColumn(
+    currentTrack: TrackDetailsDto?,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    onPlayPauseClick: () -> Unit,
+    onNextClick: () -> Unit,
+    onPrevClick: () -> Unit,
+    onToggleLike: (TrackDetailsDto) -> Unit,
+    onDislikeClick: (TrackDetailsDto) -> Unit,
+    onPlayMyVibe: () -> Unit,
+    onPlayFavorites: () -> Unit,
+    onPlayHits: () -> Unit,
+    onPlayDownloaded: () -> Unit,
+    onPlayRadio: () -> Unit,
+    progress: Long,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+    gapOnStart: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .weight(1.2f)
+            .fillMaxHeight()
+            .padding(
+                start = if (gapOnStart) 24.dp else 0.dp,
+                end = if (gapOnStart) 0.dp else 24.dp,
+                bottom = 4.dp
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Spacer(modifier = Modifier.weight(0.1f))
+
+        // 1. Redesigned Liquid Glass Controls
+        CarControls(
+            isPlaying = isPlaying,
+            isLiked = isLiked,
+            onPlayPauseClick = onPlayPauseClick,
+            onNextClick = onNextClick,
+            onPrevClick = onPrevClick,
+            onToggleLike = { currentTrack?.let { onToggleLike(it) } },
+            onDislikeClick = { currentTrack?.let { onDislikeClick(it) } },
+            isLandscape = true
+        )
+
+        Spacer(modifier = Modifier.weight(0.2f))
+
+        // 2. Interactive Waveform Visualizer & Timeline Widget (Fills the previous empty space!)
+        CarWaveformVisualizerAndTimeline(
+            progress = progress,
+            durationMs = if (durationMs > 0) durationMs else (currentTrack?.durationMs ?: 0L),
+            isPlaying = isPlaying,
+            isRadio = currentTrack?.isRadio == true,
+            onSeek = onSeek,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.weight(0.2f))
+
+        // 3. Presets Block (Grouped together at bottom like in portrait mode)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CarActionTile(Modifier.weight(1f), "Моя Волна", Color(0xFFFF3366), Icons.Default.Waves) { onPlayMyVibe() }
+                CarActionTile(Modifier.weight(1f), "Любимое", Color(0xFFFF5252), Icons.Default.Favorite) { onPlayFavorites() }
+                CarActionTile(Modifier.weight(1f), "Радио", Color(0xFFFF9800), Icons.Default.Radio) { onPlayRadio() }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CarActionTile(Modifier.weight(1f), "Хиты", Color(0xFF00B4DB), Icons.AutoMirrored.Filled.TrendingUp) { onPlayHits() }
+                CarActionTile(Modifier.weight(1f), "Скачанные", Color(0xFF4CAF50), Icons.Default.DownloadDone) { onPlayDownloaded() }
             }
         }
     }

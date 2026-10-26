@@ -59,6 +59,15 @@ class SettingsRepositoryImpl @Inject constructor(
         context.dataStore.edit { prefs -> prefs[ECONOMY_ON_MOBILE_KEY] = enabled }
     }
 
+    private val STEERING_WHEEL_ON_LEFT_KEY = booleanPreferencesKey("steering_wheel_on_left")
+    override val steeringWheelOnLeft: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[STEERING_WHEEL_ON_LEFT_KEY] ?: SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT
+    }
+
+    override suspend fun setSteeringWheelOnLeft(onLeft: Boolean) {
+        context.dataStore.edit { prefs -> prefs[STEERING_WHEEL_ON_LEFT_KEY] = onLeft }
+    }
+
     override suspend fun setDownloadOverWifiOnly(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[DOWNLOAD_WIFI_ONLY_KEY] = enabled }
     }

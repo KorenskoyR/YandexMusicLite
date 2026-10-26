@@ -96,6 +96,7 @@ fun MainScreen(
     val openedPlaylist by playlistsVm.opened.collectAsState()
     val downloadOverWifiOnly by viewModel.downloadOverWifiOnly.collectAsState()
     val economyOnMobile by viewModel.economyOnMobileData.collectAsState()
+    val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsState()
 
     val currentTrack by viewModel.currentTrack.collectAsState()
     // Stable local copy: allows smart casts instead of `!!` in the blocks below
@@ -256,6 +257,8 @@ fun MainScreen(
                         onWifiOnlyChange = { viewModel.setDownloadOverWifiOnly(it) },
                         economyOnMobile = economyOnMobile,
                         onEconomyOnMobileChange = { viewModel.setEconomyOnMobileData(it) },
+                        steeringWheelOnLeft = steeringWheelOnLeft,
+                        onSteeringWheelChange = { viewModel.setSteeringWheelOnLeft(it) },
                         onUpgradeDownloads = { viewModel.upgradeDownloadedQuality() },
                         crashReports = crashReports.size,
                         onOpenCrashLog = { showCrashLog = true },
@@ -351,6 +354,7 @@ fun MainScreen(
                             },
                             onExit = { currentTab = MainTab.HOME },
                             isLandscape = isLandscape,
+                            steeringWheelOnLeft = steeringWheelOnLeft,
                             progress = progress,
                             durationMs = currentTrack?.durationMs ?: 0L,
                             onSeek = { viewModel.seekTo(it) }

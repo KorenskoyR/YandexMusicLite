@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.HighQuality
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
@@ -77,6 +78,8 @@ fun CacheMenuBottomSheet(
     onWifiOnlyChange: (Boolean) -> Unit = {},
     economyOnMobile: Boolean = false,
     onEconomyOnMobileChange: (Boolean) -> Unit = {},
+    steeringWheelOnLeft: Boolean = true,
+    onSteeringWheelChange: (Boolean) -> Unit = {},
     onUpgradeDownloads: () -> Unit = {},
     crashReports: Int = 0,
     onOpenCrashLog: () -> Unit = {}
@@ -501,6 +504,13 @@ fun CacheMenuBottomSheet(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    SteeringSideSettingCard(
+                        onLeft = steeringWheelOnLeft,
+                        onChange = onSteeringWheelChange
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     ActionSettingCard(
                         title = stringResource(R.string.settings_upgrade_downloads),
                         subtitle = stringResource(R.string.settings_upgrade_downloads_hint),
@@ -884,6 +894,89 @@ private fun CrossfadeSettingCard(seconds: Int, onChange: (Int) -> Unit) {
                 activeTrackColor = Color(0xFFFF3366),
                 inactiveTrackColor = Color.White.copy(alpha = 0.12f)
             )
+        )
+    }
+}
+
+/**
+ * Which side the steering wheel is on. Car mode keeps the controls near the driver and the cover on
+ * the far side, so this decides the landscape layout: left-hand drive → controls left / cover right.
+ */
+@Composable
+private fun SteeringSideSettingCard(onLeft: Boolean, onChange: (Boolean) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.settings_steering_side_title),
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = stringResource(R.string.settings_steering_side_hint),
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 11.5.sp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.06f))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            SteeringSideOption(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.settings_steering_left),
+                selected = onLeft,
+                onClick = { onChange(true) }
+            )
+            SteeringSideOption(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.settings_steering_right),
+                selected = !onLeft,
+                onClick = { onChange(false) }
+            )
+        }
+    }
+}
+
+/** One pill of the steering-side segmented control; the selected one carries the accent gradient. */
+@Composable
+private fun SteeringSideOption(modifier: Modifier, label: String, selected: Boolean, onClick: () -> Unit) {
+    val background = if (selected) {
+        Brush.horizontalGradient(listOf(Color(0xFFFF3366), Color(0xFFFF9900)))
+    } else {
+        Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
+    }
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.DirectionsCar,
+            contentDescription = null,
+            tint = if (selected) Color.White else Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = if (selected) Color.White else Color.White.copy(alpha = 0.65f),
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
         )
     }
 }
