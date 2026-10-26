@@ -112,10 +112,6 @@ cd YandexMusicLite
 ./gradlew testDebugUnitTest lintDebug
 ```
 
-Релизная сборка (`./gradlew assembleRelease`) подписывается ключом владельца: путь к keystore и пароли берутся
-из `local.properties` (`KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) или переменных окружения.
-Ключи и пароли в репозитории не хранятся.
-
 ---
 
 ## 🏗 Архитектура и стек технологий
