@@ -23,7 +23,7 @@ import dagger.hilt.components.SingletonComponent
 
 /**
  * Downloads liked tracks for offline listening. Runs in WorkManager, so it survives closing the app and
- * a reboot, honours the "Wi-Fi only" constraint and shows progress in a notification.
+ * a reboot, waits for a connection and shows progress in a notification.
  * With [KEY_TRACK_ID] it downloads that single track (auto-download after a like). With [KEY_UPGRADE] it
  * re-downloads already saved tracks the server now offers in a better quality.
  */

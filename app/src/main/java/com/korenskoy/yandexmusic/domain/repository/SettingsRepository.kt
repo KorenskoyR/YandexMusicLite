@@ -9,10 +9,6 @@ interface SettingsRepository {
     val keepScreenOnInCarMode: Flow<Boolean>
     /** Crossfade between tracks in seconds; 0 turns it off. */
     val crossfadeSeconds: Flow<Int>
-    /** Offline downloads only on unmetered networks (Wi-Fi). */
-    val downloadOverWifiOnly: Flow<Boolean>
-    /** Mobile (metered) network: stream at most [ECONOMY_BITRATE_KBPS] instead of the best quality. */
-    val economyOnMobileData: Flow<Boolean>
     /**
      * Steering wheel side, for the car-mode landscape layout. True (left-hand drive) puts the
      * controls on the left (near the driver) and the cover on the right; false mirrors it.
@@ -28,8 +24,6 @@ interface SettingsRepository {
     suspend fun setAutoStartCarModeVibe(enabled: Boolean)
     suspend fun setKeepScreenOnInCarMode(enabled: Boolean)
     suspend fun setCrossfadeSeconds(seconds: Int)
-    suspend fun setDownloadOverWifiOnly(enabled: Boolean)
-    suspend fun setEconomyOnMobileData(enabled: Boolean)
     suspend fun setSteeringWheelOnLeft(onLeft: Boolean)
     suspend fun setUiScaleAuto(enabled: Boolean)
     suspend fun setUiScaleManual(scale: Float)
@@ -37,7 +31,6 @@ interface SettingsRepository {
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3
         const val MAX_CROSSFADE_SECONDS = 12
-        const val ECONOMY_BITRATE_KBPS = 128
         /** Left-hand drive is the global majority, so it is the default. */
         const val DEFAULT_STEERING_WHEEL_ON_LEFT = true
         /** UI scale defaults to automatic so misreported head-unit screens are corrected out of the box. */

@@ -12,11 +12,9 @@ object StreamVariants {
     /** Codecs ExoPlayer plays from these links, by preference at an equal bitrate. */
     private val SUPPORTED = listOf("aac", "mp3")
 
-    fun ranked(offered: List<DownloadInfoResponseDto>, maxBitrateKbps: Int? = null): List<DownloadInfoResponseDto> {
+    fun ranked(offered: List<DownloadInfoResponseDto>): List<DownloadInfoResponseDto> {
         val full = offered.filter { !it.preview && it.codec.lowercase() in SUPPORTED }
-        // A cap (economy on mobile data) never leaves the user without sound
-        val allowed = maxBitrateKbps?.let { cap -> full.filter { it.bitrateInKbps <= cap }.ifEmpty { listOfNotNull(full.minByOrNull { it.bitrateInKbps }) } } ?: full
-        val ranked = allowed.sortedWith(
+        val ranked = full.sortedWith(
             compareByDescending<DownloadInfoResponseDto> { it.bitrateInKbps }.thenBy { SUPPORTED.indexOf(it.codec.lowercase()) }
         )
         return ranked.ifEmpty { offered.filter { !it.preview }.ifEmpty { offered }.take(1) }

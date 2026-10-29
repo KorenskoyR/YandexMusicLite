@@ -44,22 +44,6 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs[CROSSFADE_SECONDS_KEY] ?: SettingsRepository.DEFAULT_CROSSFADE_SECONDS
     }
 
-    private val DOWNLOAD_WIFI_ONLY_KEY = booleanPreferencesKey("download_wifi_only")
-
-    override val downloadOverWifiOnly: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[DOWNLOAD_WIFI_ONLY_KEY] ?: true
-    }
-
-    private val ECONOMY_ON_MOBILE_KEY = booleanPreferencesKey("economy_on_mobile_data")
-    // Off by default: the owner wants the best quality everywhere
-    override val economyOnMobileData: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[ECONOMY_ON_MOBILE_KEY] ?: false
-    }
-
-    override suspend fun setEconomyOnMobileData(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[ECONOMY_ON_MOBILE_KEY] = enabled }
-    }
-
     private val STEERING_WHEEL_ON_LEFT_KEY = booleanPreferencesKey("steering_wheel_on_left")
     override val steeringWheelOnLeft: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[STEERING_WHEEL_ON_LEFT_KEY] ?: SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT
@@ -88,10 +72,6 @@ class SettingsRepositoryImpl @Inject constructor(
         context.dataStore.edit { prefs ->
             prefs[UI_SCALE_MANUAL_KEY] = scale.coerceIn(SettingsRepository.MIN_UI_SCALE, SettingsRepository.MAX_UI_SCALE)
         }
-    }
-
-    override suspend fun setDownloadOverWifiOnly(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[DOWNLOAD_WIFI_ONLY_KEY] = enabled }
     }
 
     override suspend fun setCrossfadeSeconds(seconds: Int) {

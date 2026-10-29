@@ -109,8 +109,7 @@
     <string name="cache_free_space">Освободить %1$s локального хранилища</string>
     <string name="download_progress_count">Скачано %1$d из %2$d</string>
     <string name="download_progress_waiting_title">Ожидание сети</string>
-    <string name="download_progress_waiting_hint">Скачивание начнётся при подключении к Wi‑Fi</string>
-    <string name="download_waiting_wifi">Скачивание начнётся при подключении к Wi‑Fi. Отключить ограничение можно в настройках.</string>
+    <string name="download_progress_waiting_hint">Скачивание начнётся при подключении к интернету</string>
     <string name="player_queue_count">Треков в очереди: %1$d</string>
     <string name="msg_wave_load_failed">Не удалось загрузить «Мою волну». Проверьте подключение к интернету</string>
     <string name="msg_station_unavailable">Радиостанция недоступна</string>
@@ -124,8 +123,6 @@
     <string name="download_channel_name">Загрузки</string>
     <string name="download_notification_title">Скачивание треков для офлайн-прослушивания</string>
     <string name="download_cancel">Отменить</string>
-    <string name="settings_wifi_only_title">Скачивать только по Wi‑Fi</string>
-    <string name="settings_wifi_only_subtitle">Не расходовать мобильный трафик</string>
     <string name="msg_offline_playing_downloaded">Нет сети — играют скачанные треки</string>
     <string name="msg_offline_no_downloads">Нет сети, а скачанных треков пока нет</string>
     <string name="quality_stream">%1$s · %2$d кбит/с</string>
@@ -175,10 +172,7 @@
     <string name="quality_details_offered">Сервер предложил: %1$s</string>
     <string name="quality_details_plus_active">Подписка Яндекс Плюс: активна</string>
     <string name="quality_details_plus_inactive">Подписка Яндекс Плюс: не обнаружена (для Lossless/FLAC требуется активный Плюс)</string>
-    <string name="quality_details_economy">Включена экономия трафика в мобильной сети — играет не лучший вариант.</string>
     <string name="quality_details_ok">Понятно</string>
-    <string name="settings_economy_mobile">Экономия трафика в мобильной сети</string>
-    <string name="settings_economy_mobile_hint">До 128 кбит/с, когда нет Wi‑Fi. Выключено — всегда лучшее качество.</string>
     <string name="settings_steering_side_title">Расположение в режиме «В авто»</string>
     <string name="settings_steering_left">Левый руль</string>
     <string name="settings_steering_right">Правый руль</string>

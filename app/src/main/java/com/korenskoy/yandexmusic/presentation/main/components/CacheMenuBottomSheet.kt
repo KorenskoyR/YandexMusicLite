@@ -76,10 +76,6 @@ fun CacheMenuBottomSheet(
     onLogout: () -> Unit = {},
     crossfadeSeconds: Int = 3,
     onCrossfadeChange: (Int) -> Unit = {},
-    wifiOnly: Boolean = true,
-    onWifiOnlyChange: (Boolean) -> Unit = {},
-    economyOnMobile: Boolean = false,
-    onEconomyOnMobileChange: (Boolean) -> Unit = {},
     steeringWheelOnLeft: Boolean = true,
     onSteeringWheelChange: (Boolean) -> Unit = {},
     uiScaleAuto: Boolean = true,
@@ -504,12 +500,6 @@ fun CacheMenuBottomSheet(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                SwitchSettingCard(
-                                    title = stringResource(R.string.settings_wifi_only_title),
-                                    subtitle = stringResource(R.string.settings_wifi_only_subtitle),
-                                    enabled = wifiOnly,
-                                    onChange = onWifiOnlyChange
-                                )
                                 SteeringSideSettingCard(onLeft = steeringWheelOnLeft, onChange = onSteeringWheelChange)
                                 ActionSettingCard(
                                     title = stringResource(R.string.settings_upgrade_downloads),
@@ -522,12 +512,6 @@ fun CacheMenuBottomSheet(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                SwitchSettingCard(
-                                    title = stringResource(R.string.settings_economy_mobile),
-                                    subtitle = stringResource(R.string.settings_economy_mobile_hint),
-                                    enabled = economyOnMobile,
-                                    onChange = onEconomyOnMobileChange
-                                )
                                 UiScaleSettingCard(
                                     auto = uiScaleAuto,
                                     onAutoChange = onUiScaleAutoChange,
@@ -543,20 +527,6 @@ fun CacheMenuBottomSheet(
                             }
                         }
                     } else {
-                        SwitchSettingCard(
-                            title = stringResource(R.string.settings_wifi_only_title),
-                            subtitle = stringResource(R.string.settings_wifi_only_subtitle),
-                            enabled = wifiOnly,
-                            onChange = onWifiOnlyChange
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        SwitchSettingCard(
-                            title = stringResource(R.string.settings_economy_mobile),
-                            subtitle = stringResource(R.string.settings_economy_mobile_hint),
-                            enabled = economyOnMobile,
-                            onChange = onEconomyOnMobileChange
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
                         SteeringSideSettingCard(onLeft = steeringWheelOnLeft, onChange = onSteeringWheelChange)
                         Spacer(modifier = Modifier.height(14.dp))
                         UiScaleSettingCard(
@@ -847,46 +817,6 @@ fun CacheMenuBottomSheet(
     }
 }
 }
-}
-
-/** Offline downloads only on Wi-Fi (the default), like "Download over cellular" off in Apple Music. */
-@Composable
-private fun SwitchSettingCard(title: String, subtitle: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(18.dp))
-            .clickable { onChange(!enabled) }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = subtitle,
-                color = Color.White.copy(alpha = 0.5f),
-                fontSize = 11.5.sp
-            )
-        }
-        Switch(
-            checked = enabled,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFFFF3366),
-                uncheckedThumbColor = Color.White.copy(alpha = 0.6f),
-                uncheckedTrackColor = Color.White.copy(alpha = 0.12f),
-                uncheckedBorderColor = Color.Transparent
-            )
-        )
-    }
 }
 
 /** A one-off action in the settings (it runs in the background, progress is in the notification). */

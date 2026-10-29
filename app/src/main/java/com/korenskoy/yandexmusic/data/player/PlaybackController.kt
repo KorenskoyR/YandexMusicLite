@@ -567,7 +567,6 @@ class PlaybackController @Inject constructor(
     data class QualityDetails(
         val playing: String?,
         val offered: String?,
-        val economy: Boolean,
         val hasPlus: Boolean? = null
     )
 
@@ -578,7 +577,6 @@ class PlaybackController @Inject constructor(
         return QualityDetails(
             _streamQuality.value,
             preloadManager.offeredOf(id),
-            !downloadManager.isKnownDownloaded(id) && preloadManager.isCapped(id),
             hasPlus
         )
     }

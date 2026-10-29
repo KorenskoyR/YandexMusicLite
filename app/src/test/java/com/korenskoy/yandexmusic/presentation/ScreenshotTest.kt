@@ -217,7 +217,7 @@ class ScreenshotTest {
             com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(
                 onDismiss = {}, cacheSizeBytes = 134_000_000L, autoDownloadEnabled = true,
                 onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
-                crossfadeSeconds = 3, wifiOnly = true, economyOnMobile = false,
+                crossfadeSeconds = 3,
                 steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 2
             )
         }

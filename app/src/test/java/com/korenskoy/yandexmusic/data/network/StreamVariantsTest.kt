@@ -14,8 +14,8 @@ class StreamVariantsTest {
     private fun v(codec: String, kbps: Int, preview: Boolean = false) =
         DownloadInfoResponseDto(codec = codec, bitrateInKbps = kbps, preview = preview, downloadInfoUrl = "u/$codec/$kbps")
 
-    private fun ranked(vararg offered: DownloadInfoResponseDto, cap: Int? = null) =
-        StreamVariants.ranked(offered.toList(), cap).map { "${it.codec}${it.bitrateInKbps}" }
+    private fun ranked(vararg offered: DownloadInfoResponseDto) =
+        StreamVariants.ranked(offered.toList()).map { "${it.codec}${it.bitrateInKbps}" }
 
     @Test
     fun highestBitrateWinsWhateverTheCodec() {
@@ -41,12 +41,6 @@ class StreamVariantsTest {
     @Test
     fun onlyAPreviewIsStillPlayable() {
         assertEquals(listOf("mp3128"), ranked(v("mp3", 128, preview = true)))
-    }
-
-    @Test
-    fun economyCapsTheBitrateButNeverLeavesNoSound() {
-        assertEquals(listOf("aac128", "mp3128"), ranked(v("mp3", 320), v("mp3", 128), v("aac", 128), cap = 128))
-        assertEquals(listOf("mp3192"), ranked(v("mp3", 320), v("mp3", 192), cap = 128))
     }
 
     @Test

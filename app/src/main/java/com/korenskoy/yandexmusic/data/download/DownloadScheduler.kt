@@ -9,15 +9,13 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** State of the "download all liked" job: idle, waiting for its constraints (e.g. Wi-Fi), or running. */
+/** State of the "download all liked" job: idle, waiting for a connection, or running. */
 enum class DownloadQueueState { IDLE, WAITING, RUNNING }
 
 /** Maps the work states to one queue state; extracted as a pure function so it is unit-testable. */
@@ -27,11 +25,10 @@ fun queueStateOf(states: List<WorkInfo.State>): DownloadQueueState = when {
     else -> DownloadQueueState.IDLE
 }
 
-/** Schedules offline downloads in WorkManager (survive app close, Wi-Fi-only option). */
+/** Schedules offline downloads in WorkManager (they survive the app being closed). */
 @Singleton
 class DownloadScheduler @Inject constructor(
-    @param:ApplicationContext private val context: Context,
-    private val settingsRepository: SettingsRepository
+    @param:ApplicationContext private val context: Context
 ) {
     private val workManager get() = WorkManager.getInstance(context)
 
@@ -41,8 +38,8 @@ class DownloadScheduler @Inject constructor(
         .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED } }
 
     /**
-     * Running vs merely waiting for the job's constraints (Wi-Fi / storage). Waiting must stay visible and
-     * cancellable, otherwise a job that can never start (e.g. Wi-Fi-only on mobile data) looks like a hang.
+     * Running vs merely waiting for a connection (or storage). Waiting stays visible and cancellable so a
+     * job that cannot start yet (no network) can still be dismissed.
      */
     val downloadAllState: Flow<DownloadQueueState> = WorkManager.getInstance(context)
         .getWorkInfosForUniqueWorkFlow(ALL_WORK)
@@ -83,10 +80,9 @@ class DownloadScheduler @Inject constructor(
         workManager.cancelUniqueWork(UPGRADE_WORK)
     }
 
-    private suspend fun constraints(): Constraints = Constraints.Builder()
-        .setRequiredNetworkType(
-            if (settingsRepository.downloadOverWifiOnly.first()) NetworkType.UNMETERED else NetworkType.CONNECTED
-        )
+    // Any connection is fine: the app does not police the user's traffic — they know their own data plan.
+    private fun constraints(): Constraints = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
         .setRequiresStorageNotLow(true)
         .build()
 

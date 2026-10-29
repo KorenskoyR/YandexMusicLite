@@ -83,10 +83,6 @@ fun LibraryScreen(
     onEnableAutoDownload: (Boolean) -> Unit,
     crossfadeSeconds: Int = 3,
     onCrossfadeChange: (Int) -> Unit = {},
-    wifiOnly: Boolean = true,
-    onWifiOnlyChange: (Boolean) -> Unit = {},
-    economyOnMobile: Boolean = false,
-    onEconomyOnMobileChange: (Boolean) -> Unit = {},
     steeringWheelOnLeft: Boolean = true,
     onSteeringWheelChange: (Boolean) -> Unit = {},
     uiScaleAuto: Boolean = true,
@@ -244,15 +240,15 @@ fun LibraryScreen(
                             )
                         }
 
-                        // Download activity is a separate, always-tappable indicator, so it never hides or
-                        // blocks the settings gear (a Wi-Fi-only job stuck on mobile data used to trap the user).
-                        if (downloadState != DownloadQueueState.IDLE) {
+                        // Shown only while a download is actually running, as a separate always-tappable
+                        // indicator next to (never over) the settings gear.
+                        if (downloadState == DownloadQueueState.RUNNING) {
                             IconButton(
                                 onClick = { showProgressModal = true },
                                 modifier = Modifier.size(38.dp)
                             ) {
                                 CircularProgressIndicator(
-                                    color = if (downloadState == DownloadQueueState.WAITING) Color(0xFFFF9900) else Color.White,
+                                    color = Color.White,
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp
                                 )
@@ -514,10 +510,6 @@ fun LibraryScreen(
             onEnableAutoDownload = onEnableAutoDownload,
             crossfadeSeconds = crossfadeSeconds,
             onCrossfadeChange = onCrossfadeChange,
-            wifiOnly = wifiOnly,
-            onWifiOnlyChange = onWifiOnlyChange,
-            economyOnMobile = economyOnMobile,
-            onEconomyOnMobileChange = onEconomyOnMobileChange,
             steeringWheelOnLeft = steeringWheelOnLeft,
             onSteeringWheelChange = onSteeringWheelChange,
             uiScaleAuto = uiScaleAuto,

@@ -1,14 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.main
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.account.AccountSessionManager
 import com.korenskoy.yandexmusic.data.download.DownloadQueueState
 import com.korenskoy.yandexmusic.data.download.DownloadScheduler
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
-import com.korenskoy.yandexmusic.data.network.NetworkMonitor
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
 import com.korenskoy.yandexmusic.data.player.PlaybackController
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
@@ -17,8 +14,6 @@ import com.korenskoy.yandexmusic.data.repository.LibraryRepository
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,20 +31,14 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
     authRepository: AuthRepository,
     private val session: AccountSessionManager,
     private val playbackController: PlaybackController,
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
     private val downloadManager: TrackDownloadManager,
-    private val downloadScheduler: DownloadScheduler,
-    private val networkMonitor: NetworkMonitor
+    private val downloadScheduler: DownloadScheduler
 ) : ViewModel() {
-
-    /** Settings/download notices (e.g. "download waits for Wi-Fi"), shown as a snackbar by MainScreen. */
-    private val _downloadMessages = MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val downloadMessages: SharedFlow<String> = _downloadMessages
 
     val isAuthorized = authRepository.isAuthorized()
         .stateIn(viewModelScope, SharingStarted.Eagerly, authRepository.getToken() != null)
@@ -72,10 +61,6 @@ class MainViewModel @Inject constructor(
 
     val autoDownloadEnabled: StateFlow<Boolean> = settingsRepository.autoDownloadLikedTracks
         .stateIn(viewModelScope, SharingStarted.Lazily, false)
-    val downloadOverWifiOnly: StateFlow<Boolean> = settingsRepository.downloadOverWifiOnly
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val economyOnMobileData: StateFlow<Boolean> = settingsRepository.economyOnMobileData
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val steeringWheelOnLeft: StateFlow<Boolean> = settingsRepository.steeringWheelOnLeft
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT)
     val uiScaleAuto: StateFlow<Boolean> = settingsRepository.uiScaleAuto
@@ -150,20 +135,7 @@ class MainViewModel @Inject constructor(
 
     /** Offline downloads run in WorkManager: they continue after the app is closed. */
     fun downloadAllLikedTracks() {
-        viewModelScope.launch {
-            downloadScheduler.downloadAllLiked()
-            notifyIfWaitingForWifi()
-        }
-    }
-
-    /**
-     * When downloads are Wi-Fi-only and the device is on mobile data, the job sits queued until Wi-Fi is
-     * back; tell the user instead of leaving a silent, seemingly-stuck spinner.
-     */
-    private suspend fun notifyIfWaitingForWifi() {
-        if (settingsRepository.downloadOverWifiOnly.first() && networkMonitor.isMetered()) {
-            _downloadMessages.tryEmit(context.getString(R.string.download_waiting_wifi))
-        }
+        viewModelScope.launch { downloadScheduler.downloadAllLiked() }
     }
 
     fun cancelDownloadAll() {
@@ -175,20 +147,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setAutoDownloadLikedTracks(true)
             downloadScheduler.downloadAllLiked()
-            notifyIfWaitingForWifi()
         }
     }
 
     fun setAutoDownloadLikedTracks(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutoDownloadLikedTracks(enabled) }
-    }
-
-    fun setDownloadOverWifiOnly(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setDownloadOverWifiOnly(enabled) }
-    }
-
-    fun setEconomyOnMobileData(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setEconomyOnMobileData(enabled) }
     }
 
     fun setSteeringWheelOnLeft(onLeft: Boolean) {
@@ -205,10 +168,7 @@ class MainViewModel @Inject constructor(
 
     /** Re-downloads saved tracks the server now offers in a better quality (in the background). */
     fun upgradeDownloadedQuality() {
-        viewModelScope.launch {
-            downloadScheduler.upgradeDownloadedQuality()
-            notifyIfWaitingForWifi()
-        }
+        viewModelScope.launch { downloadScheduler.upgradeDownloadedQuality() }
     }
 
     /** What plays now and what the server offered, for the quality details in the player. */

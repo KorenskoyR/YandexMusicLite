@@ -94,8 +94,6 @@ fun MainScreen(
     val sleepTimer by viewModel.sleepTimer.collectAsState()
     val userPlaylists by playlistsVm.playlists.collectAsState()
     val openedPlaylist by playlistsVm.opened.collectAsState()
-    val downloadOverWifiOnly by viewModel.downloadOverWifiOnly.collectAsState()
-    val economyOnMobile by viewModel.economyOnMobileData.collectAsState()
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsState()
     val uiScaleAuto by viewModel.uiScaleAuto.collectAsState()
     val uiScaleManual by viewModel.uiScaleManual.collectAsState()
@@ -255,10 +253,6 @@ fun MainScreen(
                         },
                         crossfadeSeconds = crossfadeSeconds,
                         onCrossfadeChange = { viewModel.setCrossfadeSeconds(it) },
-                        wifiOnly = downloadOverWifiOnly,
-                        onWifiOnlyChange = { viewModel.setDownloadOverWifiOnly(it) },
-                        economyOnMobile = economyOnMobile,
-                        onEconomyOnMobileChange = { viewModel.setEconomyOnMobileData(it) },
                         steeringWheelOnLeft = steeringWheelOnLeft,
                         onSteeringWheelChange = { viewModel.setSteeringWheelOnLeft(it) },
                         uiScaleAuto = uiScaleAuto,
@@ -539,7 +533,7 @@ fun MainScreen(
             LaunchedEffect(messageLifecycleOwner) {
                 // Collect only while visible, so a message raised in the background falls back to a toast
                 messageLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                    kotlinx.coroutines.flow.merge(viewModel.playbackMessages, playlistsVm.messages, viewModel.downloadMessages)
+                    kotlinx.coroutines.flow.merge(viewModel.playbackMessages, playlistsVm.messages)
                         .collect { snackbarHostState.showSnackbar(it) }
                 }
             }

@@ -39,10 +39,6 @@ fun QualityDetailsDialog(details: PlaybackController.QualityDetails, onDismiss: 
                         fontSize = 13.sp
                     )
                 }
-                if (details.economy) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.quality_details_economy), color = Color(0xFFFF9900), fontSize = 13.sp)
-                }
             }
         },
         containerColor = Color(0xFF1E1E26),
