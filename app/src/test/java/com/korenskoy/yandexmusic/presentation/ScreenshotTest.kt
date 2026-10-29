@@ -157,7 +157,7 @@ class ScreenshotTest {
     fun libraryWithPlaylists() {
         show {
             LibraryScreen(
-                tracks = tracks, isLoading = false, isDownloadingAll = false, autoDownloadEnabled = false,
+                tracks = tracks, isLoading = false, autoDownloadEnabled = false,
                 currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1", "2", "3"), downloadedTrackIds = setOf("2"),
                 cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
                 onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {},
@@ -208,6 +208,20 @@ class ScreenshotTest {
             )
         }
         snapScreen("playlist_picker")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun settingsSheetLandscape() {
+        show {
+            com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(
+                onDismiss = {}, cacheSizeBytes = 134_000_000L, autoDownloadEnabled = true,
+                onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
+                crossfadeSeconds = 3, wifiOnly = true, economyOnMobile = false,
+                steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 2
+            )
+        }
+        snapScreen("settings_landscape")
     }
 
     @Test

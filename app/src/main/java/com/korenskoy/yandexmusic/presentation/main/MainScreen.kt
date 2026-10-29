@@ -62,7 +62,7 @@ fun MainScreen(
     val allAccounts by accountVm.allAccounts.collectAsState()
     val activeAccount by accountVm.activeAccount.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val isDownloadingAll by viewModel.isDownloadingAll.collectAsState()
+    val downloadState by viewModel.downloadAllState.collectAsState()
     val autoDownloadEnabled by viewModel.autoDownloadEnabled.collectAsState()
     val likedTrackIds by viewModel.likedTrackIds.collectAsState()
     val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsState()
@@ -238,7 +238,7 @@ fun MainScreen(
                     MainTab.LIBRARY -> LibraryScreen(
                         tracks = tracks,
                         isLoading = isLoading,
-                        isDownloadingAll = isDownloadingAll,
+                        downloadState = downloadState,
                         autoDownloadEnabled = autoDownloadEnabled,
                         currentTrackId = currentTrackId,
                         isPlaying = isPlaying,
@@ -539,7 +539,7 @@ fun MainScreen(
             LaunchedEffect(messageLifecycleOwner) {
                 // Collect only while visible, so a message raised in the background falls back to a toast
                 messageLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                    kotlinx.coroutines.flow.merge(viewModel.playbackMessages, playlistsVm.messages)
+                    kotlinx.coroutines.flow.merge(viewModel.playbackMessages, playlistsVm.messages, viewModel.downloadMessages)
                         .collect { snackbarHostState.showSnackbar(it) }
                 }
             }

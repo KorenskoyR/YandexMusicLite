@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.network.DownloadProgressInfo
 import com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet
+import com.korenskoy.yandexmusic.data.download.DownloadQueueState
 import com.korenskoy.yandexmusic.presentation.main.components.DownloadProgressModal
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 
@@ -67,7 +68,7 @@ import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 fun LibraryScreen(
     tracks: List<TrackDetailsDto>,
     isLoading: Boolean,
-    isDownloadingAll: Boolean,
+    downloadState: DownloadQueueState = DownloadQueueState.IDLE,
     autoDownloadEnabled: Boolean,
     currentTrackId: String?,
     isPlaying: Boolean,
@@ -243,30 +244,31 @@ fun LibraryScreen(
                             )
                         }
 
-                        IconButton(
-                            onClick = {
-                                if (isDownloadingAll) {
-                                    showProgressModal = true
-                                } else {
-                                    showCacheMenu = true
-                                }
-                            },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            if (isDownloadingAll) {
+                        // Download activity is a separate, always-tappable indicator, so it never hides or
+                        // blocks the settings gear (a Wi-Fi-only job stuck on mobile data used to trap the user).
+                        if (downloadState != DownloadQueueState.IDLE) {
+                            IconButton(
+                                onClick = { showProgressModal = true },
+                                modifier = Modifier.size(38.dp)
+                            ) {
                                 CircularProgressIndicator(
-                                    color = Color.White,
+                                    color = if (downloadState == DownloadQueueState.WAITING) Color(0xFFFF9900) else Color.White,
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp
                                 )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = stringResource(R.string.cd_nastroyki_kesha),
-                                    tint = Color.White,
-                                    modifier = Modifier.size(19.dp)
-                                )
                             }
+                        }
+
+                        IconButton(
+                            onClick = { showCacheMenu = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.cd_nastroyki_kesha),
+                                tint = Color.White,
+                                modifier = Modifier.size(19.dp)
+                            )
                         }
                     }
                 }
@@ -540,8 +542,9 @@ fun LibraryScreen(
         )
     }
 
-    if (showProgressModal && downloadProgress != null) {
+    if (showProgressModal && downloadState != DownloadQueueState.IDLE) {
         DownloadProgressModal(
+            state = downloadState,
             progressInfo = downloadProgress,
             onDismiss = { showProgressModal = false },
             onCancel = {

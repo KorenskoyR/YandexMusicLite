@@ -20,16 +20,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.korenskoy.yandexmusic.data.download.DownloadQueueState
 import com.korenskoy.yandexmusic.data.network.DownloadProgressInfo
 
 @Composable
 fun DownloadProgressModal(
-    progressInfo: DownloadProgressInfo,
+    state: DownloadQueueState,
+    progressInfo: DownloadProgressInfo?,
     onDismiss: () -> Unit,
     onCancel: () -> Unit
 ) {
+    // Queued (waiting for Wi-Fi/storage) or no per-track progress yet: show an indeterminate "waiting" state
+    // so the user still sees what is happening and can always cancel.
+    val waiting = state == DownloadQueueState.WAITING || progressInfo == null
     val animatedProgress by animateFloatAsState(
-        targetValue = progressInfo.percent,
+        targetValue = progressInfo?.percent ?: 0f,
         animationSpec = tween(durationMillis = 300),
         label = "progressAnim"
     )
@@ -53,50 +58,66 @@ fun DownloadProgressModal(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = stringResource(R.string.download_progress_modal_zagruzka_kollektsii),
+                    text = stringResource(
+                        if (waiting) R.string.download_progress_waiting_title
+                        else R.string.download_progress_modal_zagruzka_kollektsii
+                    ),
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Text(
-                    text = stringResource(R.string.download_progress_count, progressInfo.current, progressInfo.total),
+                    text = if (waiting) stringResource(R.string.download_progress_waiting_hint)
+                    else stringResource(R.string.download_progress_count, progressInfo?.current ?: 0, progressInfo?.total ?: 0),
                     color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.White.copy(alpha = 0.1f)
-                )
+                if (waiting) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Current track info
-                Text(
-                    text = progressInfo.currentTrackTitle,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = progressInfo.currentArtistName,
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (progressInfo != null && progressInfo.currentTrackTitle.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = progressInfo.currentTrackTitle,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = progressInfo.currentArtistName,
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 

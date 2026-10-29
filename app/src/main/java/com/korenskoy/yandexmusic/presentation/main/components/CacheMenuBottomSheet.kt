@@ -138,8 +138,9 @@ fun CacheMenuBottomSheet(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(if (isLandscape) 0.85f else 0.94f)
-                        .widthIn(max = 500.dp)
+                        .fillMaxWidth(if (isLandscape) 0.94f else 0.94f)
+                        // Wider in landscape so the two-column settings grid fits (car head units).
+                        .widthIn(max = if (isLandscape) 860.dp else 500.dp)
                         .wrapContentHeight()
                         .heightIn(max = maxModalHeight)
                         .shadow(36.dp, RoundedCornerShape(28.dp), spotColor = Color.Black.copy(alpha = 0.85f))
@@ -492,58 +493,94 @@ fun CacheMenuBottomSheet(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    SwitchSettingCard(
-                        title = stringResource(R.string.settings_wifi_only_title),
-                        subtitle = stringResource(R.string.settings_wifi_only_subtitle),
-                        enabled = wifiOnly,
-                        onChange = onWifiOnlyChange
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    SwitchSettingCard(
-                        title = stringResource(R.string.settings_economy_mobile),
-                        subtitle = stringResource(R.string.settings_economy_mobile_hint),
-                        enabled = economyOnMobile,
-                        onChange = onEconomyOnMobileChange
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    SteeringSideSettingCard(
-                        onLeft = steeringWheelOnLeft,
-                        onChange = onSteeringWheelChange
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    UiScaleSettingCard(
-                        auto = uiScaleAuto,
-                        onAutoChange = onUiScaleAutoChange,
-                        manualScale = uiScaleManual,
-                        onManualChange = onUiScaleManualChange
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    ActionSettingCard(
-                        title = stringResource(R.string.settings_upgrade_downloads),
-                        subtitle = stringResource(R.string.settings_upgrade_downloads_hint),
-                        onClick = onUpgradeDownloads
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    ActionSettingCard(
-                        title = stringResource(R.string.crash_log_title),
-                        subtitle = if (crashReports == 0) stringResource(R.string.crash_log_none)
-                        else stringResource(R.string.crash_log_count, crashReports),
-                        onClick = onOpenCrashLog
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    CrossfadeSettingCard(seconds = crossfadeSeconds, onChange = onCrossfadeChange)
+                    // The toggle/slider settings. In landscape they go in two columns so the whole list is
+                    // visible without the easy-to-miss scroll (the complaint from car head units).
+                    if (isLandscape) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                SwitchSettingCard(
+                                    title = stringResource(R.string.settings_wifi_only_title),
+                                    subtitle = stringResource(R.string.settings_wifi_only_subtitle),
+                                    enabled = wifiOnly,
+                                    onChange = onWifiOnlyChange
+                                )
+                                SteeringSideSettingCard(onLeft = steeringWheelOnLeft, onChange = onSteeringWheelChange)
+                                ActionSettingCard(
+                                    title = stringResource(R.string.settings_upgrade_downloads),
+                                    subtitle = stringResource(R.string.settings_upgrade_downloads_hint),
+                                    onClick = onUpgradeDownloads
+                                )
+                                CrossfadeSettingCard(seconds = crossfadeSeconds, onChange = onCrossfadeChange)
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                SwitchSettingCard(
+                                    title = stringResource(R.string.settings_economy_mobile),
+                                    subtitle = stringResource(R.string.settings_economy_mobile_hint),
+                                    enabled = economyOnMobile,
+                                    onChange = onEconomyOnMobileChange
+                                )
+                                UiScaleSettingCard(
+                                    auto = uiScaleAuto,
+                                    onAutoChange = onUiScaleAutoChange,
+                                    manualScale = uiScaleManual,
+                                    onManualChange = onUiScaleManualChange
+                                )
+                                ActionSettingCard(
+                                    title = stringResource(R.string.crash_log_title),
+                                    subtitle = if (crashReports == 0) stringResource(R.string.crash_log_none)
+                                    else stringResource(R.string.crash_log_count, crashReports),
+                                    onClick = onOpenCrashLog
+                                )
+                            }
+                        }
+                    } else {
+                        SwitchSettingCard(
+                            title = stringResource(R.string.settings_wifi_only_title),
+                            subtitle = stringResource(R.string.settings_wifi_only_subtitle),
+                            enabled = wifiOnly,
+                            onChange = onWifiOnlyChange
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        SwitchSettingCard(
+                            title = stringResource(R.string.settings_economy_mobile),
+                            subtitle = stringResource(R.string.settings_economy_mobile_hint),
+                            enabled = economyOnMobile,
+                            onChange = onEconomyOnMobileChange
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        SteeringSideSettingCard(onLeft = steeringWheelOnLeft, onChange = onSteeringWheelChange)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        UiScaleSettingCard(
+                            auto = uiScaleAuto,
+                            onAutoChange = onUiScaleAutoChange,
+                            manualScale = uiScaleManual,
+                            onManualChange = onUiScaleManualChange
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        ActionSettingCard(
+                            title = stringResource(R.string.settings_upgrade_downloads),
+                            subtitle = stringResource(R.string.settings_upgrade_downloads_hint),
+                            onClick = onUpgradeDownloads
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        ActionSettingCard(
+                            title = stringResource(R.string.crash_log_title),
+                            subtitle = if (crashReports == 0) stringResource(R.string.crash_log_none)
+                            else stringResource(R.string.crash_log_count, crashReports),
+                            onClick = onOpenCrashLog
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        CrossfadeSettingCard(seconds = crossfadeSeconds, onChange = onCrossfadeChange)
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -792,6 +829,20 @@ fun CacheMenuBottomSheet(
                     Spacer(modifier = Modifier.height(18.dp))
                 }
             }
+                    // Bottom fade: hints there are more settings below when the list is scrolled off-screen.
+                    if (scrollState.canScrollForward) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(32.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.Transparent, Color(0xFF17171F))
+                                    )
+                                )
+                        )
+                    }
         }
     }
 }
