@@ -18,8 +18,8 @@ room = "2.8.5"
 roborazzi = "1.76.0"
 glance = "1.2.0"
 robolectric = "4.17"
-datastore = "1.2.1"
-palette = "1.0.0"
+datastore = "1.3.0"
+palette = "1.1.0"
 baselineprofile = "1.5.0"
 
 [libraries]
