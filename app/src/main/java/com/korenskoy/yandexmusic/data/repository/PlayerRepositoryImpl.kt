@@ -234,7 +234,9 @@ class PlayerRepositoryImpl(
             p.mediaItemCount > 0 &&
             p.playbackState != Player.STATE_ENDED
         _isPlaying.value = wantsToPlay
-        _isBuffering.value = wantsToPlay && !p.isPlaying
+        // Only a real STATE_BUFFERING counts as loading: a paused-but-wants-to-play limbo (focus loss) is not a
+        // spinner, otherwise the indicator sticks when playback is interrupted mid-start.
+        _isBuffering.value = wantsToPlay && p.playbackState == Player.STATE_BUFFERING
     }
 
     override fun getPlayer(): Player = activePlayer

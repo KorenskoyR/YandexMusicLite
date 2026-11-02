@@ -244,56 +244,40 @@ class GitHubUpdateManager @Inject constructor(
         }
 
         return try {
-            val packageArchiveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                context.packageManager.getPackageArchiveInfo(
-                    apkFile.absolutePath,
-                    PackageManager.GET_SIGNING_CERTIFICATES
-                )
+            @Suppress("DEPRECATION")
+            val baseFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
             } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageArchiveInfo(
-                    apkFile.absolutePath,
-                    PackageManager.GET_SIGNATURES
-                )
+                PackageManager.GET_SIGNATURES
             }
+            val packageArchiveInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, baseFlags)
+                ?: return ApkInstallPreCheck.CorruptedApk("Файл поврежден или не является корректным пакетом APK")
 
-            if (packageArchiveInfo == null) {
-                return ApkInstallPreCheck.CorruptedApk("Файл поврежден или не является корректным пакетом APK")
-            }
             if (packageArchiveInfo.packageName != context.packageName) {
                 return ApkInstallPreCheck.CorruptedApk("Файл не является обновлением Yandex Music Lite")
             }
 
-            val currentPackageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                context.packageManager.getPackageInfo(
-                    context.packageName,
-                    PackageManager.GET_SIGNING_CERTIFICATES
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(
-                    context.packageName,
-                    PackageManager.GET_SIGNATURES
-                )
-            }
-
+            val currentPackageInfo = context.packageManager.getPackageInfo(context.packageName, baseFlags)
             if (versionCodeOf(packageArchiveInfo) <= versionCodeOf(currentPackageInfo)) {
                 return ApkInstallPreCheck.CorruptedApk("Скачанная версия не новее установленной")
             }
 
-            val currentDigests = extractSignatures(currentPackageInfo)
-            val newDigests = extractSignatures(packageArchiveInfo)
-            if (newDigests.isEmpty()) {
-                return ApkInstallPreCheck.CorruptedApk("Файл обновления не подписан")
-            }
-            if (currentDigests.none { it in newDigests }) {
-                return ApkInstallPreCheck.SignatureMismatch(
+            val currentDigests = installedSignatures()
+            val newDigests = archiveSignatures(apkFile)
+            when {
+                // getPackageArchiveInfo often cannot read an archive's signature on some devices even when the
+                // APK is correctly signed. Rather than block a legitimate update, defer to the system installer,
+                // which verifies the signature cryptographically (and the download was SHA-256-checked already).
+                newDigests.isEmpty() || currentDigests.isEmpty() -> {
+                    Log.w(TAG, "APK signatures unreadable for pre-check; deferring verification to the system installer")
+                    ApkInstallPreCheck.Compatible
+                }
+                currentDigests.none { it in newDigests } -> ApkInstallPreCheck.SignatureMismatch(
                     currentSignatureDigest = currentDigests.firstOrNull().orEmpty(),
                     newSignatureDigest = newDigests.first()
                 )
+                else -> ApkInstallPreCheck.Compatible
             }
-
-            ApkInstallPreCheck.Compatible
         } catch (e: Exception) {
             Log.e(TAG, "Error checking APK compatibility", e)
             // Fail closed: never install what could not be verified
@@ -305,8 +289,42 @@ class GitHubUpdateManager @Inject constructor(
     private fun versionCodeOf(info: PackageInfo): Long =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
 
-    private fun extractSignatures(packageInfo: PackageInfo): List<String> {
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+    /** Signatures of the installed app, trying the modern API first and falling back to the legacy one. */
+    private fun installedSignatures(): List<String> {
+        val pm = context.packageManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val modern = extractSignatures(
+                runCatching { pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()
+            )
+            if (modern.isNotEmpty()) return modern
+        }
+        @Suppress("DEPRECATION")
+        return extractSignatures(
+            runCatching { pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES) }.getOrNull()
+        )
+    }
+
+    /**
+     * Signatures of a downloaded APK. `getPackageArchiveInfo` with GET_SIGNING_CERTIFICATES returns a null
+     * signingInfo on many devices, so fall back to the (reliable for archives) legacy GET_SIGNATURES.
+     */
+    private fun archiveSignatures(apkFile: File): List<String> {
+        val pm = context.packageManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val modern = extractSignatures(
+                runCatching { pm.getPackageArchiveInfo(apkFile.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()
+            )
+            if (modern.isNotEmpty()) return modern
+        }
+        @Suppress("DEPRECATION")
+        return extractSignatures(
+            runCatching { pm.getPackageArchiveInfo(apkFile.absolutePath, PackageManager.GET_SIGNATURES) }.getOrNull()
+        )
+    }
+
+    private fun extractSignatures(packageInfo: PackageInfo?): List<String> {
+        if (packageInfo == null) return emptyList()
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && packageInfo.signingInfo != null) {
             packageInfo.signingInfo?.apkContentsSigners
                 ?: packageInfo.signingInfo?.signingCertificateHistory
         } else {

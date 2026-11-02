@@ -119,6 +119,7 @@ class PlaybackController @Inject constructor(
     private val recentPlayedTrackIds = ArrayDeque<String>(RECENT_LIMIT)
 
     private var currentPlayJob: Job? = null
+    private var bufferingWatchdog: Job? = null
     /** Incremented on every explicit start/stop so stale async callbacks can tell they were superseded. */
     private var startRequestId = 0L
     private var retriedTrackId: String? = null
@@ -147,6 +148,33 @@ class PlaybackController @Inject constructor(
                     _isStarting.value = false
                     consecutiveFailedTracks = 0
                     retriedTrackId = null
+                }
+            }
+            .launchIn(scope)
+
+        // The player stopped wanting to play with a track still loaded (focus loss during a call, a Bluetooth
+        // unplug, a manual pause): no start is in flight any more. Clearing this flag stops the "loading" spinner
+        // from sticking and lets play()/resume() run again afterwards (it early-returns while a start is pending).
+        playerRepository.isPlaying
+            .onEach { wantsToPlay ->
+                if (!wantsToPlay && playerRepository.currentTrackId.value != null) _isStarting.value = false
+            }
+            .launchIn(scope)
+
+        // Watchdog: a stream that never finishes buffering (a dead link that reports no error) would spin forever.
+        // After a timeout, treat it as a failure so the usual retry/skip recovery kicks in instead of a stuck UI.
+        isBuffering
+            .onEach { buffering ->
+                bufferingWatchdog?.cancel()
+                if (buffering) {
+                    val trackId = _currentTrack.value?.idString
+                    bufferingWatchdog = scope.launch {
+                        delay(BUFFERING_TIMEOUT_MS)
+                        if (isBuffering.value && _currentTrack.value?.idString == trackId && trackId != null) {
+                            Log.w(TAG, "Buffering watchdog fired for $trackId")
+                            onPlaybackFailure(PlaybackFailure(trackId, progress.value, "BUFFERING_TIMEOUT"))
+                        }
+                    }
                 }
             }
             .launchIn(scope)
@@ -815,5 +843,7 @@ class PlaybackController @Inject constructor(
         private const val SNAPSHOT_INTERVAL_MS = 15_000L
         private const val RESUMPTION_START_TIMEOUT_MS = 4_000L
         private const val SLEEP_FADE_MS = 8_000L
+        /** Longest a stream may keep buffering before we treat the stall as a failure and recover. */
+        private const val BUFFERING_TIMEOUT_MS = 15_000L
     }
 }
