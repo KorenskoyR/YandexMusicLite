@@ -83,7 +83,7 @@ class NotificationOpensPlayerInstrumentedTest {
             }
             mainVm = vm
             // Radio list snapshot for visual review of the bundled station logos
-            if (hasText("FM Радио", 15_000)) device.findObject(By.text("FM Радио")).click()
+            if (hasText("Радио", 15_000)) device.findObject(By.text("Радио")).click()
             Thread.sleep(3_000)
             snap("radio_list")
             device.findObject(By.text("Dance & Club"))?.click()

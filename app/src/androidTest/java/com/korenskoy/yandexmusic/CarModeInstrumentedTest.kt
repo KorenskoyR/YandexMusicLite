@@ -58,15 +58,15 @@ class CarModeInstrumentedTest {
         var accounts: AccountViewModel? = null
         try {
             scenario.onActivity { accounts = ViewModelProvider(it)[AccountViewModel::class.java] }
-            assertTrue("bottom bar", waitFor(15_000) { hasDesc("В авто") && hasDesc("Моя Музыка") })
+            assertTrue("bottom bar", waitFor(15_000) { hasDesc("В авто") && hasDesc("Музыка") })
             device.findObject(By.desc("В авто")).click()
 
-            assertTrue("car screen", waitFor(10_000) { device.findObject(By.text("Моя Волна")) != null })
-            assertTrue("bottom bar hidden in car mode", waitFor(3_000) { !hasDesc("Моя Музыка") && !hasDesc("Главная") })
+            assertTrue("car screen", waitFor(10_000) { device.findObject(By.text("Моя волна")) != null })
+            assertTrue("bottom bar hidden in car mode", waitFor(3_000) { !hasDesc("Музыка") && !hasDesc("Волна") })
             device.executeShellCommand("screencap -p /data/local/tmp/car_mode.png")
 
             device.pressBack()
-            assertTrue("bottom bar back after leaving car mode", waitFor(5_000) { hasDesc("Моя Музыка") })
+            assertTrue("bottom bar back after leaving car mode", waitFor(5_000) { hasDesc("Музыка") })
         } finally {
             accounts?.let { vm -> instrumentation.runOnMainSync { vm.logoutAllAccounts() } }
             scenario.close()

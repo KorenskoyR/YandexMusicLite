@@ -43,8 +43,27 @@ import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.State
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.graphics.Color
+import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
+import com.korenskoy.yandexmusic.presentation.hifi.LocalArtworkTint
+import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
+import com.korenskoy.yandexmusic.presentation.hifi.TintMath
+import com.korenskoy.yandexmusic.presentation.hifi.rememberArtworkTint
+import com.korenskoy.yandexmusic.presentation.hifi.rememberHiFiLite
+import com.korenskoy.yandexmusic.utils.toCoverUrl
 
-@OptIn(ExperimentalMaterial3Api::class)
+private const val PLAYER_COVER_KEY = "player_cover"
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -167,17 +186,55 @@ fun MainScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // One tint for the whole app: the playing cover, or the station's brand colors on air
+    val lite = rememberHiFiLite()
+    val radioStations by radioVm.stations.collectAsState()
+    val stationTint = remember(shownTrack?.idString, radioStations) {
+        if (shownTrack?.isRadio != true) null
+        else radioStations.firstOrNull { it.id == shownTrack.idString.removePrefix("radio_") }?.let {
+            ArtworkTint(Color(TintMath.normalize(it.brandColorStart.toInt())), Color(TintMath.normalize(it.brandColorEnd.toInt())))
+        }
+    }
+    val coverForTint = if (shownTrack?.isRadio == true) null else shownTrack?.coverUri.toCoverUrl("200x200")
+    val appTint = rememberArtworkTint(coverForTint, stationTint)
+    val waveActive = currentSource == PlaylistSource.VIBE && currentTrack != null
+    val upcoming = remember(currentPlaylist, currentTrackId) {
+        val index = currentPlaylist.indexOfFirst { it.idString == currentTrackId }
+        if (index < 0) emptyList() else currentPlaylist.drop(index + 1).take(10)
+    }
+    val tabStates = rememberSaveableStateHolder()
+    val contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp
+    // The mini-player stays out of the way on the wave page, which already shows the playing wave
+    val showMini = shownTrack != null && currentTab != MainTab.CAR && !(currentTab == MainTab.HOME && waveActive)
+
     androidx.compose.runtime.CompositionLocalProvider(
         com.korenskoy.yandexmusic.utils.LocalStreamQuality provides streamQuality,
-        com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu provides trackMenuLauncher
+        com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu provides trackMenuLauncher,
+        LocalHiFiLite provides lite,
+        LocalArtworkTint provides appTint
     ) {
+        SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+        val sharedScope = this
         Box(modifier = Modifier.fillMaxSize()) {
+            // One living background under every tab: it does not blink when tabs change
+            if (currentTab != MainTab.CAR) {
+                HiFiBackdrop(coverUrl = coverForTint?.let { shownTrack?.coverUri.toCoverUrl("400x400") })
+            }
             // Layer 0: Full-bleed Edge-to-Edge Content Area
             // In landscape, offset content to the right to avoid NavigationRail overlap
-            Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    (fadeIn(HiFiMotion.standard()) + androidx.compose.animation.slideInVertically(HiFiMotion.standard()) { it / 100 }) togetherWith
+                        fadeOut(HiFiMotion.quick())
+                },
+                label = "tabs",
+                modifier = Modifier.fillMaxSize()
+            ) { tab ->
+              tabStates.SaveableStateProvider(tab.route) {
                 // An artist or album page covers the tab until Back (or another tab) closes it
                 val catalogTop = catalogStack.lastOrNull()
-                if (catalogTop != null && currentTab != MainTab.CAR) {
+                if (catalogTop != null && tab != MainTab.CAR) {
                     com.korenskoy.yandexmusic.presentation.catalog.CatalogPageScreen(
                         state = catalogTop,
                         currentTrackId = currentTrackId,
@@ -186,19 +243,27 @@ fun MainScreen(
                         contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp,
                         actions = catalogActions
                     )
-                } else when (currentTab) {
+                } else when (tab) {
                     MainTab.HOME -> HomeScreen(
+                        waveTrack = if (waveActive) currentTrack else null,
                         isPlaying = isPlaying,
-                        isWavePlaying = currentSource == PlaylistSource.VIBE,
                         isLoading = isBuffering && currentSource == PlaylistSource.VIBE,
-                        onPlayPauseVibe = {
-                            // Like Yandex Music: the wave button controls the wave; from any other context it starts the wave.
-                            if (currentSource == PlaylistSource.VIBE && currentTrack != null) {
+                        isLiked = currentTrackId?.let { likedTrackIds.contains(it) } == true,
+                        progress = { progressState.value },
+                        upNext = if (waveActive) upcoming else emptyList(),
+                        onPlayPause = {
+                            // Like Yandex Music: the wave knob controls the wave; from any other context it starts the wave.
+                            if (waveActive) {
                                 viewModel.togglePlayPause()
                             } else {
                                 viewModel.playMyVibe()
                             }
-                        }
+                        },
+                        onLike = { currentTrack?.let { viewModel.toggleLike(it) } },
+                        onDislike = { currentTrack?.let { viewModel.dislikeTrack(it) } },
+                        onOpenQueue = { isPlayerExpanded = true },
+                        onUpNextClick = { viewModel.playTrack(it.idString, currentPlaylist, PlaylistSource.VIBE) },
+                        contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom
                     )
                     MainTab.SEARCH -> SearchScreen(
                         query = searchQuery,
@@ -269,11 +334,13 @@ fun MainScreen(
                         hasActiveTrack = currentTrack != null,
                         accountName = accountName,
                         avatarUrl = accountAvatarUrl,
+                        hasPlus = activeAccount?.hasPlus == true,
                         defaultAccountName = defaultAccountName,
                         updateStatus = updateStatusMessage,
                         onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
                         onAccountManagementClick = { showAccountDialog = true },
-                        onLogout = { showAccountDialog = true },
+                        onAddAccount = { onNavigateToAuth() },
+                        onLogout = { accountVm.logoutCurrentAccount() },
                         playlists = userPlaylists,
                         openedPlaylist = openedPlaylist,
                         onOpenPlaylist = { playlistsVm.open(it) },
@@ -287,33 +354,27 @@ fun MainScreen(
                         onSetPlaylistPublic = { playlist, public -> playlistsVm.setPublic(playlist, public) }
                     )
                     MainTab.RADIO -> {
-                        val radioStations by radioVm.stations.collectAsState()
-                        var radioQueryState by remember { mutableStateOf("") }
-                        var selectedCategory by remember { mutableStateOf(com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL) }
-                        val favoriteStationIds by radioVm.favoriteStationIds.collectAsState()
-                    
+                        var selectedCategory by rememberSaveable { mutableStateOf(com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL) }
                         val filteredStations = radioStations.filter {
-                            (selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL || 
-                             (selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.FAVORITES && favoriteStationIds.contains(it.id)) ||
-                             it.category == selectedCategory) &&
-                            (radioQueryState.isEmpty() || it.name.contains(radioQueryState, ignoreCase = true) || it.category.title.contains(radioQueryState, ignoreCase = true) || it.frequency.contains(radioQueryState, ignoreCase = true))
+                            selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL ||
+                                (selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.FAVORITES && favoriteStationIds.contains(it.id)) ||
+                                it.category == selectedCategory
                         }
-                    
                         com.korenskoy.yandexmusic.presentation.radio.RadioScreen(
                             stations = filteredStations,
-                            searchQuery = radioQueryState,
-                            onQueryChange = { radioQueryState = it },
+                            allStations = radioStations,
                             selectedCategory = selectedCategory,
                             onCategorySelect = { selectedCategory = it },
-                            currentStationId = currentTrack?.idString?.removePrefix("radio_"),
+                            currentStationId = currentTrack?.takeIf { it.isRadio }?.idString?.removePrefix("radio_"),
                             isPlaying = isPlaying,
                             favoriteStationIds = favoriteStationIds,
                             onStationClick = { radioVm.play(it) },
                             onToggleFavorite = { radioVm.toggleFavorite(it) },
+                            onPlayPause = { viewModel.togglePlayPause() },
                             hasActiveTrack = currentTrack != null
                         )
                     }
-                    MainTab.CAR -> WithProgress(progressState) { progress ->
+                    MainTab.CAR -> run {
                         CarScreen(
                             currentTrack = currentTrack,
                             isPlaying = isPlaying,
@@ -355,12 +416,16 @@ fun MainScreen(
                             onExit = { currentTab = MainTab.HOME },
                             isLandscape = isLandscape,
                             steeringWheelOnLeft = steeringWheelOnLeft,
-                            progress = progress,
+                            progress = { progressState.value },
                             durationMs = currentTrack?.durationMs ?: 0L,
-                            onSeek = { viewModel.seekTo(it) }
+                            onSeek = { viewModel.seekTo(it) },
+                            nextTrack = if (currentTrack?.isRadio == true) null else upcoming.firstOrNull(),
+                            source = currentSource,
+                            isBuffering = isBuffering
                         )
                     }
                 }
+              }
             }
 
             // Layer 1 & 2: Floating Navigation and MiniPlayer Overlays
@@ -378,41 +443,30 @@ fun MainScreen(
                     )
                 }
 
-                // Landscape MiniPlayer in Bottom Right (hidden in CAR mode)
-                if (shownTrack != null && currentTab != MainTab.CAR) {
-                    val isMiniLiked = if (currentTrack?.isRadio == true) {
-                        favoriteStationIds.contains(shownTrack.idString.removePrefix("radio_"))
-                    } else {
-                        likedTrackIds.contains(shownTrack.idString)
-                    }
-                    WithProgress(progressState) { progress ->
+                // Landscape MiniPlayer at the bottom (hidden in CAR mode)
+                if (showMini && shownTrack != null) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !isPlayerExpanded,
+                        enter = fadeIn(HiFiMotion.standard()),
+                        exit = fadeOut(HiFiMotion.quick()),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 12.dp)
+                            .widthIn(max = 580.dp)
+                            .fillMaxWidth()
+                    ) {
                         MiniPlayer(
                             track = shownTrack,
                             isPlaying = isPlaying,
-                            isLiked = isMiniLiked,
-                            progress = progress,
-                            onPlayPauseClick = {
-                                viewModel.togglePlayPause()
-                            },
-                            onToggleLike = {
-                                if (currentTrack?.isRadio == true) {
-                                    radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
-                                } else {
-                                    viewModel.toggleLike(shownTrack)
-                                }
-                            },
-                            onClick = {
-                                isPlayerExpanded = true
-                            },
-                            onDismiss = {
-                                viewModel.stopAndClearPlayer()
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(bottom = 12.dp)
-                                .widthIn(max = 580.dp)
-                                .fillMaxWidth()
+                            progress = { progressState.value },
+                            onPlayPauseClick = { viewModel.togglePlayPause() },
+                            onNextClick = { viewModel.playNext() },
+                            onClick = { isPlayerExpanded = true },
+                            onDismiss = { viewModel.stopAndClearPlayer() },
+                            coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
+                                Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
+                            }
                         )
                     }
                 }
@@ -427,37 +481,26 @@ fun MainScreen(
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (shownTrack != null) {
-                            val isMiniLiked = if (currentTrack?.isRadio == true) {
-                                favoriteStationIds.contains(shownTrack.idString.removePrefix("radio_"))
-                            } else {
-                                likedTrackIds.contains(shownTrack.idString)
-                            }
-                            WithProgress(progressState) { progress ->
+                        if (showMini && shownTrack != null) {
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = !isPlayerExpanded,
+                                enter = fadeIn(HiFiMotion.standard()),
+                                exit = fadeOut(HiFiMotion.quick())
+                            ) {
                                 MiniPlayer(
                                     track = shownTrack,
                                     isPlaying = isPlaying,
-                                    isLiked = isMiniLiked,
-                                    progress = progress,
-                                    onPlayPauseClick = {
-                                        viewModel.togglePlayPause()
-                                    },
-                                    onToggleLike = {
-                                        if (currentTrack?.isRadio == true) {
-                                            radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
-                                        } else {
-                                            viewModel.toggleLike(shownTrack)
-                                        }
-                                    },
-                                    onClick = {
-                                        isPlayerExpanded = true
-                                    },
-                                    onDismiss = {
-                                        viewModel.stopAndClearPlayer()
+                                    progress = { progressState.value },
+                                    onPlayPauseClick = { viewModel.togglePlayPause() },
+                                    onNextClick = { viewModel.playNext() },
+                                    onClick = { isPlayerExpanded = true },
+                                    onDismiss = { viewModel.stopAndClearPlayer() },
+                                    coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
+                                        Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
                                     }
                                 )
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                         }
 
                         FloatingGlassBottomBar(
@@ -470,8 +513,8 @@ fun MainScreen(
 
             AnimatedVisibility(
                 visible = isPlayerExpanded,
-                enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)),
-                exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(300)),
+                enter = fadeIn(HiFiMotion.large()) + slideInVertically(HiFiMotion.large()) { it / 6 },
+                exit = fadeOut(HiFiMotion.standard()) + slideOutVertically(HiFiMotion.standard()) { it / 6 },
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (shownTrack != null) {
@@ -521,7 +564,10 @@ fun MainScreen(
                             onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
                             onCancelSleepTimer = { viewModel.cancelSleepTimer() },
                             onAddToPlaylist = { trackMenu = TrackMenuRequest(shownTrack, null, pickPlaylist = true) },
-                            onQualityClick = { qualityDetails = viewModel.qualityDetails() }
+                            onQualityClick = { qualityDetails = viewModel.qualityDetails() },
+                            coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
+                                Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
+                            }
                         )
                     }
                 }
@@ -651,6 +697,7 @@ fun MainScreen(
                     }
                 )
             }
+        }
         }
     }
 }

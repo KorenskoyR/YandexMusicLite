@@ -137,8 +137,8 @@ fun DownloadProgressModal(
                         onClick = onCancel,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF3366).copy(alpha = 0.2f),
-                            contentColor = Color(0xFFFF3366)
+                            containerColor = Color(0xFF0A6CFF).copy(alpha = 0.2f),
+                            contentColor = Color(0xFF0A6CFF)
                         ),
                         elevation = null
                     ) {

@@ -68,7 +68,7 @@ fun StartupAccountPickerDialog(
                         BorderStroke(
                             1.2.dp,
                             Brush.verticalGradient(
-                                listOf(Color(0xFFFF3366).copy(alpha = 0.45f), Color.White.copy(alpha = 0.08f))
+                                listOf(Color(0xFF0A6CFF).copy(alpha = 0.45f), Color.White.copy(alpha = 0.08f))
                             )
                         ),
                         RoundedCornerShape(26.dp)
@@ -92,7 +92,7 @@ fun StartupAccountPickerDialog(
                                 .clip(CircleShape)
                                 .background(
                                     Brush.linearGradient(
-                                        listOf(Color(0xFFFF3366), Color(0xFFFF9900))
+                                        listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
                                     )
                                 ),
                             contentAlignment = Alignment.Center
@@ -154,7 +154,7 @@ fun StartupAccountPickerDialog(
                                     .background(
                                         if (isSelected) {
                                             Brush.horizontalGradient(
-                                                listOf(Color(0x38FF3366), Color(0x22FF9900))
+                                                listOf(Color(0x380A6CFF), Color(0x22FF9900))
                                             )
                                         } else {
                                             Brush.horizontalGradient(
@@ -165,7 +165,7 @@ fun StartupAccountPickerDialog(
                                     .border(
                                         BorderStroke(
                                             1.dp,
-                                            if (isSelected) Color(0xFFFF3366) else Color.White.copy(alpha = 0.08f)
+                                            if (isSelected) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.08f)
                                         ),
                                         RoundedCornerShape(16.dp)
                                     )
@@ -181,7 +181,7 @@ fun StartupAccountPickerDialog(
                                         .background(
                                             if (isSelected) {
                                                 Brush.linearGradient(
-                                                    listOf(Color(0xFFFF3366), Color(0xFFFF9900))
+                                                    listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
                                                 )
                                             } else {
                                                 Brush.linearGradient(
@@ -244,7 +244,7 @@ fun StartupAccountPickerDialog(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFFFF3366)),
+                                            .background(Color(0xFF0A6CFF)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -274,7 +274,7 @@ fun StartupAccountPickerDialog(
                             checked = rememberAsDefault,
                             onCheckedChange = { rememberAsDefault = it },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = Color(0xFFFF3366),
+                                checkedColor = Color(0xFF0A6CFF),
                                 uncheckedColor = Color.White.copy(alpha = 0.4f),
                                 checkmarkColor = Color.White
                             )
@@ -329,7 +329,7 @@ fun StartupAccountPickerDialog(
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(
                                     Brush.horizontalGradient(
-                                        listOf(Color(0xFFFF3366), Color(0xFFFF7722))
+                                        listOf(Color(0xFF0A6CFF), Color(0xFF2F7BFF))
                                     )
                                 )
                                 .clickable(enabled = selectedUid.isNotBlank()) {

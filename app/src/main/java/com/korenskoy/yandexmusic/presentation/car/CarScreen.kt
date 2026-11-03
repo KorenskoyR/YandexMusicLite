@@ -1,51 +1,138 @@
 package com.korenskoy.yandexmusic.presentation.car
 
-import com.korenskoy.yandexmusic.R
-import androidx.compose.ui.res.stringResource
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.DownloadDone
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.HeartBroken
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Waves
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import coil3.request.crossfade
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
-import com.korenskoy.yandexmusic.presentation.player.components.RadioCoverCard
-import kotlinx.coroutines.delay
+import com.korenskoy.yandexmusic.data.player.PlaylistSource
+import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiKnob
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
+import com.korenskoy.yandexmusic.presentation.hifi.LocalArtworkTint
+import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
+import com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph
+import com.korenskoy.yandexmusic.presentation.hifi.RingMode
+import com.korenskoy.yandexmusic.presentation.hifi.SpectrumRing
+import com.korenskoy.yandexmusic.presentation.hifi.hifiAnodized
+import com.korenskoy.yandexmusic.presentation.hifi.hifiGlass
+import com.korenskoy.yandexmusic.presentation.hifi.hifiGrain
+import com.korenskoy.yandexmusic.presentation.hifi.hifiRecessed
+import com.korenskoy.yandexmusic.utils.browserUserAgent
 import com.korenskoy.yandexmusic.utils.toCoverUrl
-import java.util.Calendar
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
-import kotlin.math.sin
-import kotlin.math.cos
 
+/** Time source of the car clock; screenshot tests pin it. */
+val LocalCarClock = androidx.compose.runtime.staticCompositionLocalOf<() -> Long> { System::currentTimeMillis }
+
+/** The source tiles of the dock, in order. */
+enum class CarSource { WAVE, LIKED, RADIO, HITS, DOWNLOADED }
+
+/** Which dock tile is lit for the playing [source]. Pure; unit-tested. */
+fun carSourceOf(source: PlaylistSource, isRadio: Boolean): CarSource? = when {
+    isRadio || source == PlaylistSource.RADIO -> CarSource.RADIO
+    source == PlaylistSource.VIBE -> CarSource.WAVE
+    source == PlaylistSource.LIBRARY -> CarSource.LIKED
+    source == PlaylistSource.TRENDS -> CarSource.HITS
+    else -> null
+}
+
+/** "1:22" / "−3:24": elapsed and remaining time of the readout. Pure; unit-tested. */
+fun carTimeReadout(positionMs: Long, durationMs: Long): Pair<String, String> {
+    fun fmt(ms: Long): String {
+        val total = (ms.coerceAtLeast(0L) / 1000L)
+        return "${total / 60}:${(total % 60).toString().padStart(2, '0')}"
+    }
+    val position = positionMs.coerceIn(0L, durationMs.coerceAtLeast(0L))
+    return fmt(position) to "−" + fmt((durationMs - position).coerceAtLeast(0L))
+}
+
+/**
+ * "В авто" — the screen people spend the most time on, built like the digital instrument cluster of a
+ * premium car: the driver's side holds a gauge (a large metal knob in a spectrum ring that is also the
+ * track progress), knobs for previous/next and a dock of sources; the far side holds the cover with a
+ * glass "next" plate. Everything is laid out for 1280×720 and scaled to the head unit, mirrored for
+ * right-hand drive.
+ *
+ * [progress] is read where it is drawn (ring) or once a second (readout), so the screen is not
+ * recomposed on every progress tick.
+ */
 @Composable
 fun CarScreen(
     currentTrack: TrackDetailsDto?,
@@ -64,1123 +151,468 @@ fun CarScreen(
     onExit: () -> Unit,
     isLandscape: Boolean = false,
     steeringWheelOnLeft: Boolean = true,
-    progress: Long = 0L,
+    progress: () -> Long = { 0L },
     durationMs: Long = 0L,
-    onSeek: (Long) -> Unit = {}
+    onSeek: (Long) -> Unit = {},
+    nextTrack: TrackDetailsDto? = null,
+    source: PlaylistSource = PlaylistSource.NONE,
+    isLiked: Boolean = currentTrack?.let { likedTrackIds.contains(it.idString) } == true,
+    isBuffering: Boolean = false
 ) {
-    val isLiked = currentTrack?.let { likedTrackIds.contains(it.idString) } == true
-    // System back leaves car mode like the screen's own arrow, instead of closing the app
     androidx.activity.compose.BackHandler(onBack = onExit)
-
     val view = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(Unit) {
         view.keepScreenOn = true
-        onDispose {
-            view.keepScreenOn = false
-        }
+        onDispose { view.keepScreenOn = false }
     }
-
     LaunchedEffect(Unit) {
-        if (!isPlaying && currentTrack == null) {
-            onPlayMyVibe()
-        }
+        if (!isPlaying && currentTrack == null) onPlayMyVibe()
     }
 
-    // Soft ambient glow behind everything
-    Box(
+    val playPause = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() }
+    val isRadio = currentTrack?.isRadio == true
+    val active = carSourceOf(source, isRadio)
+    val sourceLabel = when (active) {
+        CarSource.WAVE -> stringResource(R.string.car_source_wave)
+        CarSource.LIKED -> stringResource(R.string.library_liked)
+        CarSource.RADIO -> stringResource(R.string.car_source_radio)
+        CarSource.HITS -> stringResource(R.string.car_source_hits)
+        else -> ""
+    }
+    val coverUrl = currentTrack?.coverUri.toCoverUrl("400x400")
+    val tint = LocalArtworkTint.current
+    val ringMode = when {
+        isBuffering -> RingMode.Loading
+        isPlaying -> RingMode.Playing
+        else -> RingMode.Paused
+    }
+    val fraction = { if (durationMs > 0 && !isRadio) progress().toFloat() / durationMs else 0f }
+    val sources = listOf(
+        DockItem(CarSource.WAVE, Icons.Rounded.Waves, stringResource(R.string.car_source_wave), onPlayMyVibe),
+        DockItem(CarSource.LIKED, Icons.Rounded.Favorite, stringResource(R.string.car_source_liked), onPlayFavorites),
+        DockItem(CarSource.RADIO, Icons.Rounded.Radio, stringResource(R.string.car_source_radio), onPlayRadio),
+        DockItem(CarSource.HITS, Icons.AutoMirrored.Rounded.TrendingUp, stringResource(R.string.car_source_hits), onPlayHits),
+        DockItem(CarSource.DOWNLOADED, Icons.Rounded.DownloadDone, stringResource(R.string.car_source_downloaded), onPlayDownloaded)
+    )
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0F13)) // Deep Obsidian Background
+            .background(HiFi.Ground)
             .pointerInput(Unit) {
                 detectHorizontalDragGestures { _, dragAmount ->
-                    if (dragAmount > 50) onPrevClick()
-                    else if (dragAmount < -50) onNextClick()
+                    if (dragAmount > 50) onPrevClick() else if (dragAmount < -50) onNextClick()
                 }
             }
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { 
-                    if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() 
-                })
-            }
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { playPause() }) }
     ) {
-        // Soft ambient glow behind everything
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color(0x33FF3366), Color.Transparent),
-                        radius = 1200f
-                    )
-                )
-        )
-
+        // Scale the 1280×720 (landscape) or 600×1060 (portrait) layout to this head unit
+        val s = if (isLandscape) minOf(maxWidth / 1280.dp, maxHeight / 720.dp) else minOf(maxWidth / 600.dp, maxHeight / 1060.dp)
+        val u = Scale(s.coerceIn(0.55f, 2f))
+        val farFocus = if (isLandscape) Offset(if (steeringWheelOnLeft) 0.78f else 0.22f, 0.45f) else Offset(0.5f, 0.25f)
+        HiFiBackdrop(tint = tint, coverUrl = coverUrl, glowCenter = farFocus, bottomFade = !isLandscape)
         if (isLandscape) {
-            CarScreenLandscape(
-                steeringWheelOnLeft = steeringWheelOnLeft,
-                currentTrack = currentTrack,
-                isPlaying = isPlaying,
-                isLiked = isLiked,
-                onPlayPauseClick = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() },
-                onNextClick = onNextClick,
-                onPrevClick = onPrevClick,
-                onToggleLike = onToggleLike,
-                onDislikeClick = onDislikeClick,
-                onPlayMyVibe = onPlayMyVibe,
-                onPlayFavorites = onPlayFavorites,
-                onPlayHits = onPlayHits,
-                onPlayDownloaded = onPlayDownloaded,
-                onPlayRadio = onPlayRadio,
-                onExit = onExit,
-                progress = progress,
-                durationMs = durationMs,
-                onSeek = onSeek
-            )
-        } else {
-            CarScreenPortrait(
-                currentTrack = currentTrack,
-                isPlaying = isPlaying,
-                isLiked = isLiked,
-                onPlayPauseClick = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() },
-                onNextClick = onNextClick,
-                onPrevClick = onPrevClick,
-                onToggleLike = onToggleLike,
-                onDislikeClick = onDislikeClick,
-                onPlayMyVibe = onPlayMyVibe,
-                onPlayFavorites = onPlayFavorites,
-                onPlayHits = onPlayHits,
-                onPlayDownloaded = onPlayDownloaded,
-                onPlayRadio = onPlayRadio,
-                onExit = onExit,
-                progress = progress,
-                durationMs = durationMs,
-                onSeek = onSeek
-            )
-        }
-    }
-}
-
-@Composable
-fun CarScreenPortrait(
-    currentTrack: TrackDetailsDto?,
-    isPlaying: Boolean,
-    isLiked: Boolean,
-    onPlayPauseClick: () -> Unit,
-    onNextClick: () -> Unit,
-    onPrevClick: () -> Unit,
-    onToggleLike: (TrackDetailsDto) -> Unit,
-    onDislikeClick: (TrackDetailsDto) -> Unit,
-    onPlayMyVibe: () -> Unit,
-    onPlayFavorites: () -> Unit,
-    onPlayHits: () -> Unit,
-    onPlayDownloaded: () -> Unit,
-    onPlayRadio: () -> Unit,
-    onExit: () -> Unit,
-    progress: Long = 0L,
-    durationMs: Long = 0L,
-    onSeek: (Long) -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(top = 8.dp, bottom = 12.dp, start = 16.dp, end = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Status Bar / Top Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onExit) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.cd_nazad),
-                        tint = Color.White
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.car_v_avtomobile),
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.5.sp
-                )
-            }
-            CarTimeWidget()
-        }
-
-        Spacer(modifier = Modifier.weight(0.3f))
-
-        // Album Art
-        val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000").orEmpty()
-        val context = LocalContext.current
-
-        if (currentTrack?.isRadio == true) {
-            RadioCoverCard(
-                coverUrl = coverUrl,
-                stationName = currentTrack.title.orEmpty(),
-                showLiveBadge = true,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .aspectRatio(1f)
-                    .widthIn(max = 160.dp)
-            )
-        } else {
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(coverUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .aspectRatio(1f)
-                    .sizeIn(maxHeight = 160.dp, maxWidth = 160.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .shadow(24.dp, RoundedCornerShape(24.dp), spotColor = Color(0xFFFF3366).copy(alpha = 0.3f))
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Title and Artist
-        Text(
-            text = currentTrack?.title ?: "Неизвестный трек",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" }?.ifEmpty { "-" } ?: "-",
-            fontSize = 16.sp,
-            color = Color.White.copy(alpha = 0.6f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Spacer(modifier = Modifier.weight(0.3f))
-
-        // Liquid Glass Controls
-        CarControls(
-            isPlaying = isPlaying,
-            isLiked = isLiked,
-            onPlayPauseClick = onPlayPauseClick,
-            onNextClick = onNextClick,
-            onPrevClick = onPrevClick,
-            onToggleLike = { currentTrack?.let { onToggleLike(it) } },
-            onDislikeClick = { currentTrack?.let { onDislikeClick(it) } }
-        )
-
-        Spacer(modifier = Modifier.weight(0.3f))
-
-        // Waveform & Timeline Visualizer
-        CarWaveformVisualizerAndTimeline(
-            progress = progress,
-            durationMs = if (durationMs > 0) durationMs else (currentTrack?.durationMs ?: 0L),
-            isPlaying = isPlaying,
-            isRadio = currentTrack?.isRadio == true,
-            onSeek = onSeek,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.weight(0.4f))
-
-        // Presets Grid
-        Row(modifier = Modifier.fillMaxWidth().height(50.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CarActionTile(Modifier.weight(1f), "Моя Волна", Color(0xFF8A2387), Icons.Default.Waves) { onPlayMyVibe() }
-            CarActionTile(Modifier.weight(1f), "Любимое", Color(0xFFC70039), Icons.Default.Favorite) { onPlayFavorites() }
-            CarActionTile(Modifier.weight(1f), "Радио", Color(0xFFFF9900), Icons.Default.Radio) { onPlayRadio() }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().height(50.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CarActionTile(Modifier.weight(1f), "Хиты", Color(0xFF00B4DB), Icons.AutoMirrored.Filled.TrendingUp) { onPlayHits() }
-            CarActionTile(Modifier.weight(1f), "Скачанные", Color(0xFF4CAF50), Icons.Default.DownloadDone) { onPlayDownloaded() }
-        }
-    }
-}
-
-@Composable
-fun CarScreenLandscape(
-    steeringWheelOnLeft: Boolean = true,
-    currentTrack: TrackDetailsDto?,
-    isPlaying: Boolean,
-    isLiked: Boolean,
-    onPlayPauseClick: () -> Unit,
-    onNextClick: () -> Unit,
-    onPrevClick: () -> Unit,
-    onToggleLike: (TrackDetailsDto) -> Unit,
-    onDislikeClick: (TrackDetailsDto) -> Unit,
-    onPlayMyVibe: () -> Unit,
-    onPlayFavorites: () -> Unit,
-    onPlayHits: () -> Unit,
-    onPlayDownloaded: () -> Unit,
-    onPlayRadio: () -> Unit,
-    onExit: () -> Unit,
-    progress: Long = 0L,
-    durationMs: Long = 0L,
-    onSeek: (Long) -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        // Full-width Top Header across the entire dashboard
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onExit) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.cd_nazad),
-                        tint = Color.White
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.car_v_avtomobile),
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.5.sp
-                )
-            }
-            CarTimeWidget()
-        }
-
-        // Two-column dashboard. Controls sit on the driver's side (near the wheel) and the cover on the
-        // far side, so left-hand drive gets controls-left/cover-right and right-hand drive mirrors it.
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (steeringWheelOnLeft) {
-                CarControlsColumn(
-                    currentTrack = currentTrack,
-                    isPlaying = isPlaying,
-                    isLiked = isLiked,
-                    onPlayPauseClick = onPlayPauseClick,
-                    onNextClick = onNextClick,
-                    onPrevClick = onPrevClick,
-                    onToggleLike = onToggleLike,
-                    onDislikeClick = onDislikeClick,
-                    onPlayMyVibe = onPlayMyVibe,
-                    onPlayFavorites = onPlayFavorites,
-                    onPlayHits = onPlayHits,
-                    onPlayDownloaded = onPlayDownloaded,
-                    onPlayRadio = onPlayRadio,
-                    progress = progress,
-                    durationMs = durationMs,
-                    onSeek = onSeek,
-                    gapOnStart = false
-                )
-                CarArtColumn(currentTrack = currentTrack)
-            } else {
-                CarArtColumn(currentTrack = currentTrack)
-                CarControlsColumn(
-                    currentTrack = currentTrack,
-                    isPlaying = isPlaying,
-                    isLiked = isLiked,
-                    onPlayPauseClick = onPlayPauseClick,
-                    onNextClick = onNextClick,
-                    onPrevClick = onPrevClick,
-                    onToggleLike = onToggleLike,
-                    onDislikeClick = onDislikeClick,
-                    onPlayMyVibe = onPlayMyVibe,
-                    onPlayFavorites = onPlayFavorites,
-                    onPlayHits = onPlayHits,
-                    onPlayDownloaded = onPlayDownloaded,
-                    onPlayRadio = onPlayRadio,
-                    progress = progress,
-                    durationMs = durationMs,
-                    onSeek = onSeek,
-                    gapOnStart = true
-                )
-            }
-        }
-    }
-}
-
-/** Art + track info column of the landscape car dashboard. */
-@Composable
-private fun RowScope.CarArtColumn(currentTrack: TrackDetailsDto?) {
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        val coverUrl = currentTrack?.coverUri?.toCoverUrl("1000x1000").orEmpty()
-        val context = LocalContext.current
-        if (currentTrack?.isRadio == true) {
-            RadioCoverCard(
-                coverUrl = coverUrl,
-                stationName = currentTrack.title.orEmpty(),
-                showLiveBadge = true,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .aspectRatio(1f)
-                    .widthIn(max = 280.dp)
-            )
-        } else {
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(coverUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .aspectRatio(1f)
-                    .widthIn(max = 280.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .shadow(32.dp, RoundedCornerShape(20.dp), spotColor = Color(0x66FF3366))
-            )
-        }
-        Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = currentTrack?.title ?: "Неизвестный трек",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = currentTrack?.artists?.joinToString(", ") { it.name ?: "" }?.ifEmpty { "-" } ?: "-",
-            fontSize = 16.sp,
-            color = Color.White.copy(alpha = 0.6f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/**
- * Controls + waveform timeline + presets column of the landscape car dashboard.
- * [gapOnStart] puts the gap to the art column on the correct side for the current wheel side.
- */
-@Composable
-private fun RowScope.CarControlsColumn(
-    currentTrack: TrackDetailsDto?,
-    isPlaying: Boolean,
-    isLiked: Boolean,
-    onPlayPauseClick: () -> Unit,
-    onNextClick: () -> Unit,
-    onPrevClick: () -> Unit,
-    onToggleLike: (TrackDetailsDto) -> Unit,
-    onDislikeClick: (TrackDetailsDto) -> Unit,
-    onPlayMyVibe: () -> Unit,
-    onPlayFavorites: () -> Unit,
-    onPlayHits: () -> Unit,
-    onPlayDownloaded: () -> Unit,
-    onPlayRadio: () -> Unit,
-    progress: Long,
-    durationMs: Long,
-    onSeek: (Long) -> Unit,
-    gapOnStart: Boolean
-) {
-    Column(
-        modifier = Modifier
-            .weight(1.2f)
-            .fillMaxHeight()
-            .padding(
-                start = if (gapOnStart) 24.dp else 0.dp,
-                end = if (gapOnStart) 0.dp else 24.dp,
-                bottom = 4.dp
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Spacer(modifier = Modifier.weight(0.1f))
-
-        // 1. Redesigned Liquid Glass Controls
-        CarControls(
-            isPlaying = isPlaying,
-            isLiked = isLiked,
-            onPlayPauseClick = onPlayPauseClick,
-            onNextClick = onNextClick,
-            onPrevClick = onPrevClick,
-            onToggleLike = { currentTrack?.let { onToggleLike(it) } },
-            onDislikeClick = { currentTrack?.let { onDislikeClick(it) } },
-            isLandscape = true
-        )
-
-        Spacer(modifier = Modifier.weight(0.2f))
-
-        // 2. Interactive Waveform Visualizer & Timeline Widget (Fills the previous empty space!)
-        CarWaveformVisualizerAndTimeline(
-            progress = progress,
-            durationMs = if (durationMs > 0) durationMs else (currentTrack?.durationMs ?: 0L),
-            isPlaying = isPlaying,
-            isRadio = currentTrack?.isRadio == true,
-            onSeek = onSeek,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.weight(0.2f))
-
-        // 3. Presets Block (Grouped together at bottom like in portrait mode)
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CarActionTile(Modifier.weight(1f), "Моя Волна", Color(0xFFFF3366), Icons.Default.Waves) { onPlayMyVibe() }
-                CarActionTile(Modifier.weight(1f), "Любимое", Color(0xFFFF5252), Icons.Default.Favorite) { onPlayFavorites() }
-                CarActionTile(Modifier.weight(1f), "Радио", Color(0xFFFF9800), Icons.Default.Radio) { onPlayRadio() }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CarActionTile(Modifier.weight(1f), "Хиты", Color(0xFF00B4DB), Icons.AutoMirrored.Filled.TrendingUp) { onPlayHits() }
-                CarActionTile(Modifier.weight(1f), "Скачанные", Color(0xFF4CAF50), Icons.Default.DownloadDone) { onPlayDownloaded() }
-            }
-        }
-    }
-}
-
-@Composable
-fun CarControls(
-    isPlaying: Boolean,
-    isLiked: Boolean,
-    onPlayPauseClick: () -> Unit,
-    onNextClick: () -> Unit,
-    onPrevClick: () -> Unit,
-    onToggleLike: () -> Unit,
-    onDislikeClick: () -> Unit,
-    isLandscape: Boolean = false
-) {
-    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
-    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
-
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isPlaying) 1.08f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_anim"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = if (isPlaying) 0.85f else 0.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_anim"
-    )
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        // Dislike: Frosted Glass Capsule
-        Box(
-            modifier = Modifier
-                .size((if (isLandscape) 52.dp else 46.dp) * scaleFactor)
-                .shadow(8.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.5f))
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0x352A2A38), Color(0x201E1E28))
-                    )
-                )
-                .border(
-                    BorderStroke(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(Color(0x40FFFFFF), Color(0x10FFFFFF))
+            // Darken the driver's side so text reads at a glance
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithCache {
+                        val shade = Brush.horizontalGradient(
+                            0f to HiFi.Ground.copy(alpha = 0.92f), 0.42f to HiFi.Ground.copy(alpha = 0.72f), 0.78f to Color.Transparent,
+                            startX = if (steeringWheelOnLeft) 0f else size.width,
+                            endX = if (steeringWheelOnLeft) size.width else 0f
                         )
-                    ),
-                    CircleShape
-                )
-                .clickable { onDislikeClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.HeartBroken,
-                contentDescription = stringResource(R.string.cd_dizlayk),
-                tint = Color.White.copy(alpha = 0.55f),
-                modifier = Modifier.size(24.dp * scaleFactor)
+                        onDrawBehind { drawRect(shade) }
+                    }
             )
         }
 
-        // Previous: Frosted Glass Pill
-        Box(
-            modifier = Modifier
-                .size((if (isLandscape) 64.dp else 56.dp) * scaleFactor)
-                .shadow(12.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.6f))
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0x40323242), Color(0x2520202C))
-                    )
-                )
-                .border(
-                    BorderStroke(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(Color(0x55FFFFFF), Color(0x18FFFFFF))
-                        )
-                    ),
-                    CircleShape
-                )
-                .clickable { onPrevClick() },
-            contentAlignment = Alignment.Center
+        // The theme's fixed 24sp line height would not follow the head-unit scale and clip small text:
+        // lines follow the (scaled) font instead
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalTextStyle provides androidx.compose.material3.LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified)
         ) {
-            Icon(
-                imageVector = Icons.Default.SkipPrevious,
-                contentDescription = stringResource(R.string.cd_predyduschiy),
-                tint = Color.White,
-                modifier = Modifier.size(32.dp * scaleFactor)
-            )
-        }
-
-        // Play / Pause: Giant Glowing Liquid Glass Sphere
-        Box(
-            modifier = Modifier
-                .size((if (isLandscape) 82.dp else 72.dp) * scaleFactor)
-                .graphicsLayer {
-                    // Pulse and glow are read in the draw phase: no recomposition per animation frame
-                    scaleX = pulseScale
-                    scaleY = pulseScale
-                    shadowElevation = (if (isPlaying) 28.dp else 16.dp).toPx()
-                    shape = CircleShape
-                    spotShadowColor = Color(0xFFFF3366).copy(alpha = glowAlpha)
-                    ambientShadowColor = Color(0xFFFF8833).copy(alpha = 0.5f)
-                }
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFFFF3366),
-                            Color(0xFFFF7722),
-                            Color(0xFFFF9900)
-                        )
-                    )
-                )
-                .border(
-                    BorderStroke(
-                        2.dp,
-                        Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = 0.85f), Color.White.copy(alpha = 0.25f))
-                        )
-                    ),
-                    CircleShape
-                )
-                .clickable { onPlayPauseClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = stringResource(R.string.cd_vosproizvedenie_pauza),
-                tint = Color.White,
-                modifier = Modifier.size(42.dp * scaleFactor)
-            )
-        }
-
-        // Next: Frosted Glass Pill
-        Box(
-            modifier = Modifier
-                .size((if (isLandscape) 64.dp else 56.dp) * scaleFactor)
-                .shadow(12.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.6f))
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0x40323242), Color(0x2520202C))
-                    )
-                )
-                .border(
-                    BorderStroke(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(Color(0x55FFFFFF), Color(0x18FFFFFF))
-                        )
-                    ),
-                    CircleShape
-                )
-                .clickable { onNextClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.SkipNext,
-                contentDescription = stringResource(R.string.cd_sleduyuschiy),
-                tint = Color.White,
-                modifier = Modifier.size(32.dp * scaleFactor)
-            )
-        }
-
-        // Like: Glowing Neon Heart
-        Box(
-            modifier = Modifier
-                .size((if (isLandscape) 52.dp else 46.dp) * scaleFactor)
-                .shadow(
-                    elevation = if (isLiked) 16.dp else 8.dp,
-                    shape = CircleShape,
-                    spotColor = if (isLiked) Color(0xFFFF3366).copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.5f)
-                )
-                .clip(CircleShape)
-                .background(
-                    if (isLiked) {
-                        Brush.verticalGradient(
-                            listOf(Color(0x44FF3366), Color(0x22FF1144))
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(Color(0x352A2A38), Color(0x201E1E28))
+        Column(Modifier.fillMaxSize().systemBarsPadding()) {
+            CarHeader(u, onExit)
+            if (isLandscape) {
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(start = u(48f), end = u(40f), bottom = u(28f)),
+                    horizontalArrangement = Arrangement.spacedBy(u(40f))
+                ) {
+                    val driver: @Composable () -> Unit = {
+                        DriverPanel(
+                            u = u, track = currentTrack, sourceLabel = sourceLabel, isPlaying = isPlaying, isLiked = isLiked,
+                            ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
+                            onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
+                            onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
+                            sources = sources, active = active,
+                            modifier = Modifier.width(u(652f)).fillMaxHeight()
                         )
                     }
-                )
-                .border(
-                    BorderStroke(
-                        1.2.dp,
-                        if (isLiked) {
-                            Brush.verticalGradient(
-                                listOf(Color(0xFFFF3366), Color(0x66FF3366))
-                            )
-                        } else {
-                            Brush.verticalGradient(
-                                listOf(Color(0x40FFFFFF), Color(0x10FFFFFF))
-                            )
+                    val far: @Composable () -> Unit = {
+                        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                            CoverWithNext(u, currentTrack, nextTrack, Modifier.size(u(500f)))
                         }
-                    ),
-                    CircleShape
-                )
-                .clickable { onToggleLike() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = stringResource(R.string.cd_nravitsya),
-                tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.55f),
-                modifier = Modifier.size(24.dp * scaleFactor)
-            )
-        }
-    }
-}
-
-@Composable
-fun CarWaveformVisualizerAndTimeline(
-    progress: Long,
-    durationMs: Long,
-    isPlaying: Boolean,
-    isRadio: Boolean,
-    onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
-    val scaleFactor = (minOf(windowSize.widthDp, windowSize.heightDp) / 400f).coerceIn(0.85f, 1.25f)
-
-    // Animated Waveform Heights using Transition
-    val infiniteTransition = rememberInfiniteTransition(label = "car_wave")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
-
-    var isDraggingSlider by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
-
-    val rawProgressFraction = if (durationMs > 0 && progress > 0L) (progress.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-    val targetFraction = if (isDraggingSlider) dragFraction else rawProgressFraction
-
-    val animatedProgressFraction by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = targetFraction,
-        animationSpec = if (isDraggingSlider) {
-            androidx.compose.animation.core.snap()
-        } else if (rawProgressFraction == 0f) {
-            androidx.compose.animation.core.tween(durationMillis = 350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-        } else {
-            androidx.compose.animation.core.tween(durationMillis = 150, easing = androidx.compose.animation.core.LinearEasing)
-        },
-        label = "car_slider_progress"
-    )
-
-    val displayFraction = if (isDraggingSlider) dragFraction else animatedProgressFraction
-    val currentPositionMs = (displayFraction * durationMs).toLong()
-
-    Box(
-        modifier = modifier
-            .shadow(16.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.45f))
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0x35282836),
-                        Color(0x1F1A1A24),
-                        Color(0x2E181820)
-                    )
-                )
-            )
-            .border(
-                BorderStroke(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(Color(0x44FFFFFF), Color(0x10FFFFFF), Color(0x28FFFFFF))
-                    )
-                ),
-                RoundedCornerShape(20.dp)
-            )
-            .padding(horizontal = 18.dp, vertical = 10.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Row: Quality Badge + Mode Title
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Quality / Stream Badge
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(if (isPlaying) Color(0xFF00E676) else Color.Gray)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isRadio) "FM СТЕРЕО" else com.korenskoy.yandexmusic.utils.LocalStreamQuality.current.orEmpty(),
-                        color = Color.White.copy(alpha = 0.75f),
-                        fontSize = (10.5f * scaleFactor).sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
-
-                // Mode Badge
-                Text(
-                    text = if (isRadio) "ПРЯМОЙ ЭФИР" else "МОЯ ВОЛНА",
-                    color = Color(0xFFFF9900),
-                    fontSize = (11f * scaleFactor).sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Dynamic Waveform Audio Visualizer (26 bars with harmonic synthesis & GPU acceleration)
-            val playActivity by animateFloatAsState(
-                targetValue = if (isPlaying) 1f else 0f,
-                animationSpec = tween(350, easing = FastOutSlowInEasing),
-                label = "play_activity"
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(32.dp * scaleFactor),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                val barCount = 26
-                val passedBarBrush = remember { Brush.verticalGradient(listOf(Color(0xFFFF3366), Color(0xFFFF9900))) }
-                val idleBarBrush = remember { Brush.verticalGradient(listOf(Color(0x55FFFFFF), Color(0x22FFFFFF))) }
-                for (i in 0 until barCount) {
-                    // Integer harmonics: 1x, 2x, 3x, 4x guaranteed to be 100% periodic at 2*PI
-                    val normI = i.toFloat() / (barCount - 1)
-                    val eqEnvelope = 0.65f + 0.35f * sin((normI * Math.PI).toFloat())
-
-                    val isBarPassed = if (!isRadio && durationMs > 0) (i.toFloat() / barCount) <= displayFraction else isPlaying
-                    val barColor = if (isBarPassed) passedBarBrush else idleBarBrush
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 1.2.dp)
-                            .fillMaxHeight()
-                            .graphicsLayer {
-                                // Animated values are read here, in the draw phase, so the wave
-                                // does not recompose the whole row on every frame
-                                val h1 = sin(phase * 1f + (i * 0.28f)) * 0.32f
-                                val h2 = sin(phase * 2f + (i * 0.56f)) * 0.28f
-                                val h3 = cos(phase * 3f - (i * 0.42f)) * 0.22f
-                                val h4 = sin(phase * 4f + (i * 0.84f)) * 0.12f
-                                val combined = h1 + h2 + h3 + h4
-                                val rawHeight = (0.22f + (combined + 0.94f) * 0.42f * eqEnvelope).coerceIn(0.14f, 1.0f)
-                                transformOrigin = TransformOrigin(0.5f, 1.0f) // Scale upwards from bottom baseline
-                                scaleY = 0.12f + (rawHeight - 0.12f) * playActivity
-                            }
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(barColor)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Interactive Progress Timeline (hidden or simplified for radio)
-            if (!isRadio && durationMs > 0) {
-                // Interactive Scrub Line
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(20.dp)
-                        .pointerInput(durationMs) {
-                            detectTapGestures { offset ->
-                                val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                onSeek((fraction * durationMs).toLong())
-                            }
-                        }
-                        .pointerInput(durationMs) {
-                            detectHorizontalDragGestures(
-                                onDragStart = { offset ->
-                                    isDraggingSlider = true
-                                    dragFraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                },
-                                onDragEnd = {
-                                    isDraggingSlider = false
-                                    onSeek((dragFraction * durationMs).toLong())
-                                },
-                                onDragCancel = {
-                                    isDraggingSlider = false
-                                }
-                            ) { change, _ ->
-                                dragFraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                            }
-                        },
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    // Background Track
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(2.5.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
-                    )
-
-                    // Active Progress Track
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(displayFraction)
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(2.5.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFFFF3366), Color(0xFFFF9900))
-                                )
-                            )
-                    )
-                }
-
-                // Time indicators Row (01:24 / 03:45)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val currentSec = if (isDraggingSlider) (dragFraction * durationMs / 1000).toLong() else (currentPositionMs / 1000)
-                    val totalSec = durationMs / 1000
-                    Text(
-                        text = String.format(Locale.US, "%02d:%02d", currentSec / 60, currentSec % 60),
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = (11.5f * scaleFactor).sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = String.format(Locale.US, "%02d:%02d", totalSec / 60, totalSec % 60),
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = (11.5f * scaleFactor).sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    }
+                    if (steeringWheelOnLeft) { driver(); far() } else { far(); driver() }
                 }
             } else {
-                // Radio Live Broadcast Indicator
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    Modifier.fillMaxSize().padding(horizontal = u(28f)).padding(bottom = u(24f)),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Radio,
-                        contentDescription = null,
-                        tint = Color(0xFFFF9900),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = stringResource(R.string.car_beskonechnyy_potok_radioveschaniya),
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = (12 * scaleFactor).sp,
-                        fontWeight = FontWeight.Medium
+                    CoverWithNext(u, currentTrack, nextTrack, Modifier.size(u(440f)))
+                    Spacer(Modifier.height(u(28f)))
+                    DriverPanel(
+                        u = u, track = currentTrack, sourceLabel = sourceLabel, isPlaying = isPlaying, isLiked = isLiked,
+                        ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
+                        onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
+                        onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
+                        sources = sources, active = active,
+                        modifier = Modifier.width(u(560f)).weight(1f),
+                        compactDock = true
                     )
                 }
+            }
+        }
+        }
+    }
+}
+
+/** dp sizes of the 1280×720 design, scaled to the screen. */
+private class Scale(val factor: Float) {
+    operator fun invoke(v: Float): Dp = (v * factor).dp
+    fun sp(v: Float): TextUnit = (v * factor).sp
+}
+
+private data class DockItem(val source: CarSource, val icon: ImageVector, val label: String, val onClick: () -> Unit)
+
+@Composable
+private fun CarHeader(u: Scale, onExit: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = u(48f), end = u(40f), top = u(22f), bottom = u(10f)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(u(56f))
+                .hifiGlass(CircleShape)
+                .clickable(role = Role.Button, onClick = onExit),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = Color.White, modifier = Modifier.size(u(26f)))
+        }
+        Spacer(Modifier.width(u(16f)))
+        Text(stringResource(R.string.car_label), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
+        Spacer(Modifier.weight(1f))
+        CarClock(u)
+    }
+}
+
+/** Large bold time over a small-caps date, right-aligned like a dashboard; refreshes once a minute. */
+@Composable
+private fun CarClock(u: Scale) {
+    val clock = LocalCarClock.current
+    var time by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+    LaunchedEffect(clock) {
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("EEEE · d MMMM", Locale.forLanguageTag("ru"))
+        while (true) {
+            val now = clock()
+            val calendar = Calendar.getInstance().apply { timeInMillis = now }
+            time = timeFormat.format(calendar.time)
+            date = dateFormat.format(calendar.time).uppercase(Locale.forLanguageTag("ru"))
+            delay((60_000L - now % 60_000L).coerceIn(1_000L, 60_000L))
+        }
+    }
+    Column(horizontalAlignment = Alignment.End) {
+        Text(time, color = Color.White, fontSize = u.sp(40f), lineHeight = u.sp(42f), fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em, style = Tabular)
+        Text(date, color = Color.White.copy(alpha = 0.60f), fontSize = u.sp(12f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em, maxLines = 1)
+    }
+}
+
+/** Tabular digits: the clock and the readout don't jump as numbers change. */
+private val Tabular = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
+
+@Composable
+private fun DriverPanel(
+    u: Scale,
+    track: TrackDetailsDto?,
+    sourceLabel: String,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    ringMode: RingMode,
+    fraction: () -> Float,
+    progress: () -> Long,
+    durationMs: Long,
+    isRadio: Boolean,
+    onPlayPause: () -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
+    sources: List<DockItem>,
+    active: CarSource?,
+    modifier: Modifier = Modifier,
+    compactDock: Boolean = false
+) {
+    Column(modifier) {
+        if (sourceLabel.isNotEmpty()) {
+            Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em)
+        }
+        AnimatedContent(
+            targetState = track,
+            contentKey = { it?.idString },
+            transitionSpec = { (fadeIn(HiFiMotion.large()) + slideInVertically(HiFiMotion.large()) { it / 10 }) togetherWith fadeOut(HiFiMotion.quick()) },
+            label = "car_title"
+        ) { shown ->
+            Column {
+                Text(
+                    shown?.title ?: stringResource(R.string.car_source_wave),
+                    color = Color.White,
+                    fontSize = u.sp(56f),
+                    lineHeight = u.sp(62f),
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.03).em,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = u(6f))
+                )
+                Text(
+                    if (shown?.isRadio == true) stringResource(R.string.mini_player_live) else shown?.artists?.joinToString { it.name ?: "" }.orEmpty(),
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = u.sp(26f),
+                    lineHeight = u.sp(32f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // The gauge cluster; in portrait (560 wide) the side controls shrink so all five fit
+        val sideSize = if (compactDock) 64f else 72f
+        val skipSize = if (compactDock) 88f else 96f
+        Row(
+            Modifier.fillMaxWidth().height(u(240f)).padding(top = u(0f)),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            GlassRound(u(sideSize), stringResource(R.string.cd_ne_nravitsya), onDislike) {
+                Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(u(28f)))
+            }
+            HiFiKnob(onClick = onPrev, contentDescription = stringResource(R.string.cd_predyduschiy_trek), size = u(skipSize)) {
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = Color(0xFFF4F6FA), modifier = Modifier.size(u(38f)))
+            }
+            Box(Modifier.size(u(240f)), contentAlignment = Alignment.Center) {
+                SpectrumRing(
+                    mode = ringMode,
+                    progress = fraction,
+                    bars = if (LocalHiFiLite.current) 60 else 90,
+                    innerRadius = u(98f),
+                    maxLength = u(20f),
+                    barWidth = u(3f),
+                    modifier = Modifier.size(u(240f))
+                )
+                HiFiKnob(onClick = onPlayPause, contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza), size = u(176f)) {
+                    PlayPauseGlyph(isPlaying = isPlaying, size = u(56f))
+                }
+            }
+            HiFiKnob(onClick = onNext, contentDescription = stringResource(R.string.cd_sleduyuschiy_trek), size = u(skipSize)) {
+                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = Color(0xFFF4F6FA), modifier = Modifier.size(u(38f)))
+            }
+            GlassRound(u(sideSize), stringResource(R.string.cd_nravitsya), onLike) {
+                Icon(
+                    if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    contentDescription = null,
+                    tint = if (isLiked) HiFi.Accent else Color.White.copy(alpha = 0.88f),
+                    modifier = Modifier.size(u(28f))
+                )
+            }
+        }
+        Box(Modifier.fillMaxWidth().padding(top = u(6f)), contentAlignment = Alignment.Center) {
+            if (isRadio) LiveReadout(u) else TimeReadout(u, progress, durationMs)
+        }
+        Spacer(Modifier.weight(1f))
+        Dock(u, sources, active, compact = compactDock)
+    }
+}
+
+/** Recessed display window: elapsed time in white, remaining dimmed; tabular digits don't jump. */
+@Composable
+private fun TimeReadout(u: Scale, progress: () -> Long, durationMs: Long) {
+    // Recomposes once a second, not on every progress tick
+    val seconds by remember(durationMs) { derivedStateOf { progress() / 1000L } }
+    val (elapsed, remaining) = carTimeReadout(seconds * 1000L, durationMs)
+    val description = stringResource(R.string.car_time_elapsed_remaining, elapsed, remaining.removePrefix("−"))
+    Row(
+        Modifier
+            .height(u(42f))
+            .hifiRecessed(u(21f))
+            .padding(horizontal = u(6f))
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(elapsed, color = Color.White, fontSize = u.sp(21f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.03.em, style = Tabular, modifier = Modifier.width(u(88f)), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Box(Modifier.width(1.dp).height(u(20f)).background(Color.White.copy(alpha = 0.18f)))
+        Text(remaining, color = Color.White.copy(alpha = 0.60f), fontSize = u.sp(21f), fontWeight = FontWeight.Medium, letterSpacing = 0.03.em, style = Tabular, modifier = Modifier.width(u(88f)), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+@Composable
+private fun LiveReadout(u: Scale) {
+    Row(
+        Modifier.height(u(42f)).hifiRecessed(u(21f)).padding(horizontal = u(18f)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(u(8f)).clip(CircleShape).background(HiFi.Live))
+        Spacer(Modifier.width(u(10f)))
+        Text(stringResource(R.string.radio_on_air), color = Color.White, fontSize = u.sp(16f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em)
+    }
+}
+
+@Composable
+private fun GlassRound(size: Dp, description: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .size(size)
+            .hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) { content() }
+}
+
+/** Five big source tiles; the playing one is dark metal with a steel rim. */
+@Composable
+private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: Boolean) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(u(12f))) {
+        items.forEach { item ->
+            val selected = item.source == active
+            val shape = RoundedCornerShape(u(22f))
+            Column(
+                Modifier
+                    .weight(1f)
+                    .height(u(if (compact) 88f else 96f))
+                    .then(
+                        if (selected) Modifier.shadow(u(14f), shape).hifiAnodized(shape)
+                        else Modifier.hifiGlass(shape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.10f))
+                    )
+                    .clickable(role = Role.Button, onClick = item.onClick),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(item.icon, contentDescription = null, tint = if (selected) Color.White else Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(28f)))
+                Spacer(Modifier.height(u(8f)))
+                Text(
+                    item.label,
+                    color = if (selected) Color.White else Color.White.copy(alpha = 0.86f),
+                    fontSize = u.sp(16f),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
 }
 
+/** The cover with a gloss and a coloured shadow; the next track sits on a glass plate over its lower edge. */
 @Composable
-fun CarActionTile(modifier: Modifier = Modifier, title: String, accentColor: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun CoverWithNext(u: Scale, track: TrackDetailsDto?, next: TrackDetailsDto?, modifier: Modifier) {
+    val context = LocalContext.current
+    val tint: ArtworkTint = LocalArtworkTint.current
+    val shape = RoundedCornerShape(u(30f))
     Box(
-        modifier = modifier
-            .shadow(8.dp, RoundedCornerShape(16.dp), spotColor = accentColor.copy(alpha = 0.2f))
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF22222C),
-                        Color(0xFF16161C)
-                    )
-                )
-            )
-            .border(
-                BorderStroke(
-                    1.dp,
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            accentColor.copy(alpha = 0.4f),
-                            Color(0x10FFFFFF)
-                        )
-                    )
-                ),
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
+        modifier
+            .aspectRatio(1f)
+            .shadow(u(44f), shape, ambientColor = tint.primary, spotColor = tint.primary)
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(tint.primary, tint.secondary)))
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+        AnimatedContent(
+            targetState = track?.coverUri,
+            transitionSpec = { fadeIn(HiFiMotion.large()) togetherWith fadeOut(HiFiMotion.large()) },
+            label = "car_cover"
+        ) { uri ->
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(uri.toCoverUrl("800x800"))
+                    .size(800)
+                    .crossfade(true)
+                    .apply { if (track?.isRadio == true) browserUserAgent() }
+                    .build(),
+                contentDescription = track?.title,
+                contentScale = if (track?.isRadio == true) ContentScale.Fit else ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (track?.isRadio == true) Modifier.background(Color.White).padding(u(60f)) else Modifier)
+            )
+        }
+        // Gloss
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithCache {
+                    val gloss = Brush.linearGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), start = Offset.Zero, end = Offset(size.width * 0.55f, size.height * 0.55f))
+                    val foot = Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.35f))
+                    onDrawBehind {
+                        drawRect(gloss)
+                        drawRect(foot)
+                    }
+                }
+        )
+        AnimatedVisibility(
+            visible = next != null,
+            enter = fadeIn(HiFiMotion.large()),
+            exit = fadeOut(HiFiMotion.quick()),
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = accentColor,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 1
-            )
+            if (next != null) NextPlate(u, next)
         }
     }
 }
 
-/** Time source of [CarTimeWidget]; screenshot tests pin it. */
-val LocalCarClock = androidx.compose.runtime.staticCompositionLocalOf<() -> Long> { System::currentTimeMillis }
-
 @Composable
-fun CarTimeWidget() {
-    var currentTime by remember { mutableStateOf("") }
-    var currentDate by remember { mutableStateOf("") }
-    val clock = LocalCarClock.current
-
-    LaunchedEffect(clock) {
-        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val dateFormat = SimpleDateFormat("dd MMM, E", Locale.forLanguageTag("ru"))
-        while (true) {
-            val calendar = Calendar.getInstance().apply { timeInMillis = clock() }
-            currentTime = timeFormat.format(calendar.time)
-            currentDate = dateFormat.format(calendar.time)
-            delay(1000)
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .shadow(12.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.5f))
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        Color(0x352A2A38),
-                        Color(0x201E1E28),
-                        Color(0x352A2A38)
-                    )
-                )
-            )
-            .border(
-                BorderStroke(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x40FFFFFF),
-                            Color(0x10FFFFFF),
-                            Color(0x25FFFFFF)
-                        )
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-    ) {
+private fun NextPlate(u: Scale, next: TrackDetailsDto) {
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(u(22f))
+    AnimatedContent(
+        targetState = next,
+        contentKey = { it.idString },
+        transitionSpec = { fadeIn(HiFiMotion.large()) togetherWith fadeOut(HiFiMotion.quick()) },
+        label = "car_next"
+    ) { shown ->
         Row(
+            Modifier
+                .padding(u(14f))
+                .fillMaxWidth()
+                .height(u(84f))
+                .hifiGlass(shape, fill = Color(0x8C080A14), border = Color.White.copy(alpha = 0.16f))
+                .hifiGrain(enabled = !LocalHiFiLite.current, alpha = 0.25f)
+                .padding(start = u(12f), end = u(20f)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = currentTime,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(shown.coverUri.toCoverUrl("200x200")).size(200).crossfade(true).build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(u(60f))
+                    .shadow(u(8f), RoundedCornerShape(u(13f)))
+                    .clip(RoundedCornerShape(u(13f)))
+                    .background(Color(0xFF1C1F28))
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "•",
-                color = Color.White.copy(alpha = 0.4f),
-                fontSize = 12.sp
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = currentDate,
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Spacer(Modifier.width(u(14f)))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.car_next), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(11f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.18.em)
+                Text(shown.title ?: "", color = Color.White, fontSize = u.sp(21f), lineHeight = u.sp(26f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(shown.artists.joinToString { it.name ?: "" }, color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(16f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

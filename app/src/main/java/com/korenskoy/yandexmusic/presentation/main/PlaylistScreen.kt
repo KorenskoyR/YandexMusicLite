@@ -82,91 +82,8 @@ import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 import com.korenskoy.yandexmusic.utils.russianQuantityString
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 
-/** Horizontal row of the user's playlists in the library header. */
 @Composable
-fun PlaylistsRow(
-    playlists: List<UserPlaylistDto>,
-    onOpen: (UserPlaylistDto) -> Unit,
-    onCreate: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var naming by remember { mutableStateOf(false) }
-    if (naming) {
-        PlaylistNameDialog(
-            title = stringResource(R.string.playlist_new),
-            confirmLabel = stringResource(R.string.playlist_create),
-            onConfirm = { onCreate(it); naming = false },
-            onDismiss = { naming = false }
-        )
-    }
-    Column(modifier = modifier) {
-        Text(
-            text = stringResource(R.string.library_playlists),
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            item(key = "new") {
-                Column(
-                    modifier = Modifier
-                        .width(104.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { naming = true }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(104.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0x1AFFFFFF))
-                            .border(BorderStroke(1.dp, Color(0x33FFFFFF)), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(36.dp))
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = stringResource(R.string.playlist_new),
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            items(playlists, key = { it.kindString }) { playlist ->
-                Column(
-                    modifier = Modifier
-                        .width(104.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onOpen(playlist) }
-                ) {
-                    PlaylistCover(playlist, Modifier.size(104.dp))
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = playlist.title.orEmpty(),
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = russianQuantityString(playlist.trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
+internal fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
@@ -233,7 +150,6 @@ fun PlaylistScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1F1626), Color(0xFF151219), Color(0xFF111115))))
     ) {
         Row(
             modifier = Modifier
@@ -262,7 +178,7 @@ fun PlaylistScreen(
             editedOrder?.let { order ->
                 Text(
                     text = stringResource(R.string.playlist_reorder_done),
-                    color = Color(0xFFFF3366),
+                    color = Color(0xFF0A6CFF),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     modifier = Modifier
@@ -396,7 +312,7 @@ fun PlaylistScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = onRetry,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3366)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A6CFF)),
                             shape = RoundedCornerShape(16.dp)
                         ) { Text(stringResource(R.string.playlist_retry), color = Color.White) }
                     }
@@ -529,7 +445,7 @@ private fun PlaylistAction(
             .height(42.dp)
             .clip(CircleShape)
             .background(
-                if (primary) Brush.linearGradient(listOf(Color(0xFFFF3366), Color(0xFFFF7722), Color(0xFFFF9900)))
+                if (primary) Brush.linearGradient(listOf(Color(0xFF3D8BFF), Color(0xFF0A6CFF), Color(0xFF0A55D6)))
                 else Brush.verticalGradient(listOf(Color(0x352A2A38), Color(0x201E1E28)))
             )
             .border(BorderStroke(1.dp, Color.White.copy(alpha = if (primary) 0.6f else 0.25f)), CircleShape)

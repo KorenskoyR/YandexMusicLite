@@ -82,7 +82,7 @@ fun UpdateDialog(
                     BorderStroke(
                         1.2.dp,
                         Brush.verticalGradient(
-                            listOf(Color(0xFFFF3366).copy(alpha = 0.45f), Color(0x33FFFFFF))
+                            listOf(Color(0xFF0A6CFF).copy(alpha = 0.45f), Color(0x33FFFFFF))
                         )
                     ),
                     RoundedCornerShape(26.dp)
@@ -101,7 +101,7 @@ fun UpdateDialog(
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
-                                    listOf(Color(0xFFFF3366), Color(0xFFFF9900))
+                                    listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
                                 )
                             ),
                         contentAlignment = Alignment.Center
@@ -131,7 +131,7 @@ fun UpdateDialog(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFFFF3366).copy(alpha = 0.25f))
+                                    .background(Color(0xFF0A6CFF).copy(alpha = 0.25f))
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
@@ -232,7 +232,7 @@ fun UpdateDialog(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        color = Color(0xFFFF3366),
+                        color = Color(0xFF0A6CFF),
                         trackColor = Color.White.copy(alpha = 0.1f),
                     )
                 }
@@ -365,7 +365,7 @@ fun UpdateDialog(
                             .clip(RoundedCornerShape(14.dp))
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(Color(0xFFFF3366), Color(0xFFFF7722))
+                                    listOf(Color(0xFF0A6CFF), Color(0xFF2F7BFF))
                                 )
                             )
                             .clickable(enabled = !isDownloading) {

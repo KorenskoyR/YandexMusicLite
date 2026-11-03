@@ -87,7 +87,6 @@ fun CatalogPageScreen(
         contentPadding = PaddingValues(bottom = contentBottom),
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1A1A2A), Color(0xFF131319), Color(0xFF111115))))
             .navigationBarsPadding()
     ) {
         item(key = "header") {
@@ -155,7 +154,7 @@ fun CatalogPageScreen(
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = actions.onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3366)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A6CFF)),
                         shape = RoundedCornerShape(16.dp)
                     ) { Text(stringResource(R.string.playlist_retry), color = Color.White) }
                 }
@@ -239,30 +238,6 @@ fun AlbumsRow(albums: List<AlbumDto>, onOpen: (AlbumDto) -> Unit, contentPadding
     }
 }
 
-/** A horizontal row of artists (round photos), used in search results. */
-@Composable
-fun ArtistsRow(
-    artists: List<com.korenskoy.yandexmusic.data.dto.ArtistDto>,
-    onOpen: (com.korenskoy.yandexmusic.data.dto.ArtistDto) -> Unit,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp)
-) {
-    LazyRow(contentPadding = contentPadding, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        items(artists, key = { it.idString!! }) { artist ->
-            Column(
-                modifier = Modifier
-                    .width(96.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onOpen(artist) },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Cover(artist.coverUri, Icons.Default.Person, CircleShape, 88.dp)
-                Spacer(Modifier.height(6.dp))
-                Text(artist.name.orEmpty(), color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
 @Composable
 private fun SectionTitle(text: String) {
     Text(
@@ -275,12 +250,12 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun Cover(uri: String?, placeholder: ImageVector, shape: Shape, size: Dp) {
+internal fun Cover(uri: String?, placeholder: ImageVector, shape: Shape, size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF3A2A4A), Color(0xFF22222C)))),
+            .background(Brush.linearGradient(listOf(Color(0xFF2A3346), Color(0xFF181B24)))),
         contentAlignment = Alignment.Center
     ) {
         Icon(placeholder, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(size / 3))
@@ -300,7 +275,7 @@ private fun PlayButton(icon: ImageVector, label: String, primary: Boolean, modif
             .height(42.dp)
             .clip(CircleShape)
             .background(
-                if (primary) Brush.linearGradient(listOf(Color(0xFFFF3366), Color(0xFFFF7722), Color(0xFFFF9900)))
+                if (primary) Brush.linearGradient(listOf(Color(0xFF3D8BFF), Color(0xFF0A6CFF), Color(0xFF0A55D6)))
                 else Brush.verticalGradient(listOf(Color(0x352A2A38), Color(0x201E1E28)))
             )
             .border(BorderStroke(1.dp, Color.White.copy(alpha = if (primary) 0.6f else 0.25f)), CircleShape)

@@ -163,13 +163,13 @@ fun TrackItem(
                 .shadow(
                     elevation = if (isLiked) 6.dp else 2.dp,
                     shape = CircleShape,
-                    spotColor = if (isLiked) Color(0xFFFF3366).copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.3f)
+                    spotColor = if (isLiked) Color(0xFF0A6CFF).copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.3f)
                 )
                 .clip(CircleShape)
                 .background(
                     if (isLiked) {
                         Brush.verticalGradient(
-                            listOf(Color(0x44FF3366), Color(0x22FF1144))
+                            listOf(Color(0x440A6CFF), Color(0x220A55D6))
                         )
                     } else {
                         Brush.verticalGradient(
@@ -182,7 +182,7 @@ fun TrackItem(
                         1.dp,
                         if (isLiked) {
                             Brush.verticalGradient(
-                                listOf(Color(0xFFFF3366), Color(0x66FF3366))
+                                listOf(Color(0xFF0A6CFF), Color(0x660A6CFF))
                             )
                         } else {
                             Brush.verticalGradient(
@@ -197,7 +197,7 @@ fun TrackItem(
         ) {
             Icon(
                 imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.45f),
+                tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.45f),
                 contentDescription = stringResource(R.string.cd_nravitsya),
                 modifier = Modifier.size(17.dp)
             )

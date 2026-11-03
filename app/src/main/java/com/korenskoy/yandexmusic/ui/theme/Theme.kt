@@ -11,15 +11,16 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+// Redesign 2.0: the single blue accent of the Hi-Fi language on a near-black ground
 private val DarkColorScheme = darkColorScheme(
-    primary = YandexYellow,
-    secondary = YandexYellow,
-    tertiary = YandexYellow,
-    background = DarkBackground,
+    primary = HiFiAccent,
+    secondary = HiFiAccent,
+    tertiary = HiFiAccent,
+    background = HiFiGround,
     surface = DarkSurface,
-    onPrimary = DarkBackground,
-    onSecondary = DarkBackground,
-    onTertiary = DarkBackground,
+    onPrimary = LightText,
+    onSecondary = LightText,
+    onTertiary = LightText,
     onBackground = LightText,
     onSurface = LightText,
 )

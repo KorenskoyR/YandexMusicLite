@@ -57,7 +57,7 @@ fun RadioCoverCard(
             .shadow(
                 elevation = 20.dp,
                 shape = RoundedCornerShape(24.dp),
-                spotColor = Color(0xFFFF3366).copy(alpha = 0.25f),
+                spotColor = Color(0xFF0A6CFF).copy(alpha = 0.25f),
                 ambientColor = Color.Black.copy(alpha = 0.5f)
             )
             .clip(RoundedCornerShape(24.dp))

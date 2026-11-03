@@ -155,7 +155,7 @@ fun AccountManagementDialog(
                                         .background(
                                             if (isActive) {
                                                 Brush.horizontalGradient(
-                                                    listOf(Color(0x33FF3366), Color(0x18FF9900))
+                                                    listOf(Color(0x330A6CFF), Color(0x18FF9900))
                                                 )
                                             } else {
                                                 Brush.horizontalGradient(
@@ -166,7 +166,7 @@ fun AccountManagementDialog(
                                         .border(
                                             BorderStroke(
                                                 1.dp,
-                                                if (isActive) Color(0x66FF3366) else Color.White.copy(alpha = 0.08f)
+                                                if (isActive) Color(0x660A6CFF) else Color.White.copy(alpha = 0.08f)
                                             ),
                                             RoundedCornerShape(16.dp)
                                         )
@@ -185,7 +185,7 @@ fun AccountManagementDialog(
                                             .background(
                                                 if (isActive) {
                                                     Brush.linearGradient(
-                                                        listOf(Color(0xFFFF3366), Color(0xFFFF9900))
+                                                        listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
                                                     )
                                                 } else {
                                                     Brush.linearGradient(

@@ -38,7 +38,10 @@ import com.korenskoy.yandexmusic.presentation.main.SearchScreen
 import com.korenskoy.yandexmusic.presentation.main.LibraryScreen
 import com.korenskoy.yandexmusic.presentation.main.OpenedPlaylist
 import com.korenskoy.yandexmusic.presentation.main.PlaylistScreen
-import com.korenskoy.yandexmusic.presentation.main.PlaylistsRow
+import com.korenskoy.yandexmusic.presentation.main.HomeScreen
+import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
+import com.korenskoy.yandexmusic.presentation.hifi.LocalArtworkTint
 import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
 import com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu
 import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
@@ -109,12 +112,20 @@ class ScreenshotTest {
         UserPlaylistDto(kind = JsonPrimitive(1004), title = "Спокойное", trackCount = 1, revision = 2)
     )
 
-    /** Renders [content] on the app's background, with infinite animations frozen. */
+    /** A fixed blue cover tint, so the living background is the same on every machine. */
+    private val tint = ArtworkTint(Color(0xFF3F6FC4), Color(0xFF1B2A6B))
+
+    /** Renders [content] on the app's living background, with infinite animations frozen. */
     private fun show(content: @Composable () -> Unit) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             YandexMusicTheme {
-                Box(Modifier.fillMaxSize().background(Color(0xFF111115))) { content() }
+                CompositionLocalProvider(LocalArtworkTint provides tint) {
+                    Box(Modifier.fillMaxSize()) {
+                        HiFiBackdrop(tint = tint)
+                        content()
+                    }
+                }
             }
         }
         // Frames in steps: an image loaded meanwhile is laid out and drawn (crossfade included)
@@ -168,9 +179,36 @@ class ScreenshotTest {
     }
 
     @Test
-    fun playlistsRowStartsWithNewPlaylist() {
-        show { PlaylistsRow(playlists = playlists, onOpen = {}, onCreate = {}, modifier = Modifier.padding(16.dp)) }
-        snap("playlists_row")
+    fun wavePlaying() {
+        show {
+            HomeScreen(
+                waveTrack = tracks[0], isPlaying = true, isLoading = false, isLiked = true, progress = { 70_000L },
+                upNext = tracks.drop(1), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+            )
+        }
+        snap("wave_playing")
+    }
+
+    @Test
+    fun wavePaused() {
+        show {
+            HomeScreen(
+                waveTrack = tracks[0], isPlaying = false, isLoading = false, isLiked = false, progress = { 70_000L },
+                upNext = tracks.drop(1), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+            )
+        }
+        snap("wave_paused")
+    }
+
+    @Test
+    fun waveIdle() {
+        show {
+            HomeScreen(
+                waveTrack = null, isPlaying = false, isLoading = false, isLiked = false, progress = { 0L },
+                upNext = emptyList(), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+            )
+        }
+        snap("wave_idle")
     }
 
     @Test
@@ -211,13 +249,26 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settingsSheet() {
+        show {
+            com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(
+                onDismiss = {}, cacheSizeBytes = 1_288_000_000L, autoDownloadEnabled = true,
+                onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
+                accountName = "Тестовый Аккаунт", hasPlus = true, crossfadeSeconds = 3,
+                steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 0
+            )
+        }
+        snapScreen("settings")
+    }
+
+    @Test
     @Config(qualifiers = "+land")
     fun settingsSheetLandscape() {
         show {
             com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(
                 onDismiss = {}, cacheSizeBytes = 134_000_000L, autoDownloadEnabled = true,
                 onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
-                crossfadeSeconds = 3,
+                accountName = "Тестовый Аккаунт", hasPlus = true, crossfadeSeconds = 3,
                 steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 2
             )
         }
@@ -229,8 +280,8 @@ class ScreenshotTest {
         show {
             Column(Modifier.padding(top = 24.dp)) {
                 MiniPlayer(
-                    track = tracks[0], isPlaying = true, isLiked = true, progress = 60_000,
-                    onPlayPauseClick = {}, onToggleLike = {}, onClick = {}, onDismiss = {}
+                    track = tracks[0], isPlaying = true, progress = { 60_000L },
+                    onPlayPauseClick = {}, onNextClick = {}, onClick = {}, onDismiss = {}
                 )
                 FloatingGlassBottomBar(currentRoute = "library", onNavigate = {})
             }
@@ -256,9 +307,9 @@ class ScreenshotTest {
         val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
         show {
             RadioScreen(
-                stations = stations, searchQuery = "", onQueryChange = {}, selectedCategory = RadioCategory.ALL,
+                stations = stations, allStations = stations, selectedCategory = RadioCategory.ALL,
                 onCategorySelect = {}, currentStationId = stations.first().id, isPlaying = true,
-                favoriteStationIds = setOf(stations[1].id), onStationClick = {}, onToggleFavorite = {}
+                favoriteStationIds = setOf(stations[1].id, stations[2].id), onStationClick = {}, onToggleFavorite = {}, onPlayPause = {}
             )
         }
         snap("radio")
@@ -321,6 +372,19 @@ class ScreenshotTest {
         snap("search_history")
     }
 
+    @Test
+    fun searchRecentPanelOpen() {
+        show {
+            SearchScreen(
+                query = "", onQueryChange = {}, results = emptyList(), weeklyHits = tracks, trendTracks = tracks,
+                isSearching = false, currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(),
+                onTrackClick = { _, _ -> }, onToggleLike = {}, history = listOf("кино", "ария", "radio record"),
+                initiallyShowHistory = true
+            )
+        }
+        snap("search_recent_open")
+    }
+
     private val catalogActions = CatalogActions({}, {}, { _, _ -> }, { _, _ -> }, { _, _, _ -> }, {})
 
     @Test
@@ -360,7 +424,8 @@ class ScreenshotTest {
     private fun car(isLandscape: Boolean, steeringWheelOnLeft: Boolean = true) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
         currentTrack = tracks[0], isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
         onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
-        onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = steeringWheelOnLeft, progress = 60_000, durationMs = 215_000
+        onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = steeringWheelOnLeft, progress = { 82_000L }, durationMs = 286_000,
+        nextTrack = tracks[2], source = com.korenskoy.yandexmusic.data.player.PlaylistSource.VIBE
     ) }
 
     private companion object {

@@ -79,7 +79,10 @@ class ScreenInsetsInstrumentedTest {
 
     @Test
     fun home() {
-        show { HomeScreen(isPlaying = false, isWavePlaying = false, onPlayPauseVibe = {}) }
+        show { HomeScreen(
+                waveTrack = null, isPlaying = false, isLoading = false, isLiked = false, progress = { 0L },
+                upNext = emptyList(), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+            ) }
         assertBelowStatusBar("Home")
     }
 
@@ -99,7 +102,7 @@ class ScreenInsetsInstrumentedTest {
     fun library() {
         show {
             LibraryScreen(
-                tracks = tracks, isLoading = false, isDownloadingAll = false, autoDownloadEnabled = false,
+                tracks = tracks, isLoading = false, autoDownloadEnabled = false,
                 currentTrackId = null, isPlaying = false, likedTrackIds = setOf("1", "2"), downloadedTrackIds = emptySet(),
                 cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
                 onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {}
@@ -113,9 +116,9 @@ class ScreenInsetsInstrumentedTest {
         val stations = RadioRepository(compose.activity.applicationContext).getBuiltinStations()
         show {
             RadioScreen(
-                stations = stations, searchQuery = "", onQueryChange = {}, selectedCategory = RadioCategory.ALL,
+                stations = stations, allStations = stations, selectedCategory = RadioCategory.ALL,
                 onCategorySelect = {}, currentStationId = null, isPlaying = false, favoriteStationIds = emptySet(),
-                onStationClick = {}, onToggleFavorite = {}
+                onStationClick = {}, onToggleFavorite = {}, onPlayPause = {}
             )
         }
         assertBelowStatusBar("Radio")
@@ -127,7 +130,7 @@ class ScreenInsetsInstrumentedTest {
             CarScreen(
                 currentTrack = tracks[0], isPlaying = true, likedTrackIds = emptySet(), onPlayPauseClick = {}, onNextClick = {},
                 onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
-                onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, progress = 60_000, durationMs = 215_000
+                onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, progress = { 60_000L }, durationMs = 215_000
             )
         }
         assertBelowStatusBar("Car")

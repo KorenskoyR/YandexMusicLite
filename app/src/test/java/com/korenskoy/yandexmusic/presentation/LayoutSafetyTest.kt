@@ -175,8 +175,8 @@ class LayoutSafetyTest {
             splashScreen.contains("R.string.splash_yandex_music_lite") && stringsXml.contains(">YANDEX MUSIC LITE<"))
 
         val searchScreen = File(sourceDir, "presentation/main/SearchScreen.kt").readText()
-        assertTrue("SearchScreen must display Каталог Yandex Music Lite",
-            searchScreen.contains("R.string.search_katalog_yandex_music_lite") && stringsXml.contains(">Каталог Yandex Music Lite<"))
+        assertTrue("SearchScreen must show its large title (Hi-Fi redesign dropped the catalog subtitle)",
+            searchScreen.contains("HiFiLargeTitle(stringResource(R.string.search_title)"))
 
         val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
         assertTrue("MusicService notification channel must be Yandex Music Lite",
@@ -383,10 +383,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 35",
-            buildGradle.contains("versionCode = 35"))
-        assertTrue("build.gradle.kts must be versionName 1.7.5",
-            buildGradle.contains("versionName = \"1.7.5\""))
+        assertTrue("build.gradle.kts must be versionCode 36",
+            buildGradle.contains("versionCode = 36"))
+        assertTrue("build.gradle.kts must be versionName 1.8.0",
+            buildGradle.contains("versionName = \"1.8.0\""))
     }
 
     @Test

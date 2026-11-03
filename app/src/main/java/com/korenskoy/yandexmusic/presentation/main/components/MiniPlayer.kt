@@ -1,9 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
-import com.korenskoy.yandexmusic.R
-import androidx.compose.ui.res.stringResource
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,113 +12,89 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import coil3.request.crossfade
-import com.korenskoy.yandexmusic.utils.browserUserAgent
-import coil3.compose.SubcomposeAsyncImage
-import coil3.request.ImageRequest
-import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.R
+import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiKnob
+import com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph
+import com.korenskoy.yandexmusic.utils.browserUserAgent
+import com.korenskoy.yandexmusic.utils.toCoverUrl
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.platform.LocalDensity
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 
+private val MiniShape = RoundedCornerShape(31.dp)
+
+/**
+ * The floating mini-player: a glass capsule above the tab bar with the cover, the track, a metal
+ * play/pause knob and "next". Swipe sideways to dismiss. [progress] is read only while drawing the
+ * hairline at the bottom, so the capsule itself is not recomposed on every progress tick.
+ */
 @Composable
 fun MiniPlayer(
     track: TrackDetailsDto,
     isPlaying: Boolean,
-    isLiked: Boolean,
-    progress: Long,
+    progress: () -> Long,
     onPlayPauseClick: () -> Unit,
-    onToggleLike: () -> Unit,
+    onNextClick: () -> Unit,
     onClick: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    coverModifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
     val density = LocalDensity.current
-
-    LaunchedEffect(track.idString) {
-        offsetX.snapTo(0f)
-    }
+    LaunchedEffect(track.idString) { offsetX.snapTo(0f) }
+    val durationMs = (track.durationMs ?: 0L).coerceAtLeast(0L)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
+            .height(62.dp)
             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-            .graphicsLayer { 
-                alpha = 1f - (abs(offsetX.value) / (300f * density.density)).coerceIn(0f, 0.8f) 
-            }
-            .shadow(
-                elevation = 20.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = Color(0x99000000),
-                ambientColor = Color(0x55000000)
-            )
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        Color(0xE6242432),
-                        Color(0xD9181824),
-                        Color(0xE6242432)
-                    )
-                )
-            )
-            .border(
-                BorderStroke(
-                    width = 1.2.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color(0x4DFFFFFF),
-                            Color(0x15FFFFFF),
-                            Color(0x33FFFFFF)
-                        )
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .clickable(onClick = onClick)
+            .graphicsLayer { alpha = 1f - (abs(offsetX.value) / (300f * density.density)).coerceIn(0f, 0.8f) }
+            .shadow(elevation = 18.dp, shape = MiniShape, spotColor = Color(0x99000000), ambientColor = Color(0x55000000))
+            .clip(MiniShape)
+            .background(HiFi.BarFill)
+            .border(1.dp, Color.White.copy(alpha = 0.12f), MiniShape)
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.cd_razvernut_pleer), onClick = onClick)
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
@@ -127,7 +104,7 @@ fun MiniPlayer(
                                 onDismiss()
                             }
                         } else {
-                            scope.launch { offsetX.animateTo(0f, spring()) }
+                            scope.launch { offsetX.animateTo(0f) }
                         }
                     },
                     onHorizontalDrag = { change, dragAmount ->
@@ -136,159 +113,94 @@ fun MiniPlayer(
                     }
                 )
             }
+            .drawBehind {
+                // Progress hairline along the bottom edge
+                if (durationMs > 0 && !track.isRadio) {
+                    val fraction = (progress().toFloat() / durationMs).coerceIn(0f, 1f)
+                    val inset = 24.dp.toPx()
+                    val y = size.height - 1.dp.toPx()
+                    val w = size.width - inset * 2
+                    drawLine(Color.White.copy(alpha = 0.12f), Offset(inset, y), Offset(inset + w, y), 2.dp.toPx())
+                    if (fraction > 0f) drawLine(Color.White.copy(alpha = 0.9f), Offset(inset, y), Offset(inset + w * fraction, y), 2.dp.toPx())
+                }
+            }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp),
+                .padding(start = 9.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val context = LocalContext.current
-            val coverUrl = track.coverUri.toCoverUrl("100x100") ?: ""
-
             Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (track.isRadio) Color(0xFF282836) else MaterialTheme.colorScheme.surface),
+                modifier = coverModifier
+                    .size(44.dp)
+                    .shadow(6.dp, RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (track.isRadio) Color.White else Color(0xFF1C1F28)),
                 contentAlignment = Alignment.Center
             ) {
-                SubcomposeAsyncImage(
+                AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(coverUrl)
+                        .data(track.coverUri.toCoverUrl("200x200"))
                         .crossfade(true)
-                        .apply {
-                            if (track.isRadio) {
-                                browserUserAgent()
-                            }
-                        }
+                        .apply { if (track.isRadio) browserUserAgent() }
                         .build(),
                     contentDescription = stringResource(R.string.cd_oblozhka),
                     contentScale = if (track.isRadio) ContentScale.Fit else ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(if (track.isRadio) 3.dp else 0.dp)
+                        .padding(if (track.isRadio) 4.dp else 0.dp)
                 )
             }
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = track.title ?: "Без названия",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = track.artists.joinToString { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (track.isRadio) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(HiFi.Live))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.mini_player_live), color = HiFi.TextSecondary, fontSize = 13.sp, maxLines = 1)
+                    }
+                } else {
+                    Text(
+                        text = track.artists.joinToString { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
+                        color = HiFi.TextSecondary,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-
+            Spacer(Modifier.width(8.dp))
+            HiFiKnob(
+                onClick = onPlayPauseClick,
+                contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),
+                size = 44.dp
+            ) {
+                PlayPauseGlyph(isPlaying = isPlaying, size = 22.dp)
+            }
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .shadow(
-                        elevation = if (isLiked) 8.dp else 4.dp,
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        spotColor = if (isLiked) Color(0xFFFF3366).copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.4f)
-                    )
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(
-                        if (isLiked) {
-                            Brush.verticalGradient(listOf(Color(0x44FF3366), Color(0x22FF1144)))
-                        } else {
-                            Brush.verticalGradient(listOf(Color(0x352A2A38), Color(0x201E1E28)))
-                        }
-                    )
-                    .border(
-                        BorderStroke(
-                            1.dp,
-                            if (isLiked) {
-                                Brush.verticalGradient(listOf(Color(0xFFFF3366), Color(0x66FF3366)))
-                            } else {
-                                Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x10FFFFFF)))
-                            }
-                        ),
-                        androidx.compose.foundation.shape.CircleShape
-                    )
-                    .clickable { onToggleLike() },
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .clickable(role = Role.Button, onClick = onNextClick),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = stringResource(R.string.cd_nravitsya),
-                    tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.65f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .shadow(
-                        elevation = if (isPlaying) 12.dp else 4.dp,
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        spotColor = Color(0xFFFF3366).copy(alpha = if (isPlaying) 0.7f else 0.3f)
-                    )
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0xFFFF3366), Color(0xFFFF7722), Color(0xFFFF9900))
-                        )
-                    )
-                    .border(
-                        BorderStroke(
-                            1.2.dp,
-                            Brush.verticalGradient(
-                                listOf(Color.White.copy(alpha = 0.85f), Color.White.copy(alpha = 0.25f))
-                            )
-                        ),
-                        androidx.compose.foundation.shape.CircleShape
-                    )
-                    .clickable { onPlayPauseClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),
+                    Icons.Rounded.SkipNext,
+                    contentDescription = stringResource(if (track.isRadio) R.string.cd_next_station else R.string.cd_sleduyuschiy_trek),
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
-
-        // Progress bar at bottom
-        val durationMs = track.durationMs ?: 1L
-        val targetProgressFraction = if (durationMs > 0 && progress > 0L) {
-            (progress.toFloat() / durationMs).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-        
-        val progressFraction by androidx.compose.animation.core.animateFloatAsState(
-            targetValue = targetProgressFraction,
-            animationSpec = if (targetProgressFraction == 0f) {
-                androidx.compose.animation.core.tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-            } else {
-                androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.LinearEasing)
-            },
-            label = "mini_progress"
-        )
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(progressFraction)
-                .height(2.dp)
-                .background(MaterialTheme.colorScheme.primary)
-                .align(Alignment.BottomStart)
-        )
     }
 }

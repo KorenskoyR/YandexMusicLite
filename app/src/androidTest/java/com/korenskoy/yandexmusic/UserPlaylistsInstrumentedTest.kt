@@ -112,10 +112,11 @@ class UserPlaylistsInstrumentedTest {
             // seeded cache is read (the same path as switching accounts in the app)
             val model = vm!!
             instrumentation.runOnMainSync { model.switchAccount(model.activeAccount.value!!.uid) }
-            assertTrue("main screen", hasDesc("Моя Музыка", 15_000))
-            device.findObject(By.desc("Моя Музыка")).click()
+            assertTrue("main screen", hasDesc("Музыка", 15_000))
+            device.findObject(By.desc("Музыка")).click()
 
             assertTrue("playlists row", hasText("Плейлисты", 10_000))
+            device.findObject(By.text("Плейлисты")).click()
             assertTrue("playlist card", hasText("Тестовый плейлист", 2_000))
             device.executeShellCommand("screencap -p /data/local/tmp/library_playlists.png")
             device.findObject(By.text("Тестовый плейлист")).click()
@@ -158,9 +159,11 @@ class UserPlaylistsInstrumentedTest {
             scenario.onActivity { vm = ViewModelProvider(it)[AccountViewModel::class.java] }
             val model = vm!!
             instrumentation.runOnMainSync { model.switchAccount(model.activeAccount.value!!.uid) }
-            assertTrue("main screen", hasDesc("Моя Музыка", 15_000))
-            device.findObject(By.desc("Моя Музыка")).click()
+            assertTrue("main screen", hasDesc("Музыка", 15_000))
+            device.findObject(By.desc("Музыка")).click()
 
+            assertTrue("playlists row", hasText("Плейлисты", 10_000))
+            device.findObject(By.text("Плейлисты")).click()
             assertTrue("new playlist card", hasText("Новый плейлист", 10_000))
             device.executeShellCommand("screencap -p /data/local/tmp/library_new_playlist.png")
             device.findObject(By.text("Тестовый плейлист")).click()

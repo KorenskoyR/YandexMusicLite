@@ -1,54 +1,118 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
-import com.korenskoy.yandexmusic.R
-import androidx.compose.ui.res.stringResource
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
+import android.view.HapticFeedbackConstants
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.request.crossfade
-import com.korenskoy.yandexmusic.utils.browserUserAgent
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
+import coil3.request.crossfade
+import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.domain.model.RadioCategory
 import com.korenskoy.yandexmusic.domain.model.RadioStation
+import com.korenskoy.yandexmusic.presentation.hifi.GlassCircleButton
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiFilterPill
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiKnob
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiLargeTitle
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiSectionHeader
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
+import com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph
+import com.korenskoy.yandexmusic.presentation.hifi.hifiGrain
+import com.korenskoy.yandexmusic.presentation.hifi.hifiRecessed
+import com.korenskoy.yandexmusic.utils.browserUserAgent
+import com.korenskoy.yandexmusic.utils.russianQuantityString
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** The FM scale of the dial; pure so the station picking is unit-tested. */
+object RadioDial {
+    const val MIN_MHZ = 88f
+    const val MAX_MHZ = 108f
+
+    /** "106.2 FM", "106,2" → 106.2; null for online-only stations. */
+    fun parseMhz(frequency: String): Float? =
+        Regex("""(\d{2,3})[.,](\d)""").find(frequency)?.let { "${it.groupValues[1]}.${it.groupValues[2]}".toFloatOrNull() }
+            ?.takeIf { it in MIN_MHZ..MAX_MHZ }
+
+    fun fraction(mhz: Float): Float = ((mhz - MIN_MHZ) / (MAX_MHZ - MIN_MHZ)).coerceIn(0f, 1f)
+
+    /** The tuned station: the one closest to [fraction] on the scale. */
+    fun nearest(stations: List<RadioStation>, fraction: Float): RadioStation? =
+        stations.mapNotNull { s -> parseMhz(s.frequency)?.let { s to fraction(it) } }
+            .minByOrNull { (_, f) -> abs(f - fraction) }?.first
+}
+
+/**
+ * FM radio as a real receiver: the station on air on a card in its brand colors with a metal knob and
+ * a tuning window (88–108 MHz) — swipe the window to tune to a neighbouring station, each station
+ * ticks under the finger. Genres, favourite tiles and a compact list of all stations below.
+ */
 @Composable
 fun RadioScreen(
     stations: List<RadioStation>,
-    searchQuery: String,
-    onQueryChange: (String) -> Unit,
+    allStations: List<RadioStation>,
     selectedCategory: RadioCategory,
     onCategorySelect: (RadioCategory) -> Unit,
     currentStationId: String?,
@@ -56,425 +120,296 @@ fun RadioScreen(
     favoriteStationIds: Set<String>,
     onStationClick: (RadioStation) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onPlayPause: () -> Unit,
     modifier: Modifier = Modifier,
     hasActiveTrack: Boolean = false
 ) {
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val contentStart = if (isLandscape) 140.dp else 16.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
+    val current = allStations.firstOrNull { it.id == currentStationId }
+    val hero = current ?: allStations.firstOrNull { it.id in favoriteStationIds } ?: allStations.firstOrNull()
+    val favorites = remember(allStations, favoriteStationIds) { allStations.filter { it.id in favoriteStationIds } }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF261A10),
-                        Color(0xFF1B1410),
-                        Color(0xFF101014)
-                    )
-                )
-            )
-            .statusBarsPadding()
-            .padding(top = 8.dp)
-    ) {
-        // Hero Header Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = contentStart, end = 16.dp, top = 8.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFFFF9900), Color(0xFFFF5500))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Radio,
-                    contentDescription = stringResource(R.string.cd_fm_radio),
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column {
+    LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(bottom = contentBottom)) {
+        item(key = "header") {
+            Column(Modifier.padding(start = contentStart + 4.dp, end = 20.dp, top = 14.dp)) {
+                HiFiLargeTitle(stringResource(R.string.radio_title))
                 Text(
-                    text = stringResource(R.string.cd_fm_radio),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp
-                )
-                Text(
-                    text = com.korenskoy.yandexmusic.utils.russianQuantityString(stations.size, R.string.stations_count_one, R.string.stations_count_few, R.string.stations_count_many),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 14.sp
+                    russianQuantityString(allStations.size, R.string.stations_count_one, R.string.stations_count_few, R.string.stations_count_many),
+                    style = HiFiType.Caption.copy(fontSize = 15.sp)
                 )
             }
         }
-
-        // Search Bar
-        TextField(
-            value = searchQuery,
-            onValueChange = onQueryChange,
-            placeholder = { Text(stringResource(R.string.radio_poisk_radiostantsiy_ili_zhanra), color = Color.Gray) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFF1E1E24),
-                unfocusedContainerColor = Color(0xFF1E1E24),
-                disabledContainerColor = Color(0xFF1E1E24),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = contentStart, end = 16.dp, top = 8.dp, bottom = 8.dp)
-        )
-
-        // Categories
-        LazyRow(
-            contentPadding = PaddingValues(start = contentStart, end = 16.dp, top = 8.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(RadioCategory.entries.toTypedArray()) { category ->
-                val isSelected = category == selectedCategory
-                Box(
+        if (hero != null) {
+            item(key = "hero") {
+                OnAirCard(
+                    station = hero,
+                    allStations = allStations,
+                    live = current != null && isPlaying,
+                    isFavorite = hero.id in favoriteStationIds,
+                    onKnob = { if (current?.id == hero.id) onPlayPause() else onStationClick(hero) },
+                    onToggleFavorite = { onToggleFavorite(hero.id) },
+                    onTune = onStationClick,
                     modifier = Modifier
-                        .shadow(
-                            elevation = if (isSelected) 10.dp else 4.dp,
-                            shape = RoundedCornerShape(16.dp),
-                            spotColor = if (isSelected) Color(0xFFFF9900).copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.3f)
-                        )
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (isSelected) {
-                                Brush.linearGradient(
-                                    listOf(Color(0xFFFF9900), Color(0xFFFF7700), Color(0xFFFF5500))
-                                )
-                            } else {
-                                Brush.verticalGradient(
-                                    listOf(Color(0x352A2A38), Color(0x201E1E28))
-                                )
-                            }
-                        )
-                        .border(
-                            BorderStroke(
-                                1.dp,
-                                if (isSelected) {
-                                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.8f), Color.White.copy(alpha = 0.2f)))
-                                } else {
-                                    Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x10FFFFFF)))
-                                }
-                            ),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .clickable { onCategorySelect(category) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (category == RadioCategory.FAVORITES) {
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = null,
-                                tint = if (isSelected) Color.White else Color(0xFFFF3366),
-                                modifier = Modifier.size(16.dp).padding(end = 4.dp)
-                            )
+                        .padding(start = contentStart, end = 16.dp, top = 16.dp)
+                        .widthIn(max = 720.dp)
+                )
+            }
+        }
+        item(key = "genres") {
+            LazyRow(contentPadding = PaddingValues(start = contentStart, end = 16.dp, top = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(RadioCategory.entries, key = { it.name }) { category ->
+                    HiFiFilterPill(
+                        text = category.title,
+                        selected = category == selectedCategory,
+                        onClick = { onCategorySelect(category) },
+                        icon = if (category == RadioCategory.FAVORITES) Icons.Rounded.Favorite else null
+                    )
+                }
+            }
+        }
+        if (favorites.isNotEmpty() && selectedCategory == RadioCategory.ALL) {
+            item(key = "fav_title") {
+                HiFiSectionHeader(stringResource(R.string.radio_favorites), Modifier.padding(start = contentStart + 4.dp, end = 20.dp, top = 22.dp, bottom = 12.dp))
+            }
+            item(key = "favorites") {
+                LazyRow(contentPadding = PaddingValues(start = contentStart, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(favorites, key = { "fav_" + it.id }) { station ->
+                        Column(
+                            Modifier.width(80.dp).clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button) { onStationClick(station) },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            StationLogo(station, 76.dp, 20.dp, Modifier.shadow(12.dp, RoundedCornerShape(20.dp)))
+                            Spacer(Modifier.height(7.dp))
+                            Text(station.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        Text(
-                            text = category.title,
-                            color = Color.White,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
                     }
                 }
             }
         }
+        item(key = "all_title") {
+            HiFiSectionHeader(stringResource(R.string.radio_all_stations), Modifier.padding(start = contentStart + 4.dp, end = 20.dp, top = 22.dp, bottom = 4.dp))
+        }
+        items(stations, key = { it.id }, contentType = { "station" }) { station ->
+            StationRow(
+                station = station,
+                isCurrent = station.id == currentStationId,
+                isPlaying = isPlaying && station.id == currentStationId,
+                isFavorite = station.id in favoriteStationIds,
+                onClick = { onStationClick(station) },
+                onToggleFavorite = { onToggleFavorite(station.id) },
+                modifier = Modifier.padding(start = contentStart + 4.dp, end = 12.dp)
+            )
+        }
+    }
+}
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Stations Grid
-        if (stations.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selectedCategory == RadioCategory.FAVORITES) {
-                    Text(
-                        text = "В избранном пока нет станций.\nНажмите на сердечко на карточке станции, чтобы добавить её сюда.",
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(32.dp)
-                    )
-                } else {
-                    Text(
-                        text = "Станции не найдены.\nПопробуйте изменить запрос или категорию.",
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(32.dp)
-                    )
+@Composable
+private fun OnAirCard(
+    station: RadioStation,
+    allStations: List<RadioStation>,
+    live: Boolean,
+    isFavorite: Boolean,
+    onKnob: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onTune: (RadioStation) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val start by animateColorAsState(Color(station.brandColorStart), HiFiMotion.tint(), label = "radio_card_start")
+    val end by animateColorAsState(Color(station.brandColorEnd), HiFiMotion.tint(), label = "radio_card_end")
+    val shape = RoundedCornerShape(28.dp)
+    Column(
+        modifier
+            .fillMaxWidth()
+            .shadow(26.dp, shape, spotColor = start)
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(start, end, Color(0xFF0A0D18))))
+            .hifiGrain(enabled = !LocalHiFiLite.current, alpha = 0.5f)
+            .drawBehind { drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), endY = 2.dp.toPx())) }
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (live) {
+                Row(
+                    Modifier
+                        .height(26.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(horizontal = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(HiFi.Live))
+                    Spacer(Modifier.width(7.dp))
+                    Text(stringResource(R.string.radio_on_air), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
                 }
             }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 145.dp),
-                contentPadding = PaddingValues(start = contentStart, end = 16.dp, top = 8.dp, bottom = contentBottom),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-            ) {
-                items(stations, key = { it.id }) { station ->
-                    val isStationPlaying = isPlaying && currentStationId == station.id
-                    val isFavorite = favoriteStationIds.contains(station.id)
-                    RadioStationCard(
-                        station = station,
-                        isPlaying = isStationPlaying,
-                        isFavorite = isFavorite,
-                        onClick = { onStationClick(station) },
-                        onToggleFavorite = { onToggleFavorite(station.id) }
-                    )
+            Spacer(Modifier.weight(1f))
+            GlassCircleButton(onClick = onToggleFavorite, contentDescription = stringResource(R.string.cd_v_izbrannoe)) {
+                Icon(if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StationLogo(station, 76.dp, 18.dp, Modifier.shadow(12.dp, RoundedCornerShape(18.dp)), plainBackground = true)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(station.name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stationSubtitle(station), color = Color.White.copy(alpha = 0.78f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(10.dp))
+            HiFiKnob(onClick = onKnob, contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza), size = 60.dp) {
+                PlayPauseGlyph(isPlaying = live, size = 26.dp)
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        TuningWindow(selected = station, stations = allStations, onTune = onTune)
+    }
+}
+
+private fun stationSubtitle(station: RadioStation): String =
+    listOfNotNull(station.category.title, RadioDial.parseMhz(station.frequency)?.let { "$it FM" }).joinToString(" · ")
+
+/**
+ * The receiver window: the FM scale with the favourite-station marks and a lit needle. Dragging moves the
+ * needle under the finger with a haptic tick on every station; letting go tunes to the nearest one.
+ */
+@Composable
+private fun TuningWindow(selected: RadioStation, stations: List<RadioStation>, onTune: (RadioStation) -> Unit) {
+    val view = LocalView.current
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val marks = remember(stations) { stations.mapNotNull { RadioDial.parseMhz(it.frequency)?.let(RadioDial::fraction) } }
+    val selectedFraction = RadioDial.parseMhz(selected.frequency)?.let(RadioDial::fraction) ?: 0.5f
+    val needle = remember { Animatable(selectedFraction) }
+    var dragging by remember { mutableStateOf(false) }
+    var lastTick by remember { mutableStateOf<RadioStation?>(null) }
+    LaunchedEffect(selectedFraction) { if (!dragging) needle.animateTo(selectedFraction, HiFiMotion.spring()) }
+
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(86.dp)
+            .hifiRecessed(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        val widthPx = with(density) { maxWidth.toPx() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(stations) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragging = true },
+                        onDragEnd = {
+                            dragging = false
+                            val station = RadioDial.nearest(stations, needle.value)
+                            if (station != null && station.id != selected.id) onTune(station)
+                            else scope.launch { needle.animateTo(selectedFraction, HiFiMotion.spring()) }
+                        },
+                        onDragCancel = {
+                            dragging = false
+                            scope.launch { needle.animateTo(selectedFraction, HiFiMotion.spring()) }
+                        }
+                    ) { change, delta ->
+                        change.consume()
+                        val next = (needle.value + delta / widthPx).coerceIn(0f, 1f)
+                        scope.launch { needle.snapTo(next) }
+                        val near = RadioDial.nearest(stations, next)
+                        val nearFraction = near?.let { RadioDial.parseMhz(it.frequency)?.let(RadioDial::fraction) }
+                        if (near != null && near != lastTick && nearFraction != null && abs(nearFraction - next) < 0.012f) {
+                            lastTick = near
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        }
+                    }
                 }
+                .drawBehind {
+                    val scaleTop = 12.dp.toPx()
+                    val minorStep = size.width / 40f
+                    var i = 0
+                    while (i <= 40) {
+                        val x = i * minorStep
+                        val major = i % 8 == 0
+                        val h = if (major) 20.dp.toPx() else 12.dp.toPx()
+                        drawLine(Color.White.copy(alpha = if (major) 0.75f else 0.32f), Offset(x, scaleTop + (20.dp.toPx() - h)), Offset(x, scaleTop + 20.dp.toPx()), if (major) 1.5.dp.toPx() else 1f)
+                        i++
+                    }
+                    marks.forEach { f -> drawCircle(Color.White.copy(alpha = 0.55f), 2.dp.toPx(), Offset(f * size.width, 3.dp.toPx())) }
+                    val nx = needle.value * size.width
+                    drawLine(HiFi.Accent.copy(alpha = 0.35f), Offset(nx, 0f), Offset(nx, scaleTop + 22.dp.toPx()), 6.dp.toPx())
+                    drawLine(HiFi.Accent, Offset(nx, 0f), Offset(nx, scaleTop + 22.dp.toPx()), 2.dp.toPx())
+                }
+        )
+        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).offset { IntOffset(0, 0) }, horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf("88", "92", "96", "100", "104", "108").forEach {
+                Text(it, color = Color.White.copy(alpha = 0.70f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
 
 @Composable
-fun RadioStationCard(
+private fun StationRow(
     station: RadioStation,
+    isCurrent: Boolean,
     isPlaying: Boolean,
     isFavorite: Boolean,
     onClick: () -> Unit,
-    onToggleFavorite: () -> Unit
+    onToggleFavorite: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val gradientBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color(station.brandColorStart).copy(alpha = 0.5f),
-            Color(station.brandColorEnd).copy(alpha = 0.25f),
-            Color(0xFF0F0F14)
-        )
-    )
-
-    Box(
-        modifier = Modifier
+    Row(
+        modifier
             .fillMaxWidth()
-            .height(180.dp)
-            .shadow(
-                elevation = if (isPlaying) 16.dp else 8.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = if (isPlaying) Color(0xFFFF9900).copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.5f)
-            )
-            .clip(RoundedCornerShape(20.dp))
-            .background(gradientBrush)
-            .border(
-                BorderStroke(
-                    if (isPlaying) 1.5.dp else 1.dp,
-                    if (isPlaying) Color(0xFFFF9900) else Color.White.copy(alpha = 0.08f)
-                ),
-                RoundedCornerShape(20.dp)
-            )
-            .clickable { onClick() }
+            .heightIn(min = 66.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Center: High-Res Original Station Logo with Ambient Glow
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 10.dp, bottom = 48.dp, start = 12.dp, end = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Ambient Brand Glow behind Logo
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(station.brandColorStart).copy(alpha = 0.5f),
-                                Color(station.brandColorEnd).copy(alpha = 0.25f),
-                                Color.Transparent
-                            )
-                        ),
-                        CircleShape
-                    )
-            )
-
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(station.iconRes ?: station.logoUrl)
-                    .crossfade(true)
-                    .browserUserAgent()
-                    .build(),
-                contentDescription = station.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .size(90.dp)
-                    .shadow(12.dp, RoundedCornerShape(16.dp), spotColor = Color.Black.copy(alpha = 0.45f))
-                    .clip(RoundedCornerShape(16.dp)),
-                alpha = 1.0f,
-                error = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = station.name.take(1).uppercase(),
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp
-                        )
-                    }
-                }
-            )
+        StationLogo(station, 48.dp, 12.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(station.name, color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.95f), fontSize = 16.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stationSubtitle(station), style = HiFiType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-
-        // Top Right: Favorite Button (Frosted Glass Capsule)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .size(34.dp)
-                .shadow(
-                    elevation = if (isFavorite) 8.dp else 4.dp,
-                    shape = CircleShape,
-                    spotColor = if (isFavorite) Color(0xFFFF3366).copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.4f)
-                )
-                .clip(CircleShape)
-                .background(
-                    if (isFavorite) {
-                        Brush.verticalGradient(listOf(Color(0x55FF3366), Color(0x33FF1144)))
-                    } else {
-                        Brush.verticalGradient(listOf(Color(0x501A1A24), Color(0x3012121A)))
-                    }
-                )
-                .border(
-                    BorderStroke(
-                        1.dp,
-                        if (isFavorite) {
-                            Brush.verticalGradient(listOf(Color(0xFFFF3366), Color(0x66FF3366)))
-                        } else {
-                            Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x15FFFFFF)))
-                        }
-                    ),
-                    CircleShape
-                )
-                .clickable { onToggleFavorite() },
-            contentAlignment = Alignment.Center
-        ) {
+        if (isPlaying) {
+            Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = HiFi.Accent, modifier = Modifier.size(20.dp))
+        }
+        Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onToggleFavorite), contentAlignment = Alignment.Center) {
             Icon(
-                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = stringResource(R.string.cd_v_izbrannoe),
-                tint = if (isFavorite) Color(0xFFFF3366) else Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.size(18.dp)
+                tint = if (isFavorite) HiFi.Accent else Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.size(20.dp)
             )
-        }
-
-        // Bottom Bar: Title & Category Scrim
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.75f),
-                            Color.Black.copy(alpha = 0.95f)
-                        )
-                    )
-                )
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = station.name,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.5.sp,
-                            color = Color.White
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = station.category.title,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 11.5.sp,
-                            color = Color.White.copy(alpha = 0.65f)
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (isPlaying) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    NeonEqualizer()
-                }
-            }
         }
     }
 }
 
+/** Station logo on its brand colors (or plain white, as on the on-air card). */
 @Composable
-fun NeonEqualizer() {
-    val infiniteTransition = rememberInfiniteTransition()
-    
-    val height1 by infiniteTransition.animateFloat(
-        initialValue = 4f,
-        targetValue = 16f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(400, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-    val height2 by infiniteTransition.animateFloat(
-        initialValue = 8f,
-        targetValue = 20f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-    val height3 by infiniteTransition.animateFloat(
-        initialValue = 12f,
-        targetValue = 6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-
-    Row(
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier.height(20.dp)
+private fun StationLogo(station: RadioStation, size: Dp, corner: Dp, modifier: Modifier = Modifier, plainBackground: Boolean = false) {
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(corner)
+    Box(
+        modifier
+            .size(size)
+            .clip(shape)
+            .background(
+                if (plainBackground) Brush.linearGradient(listOf(Color.White, Color(0xFFE9ECF2)))
+                else Brush.linearGradient(listOf(Color(station.brandColorStart), Color(station.brandColorEnd)))
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.width(3.dp).height(height1.dp).clip(CircleShape).background(Color(0xFFFF9900)))
-        Box(modifier = Modifier.width(3.dp).height(height2.dp).clip(CircleShape).background(Color(0xFFFF9900)))
-        Box(modifier = Modifier.width(3.dp).height(height3.dp).clip(CircleShape).background(Color(0xFFFF9900)))
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(station.iconRes ?: station.logoUrl)
+                .crossfade(true)
+                .browserUserAgent()
+                .build(),
+            contentDescription = station.name,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize().padding(size * 0.14f)
+        )
     }
 }

@@ -44,7 +44,7 @@ fun QualityDetailsDialog(details: PlaybackController.QualityDetails, onDismiss: 
         containerColor = Color(0xFF1E1E26),
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.quality_details_ok), color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.quality_details_ok), color = Color(0xFF0A6CFF), fontWeight = FontWeight.Bold)
             }
         }
     )

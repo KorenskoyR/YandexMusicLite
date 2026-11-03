@@ -44,10 +44,10 @@ fun CrashLogDialog(reports: List<CrashLog.Report>, onSend: () -> Unit, onClear: 
         confirmButton = {
             if (reports.isNotEmpty()) {
                 TextButton(onClick = { onSend(); onDismiss() }) {
-                    Text(stringResource(R.string.crash_log_send), color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.crash_log_send), color = Color(0xFF0A6CFF), fontWeight = FontWeight.Bold)
                 }
             } else {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.crash_log_close), color = Color(0xFFFF3366)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.crash_log_close), color = Color(0xFF0A6CFF)) }
             }
         },
         dismissButton = {

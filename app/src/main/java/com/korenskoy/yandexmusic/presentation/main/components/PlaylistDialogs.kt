@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.korenskoy.yandexmusic.R
 
 private val DialogBackground = Color(0xFF1E1E26)
-private val Accent = Color(0xFFFF3366)
+private val Accent = Color(0xFF0A6CFF)
 
 /** Name input for a new or renamed playlist; the confirm button needs a non-blank name. */
 @Composable

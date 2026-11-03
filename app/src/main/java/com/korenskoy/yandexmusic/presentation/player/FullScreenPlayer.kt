@@ -104,7 +104,6 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.player.components.AudioVisualizer
-import com.korenskoy.yandexmusic.presentation.player.components.FluidBackground
 import com.korenskoy.yandexmusic.presentation.player.components.RadioCoverCard
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 import java.util.Locale
@@ -136,7 +135,8 @@ fun FullScreenPlayer(
     onSleepAtEndOfTrack: () -> Unit = {},
     onCancelSleepTimer: () -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
-    onQualityClick: () -> Unit = {}
+    onQualityClick: () -> Unit = {},
+    coverModifier: Modifier = Modifier
 ) {
     androidx.activity.compose.BackHandler(onBack = onCollapse)
 
@@ -146,17 +146,20 @@ fun FullScreenPlayer(
     
     val coverUrl = track.coverUri.toCoverUrl("1000x1000") ?: ""
 
-    // Subtle scale animation for the cover (Live Canvas breathing effect)
-    val infiniteTransition = rememberInfiniteTransition(label = "cover_breath")
-    val coverScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.035f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cover_scale"
-    )
+    // Subtle "breathing" of the cover — only while music plays and never in light mode (no idle frames)
+    val breathe = isPlaying && !com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite.current
+    val coverScale = if (breathe) {
+        val infiniteTransition = rememberInfiniteTransition(label = "cover_breath")
+        infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.035f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "cover_scale"
+        ).value
+    } else 1f
 
     var showQueue by remember { mutableStateOf(false) }
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -193,8 +196,11 @@ fun FullScreenPlayer(
                 }
             )
     ) {
-        // Fluid Gradient Background
-        FluidBackground(coverUrl = coverUrl)
+        // Living background: the app tint and (Android 12+) the cover itself, blurred
+        com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop(
+            coverUrl = if (track.isRadio) null else track.coverUri.toCoverUrl("400x400"),
+            bottomFade = false
+        )
 
         // Dark overlay with subtle vertical gradient for contrast
         Box(
@@ -374,6 +380,7 @@ fun FullScreenPlayer(
                             .fillMaxSize()
                             .wrapContentSize(Alignment.Center)
                             .aspectRatio(1f)
+                            .then(coverModifier)
                             .shadow(
                                 elevation = 16.dp,
                                 shape = RoundedCornerShape(20.dp),
@@ -567,43 +574,13 @@ fun FullScreenPlayer(
                     )
                 }
 
-                // Play / Pause Main Button (Liquid Glass Glowing Sphere)
-                BouncyIconButton(
+                // Play / Pause: the metal knob of the Hi-Fi language
+                com.korenskoy.yandexmusic.presentation.hifi.HiFiKnob(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier
-                        .size(if (isLandscape) 64.dp else 76.dp)
-                        .shadow(
-                            elevation = if (isPlaying) 26.dp else 14.dp,
-                            shape = CircleShape,
-                            spotColor = Color(0xFFFF3366).copy(alpha = if (isPlaying) 0.85f else 0.4f),
-                            ambientColor = Color(0xFFFF8833).copy(alpha = 0.5f)
-                        )
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFFFF3366),
-                                    Color(0xFFFF7722),
-                                    Color(0xFFFF9900)
-                                )
-                            )
-                        )
-                        .border(
-                            BorderStroke(
-                                2.dp,
-                                Brush.verticalGradient(
-                                    listOf(Color.White.copy(alpha = 0.85f), Color.White.copy(alpha = 0.25f))
-                                )
-                            ),
-                            CircleShape
-                        )
+                    contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),
+                    size = if (isLandscape) 68.dp else 82.dp
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),
-                        tint = Color.White,
-                        modifier = Modifier.size(38.dp)
-                    )
+                    com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph(isPlaying = isPlaying, size = if (isLandscape) 30.dp else 36.dp)
                 }
 
                 // Next Track Button
@@ -961,43 +938,16 @@ fun LikeHeartButton(
         },
         modifier = Modifier
             .size(48.dp)
-            .shadow(
-                elevation = if (isLiked) 14.dp else 8.dp,
-                shape = CircleShape,
-                spotColor = if (isLiked) Color(0xFFFF3366).copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.4f)
-            )
+            // Hi-Fi glass, the same as on "Моя волна": the heart alone carries the accent, no glow
+            .shadow(8.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
             .clip(CircleShape)
-            .background(
-                if (isLiked) {
-                    Brush.verticalGradient(
-                        listOf(Color(0x44FF3366), Color(0x22FF1144))
-                    )
-                } else {
-                    Brush.verticalGradient(
-                        listOf(Color(0x352A2A38), Color(0x201E1E28))
-                    )
-                }
-            )
-            .border(
-                BorderStroke(
-                    1.2.dp,
-                    if (isLiked) {
-                        Brush.verticalGradient(
-                            listOf(Color(0xFFFF3366), Color(0x66FF3366))
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(Color(0x40FFFFFF), Color(0x10FFFFFF))
-                        )
-                    }
-                ),
-                CircleShape
-            )
+            .background(Brush.verticalGradient(listOf(Color(0x352A2A38), Color(0x201E1E28))))
+            .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x10FFFFFF)))), CircleShape)
     ) {
         Icon(
             imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
             contentDescription = stringResource(R.string.cd_nravitsya),
-            tint = if (isLiked) Color(0xFFFF3366) else Color.White.copy(alpha = 0.55f),
+            tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.72f),
             modifier = Modifier
                 .size(24.dp)
                 .graphicsLayer {
@@ -1038,7 +988,7 @@ fun PlayerMetadataAndUpNext(track: TrackDetailsDto, nextTrack: TrackDetailsDto?,
                     Text(
                         text = stringResource(R.string.full_player_fm_stereo_128_kbps),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFFF9900),
+                        color = Color(0xFF5AA0FF),
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
@@ -1222,7 +1172,7 @@ private fun SleepTimerButton(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(if (state != null) Color(0x55FF3366) else Color(0x352A2A38))
+                .background(if (state != null) Color(0x550A6CFF) else Color(0x352A2A38))
                 .border(BorderStroke(1.dp, Color(0x40FFFFFF)), CircleShape)
                 .clickable { expanded = true },
             contentAlignment = Alignment.Center
@@ -1259,7 +1209,7 @@ private fun SleepTimerButton(
 @Composable
 private fun SleepTimerCaption(state: com.korenskoy.yandexmusic.data.player.SleepTimerState?) {
     if (state == null) return
-    var now by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    var now by remember { androidx.compose.runtime.mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     LaunchedEffect(state) {
         while (true) {
             now = android.os.SystemClock.elapsedRealtime()
