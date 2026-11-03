@@ -104,7 +104,7 @@ fun TrackContextMenu(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF1E1E26)
+        containerColor = com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults.Container
     ) {
         Column(
             modifier = Modifier
@@ -193,7 +193,7 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF3A2A4A)),
+                .background(Color(0xFF2A3142)),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(22.dp))

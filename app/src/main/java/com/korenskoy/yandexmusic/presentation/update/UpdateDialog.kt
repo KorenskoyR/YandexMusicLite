@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
@@ -69,23 +71,16 @@ fun UpdateDialog(
             modifier = Modifier
                 .padding(24.dp)
                 .widthIn(max = 480.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF1E1E28).copy(alpha = 0.96f),
-                            Color(0xFF12121A).copy(alpha = 0.98f)
-                        )
-                    )
-                )
+                .clip(RoundedCornerShape(28.dp))
+                .background(HiFiDialogDefaults.Container)
                 .border(
                     BorderStroke(
                         1.2.dp,
                         Brush.verticalGradient(
-                            listOf(Color(0xFF0A6CFF).copy(alpha = 0.45f), Color(0x33FFFFFF))
+                            listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.05f))
                         )
                     ),
-                    RoundedCornerShape(26.dp)
+                    RoundedCornerShape(28.dp)
                 )
                 .padding(22.dp)
         ) {
@@ -100,9 +95,7 @@ fun UpdateDialog(
                             .size(44.dp)
                             .clip(CircleShape)
                             .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
-                                )
+                                Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -131,12 +124,12 @@ fun UpdateDialog(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF0A6CFF).copy(alpha = 0.25f))
+                                    .background(Color.White.copy(alpha = 0.10f))
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "v${updateInfo.versionName}",
-                                    color = Color(0xFFFF7799),
+                                    color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -214,7 +207,7 @@ fun UpdateDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.update_zagruzka_paketa),
-                            color = Color(0xFFFFB74D),
+                            color = HiFi.TextSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -241,8 +234,8 @@ fun UpdateDialog(
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = statusMessage,
-                        color = Color(0xFFFF7799),
-                        fontSize = 11.5.sp
+                        color = HiFi.Danger,
+                        fontSize = 12.sp
                     )
                 }
 
@@ -362,12 +355,12 @@ fun UpdateDialog(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF0A6CFF), Color(0xFF2F7BFF))
-                                )
-                            )
+                            // The Hi-Fi metal capsule: steel rim, anodized face
+                            .clip(CircleShape)
+                            .background(Brush.verticalGradient(HiFi.MetalEdge))
+                            .padding(1.5.dp)
+                            .clip(CircleShape)
+                            .background(Brush.radialGradient(HiFi.KnobFace, center = androidx.compose.ui.geometry.Offset.Zero, radius = 900f))
                             .clickable(enabled = !isDownloading) {
                                 if (isReadyToInstall) {
                                     if (!hasInstallPermission) {

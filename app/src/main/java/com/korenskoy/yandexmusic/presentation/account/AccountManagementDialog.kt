@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.account
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogActionKind
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
@@ -73,15 +78,15 @@ fun AccountManagementDialog(
                     .fillMaxWidth(0.92f)
                     .wrapContentHeight()
                     .clickable(enabled = false) {}
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(28.dp))
                     .border(
                         BorderStroke(1.dp, Brush.verticalGradient(
                             listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.05f))
                         )),
-                        RoundedCornerShape(26.dp)
+                        RoundedCornerShape(28.dp)
                     ),
-                color = Color(0xFF141419),
-                tonalElevation = 8.dp
+                color = HiFiDialogDefaults.Container,
+                tonalElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -154,9 +159,8 @@ fun AccountManagementDialog(
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(
                                             if (isActive) {
-                                                Brush.horizontalGradient(
-                                                    listOf(Color(0x330A6CFF), Color(0x18FF9900))
-                                                )
+                                                // Selected = dark anodized metal (no colour), like the rest of the app
+                                                Brush.verticalGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))
                                             } else {
                                                 Brush.horizontalGradient(
                                                     listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.03f))
@@ -166,7 +170,7 @@ fun AccountManagementDialog(
                                         .border(
                                             BorderStroke(
                                                 1.dp,
-                                                if (isActive) Color(0x660A6CFF) else Color.White.copy(alpha = 0.08f)
+                                                if (isActive) Color(0x80C9CED8) else Color.White.copy(alpha = 0.08f)
                                             ),
                                             RoundedCornerShape(16.dp)
                                         )
@@ -184,9 +188,7 @@ fun AccountManagementDialog(
                                             .clip(CircleShape)
                                             .background(
                                                 if (isActive) {
-                                                    Brush.linearGradient(
-                                                        listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
-                                                    )
+                                                    Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
                                                 } else {
                                                     Brush.linearGradient(
                                                         listOf(Color(0xFF33333E), Color(0xFF22222A))
@@ -260,7 +262,7 @@ fun AccountManagementDialog(
                                         Icon(
                                             imageVector = if (isDefault) Icons.Default.Star else Icons.Default.StarBorder,
                                             contentDescription = if (isDefault) "По умолчанию" else "Сделать по умолчанию",
-                                            tint = if (isDefault) Color(0xFFFFD700) else Color.White.copy(alpha = 0.35f),
+                                            tint = if (isDefault) Color.White else Color.White.copy(alpha = 0.35f),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -272,21 +274,21 @@ fun AccountManagementDialog(
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0x2800E676))
-                                                .border(BorderStroke(1.dp, Color(0x6600E676)), RoundedCornerShape(8.dp))
+                                                .background(Color.White.copy(alpha = 0.08f))
+                                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)), RoundedCornerShape(8.dp))
                                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Check,
                                                 contentDescription = null,
-                                                tint = Color(0xFF00E676),
+                                                tint = Color.White.copy(alpha = 0.85f),
                                                 modifier = Modifier.size(12.dp)
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
                                                 text = stringResource(R.string.account_management_aktiven),
-                                                color = Color(0xFF00E676),
+                                                color = Color.White.copy(alpha = 0.85f),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -299,7 +301,7 @@ fun AccountManagementDialog(
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
                                                 contentDescription = stringResource(R.string.cd_udalit_profil),
-                                                tint = Color(0xFFFF5252).copy(alpha = 0.75f),
+                                                tint = HiFi.Danger.copy(alpha = 0.75f),
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
@@ -328,7 +330,7 @@ fun AccountManagementDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White.copy(alpha = 0.08f)
                         ),
@@ -357,7 +359,7 @@ fun AccountManagementDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0x22FF5252)
                         ),
@@ -366,13 +368,13 @@ fun AccountManagementDialog(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
-                            tint = Color(0xFFFF5252),
+                            tint = HiFi.Danger,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.account_management_vyyti_iz_etogo_akkaunta),
-                            color = Color(0xFFFF5252),
+                            color = HiFi.Danger,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -399,119 +401,34 @@ fun AccountManagementDialog(
 
     // Confirmation: Logout Current Account
     if (confirmLogoutCurrent) {
-        AlertDialog(
+        HiFiAlertDialog(
             onDismissRequest = { confirmLogoutCurrent = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.account_management_vyyti_iz_akkaunta),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.account_management_dannye_i_kesh_tekuschego),
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.5.sp
-                )
-            },
-            containerColor = Color(0xFF1E1E26),
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmLogoutCurrent = false
-                        onLogoutCurrent()
-                        onDismiss()
-                    }
-                ) {
-                    Text(stringResource(R.string.account_management_vyyti), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmLogoutCurrent = false }) {
-                    Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
-                }
-            }
+            title = stringResource(R.string.account_management_vyyti_iz_akkaunta),
+            content = { Text(stringResource(R.string.account_management_dannye_i_kesh_tekuschego), color = HiFi.TextSecondary, fontSize = 15.sp) },
+            confirm = { HiFiDialogAction(stringResource(R.string.account_management_vyyti), { confirmLogoutCurrent = false; onLogoutCurrent(); onDismiss() }, HiFiDialogActionKind.Danger) },
+            dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), { confirmLogoutCurrent = false }, HiFiDialogActionKind.Quiet) }
         )
     }
 
     // Confirmation: Logout All Accounts
     if (confirmLogoutAll) {
-        AlertDialog(
+        HiFiAlertDialog(
             onDismissRequest = { confirmLogoutAll = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.account_management_vyyti_so_vseh_akkauntov_2),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.account_management_vse_sohranennye_uchetnye_zapisi),
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.5.sp
-                )
-            },
-            containerColor = Color(0xFF1E1E26),
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmLogoutAll = false
-                        onLogoutAll()
-                        onDismiss()
-                    }
-                ) {
-                    Text(stringResource(R.string.account_management_vyyti_so_vseh), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmLogoutAll = false }) {
-                    Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
-                }
-            }
+            title = stringResource(R.string.account_management_vyyti_so_vseh_akkauntov_2),
+            content = { Text(stringResource(R.string.account_management_vse_sohranennye_uchetnye_zapisi), color = HiFi.TextSecondary, fontSize = 15.sp) },
+            confirm = { HiFiDialogAction(stringResource(R.string.account_management_vyyti_so_vseh), { confirmLogoutAll = false; onLogoutAll(); onDismiss() }, HiFiDialogActionKind.Danger) },
+            dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), { confirmLogoutAll = false }, HiFiDialogActionKind.Quiet) }
         )
     }
 
     // Confirmation: Remove Individual Account
     accountToDelete?.let { target ->
-        AlertDialog(
+        HiFiAlertDialog(
             onDismissRequest = { accountToDelete = null },
-            title = {
-                Text(
-                    text = stringResource(R.string.account_management_udalit_profil),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                )
-            },
-            text = {
-                val name = target.displayName.ifBlank { target.login }.ifBlank { target.uid }
-                Text(
-                    text = stringResource(R.string.account_remove_confirm, name),
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.5.sp
-                )
-            },
-            containerColor = Color(0xFF1E1E26),
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val uidToRemove = target.uid
-                        accountToDelete = null
-                        onRemoveAccount(uidToRemove)
-                    }
-                ) {
-                    Text(stringResource(R.string.account_management_udalit), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { accountToDelete = null }) {
-                    Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
-                }
-            }
+            title = stringResource(R.string.account_management_udalit_profil),
+            content = { Text(stringResource(R.string.account_remove_confirm, target.displayName.ifBlank { target.login }.ifBlank { target.uid }), color = HiFi.TextSecondary, fontSize = 15.sp) },
+            confirm = { HiFiDialogAction(stringResource(R.string.account_management_udalit), { val uidToRemove = target.uid; accountToDelete = null; onRemoveAccount(uidToRemove) }, HiFiDialogActionKind.Danger) },
+            dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), { accountToDelete = null }, HiFiDialogActionKind.Quiet) }
         )
     }
 }

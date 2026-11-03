@@ -243,7 +243,7 @@ fun GlassPillButton(
 
 @Composable
 private fun PillLabel(text: String, icon: ImageVector?) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+    Row(Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         if (icon != null) {
             Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(8.dp))

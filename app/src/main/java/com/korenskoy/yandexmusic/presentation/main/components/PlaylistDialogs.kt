@@ -13,6 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -21,10 +23,12 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.sp
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogActionKind
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
-
-private val DialogBackground = Color(0xFF1E1E26)
-private val Accent = Color(0xFF0A6CFF)
 
 /** Name input for a new or renamed playlist; the confirm button needs a non-blank name. */
 @Composable
@@ -40,37 +44,24 @@ fun PlaylistNameDialog(
     LaunchedEffect(Unit) { focus.requestFocus() }
     val valid = name.text.isNotBlank()
 
-    AlertDialog(
+    HiFiAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp) },
-        text = {
+        title = title,
+        content = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { if (it.text.length <= MAX_NAME_LENGTH) name = it },
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
                 placeholder = { Text(stringResource(R.string.playlist_name_hint)) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Accent,
-                    cursorColor = Accent
-                ),
+                colors = HiFiDialogDefaults.textFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focus)
             )
         },
-        containerColor = DialogBackground,
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name.text.trim()) }, enabled = valid) {
-                Text(confirmLabel, color = if (valid) Accent else Color.White.copy(alpha = 0.3f), fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
-            }
-        }
+        confirm = { HiFiDialogAction(confirmLabel, { onConfirm(name.text.trim()) }, enabled = valid) },
+        dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), onDismiss, HiFiDialogActionKind.Quiet) }
     )
 }
 
@@ -80,27 +71,14 @@ fun DeletePlaylistDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    HiFiAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.playlist_delete), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp) },
-        text = {
-            Text(
-                stringResource(R.string.playlist_delete_confirm, playlistTitle),
-                color = Color.White.copy(alpha = 0.75f),
-                fontSize = 13.5.sp
-            )
+        title = stringResource(R.string.playlist_delete),
+        content = {
+            Text(stringResource(R.string.playlist_delete_confirm, playlistTitle), color = HiFi.TextSecondary, fontSize = 15.sp)
         },
-        containerColor = DialogBackground,
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.playlist_delete_button), color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.account_management_otmena), color = Color.White.copy(alpha = 0.7f))
-            }
-        }
+        confirm = { HiFiDialogAction(stringResource(R.string.playlist_delete_button), onConfirm, HiFiDialogActionKind.Danger) },
+        dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), onDismiss, HiFiDialogActionKind.Quiet) }
     )
 }
 

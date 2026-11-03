@@ -196,7 +196,7 @@ private fun AlbumSubtitle(album: AlbumDto, actions: CatalogActions) {
     if (artist != null) {
         Text(
             text = album.artists.joinToString { it.name.orEmpty() },
-            color = Color(0xFFFF9900),
+            color = Color.White.copy(alpha = 0.88f),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,

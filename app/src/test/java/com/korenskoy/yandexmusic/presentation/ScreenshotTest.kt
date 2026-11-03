@@ -266,6 +266,41 @@ class ScreenshotTest {
     }
 
     @Test
+    fun accountsDialog() {
+        val me = com.korenskoy.yandexmusic.domain.model.UserAccount(uid = "1", login = "me", displayName = "Тестовый Аккаунт", token = "t")
+        val other = com.korenskoy.yandexmusic.domain.model.UserAccount(uid = "2", login = "car", displayName = "Машина", token = "t")
+        show {
+            com.korenskoy.yandexmusic.presentation.account.AccountManagementDialog(
+                accounts = listOf(me, other), activeAccount = me, defaultAccountUid = "1",
+                onSwitchAccount = {}, onRemoveAccount = {}, onAddNewAccount = {}, onLogoutCurrent = {}, onLogoutAll = {}, onDismiss = {}
+            )
+        }
+        snapScreen("dialog_accounts")
+    }
+
+    @Test
+    fun updateDialog() {
+        show {
+            com.korenskoy.yandexmusic.presentation.update.UpdateDialog(
+                updateInfo = com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable(
+                    versionName = "1.8.2", title = "Yandex Music Lite 1.8.2", changelog = "• Новый дизайн диалогов",
+                    apkDownloadUrl = "", apkSizeBytes = 8_000_000
+                ),
+                downloadProgress = -1f, onStartDownload = {}, onInstall = {}, onDismiss = {}
+            )
+        }
+        snapScreen("dialog_update")
+    }
+
+    @Test
+    fun deletePlaylistDialog() {
+        show {
+            com.korenskoy.yandexmusic.presentation.main.components.DeletePlaylistDialog(playlistTitle = "В дорогу", onConfirm = {}, onDismiss = {})
+        }
+        snapScreen("dialog_delete_playlist")
+    }
+
+    @Test
     fun settingsSheet() {
         show {
             com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(

@@ -82,6 +82,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogActionKind
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
 import com.korenskoy.yandexmusic.BuildConfig
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.presentation.hifi.GlassCircleButton
@@ -367,13 +370,12 @@ private fun formatSize(bytes: Long): String {
 
 @Composable
 private fun ConfirmDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    HiFiAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1A1C24),
-        title = { Text(title, color = Color.White, fontWeight = FontWeight.Bold) },
-        text = { Text(text, color = HiFi.TextSecondary) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = HiFi.Danger, fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel), color = Color.White) } }
+        title = title,
+        content = { Text(text, color = HiFi.TextSecondary, fontSize = 15.sp) },
+        confirm = { HiFiDialogAction(confirm, onConfirm, HiFiDialogActionKind.Danger) },
+        dismiss = { HiFiDialogAction(stringResource(R.string.settings_cancel), onDismiss, HiFiDialogActionKind.Quiet) }
     )
 }
 

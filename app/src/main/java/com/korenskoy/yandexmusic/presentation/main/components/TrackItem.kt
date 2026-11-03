@@ -157,27 +157,35 @@ fun TrackItem(
             Spacer(modifier = Modifier.width(12.dp))
         }
 
+        // A 44dp touch area around the 34dp glass circle (the circle alone was too small to hit reliably)
         Box(
             modifier = Modifier
-                .size(34.dp)
-                // Hi-Fi glass: no platform shadow under the translucent fill (it showed through as a dark
-                // band) and no blue glow — the heart alone carries the accent
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(Brush.verticalGradient(listOf(Color(0x252A2A38), Color(0x151E1E28))))
-                .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x35FFFFFF), Color(0x10FFFFFF)))), CircleShape)
-                .clickable { onToggleLike() },
+                .clickable(role = androidx.compose.ui.semantics.Role.Button) { onToggleLike() },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.6f),
-                contentDescription = stringResource(R.string.cd_nravitsya),
-                modifier = Modifier.size(17.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    // Hi-Fi glass: no platform shadow under the translucent fill (it showed through as a dark
+                    // band) and no blue glow — the heart alone carries the accent
+                    .clip(CircleShape)
+                    .background(Brush.verticalGradient(listOf(Color(0x252A2A38), Color(0x151E1E28))))
+                    .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x35FFFFFF), Color(0x10FFFFFF)))), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.6f),
+                    contentDescription = stringResource(R.string.cd_nravitsya),
+                    modifier = Modifier.size(17.dp)
+                )
+            }
         }
 
         if (openMenu != null) {
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(0.dp))
             IconButton(onClick = openMenu, modifier = Modifier.size(40.dp)) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,

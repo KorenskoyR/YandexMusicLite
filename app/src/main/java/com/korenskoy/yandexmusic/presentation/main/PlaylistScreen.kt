@@ -71,6 +71,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.korenskoy.yandexmusic.presentation.hifi.GlassPillButton
@@ -89,7 +90,7 @@ internal fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF3A2A4A), Color(0xFF22222C)))),
+            .background(Brush.linearGradient(listOf(Color(0xFF2A3142), Color(0xFF1C2130)))),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -263,10 +264,11 @@ fun PlaylistScreen(
                 )
                 if (playlist.isPublic) {
                     Text(
-                        text = stringResource(R.string.playlist_public_badge),
-                        color = Color(0xFFFF9900),
+                        text = stringResource(R.string.playlist_public_badge).uppercase(),
+                        color = Color.White.copy(alpha = 0.66f),
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.1.em
                     )
                 }
             }
@@ -312,11 +314,12 @@ fun PlaylistScreen(
                     )
                     if (opened.failed) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Button(
+                        com.korenskoy.yandexmusic.presentation.hifi.GlassPillButton(
+                            text = stringResource(R.string.playlist_retry),
                             onClick = onRetry,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A6CFF)),
-                            shape = RoundedCornerShape(16.dp)
-                        ) { Text(stringResource(R.string.playlist_retry), color = Color.White) }
+                            modifier = Modifier.width(220.dp),
+                            height = 48.dp
+                        )
                     }
                 }
                 else -> LazyColumn(
@@ -324,10 +327,8 @@ fun PlaylistScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .navigationBarsPadding()
-                        .padding(horizontal = 8.dp)
-                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .background(Color(0x1AFFFFFF))
-                        .padding(8.dp)
+                        // Rows lie right on the backdrop, like on the album page (no lighter panel)
+                        .padding(horizontal = 12.dp)
                 ) {
                     items(opened.tracks, key = { it.idString }) { track ->
                         TrackItem(
@@ -368,10 +369,7 @@ private fun ReorderList(
         modifier = Modifier
             .fillMaxSize()
             .navigationBarsPadding()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(Color(0x1AFFFFFF))
-            .padding(8.dp)
+            .padding(horizontal = 12.dp)
     ) {
         itemsIndexed(tracks, key = { _, track -> track.idString }) { index, track ->
             val dragged = track.idString == draggedId

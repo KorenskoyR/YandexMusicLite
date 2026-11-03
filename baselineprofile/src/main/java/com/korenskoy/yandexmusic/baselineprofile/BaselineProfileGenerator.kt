@@ -37,7 +37,7 @@ class BaselineProfileGenerator {
         device.waitForIdle()
     }
 
-    /** Scrolling "Liked", search, opening the player and a playlist; skipped on the sign-in screen. */
+    /** The tabs (Волна, Поиск, Музыка, Радио, В авто), a playlist and the player; skipped on the sign-in screen. */
     @Test
     fun mainScreens() = rule.collect(
         packageName = PACKAGE,
@@ -45,22 +45,30 @@ class BaselineProfileGenerator {
     ) {
         pressHome()
         startActivityAndWait()
-        if (!device.wait(Until.hasObject(By.desc("Моя Музыка")), 10_000)) return@collect // not signed in
+        if (!device.wait(Until.hasObject(By.desc("Музыка")), 10_000)) return@collect // not signed in
 
-        openTab("Моя Музыка")
+        openTab("Музыка")
         scrollList()
-        device.findObject(By.text("Плейлисты"))?.let {
+        device.findObject(By.text("Плейлисты"))?.let { row ->
+            row.click()
+            device.waitForIdle()
             device.findObjects(By.textContains("трек")).firstOrNull()?.click()
             device.waitForIdle()
             scrollList()
+            device.pressBack()
             device.pressBack()
         }
 
         openTab("Поиск")
         scrollList()
 
-        openTab("FM Радио")
+        openTab("Радио")
         scrollList()
+
+        // The car screen: gauge, timeline and dock
+        openTab("В авто")
+        Thread.sleep(1_000)
+        device.pressBack()
 
         // The mini-player opens the full player, if anything is in the queue
         device.findObject(By.desc("Воспроизведение или пауза"))?.let {
@@ -69,7 +77,7 @@ class BaselineProfileGenerator {
             Thread.sleep(1_000)
             device.pressBack()
         }
-        openTab("Главная")
+        openTab("Волна")
     }
 
     private fun MacrobenchmarkScope.openTab(name: String) {

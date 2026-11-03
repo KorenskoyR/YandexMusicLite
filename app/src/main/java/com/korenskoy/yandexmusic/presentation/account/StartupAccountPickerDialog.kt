@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.account
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
@@ -63,18 +65,18 @@ fun StartupAccountPickerDialog(
                     .fillMaxWidth(0.92f)
                     .widthIn(max = 440.dp)
                     .wrapContentHeight()
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(28.dp))
                     .border(
                         BorderStroke(
                             1.2.dp,
                             Brush.verticalGradient(
-                                listOf(Color(0xFF0A6CFF).copy(alpha = 0.45f), Color.White.copy(alpha = 0.08f))
+                                listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.05f))
                             )
                         ),
-                        RoundedCornerShape(26.dp)
+                        RoundedCornerShape(28.dp)
                     ),
-                color = Color(0xFF141419),
-                tonalElevation = 10.dp
+                color = HiFiDialogDefaults.Container,
+                tonalElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -91,9 +93,7 @@ fun StartupAccountPickerDialog(
                                 .size(44.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
-                                    )
+                                    Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -153,9 +153,8 @@ fun StartupAccountPickerDialog(
                                     .clip(RoundedCornerShape(16.dp))
                                     .background(
                                         if (isSelected) {
-                                            Brush.horizontalGradient(
-                                                listOf(Color(0x380A6CFF), Color(0x22FF9900))
-                                            )
+                                            // Selected = dark anodized metal, no colour
+                                            Brush.verticalGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))
                                         } else {
                                             Brush.horizontalGradient(
                                                 listOf(Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.03f))
@@ -165,7 +164,7 @@ fun StartupAccountPickerDialog(
                                     .border(
                                         BorderStroke(
                                             1.dp,
-                                            if (isSelected) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.08f)
+                                            if (isSelected) Color(0x80C9CED8) else Color.White.copy(alpha = 0.08f)
                                         ),
                                         RoundedCornerShape(16.dp)
                                     )
@@ -180,9 +179,7 @@ fun StartupAccountPickerDialog(
                                         .clip(CircleShape)
                                         .background(
                                             if (isSelected) {
-                                                Brush.linearGradient(
-                                                    listOf(Color(0xFF3D8BFF), Color(0xFF0A55D6))
-                                                )
+                                                Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
                                             } else {
                                                 Brush.linearGradient(
                                                     listOf(Color(0xFF33333E), Color(0xFF22222A))
@@ -244,7 +241,8 @@ fun StartupAccountPickerDialog(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF0A6CFF)),
+                                            .background(Color(0xFF2F333E))
+                                            .border(BorderStroke(1.dp, Color(0xFFC9CED8)), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -326,12 +324,12 @@ fun StartupAccountPickerDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color(0xFF0A6CFF), Color(0xFF2F7BFF))
-                                    )
-                                )
+                                // The Hi-Fi metal capsule: steel rim, anodized face
+                                .clip(CircleShape)
+                                .background(Brush.verticalGradient(HiFi.MetalEdge))
+                                .padding(1.5.dp)
+                                .clip(CircleShape)
+                                .background(Brush.radialGradient(HiFi.KnobFace, center = androidx.compose.ui.geometry.Offset.Zero, radius = 900f))
                                 .clickable(enabled = selectedUid.isNotBlank()) {
                                     onSelectAccount(selectedUid, rememberAsDefault)
                                 }
