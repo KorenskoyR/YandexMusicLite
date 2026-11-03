@@ -38,7 +38,7 @@ class PlaybackStateStore @Inject constructor(
                 tmp.delete()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("PlaybackStateStore", "Could not save the session", e)
         }
     }
 
@@ -46,7 +46,7 @@ class PlaybackStateStore @Inject constructor(
         try {
             if (file.exists()) json.decodeFromString(PlaybackSnapshot.serializer(), file.readText()) else null
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("PlaybackStateStore", "Could not read the saved session", e)
             null
         }
     }

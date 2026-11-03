@@ -95,7 +95,8 @@ class NetworkMonitor @Inject constructor(
                 socket.connect(InetSocketAddress("oauth.yandex.ru", 443), 1500)
             }
             true
-        } catch (e: Exception) {
+        } catch (e: java.io.IOException) {
+            // Unreachable, timed out or refused: all the same here
             false
         }
     }

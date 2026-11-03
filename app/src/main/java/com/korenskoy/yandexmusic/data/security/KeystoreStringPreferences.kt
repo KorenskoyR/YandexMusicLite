@@ -63,6 +63,7 @@ class KeystoreStringPreferences(
         String(cipher.doFinal(sealed, IV_BYTES, sealed.size - IV_BYTES), Charsets.UTF_8)
     } catch (e: Exception) {
         // Tampered value or a key lost after restore: behave as if the value is absent
+        android.util.Log.w("KeystoreStringPreferences", "Stored value cannot be decrypted", e)
         null
     }
 

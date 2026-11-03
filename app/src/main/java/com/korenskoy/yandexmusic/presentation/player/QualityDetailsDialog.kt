@@ -3,14 +3,11 @@ package com.korenskoy.yandexmusic.presentation.player
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
@@ -38,7 +35,7 @@ fun QualityDetailsDialog(details: PlaybackController.QualityDetails, onDismiss: 
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = stringResource(if (hasPlus) R.string.quality_details_plus_active else R.string.quality_details_plus_inactive),
-                        color = if (hasPlus) Color(0xFF6FD08C) else Color(0xFFFFB547),
+                        color = if (hasPlus) HiFi.Success else HiFi.Warning,
                         fontSize = 14.sp
                     )
                 }

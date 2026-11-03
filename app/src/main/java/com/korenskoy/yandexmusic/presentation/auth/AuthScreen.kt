@@ -1,5 +1,17 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material.icons.Icons
+import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import com.korenskoy.yandexmusic.presentation.hifi.IconPlaque
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import android.annotation.SuppressLint
@@ -10,18 +22,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -34,8 +41,8 @@ fun AuthScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     var isUrlLoaded by remember { mutableStateOf(false) }
-    val isNetworkAvailable by viewModel.isNetworkAvailable.collectAsState()
-    
+    val isNetworkAvailable by viewModel.isNetworkAvailable.collectAsStateWithLifecycle()
+
     // The Yandex Music OAuth URL for getting the token.
     // We use a known client_id for Yandex Music Android app.
     val authUrl = "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d"
@@ -49,7 +56,7 @@ fun AuthScreen(
             val cookieManager = android.webkit.CookieManager.getInstance()
             cookieManager.removeAllCookies(null)
             cookieManager.flush()
-            
+
             WebView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -125,7 +132,7 @@ fun AuthScreen(
 
 /** The token is only accepted from Yandex's own pages, never from a third-party redirect. */
 internal fun isTrustedYandexUrl(url: String): Boolean {
-    val uri = try { java.net.URI(url) } catch (e: Exception) { return false }
+    val uri = try { java.net.URI(url) } catch (e: java.net.URISyntaxException) { return false }
     if (uri.scheme != "https") return false
     val host = uri.host?.lowercase() ?: return false
     val trustedRoots = listOf("yandex.ru", "yandex.com", "yandex.by", "yandex.kz", "ya.ru")
@@ -150,72 +157,56 @@ internal fun extractTokenFromUrl(url: String): String? {
     return null
 }
 
+/**
+ * Sign-in needs the network: the Hi-Fi page with soft rings breathing out from the middle (drawn in the
+ * draw phase, still in lite mode), a plaque, one line of explanation and the activity mark.
+ */
 @Composable
 fun WaitingForInternetScreen() {
-    val infiniteTransition = rememberInfiniteTransition(label = "NetworkResonance")
-    val waveProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "WaveProgress"
-    )
+    val lite = LocalHiFiLite.current
+    val wave: androidx.compose.runtime.State<Float>? = if (!lite) {
+        rememberInfiniteTransition(label = "network_rings").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(2600, easing = LinearOutSlowInEasing), RepeatMode.Restart),
+            label = "network_rings_phase"
+        )
+    } else null
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0A0A0E)),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(360.dp)) {
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val maxRadius = size.width / 2f
-            
-            val radius1 = maxRadius * waveProgress
-            val alpha1 = 1f - waveProgress
-            val brush1 = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color(0xFFFFB703).copy(alpha = alpha1 * 0.4f), Color.Transparent),
-                center = center,
-                radius = if (radius1 > 0) radius1 else 1f
-            )
-            drawCircle(brush = brush1, radius = radius1, center = center)
-
-            val waveProgress2 = (waveProgress + 0.5f) % 1f
-            val radius2 = maxRadius * waveProgress2
-            val alpha2 = 1f - waveProgress2
-            val brush2 = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color(0xFFE11D48).copy(alpha = alpha2 * 0.3f), Color.Transparent),
-                center = center,
-                radius = if (radius2 > 0) radius2 else 1f
-            )
-            drawCircle(brush = brush2, radius = radius2, center = center)
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            CircularProgressIndicator(
-                color = Color(0xFFFFB703),
-                modifier = Modifier.size(48.dp),
-                strokeWidth = 3.dp
-            )
-            Spacer(modifier = Modifier.height(24.dp))
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        HiFiBackdrop()
+        Spacer(
+            Modifier
+                .size(360.dp)
+                .drawBehind {
+                    val p = wave?.value ?: return@drawBehind
+                    val maxRadius = size.minDimension / 2f
+                    for (k in 0..1) {
+                        val f = (p + k * 0.5f) % 1f
+                        drawCircle(
+                            Color.White.copy(alpha = (1f - f) * 0.16f),
+                            radius = maxRadius * f,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx())
+                        )
+                    }
+                }
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            IconPlaque(Icons.Rounded.WifiOff, size = 56.dp)
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = stringResource(R.string.auth_ozhidanie_interneta),
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+                style = HiFiType.LargeTitle.copy(fontSize = 24.sp, lineHeight = 30.sp)
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.auth_waiting_for_network),
-                color = Color.Gray,
-                fontSize = 14.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                style = HiFiType.Caption.copy(fontSize = 15.sp, lineHeight = 21.sp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 40.dp)
             )
+            Spacer(modifier = Modifier.height(28.dp))
+            HiFiActivityIndicator(size = 28.dp)
         }
     }
 }

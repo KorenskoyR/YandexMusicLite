@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
@@ -13,7 +15,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -58,7 +58,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -294,7 +293,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = shown.title ?: "Без названия",
+                        text = shown.title ?: stringResource(R.string.bez_nazvaniya),
                         color = Color.White,
                         fontSize = 26.sp,
                         lineHeight = 32.sp,
@@ -374,8 +373,7 @@ private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(size)
-            .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .hifiPress(onClick)
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context).data(track.coverUri.toCoverUrl("300x300")).crossfade(true).size(320).build(),
@@ -383,12 +381,12 @@ private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(size)
-                .shadow(12.dp, RoundedCornerShape(14.dp))
+                .hifiSoftShadow(RoundedCornerShape(14.dp), 16.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF1C1F28))
+                .background(HiFi.Placeholder)
         )
         Spacer(Modifier.height(8.dp))
-        Text(track.title ?: "Без названия", color = Color.White, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.title ?: stringResource(R.string.bez_nazvaniya), color = Color.White, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(track.artists.joinToString { it.name ?: "" }, color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

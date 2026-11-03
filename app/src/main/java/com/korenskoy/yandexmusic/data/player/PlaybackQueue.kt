@@ -8,6 +8,18 @@ enum class PlaylistSource {
 /** Sleep timer: either a moment in [android.os.SystemClock.elapsedRealtime] time or "at the end of this track". */
 data class SleepTimerState(val endsAtElapsedMs: Long?, val atEndOfTrack: Boolean)
 
+/** What to do when the stream of the current track fails. */
+enum class Recovery {
+    /** No network and the track is not on the device: go on with downloaded music. */
+    CONTINUE_OFFLINE,
+    /** First failure of this track: fetch a fresh link and resume where it stopped (links expire). */
+    RETRY,
+    /** A station, or several tracks in a row: stop and tell the user. */
+    STOP,
+    /** This track is broken: the next one. */
+    SKIP
+}
+
 /** What "next" should do for a queue position. Pure logic, unit-tested in PlaybackQueueTest. */
 sealed interface NextAction {
     data class PlayIndex(val index: Int) : NextAction
@@ -48,6 +60,23 @@ object PlaybackQueue {
             if (accept(queue[index])) return index
         }
         return null
+    }
+
+    /** Broken tracks in a row after which playback stops instead of skipping on. */
+    const val MAX_FAILED_TRACKS = 3
+
+    /** Pure; unit-tested. [failedTracksInARow] counts this failure too. */
+    fun recoveryFor(offline: Boolean, isRadio: Boolean, isDownloaded: Boolean, alreadyRetried: Boolean, failedTracksInARow: Int): Recovery = when {
+        offline && !isRadio && !isDownloaded -> Recovery.CONTINUE_OFFLINE
+        !alreadyRetried -> Recovery.RETRY
+        isRadio || failedTracksInARow >= MAX_FAILED_TRACKS -> Recovery.STOP
+        else -> Recovery.SKIP
+    }
+
+    /** [list] with the item at [from] moved to [to]; out-of-range positions leave it unchanged. */
+    fun <T> moved(list: List<T>, from: Int, to: Int): List<T> {
+        if (from !in list.indices || to !in list.indices || from == to) return list
+        return list.toMutableList().apply { add(to, removeAt(from)) }
     }
 
     /** The wave page wants at least this many tracks in its "next up" shelf. */

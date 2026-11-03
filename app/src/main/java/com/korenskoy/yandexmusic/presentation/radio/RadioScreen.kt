@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
+import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -45,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -84,7 +85,6 @@ import com.korenskoy.yandexmusic.utils.browserUserAgent
 import com.korenskoy.yandexmusic.utils.russianQuantityString
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /** The FM scale of the dial; pure so the station picking is unit-tested. */
 object RadioDial {
@@ -178,10 +178,10 @@ fun RadioScreen(
                 LazyRow(contentPadding = PaddingValues(start = contentStart, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(favorites, key = { "fav_" + it.id }) { station ->
                         Column(
-                            Modifier.width(80.dp).clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button) { onStationClick(station) },
+                            Modifier.width(80.dp).hifiPress({ onStationClick(station) }),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            StationLogo(station, 76.dp, 20.dp, Modifier.shadow(12.dp, RoundedCornerShape(20.dp)))
+                            StationLogo(station, 76.dp, 20.dp, Modifier.hifiSoftShadow(RoundedCornerShape(20.dp), 16.dp))
                             Spacer(Modifier.height(7.dp))
                             Text(station.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -223,9 +223,9 @@ private fun OnAirCard(
     Column(
         modifier
             .fillMaxWidth()
-            .shadow(26.dp, shape, spotColor = start)
+            .hifiSoftShadow(shape, 30.dp, start.copy(alpha = 0.45f))
             .clip(shape)
-            .background(Brush.linearGradient(listOf(start, end, Color(0xFF0A0D18))))
+            .background(Brush.linearGradient(listOf(start, end, HiFi.Ground)))
             .hifiGrain(enabled = !LocalHiFiLite.current, alpha = 0.5f)
             .drawBehind { drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), endY = 2.dp.toPx())) }
             .padding(16.dp)
@@ -252,7 +252,7 @@ private fun OnAirCard(
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StationLogo(station, 76.dp, 18.dp, Modifier.shadow(12.dp, RoundedCornerShape(18.dp)), plainBackground = true)
+            StationLogo(station, 76.dp, 18.dp, Modifier.hifiSoftShadow(RoundedCornerShape(18.dp), 16.dp), plainBackground = true)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(station.name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -363,7 +363,7 @@ private fun StationRow(
             .fillMaxWidth()
             .heightIn(min = 66.dp)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onClick),
+            .hifiPress(onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         StationLogo(station, 48.dp, 12.dp)
@@ -396,7 +396,7 @@ private fun StationLogo(station: RadioStation, size: Dp, corner: Dp, modifier: M
             .size(size)
             .clip(shape)
             .background(
-                if (plainBackground) Brush.linearGradient(listOf(Color.White, Color(0xFFE9ECF2)))
+                if (plainBackground) Brush.linearGradient(listOf(Color.White, HiFi.Paper))
                 else Brush.linearGradient(listOf(Color(station.brandColorStart), Color(station.brandColorEnd)))
             ),
         contentAlignment = Alignment.Center

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
@@ -194,7 +195,7 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF2A3142)),
+                .background(HiFi.SteelLight),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(22.dp))

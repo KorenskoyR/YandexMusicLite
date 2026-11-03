@@ -37,7 +37,8 @@ class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val libraryRepository: LibraryRepository,
     private val downloadManager: TrackDownloadManager,
-    private val downloadScheduler: DownloadScheduler
+    private val downloadScheduler: DownloadScheduler,
+    networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -50,6 +51,14 @@ class MainViewModel @Inject constructor(
     val likedTrackIds: StateFlow<Set<String>> = libraryRepository.likedIds
     val popularTracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.popularTracks
     val isLoading: StateFlow<Boolean> = libraryRepository.isSyncingLikes
+    /** The likes could not be loaded; they are retried by themselves as soon as the network is back. */
+    val libraryLoadFailed: StateFlow<Boolean> = libraryRepository.likesSyncFailed
+
+    init {
+        networkMonitor.isConnectedFlow
+            .onEach { online -> if (online && libraryRepository.likesSyncFailed.value) loadLikedTracks() }
+            .launchIn(viewModelScope)
+    }
 
     val isDownloadingAll: StateFlow<Boolean> = downloadScheduler.isDownloadingAll
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -193,6 +202,12 @@ class MainViewModel @Inject constructor(
 
     fun playAllLikedTracks() = playbackController.playAllLikedTracks()
 
+    /** The liked tracks that are on the device, in the library's order. */
+    fun playDownloaded() {
+        val downloaded = tracks.value.filter { it.idString in downloadedTrackIds.value }
+        downloaded.firstOrNull()?.let { playbackController.playTrack(it.idString, downloaded, PlaylistSource.LIBRARY) }
+    }
+
     fun shuffleLikedTracks() = playbackController.playAllLikedTracks(shuffle = true)
 
     fun playHits(shuffle: Boolean = true) = playbackController.playHits(libraryRepository.weeklyHits.value, shuffle)
@@ -209,6 +224,7 @@ class MainViewModel @Inject constructor(
     fun seekTo(positionMs: Long) = playbackController.seekTo(positionMs)
 
     fun removeFromQueue(trackId: String) = playbackController.removeFromQueue(trackId)
+    fun moveInQueue(trackId: String, targetId: String) = playbackController.moveInQueue(trackId, targetId)
 
     fun enqueueNext(track: TrackDetailsDto) = playbackController.enqueueNext(track)
 

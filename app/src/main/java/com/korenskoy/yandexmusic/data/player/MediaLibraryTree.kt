@@ -2,6 +2,7 @@ package com.korenskoy.yandexmusic.data.player
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -193,12 +194,12 @@ class MediaLibraryTree @Inject constructor(
             .build()
 
     private fun MediaItem.withArtwork(url: String?): MediaItem =
-        if (url == null) this else buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setArtworkUri(Uri.parse(url)).build()).build()
+        if (url == null) this else buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setArtworkUri(url.toUri()).build()).build()
 
     private fun MediaItem.withExtras(extras: Bundle): MediaItem =
         buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setExtras(extras).build()).build()
 
-    private fun resourceUri(resId: Int): Uri = Uri.parse("android.resource://${BuildConfig.APPLICATION_ID}/$resId")
+    private fun resourceUri(resId: Int): Uri = "android.resource://${BuildConfig.APPLICATION_ID}/$resId".toUri()
 
     companion object {
         const val ROOT_ID = "root"

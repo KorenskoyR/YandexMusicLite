@@ -93,7 +93,7 @@ fun StartupAccountPickerDialog(
                                 .size(44.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
+                                    Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -154,7 +154,7 @@ fun StartupAccountPickerDialog(
                                     .background(
                                         if (isSelected) {
                                             // Selected = dark anodized metal, no colour
-                                            Brush.verticalGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))
+                                            Brush.verticalGradient(listOf(HiFi.AnodizedLight, HiFi.AnodizedDark))
                                         } else {
                                             Brush.horizontalGradient(
                                                 listOf(Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.03f))
@@ -179,10 +179,10 @@ fun StartupAccountPickerDialog(
                                         .clip(CircleShape)
                                         .background(
                                             if (isSelected) {
-                                                Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
+                                                Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
                                             } else {
                                                 Brush.linearGradient(
-                                                    listOf(Color(0xFF33333E), Color(0xFF22222A))
+                                                    listOf(HiFi.SteelLight, HiFi.SteelDark)
                                                 )
                                             }
                                         ),
@@ -241,8 +241,8 @@ fun StartupAccountPickerDialog(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF2F333E))
-                                            .border(BorderStroke(1.dp, Color(0xFFC9CED8)), CircleShape),
+                                            .background(HiFi.AnodizedLight)
+                                            .border(BorderStroke(1.dp, HiFi.SteelEdge), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -272,9 +272,10 @@ fun StartupAccountPickerDialog(
                             checked = rememberAsDefault,
                             onCheckedChange = { rememberAsDefault = it },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = Color(0xFF0A6CFF),
+                                // Monochrome like the rest of the dialog: a white box with a dark tick
+                                checkedColor = Color.White,
                                 uncheckedColor = Color.White.copy(alpha = 0.4f),
-                                checkmarkColor = Color.White
+                                checkmarkColor = HiFi.Ground
                             )
                         )
                         Spacer(modifier = Modifier.width(6.dp))

@@ -75,6 +75,13 @@ class BaselineProfileGenerator {
             device.findObjects(By.desc("Обложка")).maxByOrNull { it.visibleBounds.top }?.click()
             device.waitForIdle()
             Thread.sleep(1_000)
+            // The queue sheet: list, drag handles, swipe-to-remove rows
+            device.findObject(By.desc("Очередь"))?.let { queue ->
+                queue.click()
+                device.waitForIdle()
+                scrollList()
+                device.pressBack()
+            }
             device.pressBack()
         }
         openTab("Волна")

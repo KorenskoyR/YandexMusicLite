@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.splash
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -73,7 +74,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0E))
+            .background(HiFi.Ground)
             .alpha(screenAlpha.value),
         contentAlignment = Alignment.Center
     ) {
@@ -81,12 +82,12 @@ fun SplashScreen(
         Canvas(modifier = Modifier.size((280 * scaleFactor).dp)) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val maxRadius = size.width / 2f
-            
+
             // First expanding ring
             val radius1 = maxRadius * waveProgress
             val alpha1 = 1f - waveProgress
             val brush1 = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color(0xFFFFB703).copy(alpha = alpha1 * 0.4f), Color.Transparent),
+                colors = listOf(Color.Transparent, HiFi.SteelEdge.copy(alpha = alpha1 * 0.35f), Color.Transparent),
                 center = center,
                 radius = if (radius1 > 0) radius1 else 1f
             )
@@ -97,7 +98,7 @@ fun SplashScreen(
             val radius2 = maxRadius * waveProgress2
             val alpha2 = 1f - waveProgress2
             val brush2 = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color(0xFFE11D48).copy(alpha = alpha2 * 0.3f), Color.Transparent),
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = alpha2 * 0.22f), Color.Transparent),
                 center = center,
                 radius = if (radius2 > 0) radius2 else 1f
             )
@@ -135,7 +136,7 @@ fun SplashScreen(
             Text(
                 text = stringResource(R.string.splash_lossless_audio),
                 style = TextStyle(
-                    color = Color(0xFFFFB703),
+                    color = HiFi.TextSecondary,
                     fontSize = (12 * scaleFactor).sp,
                     fontWeight = FontWeight.Normal,
                     letterSpacing = (2 * scaleFactor).sp

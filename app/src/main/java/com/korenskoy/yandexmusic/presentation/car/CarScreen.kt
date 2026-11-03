@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -395,7 +396,7 @@ private fun DriverPanel(
                 Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(u(28f)))
             }
             HiFiKnob(onClick = onPrev, contentDescription = stringResource(R.string.cd_predyduschiy_trek), size = u(skipSize)) {
-                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = Color(0xFFF4F6FA), modifier = Modifier.size(u(38f)))
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(38f)))
             }
             Box(Modifier.size(u(240f)), contentAlignment = Alignment.Center) {
                 SpectrumRing(
@@ -412,7 +413,7 @@ private fun DriverPanel(
                 }
             }
             HiFiKnob(onClick = onNext, contentDescription = stringResource(R.string.cd_sleduyuschiy_trek), size = u(skipSize)) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = Color(0xFFF4F6FA), modifier = Modifier.size(u(38f)))
+                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(38f)))
             }
             GlassRound(u(sideSize), stringResource(R.string.cd_nravitsya), onLike) {
                 Icon(
@@ -455,7 +456,7 @@ private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: B
                     .weight(1f)
                     .height(u(if (compact) 88f else 96f))
                     .then(
-                        if (selected) Modifier.shadow(u(14f), shape).hifiAnodized(shape)
+                        if (selected) Modifier.hifiSoftShadow(shape, u(14f)).hifiAnodized(shape)
                         else Modifier.hifiGlass(shape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.10f))
                     )
                     .clickable(role = Role.Button, onClick = item.onClick),
@@ -486,7 +487,7 @@ private fun CoverWithNext(u: Scale, track: TrackDetailsDto?, next: TrackDetailsD
     Box(
         modifier
             .aspectRatio(1f)
-            .shadow(u(44f), shape, ambientColor = tint.primary, spotColor = tint.primary)
+            .hifiSoftShadow(shape, u(44f), tint.primary.copy(alpha = 0.45f))
             .clip(shape)
             .background(Brush.linearGradient(listOf(tint.primary, tint.secondary)))
     ) {
@@ -559,9 +560,9 @@ private fun NextPlate(u: Scale, next: TrackDetailsDto) {
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(u(60f))
-                    .shadow(u(8f), RoundedCornerShape(u(13f)))
+                    .hifiSoftShadow(RoundedCornerShape(u(13f)), u(10f))
                     .clip(RoundedCornerShape(u(13f)))
-                    .background(Color(0xFF1C1F28))
+                    .background(HiFi.Placeholder)
             )
             Spacer(Modifier.width(u(14f)))
             Column(Modifier.weight(1f)) {

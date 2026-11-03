@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- targetSdk 37 (Android 17) changes runtime behaviour; raise it after checking on an Android 17 device. -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- Library freshness is checked by hand: these would fail CI whenever someone else publishes a release. -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+</lint>

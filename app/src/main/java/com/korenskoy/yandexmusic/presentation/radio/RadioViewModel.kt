@@ -28,6 +28,11 @@ class RadioViewModel @Inject constructor(
 
     fun play(station: RadioStation) = playbackController.playRadioStation(station)
 
+    /** "Радио" in the car: the first station of the list. */
+    fun playFirst() {
+        stations.value.firstOrNull()?.let { play(it) }
+    }
+
     fun toggleFavorite(stationId: String) {
         viewModelScope.launch { radioRepository.toggleFavorite(stationId) }
     }

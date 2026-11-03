@@ -480,21 +480,21 @@ class ScreenshotTest {
 
     @Test
     fun carPortrait() {
-        show { car(isLandscape = false) }
+        show { Car(isLandscape = false) }
         snap("car_portrait")
     }
 
     @Test
     @Config(qualifiers = "+land")
     fun carLandscape() {
-        show { car(isLandscape = true) }
+        show { Car(isLandscape = true) }
         snap("car_landscape")
     }
 
     @Test
     @Config(qualifiers = "+land")
     fun carLandscapeRightHandDrive() {
-        show { car(isLandscape = true, steeringWheelOnLeft = false) }
+        show { Car(isLandscape = true, steeringWheelOnLeft = false) }
         snap("car_landscape_right_wheel")
     }
 
@@ -505,14 +505,14 @@ class ScreenshotTest {
         show {
             val base = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(base.density * 1.4f, base.fontScale)) {
-                car(isLandscape = true)
+                Car(isLandscape = true)
             }
         }
         snap("car_landscape_scaled")
     }
 
     @Composable
-    private fun car(isLandscape: Boolean, steeringWheelOnLeft: Boolean = true, track: TrackDetailsDto = tracks[0]) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
+    private fun Car(isLandscape: Boolean, steeringWheelOnLeft: Boolean = true, track: TrackDetailsDto = tracks[0]) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
         currentTrack = track, isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
         onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
         onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = steeringWheelOnLeft, progress = { 82_000L }, durationMs = 286_000,
@@ -523,7 +523,7 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "+land")
     fun carRadio() {
-        show { car(isLandscape = true, track = tracks[0].copy(id = JsonPrimitive("radio_europa"), title = "Европа Плюс", isRadio = true)) }
+        show { Car(isLandscape = true, track = tracks[0].copy(id = JsonPrimitive("radio_europa"), title = "Европа Плюс", isRadio = true)) }
         snap("car_radio")
     }
 

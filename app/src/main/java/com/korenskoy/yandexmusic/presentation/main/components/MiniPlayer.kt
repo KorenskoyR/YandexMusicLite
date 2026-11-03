@@ -1,10 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.runtime.getValue
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -62,9 +63,32 @@ import kotlin.math.roundToInt
 
 private val MiniShape = RoundedCornerShape(31.dp)
 
+/** What a drag on the mini-player does. Pure; unit-tested. */
+object MiniGesture {
+    enum class Axis { NONE, HORIZONTAL, VERTICAL }
+    enum class Outcome { NONE, DISMISS, OPEN }
+
+    /** Sideways past 100 dp dismisses; up past 48 dp opens the player. */
+    const val DISMISS_DP = 100f
+    const val OPEN_DP = 48f
+
+    fun axisOf(dx: Float, dy: Float): Axis = when {
+        dx == 0f && dy == 0f -> Axis.NONE
+        abs(dx) >= abs(dy) -> Axis.HORIZONTAL
+        else -> Axis.VERTICAL
+    }
+
+    fun outcome(axis: Axis, offsetX: Float, offsetY: Float, density: Float): Outcome = when {
+        axis == Axis.HORIZONTAL && abs(offsetX) > DISMISS_DP * density -> Outcome.DISMISS
+        axis == Axis.VERTICAL && -offsetY > OPEN_DP * density * 0.6f -> Outcome.OPEN
+        else -> Outcome.NONE
+    }
+}
+
 /**
  * The floating mini-player: a glass capsule above the tab bar with the cover, the track, a metal
- * play/pause knob and "next". Swipe sideways to dismiss. [progress] is read only while drawing the
+ * play/pause knob and "next". Swipe sideways to dismiss; pull it up and it rises after the finger and
+ * opens the full player. [progress] is read only while drawing the
  * hairline at the bottom, so the capsule itself is not recomposed on every progress tick.
  */
 @Composable
@@ -81,38 +105,72 @@ fun MiniPlayer(
 ) {
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(0f) }
     val density = LocalDensity.current
     LaunchedEffect(track.idString) { offsetX.snapTo(0f) }
+    val open by androidx.compose.runtime.rememberUpdatedState(onClick)
+    val dismiss by androidx.compose.runtime.rememberUpdatedState(onDismiss)
     val durationMs = (track.durationMs ?: 0L).coerceAtLeast(0L)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(62.dp)
-            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-            .graphicsLayer { alpha = 1f - (abs(offsetX.value) / (300f * density.density)).coerceIn(0f, 0.8f) }
+            .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
+            .graphicsLayer {
+                alpha = 1f - (abs(offsetX.value) / (300f * density.density)).coerceIn(0f, 0.8f)
+                // Pulled up, the capsule grows a little towards the player it opens
+                val lift = (-offsetY.value / (80f * density.density)).coerceIn(0f, 1f)
+                scaleX = 1f + 0.04f * lift
+                scaleY = 1f + 0.04f * lift
+            }
             .hifiSoftShadow(MiniShape, 18.dp)
             .clip(MiniShape)
             .background(HiFi.BarFill)
             .border(1.dp, Color.White.copy(alpha = 0.12f), MiniShape)
             .clickable(role = Role.Button, onClickLabel = stringResource(R.string.cd_razvernut_pleer), onClick = onClick)
             .pointerInput(Unit) {
-                detectHorizontalDragGestures(
+                // The first clear movement decides: sideways dismisses, upwards opens the player
+                var axis = MiniGesture.Axis.NONE
+                detectDragGestures(
+                    onDragStart = { axis = MiniGesture.Axis.NONE },
                     onDragEnd = {
-                        if (abs(offsetX.value) > 100.dp.toPx()) {
-                            scope.launch {
+                        when (MiniGesture.outcome(axis, offsetX.value, offsetY.value, density.density)) {
+                            MiniGesture.Outcome.DISMISS -> scope.launch {
                                 offsetX.animateTo(if (offsetX.value > 0) 1000f else -1000f)
-                                onDismiss()
+                                dismiss()
                             }
-                        } else {
-                            scope.launch { offsetX.animateTo(0f) }
+                            MiniGesture.Outcome.OPEN -> {
+                                open()
+                                scope.launch { offsetY.animateTo(0f, HiFiMotion.spring()) }
+                            }
+                            MiniGesture.Outcome.NONE -> scope.launch {
+                                launch { offsetX.animateTo(0f, HiFiMotion.spring()) }
+                                offsetY.animateTo(0f, HiFiMotion.spring())
+                            }
                         }
                     },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        scope.launch { offsetX.snapTo(offsetX.value + dragAmount) }
+                    onDragCancel = {
+                        scope.launch {
+                            launch { offsetX.animateTo(0f) }
+                            offsetY.animateTo(0f)
+                        }
                     }
-                )
+                ) { change, drag ->
+                    change.consume()
+                    if (axis == MiniGesture.Axis.NONE) axis = MiniGesture.axisOf(drag.x, drag.y)
+                    scope.launch {
+                        when (axis) {
+                            MiniGesture.Axis.HORIZONTAL -> offsetX.snapTo(offsetX.value + drag.x)
+                            // Up follows the finger with resistance, down hardly moves
+                            MiniGesture.Axis.VERTICAL -> offsetY.snapTo(
+                                (offsetY.value + drag.y * if (offsetY.value + drag.y < 0) 0.6f else 0.15f)
+                                    .coerceIn(-120f * density.density, 12f * density.density)
+                            )
+                            MiniGesture.Axis.NONE -> Unit
+                        }
+                    }
+                }
             }
             .drawBehind {
                 // Progress hairline along the bottom edge
@@ -136,9 +194,9 @@ fun MiniPlayer(
             Box(
                 modifier = coverModifier
                     .size(44.dp)
-                    .shadow(6.dp, RoundedCornerShape(12.dp))
+                    .hifiSoftShadow(RoundedCornerShape(12.dp), 8.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (track.isRadio) Color.White else Color(0xFF1C1F28)),
+                    .background(if (track.isRadio) Color.White else HiFi.Placeholder),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
@@ -157,7 +215,7 @@ fun MiniPlayer(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = track.title ?: "Без названия",
+                    text = track.title ?: stringResource(R.string.bez_nazvaniya),
                     color = Color.White,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
@@ -172,7 +230,7 @@ fun MiniPlayer(
                     }
                 } else {
                     Text(
-                        text = track.artists.joinToString { it.name ?: "" }.ifEmpty { "Неизвестный исполнитель" },
+                        text = track.artists.joinToString { it.name ?: "" }.ifEmpty { stringResource(R.string.player_unknown_artist) },
                         color = HiFi.TextSecondary,
                         fontSize = 13.sp,
                         maxLines = 1,

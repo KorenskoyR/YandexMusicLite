@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
@@ -61,8 +62,8 @@ fun RadioCoverCard(
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF2A2E39),
-                        Color(0xFF111318)
+                        HiFi.AnodizedLight,
+                        HiFi.AnodizedDark
                     ),
                     radius = 900f
                 )

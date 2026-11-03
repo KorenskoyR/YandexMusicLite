@@ -48,6 +48,9 @@ class LibraryRepository @Inject constructor(
 
     private val _isSyncingLikes = MutableStateFlow(false)
     val isSyncingLikes: StateFlow<Boolean> = _isSyncingLikes.asStateFlow()
+    private val _likesSyncFailed = MutableStateFlow(false)
+    /** The last sync of the likes failed (no network, server error); cleared by the next successful one. */
+    val likesSyncFailed: StateFlow<Boolean> = _likesSyncFailed.asStateFlow()
 
     private val _weeklyHits = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
     val weeklyHits: StateFlow<List<TrackDetailsDto>> = _weeklyHits.asStateFlow()
@@ -108,6 +111,7 @@ class LibraryRepository @Inject constructor(
                 if (uid != "me") api.getLikedTracks("me", richTracks = false) else throw e
             }
             val result = response.result ?: return false
+            _likesSyncFailed.value = false
             val revision = result.library?.revision ?: result.revision
             var ids = result.allTracks.map { it.idString }.filter { it.isNotEmpty() }.distinct()
 
@@ -133,7 +137,7 @@ class LibraryRepository @Inject constructor(
             // Keep the server's order (most recent like first)
             val tracks = ids.map { id ->
                 cachedById[id] ?: embedded[id] ?: fetched[id]
-                    ?: TrackDetailsDto(id = kotlinx.serialization.json.JsonPrimitive(id), title = "Трек $id")
+                    ?: TrackDetailsDto(id = kotlinx.serialization.json.JsonPrimitive(id))
             }
             if (activeFolder != folder) return false // account switched while syncing
             _likedTracks.value = tracks
@@ -145,6 +149,7 @@ class LibraryRepository @Inject constructor(
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Likes sync failed", e)
+            _likesSyncFailed.value = true
             return false
         } finally {
             _isSyncingLikes.value = false

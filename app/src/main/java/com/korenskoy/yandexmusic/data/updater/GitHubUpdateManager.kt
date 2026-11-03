@@ -1,11 +1,11 @@
 package com.korenskoy.yandexmusic.data.updater
 
+import com.korenskoy.yandexmusic.R
 import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
@@ -79,7 +79,7 @@ class GitHubUpdateManager @Inject constructor(
                     return@withContext UpdateCheckResult.Error("HTTP ${response.code}: ${response.message}")
                 }
 
-                val body = response.body.string().ifEmpty { return@withContext UpdateCheckResult.Error("Пустой ответ от GitHub API") }
+                val body = response.body.string().ifEmpty { return@withContext UpdateCheckResult.Error(context.getString(R.string.update_err_empty_response)) }
                 json.decodeFromString<GitHubReleaseDto>(body)
             }
 
@@ -88,12 +88,12 @@ class GitHubUpdateManager @Inject constructor(
 
             if (isVersionNewer(remoteVersion, localVersion)) {
                 val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-                    ?: return@withContext UpdateCheckResult.Error("Релиз $remoteVersion найден, но APK-файл в ассетах отсутствует")
+                    ?: return@withContext UpdateCheckResult.Error(context.getString(R.string.update_err_no_apk, remoteVersion))
 
                 UpdateCheckResult.UpdateAvailable(
                     versionName = remoteVersion,
                     title = release.name ?: "Yandex Music Lite v$remoteVersion",
-                    changelog = cleanChangelog(release.body ?: ""),
+                    changelog = cleanChangelog(release.body ?: "", context.getString(R.string.update_notes_default)),
                     apkDownloadUrl = apkAsset.browserDownloadUrl,
                     apkSizeBytes = apkAsset.size,
                     apkSha256 = apkAsset.digest?.removePrefix("sha256:")?.lowercase()
@@ -103,7 +103,7 @@ class GitHubUpdateManager @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for updates", e)
-            UpdateCheckResult.Error(e.localizedMessage ?: "Сетевая ошибка при проверке обновлений")
+            UpdateCheckResult.Error(e.localizedMessage ?: context.getString(R.string.update_err_network))
         }
     }
 
@@ -157,7 +157,7 @@ class GitHubUpdateManager @Inject constructor(
         onProgress: (Float) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         if (!isTrustedDownloadUrl(downloadUrl)) {
-            return@withContext Result.failure(SecurityException("Обновление можно скачать только с GitHub по HTTPS"))
+            return@withContext Result.failure(SecurityException(context.getString(R.string.update_err_not_github)))
         }
         val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
         val tempFile = File(updatesDir, "YandexMusicLite_download.tmp")
@@ -175,7 +175,7 @@ class GitHubUpdateManager @Inject constructor(
 
             val downloadResult = okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("HTTP ${response.code} при скачивании обновления"))
+                    return@withContext Result.failure(Exception(context.getString(R.string.update_err_http, response.code)))
                 }
 
                 val responseBody = response.body
@@ -203,19 +203,19 @@ class GitHubUpdateManager @Inject constructor(
 
                 if (contentLength > 0 && tempFile.length() != contentLength) {
                     tempFile.delete()
-                    return@withContext Result.failure(Exception("Загрузка прервана: получено ${tempFile.length()} из $contentLength байт"))
+                    return@withContext Result.failure(Exception(context.getString(R.string.update_err_incomplete, tempFile.length(), contentLength)))
                 }
                 val actualSha256 = sha256.digest().joinToString("") { "%02x".format(it) }
                 if (expectedSha256 != null && !actualSha256.equals(expectedSha256, ignoreCase = true)) {
                     tempFile.delete()
-                    return@withContext Result.failure(SecurityException("Контрольная сумма обновления не совпадает с опубликованной на GitHub"))
+                    return@withContext Result.failure(SecurityException(context.getString(R.string.update_err_checksum)))
                 }
                 true
             }
 
             if (!downloadResult) {
                 if (tempFile.exists()) tempFile.delete()
-                return@withContext Result.failure(Exception("Ошибка сохранения обновления"))
+                return@withContext Result.failure(Exception(context.getString(R.string.update_err_save)))
             }
 
             if (tempFile.exists()) {
@@ -224,7 +224,7 @@ class GitHubUpdateManager @Inject constructor(
             }
 
             if (!targetFile.exists() || targetFile.length() == 0L) {
-                return@withContext Result.failure(Exception("Файл APK пуст или не был сохранен"))
+                return@withContext Result.failure(Exception(context.getString(R.string.update_err_apk_empty)))
             }
 
             Result.success(targetFile)
@@ -240,7 +240,7 @@ class GitHubUpdateManager @Inject constructor(
      */
     fun checkApkCompatibility(apkFile: File): ApkInstallPreCheck {
         if (!apkFile.exists() || apkFile.length() == 0L) {
-            return ApkInstallPreCheck.CorruptedApk("Файл обновления пуст или не найден")
+            return ApkInstallPreCheck.CorruptedApk(context.getString(R.string.update_err_apk_missing))
         }
 
         return try {
@@ -251,15 +251,15 @@ class GitHubUpdateManager @Inject constructor(
                 PackageManager.GET_SIGNATURES
             }
             val packageArchiveInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, baseFlags)
-                ?: return ApkInstallPreCheck.CorruptedApk("Файл поврежден или не является корректным пакетом APK")
+                ?: return ApkInstallPreCheck.CorruptedApk(context.getString(R.string.update_err_apk_corrupt))
 
             if (packageArchiveInfo.packageName != context.packageName) {
-                return ApkInstallPreCheck.CorruptedApk("Файл не является обновлением Yandex Music Lite")
+                return ApkInstallPreCheck.CorruptedApk(context.getString(R.string.update_err_apk_foreign))
             }
 
             val currentPackageInfo = context.packageManager.getPackageInfo(context.packageName, baseFlags)
             if (versionCodeOf(packageArchiveInfo) <= versionCodeOf(currentPackageInfo)) {
-                return ApkInstallPreCheck.CorruptedApk("Скачанная версия не новее установленной")
+                return ApkInstallPreCheck.CorruptedApk(context.getString(R.string.update_err_apk_older))
             }
 
             val currentDigests = installedSignatures()
@@ -281,7 +281,7 @@ class GitHubUpdateManager @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Error checking APK compatibility", e)
             // Fail closed: never install what could not be verified
-            ApkInstallPreCheck.CorruptedApk("Не удалось проверить файл обновления")
+            ApkInstallPreCheck.CorruptedApk(context.getString(R.string.update_err_apk_check))
         }
     }
 
@@ -337,7 +337,8 @@ class GitHubUpdateManager @Inject constructor(
                 val md = MessageDigest.getInstance("SHA-256")
                 val digest = md.digest(sig.toByteArray())
                 digest.joinToString(":") { "%02X".format(it) }
-            } catch (e: Exception) {
+            } catch (e: java.security.NoSuchAlgorithmException) {
+                Log.w(TAG, "SHA-256 unavailable", e)
                 null
             }
         } ?: emptyList()
@@ -355,7 +356,7 @@ class GitHubUpdateManager @Inject constructor(
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            val chooser = Intent.createChooser(shareIntent, "Сохранить или отправить файл обновления").apply {
+            val chooser = Intent.createChooser(shareIntent, context.getString(R.string.update_share_title)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)
@@ -370,13 +371,13 @@ class GitHubUpdateManager @Inject constructor(
     fun installApk(apkFile: File): Result<Unit> {
         return try {
             if (!apkFile.exists() || apkFile.length() == 0L) {
-                return Result.failure(Exception("Файл APK не найден или пуст"))
+                return Result.failure(Exception(context.getString(R.string.update_err_apk_missing)))
             }
 
             // On Android 8.0+ check if installing from unknown sources is permitted
             if (!canRequestPackageInstalls()) {
                 openInstallPermissionSettings()
-                return Result.failure(SecurityException("Пожалуйста, разрешите установку приложений для Yandex Music Lite в открывшихся настройках"))
+                return Result.failure(SecurityException(context.getString(R.string.update_err_allow_install)))
             }
 
             val authority = "${context.packageName}.update_provider"
@@ -421,12 +422,14 @@ class GitHubUpdateManager @Inject constructor(
 
     companion object {
         private const val TAG = "GitHubUpdateManager"
+        /** Used without a Context (tests); the app passes the localized string. */
+        private const val DEFAULT_NOTES = "•"
 
         /**
          * Cleans technical noise and links from changelog text for user display.
          */
-        fun cleanChangelog(rawBody: String): String {
-            if (rawBody.isBlank()) return "• Улучшения стабильности и воспроизведения аудио"
+        fun cleanChangelog(rawBody: String, fallback: String = DEFAULT_NOTES): String {
+            if (rawBody.isBlank()) return fallback
 
             val lines = rawBody.lines()
                 .filterNot { it.contains("Full Changelog", ignoreCase = true) }
@@ -443,7 +446,7 @@ class GitHubUpdateManager @Inject constructor(
                 .filter { it.isNotBlank() }
 
             return if (lines.isEmpty()) {
-                "• Улучшения стабильности и воспроизведения аудио"
+                fallback
             } else {
                 lines.joinToString("\n")
             }
@@ -454,7 +457,7 @@ class GitHubUpdateManager @Inject constructor(
          */
         /** Release assets are served from github.com and redirected to GitHub's object storage. */
         fun isTrustedDownloadUrl(url: String): Boolean {
-            val uri = try { java.net.URI(url) } catch (e: Exception) { return false }
+            val uri = try { java.net.URI(url) } catch (e: java.net.URISyntaxException) { return false }
             val host = uri.host?.lowercase() ?: return false
             return uri.scheme == "https" && (host == "github.com" || host.endsWith(".githubusercontent.com"))
         }

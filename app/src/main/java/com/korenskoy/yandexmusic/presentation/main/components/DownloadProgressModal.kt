@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogActionKind
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
+import com.korenskoy.yandexmusic.presentation.hifi.GlassPillButton
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiProgressBar
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.animateFloatAsState
@@ -79,26 +83,7 @@ fun DownloadProgressModal(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                if (waiting) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = Color.White.copy(alpha = 0.1f)
-                    )
-                } else {
-                    LinearProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = Color.White.copy(alpha = 0.1f)
-                    )
-                }
+                HiFiProgressBar(progress = if (waiting) null else ({ animatedProgress }), height = 8.dp)
 
                 if (progressInfo != null && progressInfo.currentTrackTitle.isNotBlank()) {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -125,24 +110,10 @@ fun DownloadProgressModal(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.7f))
-                    ) {
-                        Text(stringResource(R.string.download_progress_modal_svernut), fontWeight = FontWeight.Bold)
-                    }
-                    
-                    Button(
-                        onClick = onCancel,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0A6CFF).copy(alpha = 0.2f),
-                            contentColor = Color(0xFF0A6CFF)
-                        ),
-                        elevation = null
-                    ) {
-                        Text(stringResource(R.string.download_progress_modal_otmenit), fontWeight = FontWeight.Bold)
+                    GlassPillButton(stringResource(R.string.download_progress_modal_svernut), onDismiss, Modifier.weight(1f), height = 48.dp)
+                    // Cancelling throws the queue away: a red glass capsule, like every destructive action
+                    Box(Modifier.weight(1f)) {
+                        HiFiDialogAction(stringResource(R.string.download_progress_modal_otmenit), onCancel, HiFiDialogActionKind.Danger)
                     }
                 }
             }

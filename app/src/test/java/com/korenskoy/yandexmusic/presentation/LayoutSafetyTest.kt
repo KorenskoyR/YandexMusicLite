@@ -49,7 +49,7 @@ class LayoutSafetyTest {
                 }
             }
         """.trimIndent()
-        
+
         val parsed = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TracksResponseDto>>(sampleJson)
         val tracks = parsed.result?.allTracks
         org.junit.Assert.assertNotNull("Parsed tracks must not be null", tracks)
@@ -83,7 +83,7 @@ class LayoutSafetyTest {
                 }
             }
         """.trimIndent()
-        
+
         val parsed = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TracksResponseDto>>(sampleJson)
         val tracks = parsed.result?.allTracks
         org.junit.Assert.assertNotNull("Parsed tracks must not be null", tracks)
@@ -107,7 +107,7 @@ class LayoutSafetyTest {
                 }
             }
         """.trimIndent()
-        
+
         val parsed = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TracksResponseDto>>(sampleJson)
         val tracks = parsed.result?.allTracks
         org.junit.Assert.assertNotNull("Parsed direct tracks must not be null", tracks)
@@ -118,11 +118,11 @@ class LayoutSafetyTest {
     @Test
     fun testApiTracksMetadataSignatures() {
         val apiFile = File(sourceDir, "data/network/YandexMusicApi.kt").readText()
-        assertTrue("YandexMusicApi must declare POST getTracksMetadata with List<String>", 
+        assertTrue("YandexMusicApi must declare POST getTracksMetadata with List<String>",
             apiFile.contains("suspend fun getTracksMetadata(\n        @retrofit2.http.Field(\"track-ids\") trackIds: List<String>"))
-        assertTrue("YandexMusicApi must declare GET getTracksMetadataQuery with String", 
+        assertTrue("YandexMusicApi must declare GET getTracksMetadataQuery with String",
             apiFile.contains("suspend fun getTracksMetadataQuery(\n        @retrofit2.http.Query(\"track-ids\") trackIds: String"))
-        assertTrue("YandexMusicApi must declare rich-tracks parameter on getLikedTracks", 
+        assertTrue("YandexMusicApi must declare rich-tracks parameter on getLikedTracks",
             apiFile.contains("@retrofit2.http.Query(\"rich-tracks\") richTracks: Boolean = true"))
     }
 
@@ -141,7 +141,7 @@ class LayoutSafetyTest {
     @Test
     fun testAccountStatusResponseDtoUidParsing() {
         val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
-        
+
         // Nested uid in account
         val nestedJson = """{"result": {"account": {"uid": 12345678}}}"""
         val parsedNested = json.decodeFromString<com.korenskoy.yandexmusic.data.dto.ResponseWrapper<com.korenskoy.yandexmusic.data.dto.AccountStatusResponseDto>>(nestedJson)
@@ -245,8 +245,8 @@ class LayoutSafetyTest {
 
     @Test
     fun testQueuePrefetchThreshold() {
-        val player = File(sourceDir, "presentation/player/FullScreenPlayer.kt").readText()
-        assertTrue("FullScreenPlayer must prefetch when lastVisible >= total - 12",
+        val player = File(sourceDir, "presentation/player/PlayerQueueSheet.kt").readText()
+        assertTrue("The queue sheet must prefetch when lastVisible >= total - 12",
             player.contains("lastVisible >= total - 12"))
     }
 
@@ -360,9 +360,9 @@ class LayoutSafetyTest {
         assertTrue("StartupAccountPickerDialog must have rememberAsDefault option",
             startupDialogFile.contains("rememberAsDefault"))
 
-        val mainScreenFile = File(sourceDir, "presentation/main/MainScreen.kt").readText()
-        assertTrue("MainScreen must check showStartupAccountPicker",
-            mainScreenFile.contains("showStartupAccountPicker"))
+        val dialogsFile = File(sourceDir, "presentation/main/MainDialogs.kt").readText()
+        assertTrue("The startup picker shows only for several accounts without a default one",
+            dialogsFile.contains("!startupPickerHandled && accounts.size > 1 && defaultUid == null"))
     }
 
     @Test
@@ -383,10 +383,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 39",
-            buildGradle.contains("versionCode = 39"))
-        assertTrue("build.gradle.kts must be versionName 1.8.3",
-            buildGradle.contains("versionName = \"1.8.3\""))
+        assertTrue("build.gradle.kts must be versionCode 40",
+            buildGradle.contains("versionCode = 40"))
+        assertTrue("build.gradle.kts must be versionName 1.9.2",
+            buildGradle.contains("versionName = \"1.9.2\""))
     }
 
     @Test

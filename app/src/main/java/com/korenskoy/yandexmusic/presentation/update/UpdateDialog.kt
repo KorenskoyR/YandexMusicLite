@@ -1,12 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiProgressBar
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,9 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -95,7 +92,7 @@ fun UpdateDialog(
                             .size(44.dp)
                             .clip(CircleShape)
                             .background(
-                                Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
+                                Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -191,7 +188,7 @@ fun UpdateDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     val sizeMb = String.format(java.util.Locale.US, "%.2f", updateInfo.apkSizeBytes / (1024f * 1024f))
                     Text(
-                        text = "Размер файла: ~$sizeMb МБ",
+                        text = stringResource(R.string.update_file_size, sizeMb.toString()),
                         color = Color.White.copy(alpha = 0.45f),
                         fontSize = 11.sp
                     )
@@ -219,15 +216,7 @@ fun UpdateDialog(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { downloadProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = Color(0xFF0A6CFF),
-                        trackColor = Color.White.copy(alpha = 0.1f),
-                    )
+                    HiFiProgressBar(progress = { downloadProgress }, height = 8.dp)
                 }
 
                 if (statusMessage != null) {
@@ -245,8 +234,8 @@ fun UpdateDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFFFF9900).copy(alpha = 0.15f))
-                            .border(BorderStroke(1.dp, Color(0xFFFF9900).copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
+                            .background(HiFi.Warning.copy(alpha = 0.15f))
+                            .border(BorderStroke(1.dp, HiFi.Warning.copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
                             .padding(14.dp)
                     ) {
                         Column {
@@ -254,13 +243,13 @@ fun UpdateDialog(
                                 Icon(
                                     imageVector = Icons.Default.SystemUpdate,
                                     contentDescription = null,
-                                    tint = Color(0xFFFFB74D),
+                                    tint = HiFi.Warning,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.update_perehod_na_ofitsialnyy_reliz),
-                                    color = Color(0xFFFFD54F),
+                                    color = HiFi.Warning,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -282,8 +271,8 @@ fun UpdateDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFFFF9900).copy(alpha = 0.12f))
-                            .border(BorderStroke(1.dp, Color(0xFFFF9900).copy(alpha = 0.35f)), RoundedCornerShape(14.dp))
+                            .background(HiFi.Warning.copy(alpha = 0.12f))
+                            .border(BorderStroke(1.dp, HiFi.Warning.copy(alpha = 0.35f)), RoundedCornerShape(14.dp))
                             .clickable { onRequestPermission() }
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
@@ -291,13 +280,13 @@ fun UpdateDialog(
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = null,
-                                tint = Color(0xFFFFB74D),
+                                tint = HiFi.Warning,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = stringResource(R.string.update_trebuetsya_odin_raz_razreshit),
-                                color = Color(0xFFFFD54F),
+                                color = HiFi.Warning,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
                             )
@@ -377,11 +366,7 @@ fun UpdateDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (isDownloading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
-                                )
+                                HiFiActivityIndicator(size = 16.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.update_zagruzka),
@@ -412,7 +397,7 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = if (isSignatureMismatch) "Открыть установщик" else "Установить",
+                                    text = stringResource(if (isSignatureMismatch) R.string.update_open_installer else R.string.update_install),
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold

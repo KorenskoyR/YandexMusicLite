@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic
 
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.performTouchInput
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.semantics.SemanticsActions
@@ -97,5 +99,47 @@ class FullPlayerInstrumentedTest {
         Espresso.pressBack()
         compose.waitForIdle()
         assertEquals(1, collapsed)
+    }
+
+    /** Pulled down far enough the player closes; a short pull springs back. Queue rows move by TalkBack actions. */
+    @Test
+    fun pullDownClosesAndQueueRowsMove() {
+        var collapsed = 0
+        var moved: Pair<String, String>? = null
+        compose.setContent {
+            YandexMusicTheme {
+                FullScreenPlayer(
+                    track = queue[0], isPlaying = false, isLiked = false, progress = { 0L }, queue = queue,
+                    onPlayPauseClick = {}, onToggleLike = {}, onNextClick = {}, onPrevClick = {},
+                    onSeekTo = {}, onTrackSelect = {}, onRemoveFromQueue = {},
+                    onCollapse = { collapsed++ }, onCloseAndClear = {}, onDislikeClick = {},
+                    onMoveInQueue = { id, target -> moved = id to target }
+                )
+            }
+        }
+        // A short pull on the header area: nothing happens
+        compose.onNodeWithText("СЕЙЧАС ИГРАЕТ").performTouchInput { swipeDown(startY = centerY, endY = centerY + 60f, durationMillis = 400) }
+        compose.waitForIdle()
+        assertEquals(0, collapsed)
+        // A long pull closes it
+        compose.onNodeWithText("СЕЙЧАС ИГРАЕТ").performTouchInput { swipeDown(startY = centerY, endY = centerY + 1400f, durationMillis = 500) }
+        compose.waitForIdle()
+        assertEquals(1, collapsed)
+
+        // The queue: "Вторая песня" goes one down, below "Третья песня"
+        compose.onNodeWithText("ДАЛЕЕ").performClick()
+        compose.waitForIdle()
+        compose.onAllNodes(hasCustomAction("Ниже"))[0].performCustomAction("Ниже")
+        assertEquals("2" to "3", moved)
+    }
+
+    private fun hasCustomAction(label: String) = androidx.compose.ui.test.SemanticsMatcher("has action $label") { node ->
+        val key = androidx.compose.ui.semantics.SemanticsActions.CustomActions
+        key in node.config && node.config[key].any { it.label == label }
+    }
+
+    private fun androidx.compose.ui.test.SemanticsNodeInteraction.performCustomAction(label: String) {
+        val action = fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.CustomActions].first { it.label == label }
+        compose.runOnUiThread { action.action() }
     }
 }

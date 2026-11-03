@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Yandex Music Lite</string>
     <string name="account_management_upravlenie_akkauntami">Управление аккаунтами</string>
     <string name="account_management_pereklyuchenie_profiley_i_nastroyki">Переключение профилей и настройки входа</string>
@@ -107,7 +107,6 @@
     <string name="auto_radio">Радио</string>
     <string name="playlist_load_failed">Не удалось загрузить плейлист</string>
     <string name="playlist_empty">В плейлисте нет треков</string>
-    <string name="playlist_retry">Повторить</string>
     <string name="auto_playlists">Плейлисты</string>
     <string name="bez_nazvaniya">Без названия</string>
     <string name="cd_track_menu">Ещё</string>
@@ -142,8 +141,8 @@
     <string name="settings_ui_scale_title">Масштаб интерфейса</string>
     <string name="settings_ui_scale_auto">Авто</string>
     <string name="settings_ui_scale_manual">Вручную</string>
-    <string name="settings_ui_scale_auto_info">Экран %1$d×%2$d · система %3$d dpi · физически ≈ %4$s dpi → %5$d%%</string>
-    <string name="settings_ui_scale_manual_value">%1$d%% · ≈ %2$d dpi</string>
+    <string name="settings_ui_scale_auto_info" tools:ignore="PluralsCandidate">Экран %1$d×%2$d · система %3$d dpi · физически ≈ %4$s dpi → %5$d%%</string>
+    <string name="settings_ui_scale_manual_value" tools:ignore="PluralsCandidate">%1$d%% · ≈ %2$d dpi</string>
     <string name="settings_upgrade_downloads">Улучшить качество скачанных</string>
     <string name="settings_upgrade_downloads_hint">Перекачать треки, для которых сервер теперь даёт лучшее качество</string>
     <string name="playlist_reorder">Изменить порядок</string>
@@ -266,4 +265,46 @@
         <item quantity="many">%1$d треков</item>
         <item quantity="other">%1$d трека</item>
     </plurals>
+    <string name="state_error_title">Не удалось загрузить</string>
+    <string name="state_error_message">Проверьте подключение. Как только сеть появится, приложение повторит само.</string>
+    <string name="state_retry">Повторить</string>
+    <string name="state_loading">Загрузка</string>
+    <string name="library_empty_title">Здесь пока пусто</string>
+    <string name="library_empty_message">Отмечайте треки сердечком — они появятся в «Моей музыке».</string>
+    <string name="queue_remove">Убрать</string>
+    <string name="update_err_empty_response">Пустой ответ от GitHub</string>
+    <string name="update_err_no_apk">Релиз %1$s найден, но файла APK в нём нет</string>
+    <string name="update_err_network">Не удалось проверить обновления: нет связи</string>
+    <string name="update_err_not_github">Обновление можно скачать только с GitHub по HTTPS</string>
+    <string name="update_err_http">Ошибка HTTP %1$d при скачивании обновления</string>
+    <string name="update_err_incomplete">Загрузка прервалась: получено %1$d из %2$d байт</string>
+    <string name="update_err_checksum">Контрольная сумма обновления не совпадает с опубликованной на GitHub</string>
+    <string name="update_err_save">Не удалось сохранить обновление</string>
+    <string name="update_err_apk_empty">Файл обновления пуст или не сохранился</string>
+    <string name="update_err_apk_missing">Файл обновления пуст или не найден</string>
+    <string name="update_err_apk_corrupt">Файл повреждён или это не пакет APK</string>
+    <string name="update_err_apk_foreign">Это не обновление Yandex Music Lite</string>
+    <string name="update_err_apk_older">Скачанная версия не новее установленной</string>
+    <string name="update_err_apk_check">Не удалось проверить файл обновления</string>
+    <string name="update_share_title">Сохранить или отправить файл обновления</string>
+    <string name="update_err_allow_install">Разрешите установку приложений для Yandex Music Lite в открывшихся настройках</string>
+    <string name="update_notes_default">• Улучшения стабильности и воспроизведения</string>
+    <string name="update_status_checking">Проверяем обновления…</string>
+    <string name="update_status_latest">Установлена последняя версия</string>
+    <string name="update_status_download_failed">Не удалось скачать: %1$s</string>
+    <string name="update_status_package_failed">Файл обновления не подходит: %1$s</string>
+    <string name="update_status_reinstall">Обновление готово. Из‑за смены ключа подписи на официальный нужна разовая чистая переустановка.</string>
+    <string name="update_file_size">Размер файла: ~%1$s МБ</string>
+    <string name="update_open_installer">Открыть установщик</string>
+    <string name="update_install">Установить</string>
+    <string name="notification_channel_description">Уведомления плеера Yandex Music Lite</string>
+    <string name="account_is_default">По умолчанию</string>
+    <string name="account_make_default">Сделать по умолчанию</string>
+    <string name="tab_wave">Волна</string>
+    <string name="tab_search">Поиск</string>
+    <string name="tab_music">Музыка</string>
+    <string name="tab_radio">Радио</string>
+    <string name="tab_car">В авто</string>
+    <string name="radio_live_frequency">Прямой эфир • %1$s</string>
+    <string name="search_nothing_found_hint">Попробуйте написать иначе или короче.</string>
 </resources>

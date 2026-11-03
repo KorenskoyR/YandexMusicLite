@@ -27,21 +27,32 @@ val yandexSalt = if (rawSalt.isNullOrBlank()) {
     "\"$rawSalt\""
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("app/compose-stability.conf"))
+}
+
 android {
     namespace = "com.korenskoy.yandexmusic"
     compileSdk {
         version = release(37)
     }
 
+    // Every lint warning fails the build: the code base is kept at zero warnings.
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        lintConfig = file("lint.xml")
+    }
+
     defaultConfig {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 24
         targetSdk = 36
-        versionCode = 39
-        versionName = "1.8.3"
+        versionCode = 40
+        versionName = "1.9.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
         buildConfigField("String", "YANDEX_SALT", yandexSalt)
 
         ndk {
@@ -130,7 +141,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
-    
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -168,12 +179,13 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     baselineProfile(project(":baselineprofile"))
-    
+
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     testImplementation(libs.junit)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)

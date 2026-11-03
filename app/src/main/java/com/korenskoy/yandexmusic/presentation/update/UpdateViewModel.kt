@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import com.korenskoy.yandexmusic.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.updater.ApkInstallPreCheck
@@ -17,7 +18,8 @@ import javax.inject.Inject
 /** In-app updates from GitHub releases: check, download (with the SHA-256 check) and install. */
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
-    private val updateManager: GitHubUpdateManager
+    private val updateManager: GitHubUpdateManager,
+    @param:dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
     private val _checkResult = MutableStateFlow<UpdateCheckResult?>(null)
@@ -48,14 +50,14 @@ class UpdateViewModel @Inject constructor(
     fun checkForUpdates(silent: Boolean = false) {
         viewModelScope.launch {
             if (!silent) {
-                _statusMessage.value = "Проверка обновлений..."
+                _statusMessage.value = context.getString(R.string.update_status_checking)
             }
             val result = updateManager.checkForUpdates()
             if (!silent || result is UpdateCheckResult.UpdateAvailable) {
                 _checkResult.value = result
             }
             if (result is UpdateCheckResult.UpToDate && !silent) {
-                _statusMessage.value = "У вас установлена актуальная версия"
+                _statusMessage.value = context.getString(R.string.update_status_latest)
             }
         }
     }
@@ -77,7 +79,7 @@ class UpdateViewModel @Inject constructor(
                 installDownloaded()
             }.onFailure { err ->
                 _downloadProgress.value = -1f
-                _statusMessage.value = "Ошибка загрузки: ${err.localizedMessage}"
+                _statusMessage.value = context.getString(R.string.update_status_download_failed, err.localizedMessage.orEmpty())
             }
         }
     }
@@ -89,12 +91,12 @@ class UpdateViewModel @Inject constructor(
         // system installer handle a signing-key change (it will ask the user to reinstall)
         val preCheck = updateManager.checkApkCompatibility(file)
         if (preCheck is ApkInstallPreCheck.CorruptedApk) {
-            _statusMessage.value = "Ошибка пакета: ${preCheck.reason}"
+            _statusMessage.value = context.getString(R.string.update_status_package_failed, preCheck.reason)
             return
         }
         if (!forceSystemInstall && preCheck is ApkInstallPreCheck.SignatureMismatch) {
             _isSignatureMismatch.value = true
-            _statusMessage.value = "Обновление готово! Требуется разовая чистая переустановка из-за смены ключа подписи на официальный."
+            _statusMessage.value = context.getString(R.string.update_status_reinstall)
             return
         }
 

@@ -100,13 +100,13 @@ class TrackDownloadManager @Inject constructor(
             url.substringAfter("#encraw_key=").takeIf { it.isNotBlank() }
         } else null
         val cleanUrl = if (encrawKey != null) url.substringBefore("#encraw_key=") else url
-        
+
         try {
             val request = Request.Builder().url(cleanUrl).build()
             val isSuccess = okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use false
                 val body = response.body
-                
+
                 FileOutputStream(tempFile).use { fos ->
                     val rawStream = body.byteStream()
                     val inputStream = if (encrawKey != null) EncrawDecryptor.wrapInputStream(rawStream, encrawKey) else rawStream
@@ -116,12 +116,12 @@ class TrackDownloadManager @Inject constructor(
                 }
                 true
             }
-            
+
             if (!isSuccess) {
                 tempFile.delete()
                 return@withContext false
             }
-            
+
             // Rename after successful download
             if (file.exists()) file.delete()
             val renamed = tempFile.renameTo(file)
@@ -133,13 +133,16 @@ class TrackDownloadManager @Inject constructor(
             if (quality != null) qualityFile.writeText("${quality.codec}:${quality.bitrateKbps}") else qualityFile.delete()
             updateCacheStats()
             return@withContext true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            tempFile.delete()
+            throw e
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("TrackDownloadManager", "Download failed", e)
             tempFile.delete()
             return@withContext false
         }
     }
-    
+
     suspend fun removeTrack(trackId: String) = withContext(Dispatchers.IO) {
         val file = File(tracksDir, "$trackId.mp3")
         File(tracksDir, "$trackId.quality").delete()
@@ -148,7 +151,7 @@ class TrackDownloadManager @Inject constructor(
             updateCacheStats()
         }
     }
-    
+
     suspend fun clearMusicCache() = withContext(Dispatchers.IO) {
         tracksDir.listFiles()?.forEach { it.delete() }
         updateCacheStats()

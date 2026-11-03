@@ -1,5 +1,17 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import com.korenskoy.yandexmusic.presentation.hifi.appearOnce
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAppearance
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiEmptyState
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiErrorState
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiSkeletonRows
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
+import com.korenskoy.yandexmusic.presentation.hifi.hifiGlass
+import com.korenskoy.yandexmusic.presentation.hifi.predictiveBack
+import com.korenskoy.yandexmusic.presentation.hifi.rememberPredictiveBack
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -20,7 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,7 +40,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
@@ -46,13 +56,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -90,7 +96,7 @@ internal fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF2A3142), Color(0xFF1C2130)))),
+            .background(Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -130,7 +136,9 @@ fun PlaylistScreen(
     val playlist = opened.playlist
     // Track order being edited (null — normal view); saved as one change with "Done"
     var editedOrder by remember(opened.tracks) { mutableStateOf<List<com.korenskoy.yandexmusic.data.dto.TrackDetailsDto>?>(null) }
-    BackHandler { if (editedOrder != null) editedOrder = null else onBack() }
+    // Back leaves the playlist (the page shrinks under the gesture); while reordering it only cancels that
+    val back = rememberPredictiveBack(enabled = true, onBack = onBack)
+    BackHandler(enabled = editedOrder != null) { editedOrder = null }
     var showMenu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
@@ -153,6 +161,7 @@ fun PlaylistScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .predictiveBack(back)
     ) {
         Row(
             modifier = Modifier
@@ -164,10 +173,8 @@ fun PlaylistScreen(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x352A2A38))
-                    .border(BorderStroke(1.dp, Color(0x40FFFFFF)), CircleShape)
-                    .clickable(onClick = onBack),
+                    .hifiGlass(CircleShape)
+                    .hifiPress(onBack),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -181,7 +188,7 @@ fun PlaylistScreen(
             editedOrder?.let { order ->
                 Text(
                     text = stringResource(R.string.playlist_reorder_done),
-                    color = Color(0xFF0A6CFF),
+                    color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     modifier = Modifier
@@ -248,9 +255,7 @@ fun PlaylistScreen(
             Column {
                 Text(
                     text = playlist.title.orEmpty(),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
+                    style = HiFiType.LargeTitle.copy(fontSize = 26.sp, lineHeight = 32.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -291,37 +296,19 @@ fun PlaylistScreen(
         // The menu of a track listed here also offers "remove from playlist"
         CompositionLocalProvider(LocalTrackMenuPlaylist provides playlist) {
             val order = editedOrder
+            val appearance = rememberAppearance(playlist.kindString)
             when {
                 order != null -> ReorderList(
                     tracks = order,
                     contentBottom = contentBottom,
                     onMove = { from, to -> editedOrder = order.toMutableList().apply { add(to, removeAt(from)) } }
                 )
-                opened.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-                opened.failed || opened.tracks.isEmpty() -> Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = contentBottom),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = stringResource(if (opened.failed) R.string.playlist_load_failed else R.string.playlist_empty),
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 15.sp
-                    )
-                    if (opened.failed) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        com.korenskoy.yandexmusic.presentation.hifi.GlassPillButton(
-                            text = stringResource(R.string.playlist_retry),
-                            onClick = onRetry,
-                            modifier = Modifier.width(220.dp),
-                            height = 48.dp
-                        )
-                    }
-                }
+                opened.isLoading -> HiFiSkeletonRows(Modifier.padding(top = 8.dp), count = 6)
+                opened.failed -> HiFiErrorState(onRetry = onRetry, message = stringResource(R.string.playlist_load_failed))
+                opened.tracks.isEmpty() -> HiFiEmptyState(
+                    icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
+                    title = stringResource(R.string.playlist_empty)
+                )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(bottom = contentBottom),
                     modifier = Modifier
@@ -330,7 +317,8 @@ fun PlaylistScreen(
                         // Rows lie right on the backdrop, like on the album page (no lighter panel)
                         .padding(horizontal = 12.dp)
                 ) {
-                    items(opened.tracks, key = { it.idString }) { track ->
+                    itemsIndexed(opened.tracks, key = { _, t -> t.idString }, contentType = { _, _ -> "track" }) { index, track ->
+                        Box(Modifier.appearOnce(appearance, track.idString, index)) {
                         TrackItem(
                             track = track,
                             isPlaying = isPlaying && track.idString == currentTrackId,
@@ -339,6 +327,7 @@ fun PlaylistScreen(
                             onToggleLike = { onToggleLike(track) },
                             onClick = { onTrackClick(track.idString) }
                         )
+                        }
                     }
                 }
             }
@@ -379,7 +368,7 @@ private fun ReorderList(
                     .zIndex(if (dragged) 1f else 0f)
                     .graphicsLayer { translationY = if (dragged) dragOffset else 0f }
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (dragged) Color(0xFF2A2A36) else Color.Transparent)
+                    .background(if (dragged) HiFi.GlassFill else Color.Transparent)
                     .semantics {
                         customActions = listOfNotNull(
                             CustomAccessibilityAction(upLabel) { onMove(index, index - 1); true }.takeIf { index > 0 },

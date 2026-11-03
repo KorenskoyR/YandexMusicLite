@@ -1,6 +1,18 @@
 package com.korenskoy.yandexmusic.presentation.main
 
-import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
+import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
+import com.korenskoy.yandexmusic.presentation.hifi.appearOnce
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAppearance
+import com.korenskoy.yandexmusic.presentation.hifi.predictiveBack
+import com.korenskoy.yandexmusic.presentation.hifi.rememberPredictiveBack
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiEmptyState
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiErrorState
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiSkeletonRows
+import com.korenskoy.yandexmusic.presentation.hifi.LoadState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,7 +20,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,10 +47,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,15 +60,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,6 +102,7 @@ private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS }
 fun LibraryScreen(
     tracks: List<TrackDetailsDto>,
     isLoading: Boolean,
+    loadFailed: Boolean = false,
     downloadState: DownloadQueueState = DownloadQueueState.IDLE,
     autoDownloadEnabled: Boolean,
     currentTrackId: String?,
@@ -151,7 +157,7 @@ fun LibraryScreen(
     var showProgressModal by remember { mutableStateOf(false) }
     var sectionName by rememberSaveable { mutableStateOf<String?>(null) }
     val section = sectionName?.let { LibrarySection.valueOf(it) }
-    BackHandler(enabled = section != null && openedPlaylist == null) { sectionName = null }
+    val back = rememberPredictiveBack(enabled = section != null && openedPlaylist == null) { sectionName = null }
 
     val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -196,7 +202,7 @@ fun LibraryScreen(
                         HiFiLargeTitle(stringResource(R.string.library_title), modifier = Modifier.weight(1f))
                         if (downloadState == DownloadQueueState.RUNNING) {
                             GlassCircleButton(onClick = { showProgressModal = true }, contentDescription = stringResource(R.string.download_progress_modal_zagruzka_kollektsii)) {
-                                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                                HiFiActivityIndicator(size = 18.dp)
                             }
                             Spacer(Modifier.width(10.dp))
                         }
@@ -218,14 +224,19 @@ fun LibraryScreen(
                         SectionRow(Icons.AutoMirrored.Rounded.PlaylistPlay, stringResource(R.string.library_playlists_row), playlists.size) { sectionName = LibrarySection.PLAYLISTS.name }
                     }
                 }
-                when {
-                    isLoading && tracks.isEmpty() -> item(key = "loading") {
-                        Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
-                        }
+                when (LoadState.of(tracks, tracks.isEmpty(), isLoading, loadFailed)) {
+                    LoadState.Loading -> item(key = "loading") { HiFiSkeletonRows(Modifier.padding(top = 28.dp), count = 4) }
+                    LoadState.Failed -> item(key = "failed") { HiFiErrorState(onRetry = onRefresh) }
+                    LoadState.Empty -> item(key = "empty") {
+                        HiFiEmptyState(
+                            icon = Icons.Rounded.FavoriteBorder,
+                            title = stringResource(R.string.library_empty_title),
+                            message = stringResource(R.string.library_empty_message),
+                            actionLabel = stringResource(R.string.library_obnovit_mediateku),
+                            onAction = onRefresh
+                        )
                     }
-                    tracks.isEmpty() -> item(key = "empty") { EmptyLibrary(onRefresh) }
-                    else -> {
+                    is LoadState.Ready -> {
                         item(key = "recent_title") {
                             HiFiSectionHeader(stringResource(R.string.library_recent), Modifier.padding(top = 26.dp, bottom = 12.dp))
                         }
@@ -239,7 +250,8 @@ fun LibraryScreen(
             }
             LibrarySection.LIKED, LibrarySection.DOWNLOADED -> {
                 val list = if (shown == LibrarySection.LIKED) tracks else downloaded
-                LazyColumn(modifier = Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(start = if (isLandscape) 132.dp else 8.dp, end = 8.dp, bottom = contentBottom)) {
+                val appearance = rememberAppearance(shown)
+                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).statusBarsPadding(), contentPadding = PaddingValues(start = if (isLandscape) 132.dp else 8.dp, end = 8.dp, bottom = contentBottom)) {
                     item(key = "header") {
                         SectionHeader(
                             title = stringResource(if (shown == LibrarySection.LIKED) R.string.library_liked else R.string.library_downloaded),
@@ -257,11 +269,9 @@ fun LibraryScreen(
                     }
                     if (list.isEmpty()) {
                         item(key = "empty") {
-                            Text(
-                                stringResource(if (shown == LibrarySection.DOWNLOADED) R.string.library_downloaded_empty else R.string.library_mne_nravitsya),
-                                style = HiFiType.Body.copy(color = HiFi.TextSecondary),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(top = 48.dp)
+                            HiFiEmptyState(
+                                icon = if (shown == LibrarySection.DOWNLOADED) Icons.Rounded.DownloadDone else Icons.Rounded.FavoriteBorder,
+                                title = stringResource(if (shown == LibrarySection.DOWNLOADED) R.string.library_downloaded_empty else R.string.library_mne_nravitsya)
                             )
                         }
                     } else if (isLandscape) {
@@ -274,13 +284,16 @@ fun LibraryScreen(
                             }
                         }
                     } else {
-                        items(list, key = { it.idString }, contentType = { "track" }) { track ->
-                            LibraryTrack(track, currentTrackId, isPlaying, likedTrackIds, downloadedTrackIds, onToggleLike, onTrackClick)
+                        itemsIndexed(list, key = { _, t -> t.idString }, contentType = { _, _ -> "track" }) { index, track ->
+                            Box(Modifier.appearOnce(appearance, track.idString, index)) {
+                                LibraryTrack(track, currentTrackId, isPlaying, likedTrackIds, downloadedTrackIds, onToggleLike, onTrackClick)
+                            }
                         }
                     }
                 }
             }
             LibrarySection.PLAYLISTS -> PlaylistsPage(
+                modifier = Modifier.predictiveBack(back),
                 playlists = playlists,
                 columns = columns,
                 contentPadding = listPadding,
@@ -365,8 +378,7 @@ private fun SectionRow(icon: ImageVector, title: String, count: Int, onClick: ()
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 60.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button, onClick = onClick),
+            .hifiPress(onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconPlaque(icon, size = 36.dp)
@@ -413,8 +425,7 @@ internal fun CoverCard(track: TrackDetailsDto, modifier: Modifier = Modifier, on
     Column(
         // Only the top corners are rounded: a fully rounded clip would shave the first letter off the caption
         modifier = modifier
-            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .hifiPress(onClick)
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context).data(track.coverUri.toCoverUrl("400x400")).size(400).crossfade(true).build(),
@@ -423,34 +434,20 @@ internal fun CoverCard(track: TrackDetailsDto, modifier: Modifier = Modifier, on
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .shadow(14.dp, RoundedCornerShape(16.dp))
+                .hifiSoftShadow(RoundedCornerShape(16.dp), 18.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF1C1F28))
+                .background(HiFi.Placeholder)
                 .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
         )
         Spacer(Modifier.height(9.dp))
-        Text(track.title ?: "Без названия", style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.title ?: stringResource(R.string.bez_nazvaniya), style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(track.artists.joinToString { it.name ?: "" }, style = HiFiType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-private fun EmptyLibrary(onRefresh: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            "Медиатека пуста или загружается",
-            color = Color.White,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(16.dp))
-        GlassPillButton(stringResource(R.string.library_obnovit_mediateku), onRefresh, Modifier.width(240.dp), icon = Icons.Rounded.Refresh, height = 48.dp)
-    }
-}
-
-@Composable
 private fun PlaylistsPage(
+    modifier: Modifier,
     playlists: List<UserPlaylistDto>,
     columns: Int,
     contentPadding: PaddingValues,
@@ -468,7 +465,7 @@ private fun PlaylistsPage(
         )
     }
     val cells: List<UserPlaylistDto?> = listOf<UserPlaylistDto?>(null) + playlists
-    LazyColumn(modifier = Modifier.fillMaxSize().statusBarsPadding(), contentPadding = contentPadding) {
+    LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = contentPadding) {
         item(key = "header") {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
@@ -484,8 +481,7 @@ private fun PlaylistsPage(
                     Column(
                         Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
-                            .clickable(role = Role.Button) { if (playlist == null) naming = true else onOpen(playlist) }
+                            .hifiPress({ if (playlist == null) naming = true else onOpen(playlist) })
                     ) {
                         if (playlist == null) {
                             Box(
@@ -502,7 +498,7 @@ private fun PlaylistsPage(
                             Spacer(Modifier.height(9.dp))
                             Text(stringResource(R.string.playlist_new), style = HiFiType.CardTitle, maxLines = 1)
                         } else {
-                            PlaylistCover(playlist, Modifier.fillMaxWidth().aspectRatio(1f).shadow(14.dp, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp)))
+                            PlaylistCover(playlist, Modifier.fillMaxWidth().aspectRatio(1f).hifiSoftShadow(RoundedCornerShape(16.dp), 18.dp).clip(RoundedCornerShape(16.dp)))
                             Spacer(Modifier.height(9.dp))
                             Text(playlist.title ?: "", style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(

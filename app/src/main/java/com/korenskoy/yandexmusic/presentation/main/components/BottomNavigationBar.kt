@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.res.stringResource
+import com.korenskoy.yandexmusic.R
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -31,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -45,12 +46,12 @@ import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
 
-enum class MainTab(val title: String, val icon: ImageVector, val route: String) {
-    HOME("Волна", Icons.Rounded.Waves, "home"),
-    SEARCH("Поиск", Icons.Rounded.Search, "search"),
-    LIBRARY("Музыка", Icons.Rounded.LibraryMusic, "library"),
-    RADIO("Радио", Icons.Rounded.Radio, "radio"),
-    CAR("В авто", Icons.Rounded.DirectionsCar, "car")
+enum class MainTab(@param:androidx.annotation.StringRes val title: Int, val icon: ImageVector, val route: String) {
+    HOME(R.string.tab_wave, Icons.Rounded.Waves, "home"),
+    SEARCH(R.string.tab_search, Icons.Rounded.Search, "search"),
+    LIBRARY(R.string.tab_music, Icons.Rounded.LibraryMusic, "library"),
+    RADIO(R.string.tab_radio, Icons.Rounded.Radio, "radio"),
+    CAR(R.string.tab_car, Icons.Rounded.DirectionsCar, "car")
 }
 
 private val BarShape = RoundedCornerShape(32.dp)
@@ -169,10 +170,10 @@ private fun TabItem(tab: MainTab, selected: Boolean, scaleFactor: Float, modifie
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(imageVector = tab.icon, contentDescription = tab.title, tint = iconColor, modifier = Modifier.size(iconSize))
+            Icon(imageVector = tab.icon, contentDescription = stringResource(tab.title), tint = iconColor, modifier = Modifier.size(iconSize))
             Spacer(Modifier.height(2.dp))
             Text(
-                text = tab.title,
+                text = stringResource(tab.title),
                 color = if (selected) Color.White else Color.White.copy(alpha = 0.80f),
                 fontSize = (10.5f * scaleFactor).sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,

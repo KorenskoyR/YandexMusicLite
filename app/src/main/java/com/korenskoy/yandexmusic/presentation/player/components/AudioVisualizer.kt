@@ -1,7 +1,5 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
-import com.korenskoy.yandexmusic.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat

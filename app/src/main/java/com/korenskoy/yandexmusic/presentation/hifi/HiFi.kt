@@ -33,9 +33,26 @@ object HiFi {
     val GlassFill = Color.White.copy(alpha = 0.08f)
     val GlassBorder = Color.White.copy(alpha = 0.16f)
     val BarFill = Color(0xB81C1E26)
-    val SheetFill = Color(0xF010121A)
+    val SheetFill = Color(0xFF10121A)
     val Danger = Color(0xFFFF6B6B)
     val Live = Color(0xFFFF4D4D)
+    /** Behind a cover while it loads, and for a missing cover. */
+    val Placeholder = Color(0xFF1C1F28)
+    /** Text and icons on the knobs and metal capsules. */
+    val OnMetal = Color(0xFFF4F6FA)
+    /** Selected rows: dark anodized metal, lit from the top. */
+    val AnodizedLight = Color(0xFF2F333E)
+    val AnodizedDark = Color(0xFF16181E)
+    /** Avatars and cover placeholders: brushed steel. */
+    val SteelLight = Color(0xFF3A4152)
+    val SteelDark = Color(0xFF1C2130)
+    /** The light steel of rims and selected outlines. */
+    val SteelEdge = Color(0xFFC9CED8)
+    /** A white plate behind station logos drawn for light backgrounds. */
+    val Paper = Color(0xFFE9ECF2)
+    /** Status colours, used only for words and small marks: all is well / needs attention. */
+    val Success = Color(0xFF6FD08C)
+    val Warning = Color(0xFFFFB547)
     /** A liked track or a favourite station: the heart is always this red, everywhere. */
     val Love = Color(0xFFFF3B5C)
 

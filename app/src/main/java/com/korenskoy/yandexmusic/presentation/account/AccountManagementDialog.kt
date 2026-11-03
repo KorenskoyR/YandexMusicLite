@@ -7,9 +7,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -160,7 +157,7 @@ fun AccountManagementDialog(
                                         .background(
                                             if (isActive) {
                                                 // Selected = dark anodized metal (no colour), like the rest of the app
-                                                Brush.verticalGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))
+                                                Brush.verticalGradient(listOf(HiFi.AnodizedLight, HiFi.AnodizedDark))
                                             } else {
                                                 Brush.horizontalGradient(
                                                     listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.03f))
@@ -188,10 +185,10 @@ fun AccountManagementDialog(
                                             .clip(CircleShape)
                                             .background(
                                                 if (isActive) {
-                                                    Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF1C2130)))
+                                                    Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
                                                 } else {
                                                     Brush.linearGradient(
-                                                        listOf(Color(0xFF33333E), Color(0xFF22222A))
+                                                        listOf(HiFi.SteelLight, HiFi.SteelDark)
                                                     )
                                                 }
                                             ),
@@ -261,7 +258,7 @@ fun AccountManagementDialog(
                                     ) {
                                         Icon(
                                             imageVector = if (isDefault) Icons.Default.Star else Icons.Default.StarBorder,
-                                            contentDescription = if (isDefault) "По умолчанию" else "Сделать по умолчанию",
+                                            contentDescription = stringResource(if (isDefault) R.string.account_is_default else R.string.account_make_default),
                                             tint = if (isDefault) Color.White else Color.White.copy(alpha = 0.35f),
                                             modifier = Modifier.size(20.dp)
                                         )

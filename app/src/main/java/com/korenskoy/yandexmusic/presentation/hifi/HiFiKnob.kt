@@ -134,7 +134,7 @@ fun HiFiKnob(
 
 /** Play ↔ Pause glyph that cross-fades (120 ms) instead of jumping; play is optically nudged right. */
 @Composable
-fun PlayPauseGlyph(isPlaying: Boolean, size: Dp, tint: Color = Color(0xFFF4F6FA)) {
+fun PlayPauseGlyph(isPlaying: Boolean, size: Dp, tint: Color = HiFi.OnMetal) {
     Crossfade(targetState = isPlaying, animationSpec = HiFiMotion.quick(), label = "play_pause") { playing ->
         Icon(
             imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,

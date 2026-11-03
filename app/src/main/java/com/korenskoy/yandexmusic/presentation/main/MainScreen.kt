@@ -1,56 +1,57 @@
 package com.korenskoy.yandexmusic.presentation.main
 
-import androidx.lifecycle.repeatOnLifecycle
+import android.content.res.Configuration
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
-import android.content.res.Configuration
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalConfiguration
-import com.korenskoy.yandexmusic.presentation.car.CarScreen
-import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassNavigationRail
-import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
-import com.korenskoy.yandexmusic.presentation.main.components.MainTab
-import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
-import com.korenskoy.yandexmusic.presentation.account.AccountManagementDialog
-import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.State
-import com.korenskoy.yandexmusic.data.player.PlaylistSource
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
+import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
+import com.korenskoy.yandexmusic.presentation.catalog.CatalogActions
+import com.korenskoy.yandexmusic.presentation.catalog.CatalogPageScreen
+import com.korenskoy.yandexmusic.presentation.catalog.CatalogViewModel
+import com.korenskoy.yandexmusic.presentation.crash.CrashLogViewModel
 import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
@@ -59,96 +60,76 @@ import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
 import com.korenskoy.yandexmusic.presentation.hifi.TintMath
 import com.korenskoy.yandexmusic.presentation.hifi.rememberArtworkTint
 import com.korenskoy.yandexmusic.presentation.hifi.rememberHiFiLite
+import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
+import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassNavigationRail
+import com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu
+import com.korenskoy.yandexmusic.presentation.main.components.MainTab
+import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
+import com.korenskoy.yandexmusic.presentation.main.components.TrackMenuLauncher
+import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
+import com.korenskoy.yandexmusic.presentation.player.QualityDetailsDialog
+import com.korenskoy.yandexmusic.presentation.player.playerSourceLabelRes
+import com.korenskoy.yandexmusic.presentation.radio.RadioViewModel
+import com.korenskoy.yandexmusic.presentation.update.UpdateViewModel
+import com.korenskoy.yandexmusic.data.player.PlaybackController
+import com.korenskoy.yandexmusic.utils.LocalStreamQuality
 import com.korenskoy.yandexmusic.utils.toCoverUrl
+import kotlinx.coroutines.flow.merge
 
 private const val PLAYER_COVER_KEY = "player_cover"
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+/**
+ * The app's frame: the tab content, the floating mini-player and tab bar, the full-screen player and
+ * the dialogs. Only what all of them share is collected here (the playing track, play state, likes);
+ * every tab collects its own state, so a change on one tab does not recompose the others.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
     onNavigateToAuth: () -> Unit = {},
     openPlayerSignal: Int = 0,
-    accountVm: com.korenskoy.yandexmusic.presentation.account.AccountViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
-    searchVm: SearchViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
-    playlistsVm: PlaylistsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
-    radioVm: com.korenskoy.yandexmusic.presentation.radio.RadioViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
-    updateVm: com.korenskoy.yandexmusic.presentation.update.UpdateViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
-    catalogVm: com.korenskoy.yandexmusic.presentation.catalog.CatalogViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
-    crashVm: com.korenskoy.yandexmusic.presentation.crash.CrashLogViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
+    accountVm: AccountViewModel = hiltViewModel(),
+    searchVm: SearchViewModel = hiltViewModel(),
+    playlistsVm: PlaylistsViewModel = hiltViewModel(),
+    radioVm: RadioViewModel = hiltViewModel(),
+    updateVm: UpdateViewModel = hiltViewModel(),
+    catalogVm: CatalogViewModel = hiltViewModel(),
+    crashVm: CrashLogViewModel = hiltViewModel()
 ) {
-    val tracks by viewModel.tracks.collectAsState()
-    val allAccounts by accountVm.allAccounts.collectAsState()
-    val activeAccount by accountVm.activeAccount.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val downloadState by viewModel.downloadAllState.collectAsState()
-    val autoDownloadEnabled by viewModel.autoDownloadEnabled.collectAsState()
-    val likedTrackIds by viewModel.likedTrackIds.collectAsState()
-    val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsState()
-    val favoriteStationIds by radioVm.favoriteStationIds.collectAsState()
-    
-    val searchQuery by searchVm.query.collectAsState()
-    val searchResults by searchVm.results.collectAsState()
-    val isSearching by searchVm.isSearching.collectAsState()
-    val searchFound by searchVm.found.collectAsState()
-    val searchHistory by searchVm.history.collectAsState()
-    val catalogStack by catalogVm.stack.collectAsState()
-    val crashReports by crashVm.reports.collectAsState()
-    var showCrashLog by remember { mutableStateOf(false) }
-    
-    val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
-    val downloadProgress by viewModel.downloadProgress.collectAsState()
-    val accountName by accountVm.accountName.collectAsState()
-    val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsState()
-    val defaultAccountUid by accountVm.defaultAccountUid.collectAsState()
-    val defaultAccountName by accountVm.defaultAccountName.collectAsState()
+    val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val isBuffering by viewModel.isBuffering.collectAsStateWithLifecycle()
+    val currentSource by viewModel.currentSource.collectAsStateWithLifecycle()
+    val likedTrackIds by viewModel.likedTrackIds.collectAsStateWithLifecycle()
+    val favoriteStationIds by radioVm.favoriteStationIds.collectAsStateWithLifecycle()
+    val streamQuality by viewModel.streamQuality.collectAsStateWithLifecycle()
+    val catalogStack by catalogVm.stack.collectAsStateWithLifecycle()
+    val radioStations by radioVm.stations.collectAsStateWithLifecycle()
+    // Progress ticks 10× a second: the State is handed out as `{ progressState.value }` and read only where
+    // it is drawn, so nothing here recomposes on a tick
+    val progressState = viewModel.progress.collectAsStateWithLifecycle()
+    val progress = remember(progressState) { { progressState.value } }
 
-    val updateCheckResult by updateVm.checkResult.collectAsState()
-    val updateDownloadProgress by updateVm.downloadProgress.collectAsState()
-    val updateStatusMessage by updateVm.statusMessage.collectAsState()
-    val isSignatureMismatch by updateVm.isSignatureMismatch.collectAsState()
-    val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsState()
-    val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsState()
-    val streamQuality by viewModel.streamQuality.collectAsState()
-    val sleepTimer by viewModel.sleepTimer.collectAsState()
-    val userPlaylists by playlistsVm.playlists.collectAsState()
-    val openedPlaylist by playlistsVm.opened.collectAsState()
-    val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsState()
-    val uiScaleAuto by viewModel.uiScaleAuto.collectAsState()
-    val uiScaleManual by viewModel.uiScaleManual.collectAsState()
-
-    val currentTrack by viewModel.currentTrack.collectAsState()
-    // Stable local copy: allows smart casts instead of `!!` in the blocks below
-    val shownTrack = currentTrack
-    val currentTrackId by viewModel.currentTrackId.collectAsState()
-    val isPlaying by viewModel.isPlaying.collectAsState()
-    val isBuffering by viewModel.isBuffering.collectAsState()
-    // Progress ticks 10x per second: keep the State and hand out `{ progressState.value }`, read only where drawn,
-    // so the whole screen (lists included) is not recomposed on every tick.
-    val progressState = viewModel.progress.collectAsState()
-    
-    val weeklyHits by searchVm.weeklyHits.collectAsState()
-    val trendTracks by searchVm.trendTracks.collectAsState()
-    val popularTracks by viewModel.popularTracks.collectAsState()
-    val currentPlaylist by viewModel.currentPlaylist.collectAsState()
-    val currentSource by viewModel.currentSource.collectAsState()
+    val now = NowPlaying(currentTrack, isPlaying, isBuffering, currentSource, likedTrackIds)
 
     var currentTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(openPlayerSignal) {
         if (openPlayerSignal > 0 && viewModel.currentTrack.value != null) isPlayerExpanded = true
     }
+    // Nothing to show: a stale "expanded" would open an empty player with the next track
+    LaunchedEffect(currentTrack == null) { if (currentTrack == null) isPlayerExpanded = false }
     var showAccountDialog by remember { mutableStateOf(false) }
-    var qualityDetails by remember { mutableStateOf<com.korenskoy.yandexmusic.data.player.PlaybackController.QualityDetails?>(null) }
-    // Track menu ("⋮" on any track, or the player's "add to playlist")
+    var showCrashLog by remember { mutableStateOf(false) }
+    var startupPickerHandled by rememberSaveable { mutableStateOf(false) }
+    var qualityDetails by remember { mutableStateOf<PlaybackController.QualityDetails?>(null) }
     var trackMenu by remember { mutableStateOf<TrackMenuRequest?>(null) }
     val trackMenuLauncher = remember {
-        com.korenskoy.yandexmusic.presentation.main.components.TrackMenuLauncher { track, playlist ->
-            trackMenu = TrackMenuRequest(track, playlist, pickPlaylist = false)
-        }
+        TrackMenuLauncher { track, playlist -> trackMenu = TrackMenuRequest(track, playlist, pickPlaylist = false) }
     }
     val catalogActions = remember(catalogVm, viewModel) {
-        com.korenskoy.yandexmusic.presentation.catalog.CatalogActions(
+        CatalogActions(
             onBack = { catalogVm.back() },
             onRetry = { catalogVm.retry() },
             onOpenArtist = { id, name -> catalogVm.openArtist(id, name) },
@@ -159,560 +140,291 @@ fun MainScreen(
     }
     // Another tab: the catalog pages belong to where they were opened
     LaunchedEffect(currentTab) { catalogVm.closeAll() }
-    var hasHandledStartupAccountPicker by rememberSaveable { mutableStateOf(false) }
-    val showStartupAccountPicker = !hasHandledStartupAccountPicker && allAccounts.size > 1 && defaultAccountUid == null
+    InstallDownloadedUpdateOnResume(updateVm)
 
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                if (updateVm.downloadProgress.value >= 2f && updateVm.canRequestPackageInstalls) {
-                    updateVm.installDownloaded()
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    LaunchedEffect(currentTab) {
-        if (currentTab == MainTab.LIBRARY && tracks.isEmpty()) {
-            viewModel.loadLikedTracks()
-        }
-    }
-
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    // One tint for the whole app: the playing cover, or the station's brand colors on air
+    // One tint for the whole app: the playing cover, or the station's brand colours on air
     val lite = rememberHiFiLite()
-    val radioStations by radioVm.stations.collectAsState()
-    val stationTint = remember(shownTrack?.idString, radioStations) {
-        if (shownTrack?.isRadio != true) null
-        else radioStations.firstOrNull { it.id == shownTrack.idString.removePrefix("radio_") }?.let {
+    val stationTint = remember(currentTrack?.idString, radioStations) {
+        val track = currentTrack
+        if (track?.isRadio != true) null
+        else radioStations.firstOrNull { it.id == track.idString.removePrefix("radio_") }?.let {
             ArtworkTint(Color(TintMath.normalize(it.brandColorStart.toInt())), Color(TintMath.normalize(it.brandColorEnd.toInt())))
         }
     }
-    val coverForTint = if (shownTrack?.isRadio == true) null else shownTrack?.coverUri.toCoverUrl("200x200")
+    val coverForTint = if (currentTrack?.isRadio == true) null else currentTrack?.coverUri.toCoverUrl("200x200")
     val appTint = rememberArtworkTint(coverForTint, stationTint)
-    val waveActive = currentSource == PlaylistSource.VIBE && currentTrack != null
-    val upcoming = remember(currentPlaylist, currentTrackId) {
-        val index = currentPlaylist.indexOfFirst { it.idString == currentTrackId }
-        if (index < 0) emptyList() else currentPlaylist.drop(index + 1).take(10)
-    }
-    val wavePreview by viewModel.wavePreview.collectAsState()
-    val isFetchingWave by viewModel.isFetchingMoreQueue.collectAsState()
-    val waveShelf = remember(waveActive, upcoming, wavePreview) { waveShelfOf(waveActive, upcoming, wavePreview) }
     val tabStates = rememberSaveableStateHolder()
     val contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp
     // The mini-player stays out of the way on the wave page, which already shows the playing wave
-    val showMini = shownTrack != null && currentTab != MainTab.CAR && !(currentTab == MainTab.HOME && waveActive)
+    val showMini = currentTrack != null && currentTab != MainTab.CAR && !(currentTab == MainTab.HOME && now.waveActive)
+    val snackbar = remember { SnackbarHostState() }
+    val openPlayer = { isPlayerExpanded = true }
 
-    androidx.compose.runtime.CompositionLocalProvider(
-        com.korenskoy.yandexmusic.utils.LocalStreamQuality provides streamQuality,
-        com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu provides trackMenuLauncher,
+    CompositionLocalProvider(
+        LocalStreamQuality provides streamQuality,
+        LocalTrackMenu provides trackMenuLauncher,
         LocalHiFiLite provides lite,
         LocalArtworkTint provides appTint
     ) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
-        val sharedScope = this
-        Box(modifier = Modifier.fillMaxSize()) {
-            // One living background under every tab: it does not blink when tabs change
-            if (currentTab != MainTab.CAR) {
-                HiFiBackdrop(coverUrl = coverForTint?.let { shownTrack?.coverUri.toCoverUrl("400x400") })
-            }
-            // Layer 0: Full-bleed Edge-to-Edge Content Area
-            // In landscape, offset content to the right to avoid NavigationRail overlap
-            AnimatedContent(
-                targetState = currentTab,
-                transitionSpec = {
-                    (fadeIn(HiFiMotion.standard()) + androidx.compose.animation.slideInVertically(HiFiMotion.standard()) { it / 100 }) togetherWith
-                        fadeOut(HiFiMotion.quick())
-                },
-                label = "tabs",
-                modifier = Modifier.fillMaxSize()
-            ) { tab ->
-              tabStates.SaveableStateProvider(tab.route) {
-                // An artist or album page covers the tab until Back (or another tab) closes it
-                val catalogTop = catalogStack.lastOrNull()
-                if (catalogTop != null && tab != MainTab.CAR) {
-                    com.korenskoy.yandexmusic.presentation.catalog.CatalogPageScreen(
-                        state = catalogTop,
-                        currentTrackId = currentTrackId,
-                        isPlaying = isPlaying,
-                        likedTrackIds = likedTrackIds,
-                        contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp,
-                        actions = catalogActions
-                    )
-                } else when (tab) {
-                    MainTab.HOME -> HomeScreen(
-                        waveTrack = if (waveActive) currentTrack else null,
-                        isPlaying = isPlaying,
-                        isLoading = isBuffering && currentSource == PlaylistSource.VIBE,
-                        isLiked = currentTrackId?.let { likedTrackIds.contains(it) } == true,
-                        progress = { progressState.value },
-                        shelf = waveShelf,
-                        shimmer = isFetchingWave || isBuffering,
-                        onPlayPause = {
-                            // Like Yandex Music: the wave knob controls the wave; from any other context it starts the wave.
-                            if (waveActive) {
-                                viewModel.togglePlayPause()
-                            } else {
-                                viewModel.playMyVibe()
-                            }
-                        },
-                        onLike = { currentTrack?.let { viewModel.toggleLike(it) } },
-                        onDislike = { currentTrack?.let { viewModel.dislikeTrack(it) } },
-                        onOpenPlayer = if (shownTrack != null) { { isPlayerExpanded = true } } else null,
-                        onShelfClick = {
-                            if (waveActive) viewModel.playTrack(it.idString, currentPlaylist, PlaylistSource.VIBE)
-                            else viewModel.playWaveFrom(it.idString)
-                        },
-                        contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom
-                    )
-                    MainTab.SEARCH -> SearchScreen(
-                        query = searchQuery,
-                        onQueryChange = { searchVm.onQueryChange(it) },
-                        results = searchResults,
-                        weeklyHits = weeklyHits,
-                        trendTracks = trendTracks,
-                        isSearching = isSearching,
-                        currentTrackId = currentTrackId,
-                        isPlaying = isPlaying,
-                        likedTrackIds = likedTrackIds,
-                        onTrackClick = { id, playlist ->
-                            searchVm.rememberQuery()
-                            viewModel.playTrack(id, playlist, PlaylistSource.SEARCH)
-                        },
-                        onToggleLike = { track -> viewModel.toggleLike(track) },
-                        onLoadMoreHits = { searchVm.loadMoreHits() },
-                        onLoadMoreTrends = { searchVm.loadMoreTrends() },
-                        hasActiveTrack = currentTrack != null,
-                        artists = searchFound.artists,
-                        albums = searchFound.albums,
-                        history = searchHistory,
-                        onArtistClick = { artist ->
-                            searchVm.rememberQuery()
-                            catalogVm.openArtist(artist.idString!!, artist.name.orEmpty())
-                        },
-                        onAlbumClick = { album ->
-                            searchVm.rememberQuery()
-                            catalogVm.openAlbum(album.idString!!, album.title.orEmpty())
-                        },
-                        onRemoveFromHistory = { searchVm.removeFromHistory(it) },
-                        onClearHistory = { searchVm.clearHistory() },
-                        onSubmit = { searchVm.rememberQuery() }
-                    )
-                    MainTab.LIBRARY -> LibraryScreen(
-                        tracks = tracks,
-                        isLoading = isLoading,
-                        downloadState = downloadState,
-                        autoDownloadEnabled = autoDownloadEnabled,
-                        currentTrackId = currentTrackId,
-                        isPlaying = isPlaying,
-                        likedTrackIds = likedTrackIds,
-                        downloadedTrackIds = downloadedTrackIds,
-                        cacheSizeBytes = cacheSizeBytes,
-                        downloadProgress = downloadProgress,
-                        onTrackClick = { id -> viewModel.playTrack(id, tracks, PlaylistSource.LIBRARY) },
-                        onPlayAllClick = { viewModel.playAllLikedTracks() },
-                        onShuffleClick = { viewModel.shuffleLikedTracks() },
-                        onDownloadAllClick = { viewModel.downloadAllLikedTracks() },
-                        onEnableAutoDownload = { enabled ->
-                            if (enabled) viewModel.enableAutoDownloadAndStart() else viewModel.setAutoDownloadLikedTracks(false)
-                        },
-                        crossfadeSeconds = crossfadeSeconds,
-                        onCrossfadeChange = { viewModel.setCrossfadeSeconds(it) },
-                        steeringWheelOnLeft = steeringWheelOnLeft,
-                        onSteeringWheelChange = { viewModel.setSteeringWheelOnLeft(it) },
-                        uiScaleAuto = uiScaleAuto,
-                        onUiScaleAutoChange = { viewModel.setUiScaleAuto(it) },
-                        uiScaleManual = uiScaleManual,
-                        onUiScaleManualChange = { viewModel.setUiScaleManual(it) },
-                        onUpgradeDownloads = { viewModel.upgradeDownloadedQuality() },
-                        crashReports = crashReports.size,
-                        onOpenCrashLog = { showCrashLog = true },
-                        onCancelDownload = { viewModel.cancelDownloadAll() },
-                        onClearCache = { viewModel.clearMusicCache() },
-                        onToggleLike = { track -> viewModel.toggleLike(track) },
-                        onRefresh = { viewModel.loadLikedTracks() },
-                        hasActiveTrack = currentTrack != null,
-                        accountName = accountName,
-                        avatarUrl = accountAvatarUrl,
-                        hasPlus = activeAccount?.hasPlus == true,
-                        defaultAccountName = defaultAccountName,
-                        updateStatus = updateStatusMessage,
-                        onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
-                        onAccountManagementClick = { showAccountDialog = true },
-                        onAddAccount = { onNavigateToAuth() },
-                        onLogout = { accountVm.logoutCurrentAccount() },
-                        playlists = userPlaylists,
-                        openedPlaylist = openedPlaylist,
-                        onOpenPlaylist = { playlistsVm.open(it) },
-                        onClosePlaylist = { playlistsVm.close() },
-                        onPlayPlaylist = { playlistsVm.play(it) },
-                        onPlaylistTrackClick = { playlistsVm.playTrack(it) },
-                        onCreatePlaylist = { playlistsVm.create(it) },
-                        onRenamePlaylist = { playlist, title -> playlistsVm.rename(playlist, title) },
-                        onDeletePlaylist = { playlistsVm.delete(it) },
-                        onReorderPlaylist = { playlist, shown, new -> playlistsVm.reorder(playlist, shown, new) },
-                        onSetPlaylistPublic = { playlist, public -> playlistsVm.setPublic(playlist, public) }
-                    )
-                    MainTab.RADIO -> {
-                        var selectedCategory by rememberSaveable { mutableStateOf(com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL) }
-                        val filteredStations = radioStations.filter {
-                            selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.ALL ||
-                                (selectedCategory == com.korenskoy.yandexmusic.domain.model.RadioCategory.FAVORITES && favoriteStationIds.contains(it.id)) ||
-                                it.category == selectedCategory
+            val sharedScope = this
+            Box(modifier = Modifier.fillMaxSize()) {
+                // One living background under every tab: it does not blink when tabs change
+                if (currentTab != MainTab.CAR) {
+                    HiFiBackdrop(coverUrl = coverForTint?.let { currentTrack?.coverUri.toCoverUrl("400x400") })
+                }
+                AnimatedContent(
+                    targetState = currentTab,
+                    transitionSpec = {
+                        (fadeIn(HiFiMotion.standard()) + slideInVertically(HiFiMotion.standard()) { it / 100 }) togetherWith
+                            fadeOut(HiFiMotion.quick())
+                    },
+                    label = "tabs",
+                    modifier = Modifier.fillMaxSize()
+                ) { tab ->
+                    tabStates.SaveableStateProvider(tab.route) {
+                        // An artist or album page covers the tab until Back (or another tab) closes it. Pages
+                        // slide in from the right as they open and back out to the right on Back.
+                        val depth = if (tab == MainTab.CAR) 0 else catalogStack.size
+                        AnimatedContent(
+                            targetState = depth to catalogStack.lastOrNull()?.takeIf { depth > 0 },
+                            contentKey = { (_, page) -> page?.page },
+                            transitionSpec = { catalogTransition(forward = targetState.first > initialState.first, lite = lite) },
+                            label = "catalog_page"
+                        ) { (_, catalogTop) ->
+                        if (catalogTop != null) {
+                            CatalogPageScreen(
+                                state = catalogTop,
+                                currentTrackId = now.trackId,
+                                isPlaying = isPlaying,
+                                likedTrackIds = likedTrackIds,
+                                contentBottom = contentBottom,
+                                actions = catalogActions
+                            )
+                        } else when (tab) {
+                            MainTab.HOME -> HomeTab(
+                                viewModel, now, progress, isLandscape, contentBottom,
+                                onOpenPlayer = if (currentTrack != null) openPlayer else null
+                            )
+                            MainTab.SEARCH -> SearchTab(viewModel, searchVm, catalogVm, now)
+                            MainTab.LIBRARY -> LibraryTab(
+                                viewModel, accountVm, playlistsVm, updateVm, crashVm, now,
+                                onOpenAccounts = { showAccountDialog = true },
+                                onOpenCrashLog = { showCrashLog = true },
+                                onAddAccount = onNavigateToAuth
+                            )
+                            MainTab.RADIO -> RadioTab(viewModel, radioVm, now)
+                            MainTab.CAR -> CarTab(viewModel, radioVm, now, progress, isLandscape, onExit = { currentTab = MainTab.HOME })
                         }
-                        com.korenskoy.yandexmusic.presentation.radio.RadioScreen(
-                            stations = filteredStations,
-                            allStations = radioStations,
-                            selectedCategory = selectedCategory,
-                            onCategorySelect = { selectedCategory = it },
-                            currentStationId = currentTrack?.takeIf { it.isRadio }?.idString?.removePrefix("radio_"),
-                            isPlaying = isPlaying,
-                            favoriteStationIds = favoriteStationIds,
-                            onStationClick = { radioVm.play(it) },
-                            onToggleFavorite = { radioVm.toggleFavorite(it) },
-                            onPlayPause = { viewModel.togglePlayPause() },
-                            hasActiveTrack = currentTrack != null
-                        )
-                    }
-                    MainTab.CAR -> run {
-                        CarScreen(
-                            currentTrack = currentTrack,
-                            isPlaying = isPlaying,
-                            likedTrackIds = likedTrackIds,
-                            onPlayPauseClick = {
-                                viewModel.togglePlayPause()
-                            },
-                            onNextClick = { viewModel.playNext() },
-                            onPrevClick = { viewModel.playPrev() },
-                            onToggleLike = { track ->
-                                if (track.isRadio) {
-                                    radioVm.toggleFavorite(track.idString.removePrefix("radio_"))
-                                } else {
-                                    viewModel.toggleLike(track)
-                                }
-                            },
-                            onDislikeClick = { track ->
-                                if (track.isRadio) {
-                                    radioVm.removeFavorite(track.idString.removePrefix("radio_"))
-                                } else {
-                                    viewModel.dislikeTrack(track)
-                                }
-                            },
-                            onPlayMyVibe = { viewModel.playMyVibe() },
-                            onPlayFavorites = { viewModel.playAllLikedTracks() },
-                            onPlayHits = { viewModel.playHits(shuffle = true) },
-                            onPlayDownloaded = {
-                                val downloaded = tracks.filter { downloadedTrackIds.contains(it.idString) }
-                                if (downloaded.isNotEmpty()) {
-                                    viewModel.playTrack(downloaded.first().idString, downloaded, PlaylistSource.LIBRARY)
-                                }
-                            },
-                            onPlayRadio = {
-                                val stations = radioVm.stations.value
-                                if (stations.isNotEmpty()) {
-                                    radioVm.play(stations.first())
-                                }
-                            },
-                            onExit = { currentTab = MainTab.HOME },
-                            isLandscape = isLandscape,
-                            steeringWheelOnLeft = steeringWheelOnLeft,
-                            progress = { progressState.value },
-                            durationMs = currentTrack?.durationMs ?: 0L,
-                            onSeek = { viewModel.seekTo(it) },
-                            nextTrack = if (currentTrack?.isRadio == true) null else upcoming.firstOrNull(),
-                            source = currentSource,
-                            isBuffering = isBuffering
-                        )
+                        }
                     }
                 }
-              }
-            }
 
-            // Layer 1 & 2: Floating Navigation and MiniPlayer Overlays
-            if (isLandscape) {
-                // Landscape Navigation Rail (hidden in CAR mode)
+                // Floating navigation and mini-player (hidden in the car)
                 if (currentTab != MainTab.CAR) {
-                    FloatingGlassNavigationRail(
-                        currentRoute = currentTab.route,
-                        onNavigate = { currentTab = it },
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 14.dp, top = 16.dp, bottom = 16.dp)
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
-                    )
-                }
-
-                // Landscape MiniPlayer at the bottom (hidden in CAR mode)
-                if (showMini && shownTrack != null) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = !isPlayerExpanded,
-                        enter = fadeIn(HiFiMotion.standard()),
-                        exit = fadeOut(HiFiMotion.quick()),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(bottom = 12.dp)
-                            .widthIn(max = 580.dp)
-                            .fillMaxWidth()
-                    ) {
-                        MiniPlayer(
-                            track = shownTrack,
-                            isPlaying = isPlaying,
-                            progress = { progressState.value },
-                            onPlayPauseClick = { viewModel.togglePlayPause() },
-                            onNextClick = { viewModel.playNext() },
-                            onClick = { isPlayerExpanded = true },
-                            onDismiss = { viewModel.stopAndClearPlayer() },
-                            coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
-                                Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
-                            }
-                        )
-                }
-                }
-            } else {
-                // Portrait Unified Bottom Overlay: MiniPlayer stacked cleanly above FloatingGlassBottomBar
-                if (currentTab != MainTab.CAR) {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-                            .fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (showMini && shownTrack != null) {
-                            androidx.compose.animation.AnimatedVisibility(
+                    val mini: @Composable () -> Unit = {
+                        val track = currentTrack
+                        if (showMini && track != null) {
+                            AnimatedVisibility(
                                 visible = !isPlayerExpanded,
                                 enter = fadeIn(HiFiMotion.standard()),
                                 exit = fadeOut(HiFiMotion.quick())
                             ) {
                                 MiniPlayer(
-                                    track = shownTrack,
+                                    track = track,
                                     isPlaying = isPlaying,
-                                    progress = { progressState.value },
+                                    progress = progress,
                                     onPlayPauseClick = { viewModel.togglePlayPause() },
                                     onNextClick = { viewModel.playNext() },
-                                    onClick = { isPlayerExpanded = true },
+                                    onClick = openPlayer,
                                     onDismiss = { viewModel.stopAndClearPlayer() },
-                                    coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
-                                        Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
-                                    }
+                                    coverModifier = Modifier.sharedCover(sharedScope, this, enabled = !lite && !track.isRadio)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
                         }
-
-                        FloatingGlassBottomBar(
+                    }
+                    if (isLandscape) {
+                        FloatingGlassNavigationRail(
                             currentRoute = currentTab.route,
-                            onNavigate = { currentTab = it }
+                            onNavigate = { currentTab = it },
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = 14.dp, top = 16.dp, bottom = 16.dp)
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
+                        )
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = 12.dp)
+                                .widthIn(max = 580.dp)
+                                .fillMaxWidth()
+                        ) { mini() }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (showMini) {
+                                mini()
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                            FloatingGlassBottomBar(currentRoute = currentTab.route, onNavigate = { currentTab = it })
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = isPlayerExpanded,
+                    enter = fadeIn(HiFiMotion.large()) + slideInVertically(HiFiMotion.large()) { it / 6 },
+                    exit = fadeOut(HiFiMotion.standard()) + slideOutVertically(HiFiMotion.standard()) { it / 6 },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val track = currentTrack
+                    if (track != null) {
+                        PlayerHost(
+                            track = track,
+                            now = now,
+                            favoriteStationIds = favoriteStationIds,
+                            progress = progress,
+                            viewModel = viewModel,
+                            radioVm = radioVm,
+                            onCollapse = { isPlayerExpanded = false },
+                            onAddToPlaylist = { trackMenu = TrackMenuRequest(track, null, pickPlaylist = true) },
+                            onQualityClick = { qualityDetails = viewModel.qualityDetails() },
+                            coverModifier = Modifier.sharedCover(sharedScope, this, enabled = !lite && !track.isRadio)
                         )
                     }
                 }
-            }
 
-            AnimatedVisibility(
-                visible = isPlayerExpanded,
-                enter = fadeIn(HiFiMotion.large()) + slideInVertically(HiFiMotion.large()) { it / 6 },
-                exit = fadeOut(HiFiMotion.standard()) + slideOutVertically(HiFiMotion.standard()) { it / 6 },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (shownTrack != null) {
-                    val isPlayerLiked = if (currentTrack?.isRadio == true) {
-                        favoriteStationIds.contains(shownTrack.idString.removePrefix("radio_"))
-                    } else {
-                        likedTrackIds.contains(shownTrack.idString)
+                // Playback and playlist errors ("no connection", "station unavailable"), above the mini-player
+                val lifecycleOwner = LocalLifecycleOwner.current
+                LaunchedEffect(lifecycleOwner) {
+                    // Collected only while visible, so a message raised in the background falls back to a toast
+                    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        merge(viewModel.playbackMessages, playlistsVm.messages).collect { snackbar.showSnackbar(it) }
                     }
-                    val playerSource = com.korenskoy.yandexmusic.presentation.player.playerSourceLabelRes(currentSource, shownTrack.isRadio)
-                        ?.let { androidx.compose.ui.res.stringResource(it) }.orEmpty()
-                    FullScreenPlayer(
-                        track = shownTrack,
-                        isPlaying = isPlaying,
-                        isLiked = isPlayerLiked,
-                        progress = { progressState.value },
-                        queue = currentPlaylist,
-                        sourceLabel = playerSource,
-                        onPlayPauseClick = {
-                            viewModel.togglePlayPause()
-                        },
-                        onToggleLike = {
-                            if (currentTrack?.isRadio == true) {
-                                radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
-                            } else {
-                                viewModel.toggleLike(shownTrack)
-                            }
-                        },
-                        onNextClick = { viewModel.playNext() },
-                        onPrevClick = { viewModel.playPrev() },
-                        onSeekTo = { position -> viewModel.seekTo(position) },
-                        onTrackSelect = { id -> viewModel.playTrack(id, currentPlaylist) },
-                        onRemoveFromQueue = { id -> viewModel.removeFromQueue(id) },
-                        onCollapse = { isPlayerExpanded = false },
-                        onCloseAndClear = { 
-                            isPlayerExpanded = false
-                            viewModel.stopAndClearPlayer()
-                        },
-                        onDislikeClick = {
-                            if (currentTrack?.isRadio == true) {
-                                radioVm.removeFavorite(shownTrack.idString.removePrefix("radio_"))
-                            } else {
-                                viewModel.dislikeTrack(shownTrack)
-                            }
-                        },
-                        onLoadMoreQueue = { viewModel.loadMoreQueue() },
-                        isFetchingMoreQueue = isFetchingMoreQueue,
-                        sleepTimer = sleepTimer,
-                        onSleepTimer = { viewModel.setSleepTimer(it) },
-                        onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
-                        onCancelSleepTimer = { viewModel.cancelSleepTimer() },
-                        onAddToPlaylist = { trackMenu = TrackMenuRequest(shownTrack, null, pickPlaylist = true) },
-                        onQualityClick = { qualityDetails = viewModel.qualityDetails() },
-                        coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
-                            Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
-                        }
+                }
+                SnackbarHost(
+                    hostState = snackbar,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = if (currentTrack != null) 160.dp else 90.dp)
+                ) { data -> com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar(data.visuals.message) }
+
+                if (showCrashLog) CrashLogHost(crashVm) { showCrashLog = false }
+                qualityDetails?.let { details -> QualityDetailsDialog(details) { qualityDetails = null } }
+                trackMenu?.let { request ->
+                    TrackMenuHost(
+                        request, viewModel, playlistsVm, catalogVm, likedTrackIds, snackbar,
+                        onDismiss = { trackMenu = null },
+                        onLeavePlayer = { isPlayerExpanded = false }
                     )
                 }
-            }
-
-            // Playback errors ("no connection", "station unavailable"), above the mini-player and bottom bar
-            val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
-            val messageLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-            LaunchedEffect(messageLifecycleOwner) {
-                // Collect only while visible, so a message raised in the background falls back to a toast
-                messageLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                    kotlinx.coroutines.flow.merge(viewModel.playbackMessages, playlistsVm.messages)
-                        .collect { snackbarHostState.showSnackbar(it) }
-                }
-            }
-            androidx.compose.material3.SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = if (shownTrack != null) 160.dp else 90.dp)
-            )
-
-            if (showCrashLog) {
-                com.korenskoy.yandexmusic.presentation.crash.CrashLogDialog(
-                    reports = crashReports,
-                    onSend = { crashVm.send() },
-                    onClear = { crashVm.clear() },
-                    onDismiss = { showCrashLog = false }
+                UpdateHost(updateVm)
+                AccountHost(
+                    accountVm,
+                    showManagement = showAccountDialog,
+                    onCloseManagement = { showAccountDialog = false },
+                    startupPickerHandled = startupPickerHandled,
+                    onStartupPickerHandled = { startupPickerHandled = true },
+                    onAddAccount = onNavigateToAuth
                 )
             }
-
-            qualityDetails?.let { details ->
-                com.korenskoy.yandexmusic.presentation.player.QualityDetailsDialog(details) { qualityDetails = null }
-            }
-
-            trackMenu?.let { request ->
-                val playNextDone = androidx.compose.ui.res.stringResource(com.korenskoy.yandexmusic.R.string.track_menu_play_next_done)
-                val menuScope = androidx.compose.runtime.rememberCoroutineScope()
-                com.korenskoy.yandexmusic.presentation.main.components.TrackContextMenu(
-                    track = request.track,
-                    inPlaylist = request.playlist,
-                    playlists = userPlaylists,
-                    isLiked = likedTrackIds.contains(request.track.idString),
-                    startWithPlaylists = request.pickPlaylist,
-                    onDismiss = { trackMenu = null },
-                    onPlayNext = {
-                        viewModel.enqueueNext(request.track)
-                        menuScope.launch { snackbarHostState.showSnackbar(playNextDone) }
-                    },
-                    onToggleLike = { viewModel.toggleLike(request.track) },
-                    onAddTo = { playlistsVm.addTrack(it, request.track) },
-                    onCreatePlaylist = { playlistsVm.create(it, thenAdd = request.track) },
-                    onRemoveFromPlaylist = { request.playlist?.let { playlistsVm.removeTrack(it, request.track.idString) } },
-                    onOpenArtist = request.track.artists.firstOrNull { it.idString != null }?.let { artist ->
-                        {
-                            isPlayerExpanded = false
-                            catalogVm.openArtist(artist.idString!!, artist.name.orEmpty())
-                        }
-                    },
-                    onOpenAlbum = request.track.albums.firstOrNull()?.let { album ->
-                        val albumId = (album.id as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@let null
-                        {
-                            isPlayerExpanded = false
-                            catalogVm.openAlbum(albumId, album.title.orEmpty())
-                        }
-                    }
-                )
-            }
-
-            // In-App Update Dialog
-            if (updateCheckResult is com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable) {
-                val updateAvailable = updateCheckResult as com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable
-                com.korenskoy.yandexmusic.presentation.update.UpdateDialog(
-                    updateInfo = updateAvailable,
-                    downloadProgress = updateDownloadProgress,
-                    statusMessage = updateStatusMessage,
-                    hasInstallPermission = updateVm.canRequestPackageInstalls,
-                    isSignatureMismatch = isSignatureMismatch,
-                    onRequestPermission = { updateVm.openInstallPermissionSettings() },
-                    onStartDownload = {
-                        updateVm.startDownload(updateAvailable.apkDownloadUrl)
-                    },
-                    onInstall = {
-                        updateVm.installDownloaded(forceSystemInstall = true)
-                    },
-                    onShareOrSave = {
-                        updateVm.shareOrSaveDownloadedApk()
-                    },
-                    onDismiss = {
-                        updateVm.dismiss()
-                    }
-                )
-            }
-
-            // Account Management Dialog
-            if (showAccountDialog) {
-                AccountManagementDialog(
-                    accounts = allAccounts,
-                    activeAccount = activeAccount,
-                    defaultAccountUid = defaultAccountUid,
-                    onSetDefaultAccount = { uid -> accountVm.setDefaultAccount(uid) },
-                    onSwitchAccount = { uid -> accountVm.switchAccount(uid) },
-                    onRemoveAccount = { uid -> accountVm.removeAccount(uid) },
-                    onAddNewAccount = { onNavigateToAuth() },
-                    onLogoutCurrent = { accountVm.logoutCurrentAccount() },
-                    onLogoutAll = { accountVm.logoutAllAccounts() },
-                    onDismiss = { showAccountDialog = false }
-                )
-            }
-
-            // Startup Account Picker Dialog (shown when multiple accounts exist and no default user set)
-            if (showStartupAccountPicker) {
-                com.korenskoy.yandexmusic.presentation.account.StartupAccountPickerDialog(
-                    accounts = allAccounts,
-                    activeAccount = activeAccount,
-                    onSelectAccount = { uid, rememberAsDefault ->
-                        accountVm.switchAccount(uid)
-                        if (rememberAsDefault) {
-                            accountVm.setDefaultAccount(uid)
-                        }
-                        hasHandledStartupAccountPicker = true
-                    },
-                    onAddNewAccount = {
-                        hasHandledStartupAccountPicker = true
-                        onNavigateToAuth()
-                    }
-                )
-            }
-        }
         }
     }
 }
 
-/** What the track menu was opened for; [pickPlaylist] goes straight to the playlist picker. */
-private data class TrackMenuRequest(
-    val track: com.korenskoy.yandexmusic.data.dto.TrackDetailsDto,
-    val playlist: com.korenskoy.yandexmusic.data.dto.UserPlaylistDto?,
-    val pickPlaylist: Boolean
-)
+/** A catalog page slides a fifth of the way in from the right and fades in; Back mirrors it. */
+private fun catalogTransition(forward: Boolean, lite: Boolean): androidx.compose.animation.ContentTransform =
+    if (lite) {
+        fadeIn(HiFiMotion.quick()) togetherWith fadeOut(HiFiMotion.quick())
+    } else {
+        val dir = if (forward) 1 else -1
+        (androidx.compose.animation.slideInHorizontally(HiFiMotion.large()) { it * dir / 5 } + fadeIn(HiFiMotion.standard())) togetherWith
+            (androidx.compose.animation.slideOutHorizontally(HiFiMotion.standard()) { -it * dir / 5 } + fadeOut(HiFiMotion.quick()))
+    }
+
+/** The full-screen player wired to the view models. */
+// coverModifier is the shared cover transition handed through to the player's cover
+@Suppress("ModifierParameter")
+@Composable
+private fun PlayerHost(
+    track: TrackDetailsDto,
+    now: NowPlaying,
+    favoriteStationIds: Set<String>,
+    progress: () -> Long,
+    viewModel: MainViewModel,
+    radioVm: RadioViewModel,
+    onCollapse: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onQualityClick: () -> Unit,
+    coverModifier: Modifier
+) {
+    val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
+    val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsStateWithLifecycle()
+    val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
+    val stationId = track.idString.removePrefix("radio_")
+    FullScreenPlayer(
+        track = track,
+        isPlaying = now.isPlaying,
+        isLiked = if (track.isRadio) stationId in favoriteStationIds else track.idString in now.likedTrackIds,
+        progress = progress,
+        queue = queue,
+        sourceLabel = playerSourceLabelRes(now.source, track.isRadio)?.let { stringResource(it) }.orEmpty(),
+        onPlayPauseClick = { viewModel.togglePlayPause() },
+        onToggleLike = { if (track.isRadio) radioVm.toggleFavorite(stationId) else viewModel.toggleLike(track) },
+        onNextClick = { viewModel.playNext() },
+        onPrevClick = { viewModel.playPrev() },
+        onSeekTo = { viewModel.seekTo(it) },
+        onTrackSelect = { id -> viewModel.playTrack(id, queue) },
+        onRemoveFromQueue = { viewModel.removeFromQueue(it) },
+        onMoveInQueue = { id, target -> viewModel.moveInQueue(id, target) },
+        onCollapse = onCollapse,
+        onCloseAndClear = {
+            onCollapse()
+            viewModel.stopAndClearPlayer()
+        },
+        onDislikeClick = { if (track.isRadio) radioVm.removeFavorite(stationId) else viewModel.dislikeTrack(track) },
+        onLoadMoreQueue = { viewModel.loadMoreQueue() },
+        isFetchingMoreQueue = isFetchingMoreQueue,
+        sleepTimer = sleepTimer,
+        onSleepTimer = { viewModel.setSleepTimer(it) },
+        onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
+        onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+        onAddToPlaylist = onAddToPlaylist,
+        onQualityClick = onQualityClick,
+        coverModifier = coverModifier
+    )
+}
+
+/** The cover shared between the mini-player and the full player (off in lite mode and for radio). */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun Modifier.sharedCover(scope: SharedTransitionScope, visibility: AnimatedVisibilityScope, enabled: Boolean): Modifier =
+    if (!enabled) this else with(scope) {
+        this@sharedCover.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), visibility)
+    }
+
+/** Back from the system installer's permission screen: continue the update that was waiting for it. */
+@Composable
+private fun InstallDownloadedUpdateOnResume(updateVm: UpdateViewModel) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && updateVm.downloadProgress.value >= 2f && updateVm.canRequestPackageInstalls) {
+                updateVm.installDownloaded()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}

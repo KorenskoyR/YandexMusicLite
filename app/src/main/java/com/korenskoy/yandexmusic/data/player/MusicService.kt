@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.R
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -91,7 +93,7 @@ class MusicService : MediaLibraryService() {
                 "Yandex Music Lite",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Уведомления плеера Yandex Music Lite"
+                description = getString(R.string.notification_channel_description)
                 setShowBadge(false)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }

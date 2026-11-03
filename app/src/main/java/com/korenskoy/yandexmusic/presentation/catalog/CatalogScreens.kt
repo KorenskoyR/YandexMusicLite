@@ -1,9 +1,19 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiSectionHeader
+import androidx.compose.ui.semantics.Role
+import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import com.korenskoy.yandexmusic.presentation.hifi.GlassCircleButton
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiErrorState
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiSkeletonRows
+import com.korenskoy.yandexmusic.presentation.hifi.appearOnce
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAppearance
+import com.korenskoy.yandexmusic.presentation.hifi.predictiveBack
+import com.korenskoy.yandexmusic.presentation.hifi.rememberPredictiveBack
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,10 +41,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -81,14 +88,16 @@ fun CatalogPageScreen(
     contentBottom: Dp,
     actions: CatalogActions
 ) {
-    BackHandler(onBack = actions.onBack)
+    val back = rememberPredictiveBack(enabled = true, onBack = actions.onBack)
     val isArtist = state.page is CatalogPage.Artist
     val tracks = state.artist?.popularTracks ?: state.album?.tracks.orEmpty()
+    val appearance = rememberAppearance(state.page)
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = contentBottom),
         modifier = Modifier
             .fillMaxSize()
+            .predictiveBack(back)
             .navigationBarsPadding()
     ) {
         item(key = "header") {
@@ -98,16 +107,8 @@ fun CatalogPageScreen(
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x352A2A38))
-                        .border(BorderStroke(1.dp, Color(0x40FFFFFF)), CircleShape)
-                        .clickable(onClick = actions.onBack),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_nazad), tint = Color.White, modifier = Modifier.size(22.dp))
+                GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -121,9 +122,7 @@ fun CatalogPageScreen(
                     Column {
                         Text(
                             text = state.artist?.artist?.name ?: state.album?.title ?: state.page.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
+                            style = HiFiType.LargeTitle.copy(fontSize = 26.sp, lineHeight = 32.sp),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -145,28 +144,16 @@ fun CatalogPageScreen(
         }
 
         when {
-            state.isLoading -> item(key = "loading") {
-                Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            }
+            state.isLoading -> item(key = "loading") { HiFiSkeletonRows(Modifier.padding(top = 20.dp), count = 6) }
             state.failed -> item(key = "failed") {
-                Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.catalog_load_failed), color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp)
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = actions.onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A6CFF)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) { Text(stringResource(R.string.playlist_retry), color = Color.White) }
-                }
+                HiFiErrorState(onRetry = actions.onRetry, message = stringResource(R.string.catalog_load_failed))
             }
             else -> {
                 if (isArtist && tracks.isNotEmpty()) {
                     item(key = "popular_title") { SectionTitle(stringResource(R.string.catalog_popular_tracks)) }
                 }
-                items(tracks, key = { "t" + it.idString }) { track ->
-                    Box(Modifier.padding(horizontal = 8.dp)) {
+                itemsIndexed(tracks, key = { _, t -> "t" + t.idString }, contentType = { _, _ -> "track" }) { index, track ->
+                    Box(Modifier.padding(horizontal = 8.dp).appearOnce(appearance, track.idString, index)) {
                         TrackItem(
                             track = track,
                             isPlaying = isPlaying && track.idString == currentTrackId,
@@ -181,7 +168,7 @@ fun CatalogPageScreen(
                     item(key = "albums") {
                         Column {
                             SectionTitle(stringResource(R.string.catalog_albums))
-                            AlbumsRow(albums, onOpen = { actions.onOpenAlbum(it.idString!!, it.title.orEmpty()) })
+                            AlbumsRow(albums, onOpen = { album -> album.idString?.let { actions.onOpenAlbum(it, album.title.orEmpty()) } })
                         }
                     }
                 }
@@ -201,7 +188,7 @@ private fun AlbumSubtitle(album: AlbumDto, actions: CatalogActions) {
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable { actions.onOpenArtist(artist.idString!!, artist.name.orEmpty()) }
+            modifier = Modifier.clickable(role = Role.Button) { artist.idString?.let { actions.onOpenArtist(it, artist.name.orEmpty()) } }
         )
     }
     Text(
@@ -218,12 +205,11 @@ private fun AlbumSubtitle(album: AlbumDto, actions: CatalogActions) {
 @Composable
 fun AlbumsRow(albums: List<AlbumDto>, onOpen: (AlbumDto) -> Unit, contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp)) {
     LazyRow(contentPadding = contentPadding, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(albums, key = { it.idString!! }) { album ->
+        items(albums, key = { it.idString ?: it.title.orEmpty() }) { album ->
             Column(
                 modifier = Modifier
                     .width(120.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onOpen(album) }
+                    .hifiPress({ onOpen(album) })
             ) {
                 Cover(album.coverUri, Icons.Default.Album, RoundedCornerShape(12.dp), 120.dp)
                 Spacer(Modifier.height(6.dp))
@@ -242,13 +228,8 @@ fun AlbumsRow(albums: List<AlbumDto>, onOpen: (AlbumDto) -> Unit, contentPadding
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        color = Color.White,
-        fontWeight = FontWeight.Bold,
-        fontSize = 18.sp,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-    )
+    // The section caps of every other page
+    HiFiSectionHeader(text, Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp))
 }
 
 @Composable
@@ -257,7 +238,7 @@ internal fun Cover(uri: String?, placeholder: ImageVector, shape: Shape, size: D
         modifier = Modifier
             .size(size)
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF2A3346), Color(0xFF181B24)))),
+            .background(Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))),
         contentAlignment = Alignment.Center
     ) {
         Icon(placeholder, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(size / 3))

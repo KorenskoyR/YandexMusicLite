@@ -7,7 +7,6 @@ import javax.inject.Inject
 
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.network.NetworkMonitor
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

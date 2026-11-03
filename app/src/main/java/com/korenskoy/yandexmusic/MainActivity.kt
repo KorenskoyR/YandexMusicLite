@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -11,17 +13,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
@@ -70,13 +67,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-        
+
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
         if (savedInstanceState == null) intent?.let { playFromSearch(it) }
 
@@ -84,13 +81,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             // Scale the whole UI for screens whose reported density is wrong (dense car head units):
             // the app cannot change the system density, so it overrides its own instead.
-            val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsState(initial = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
-            val uiScaleManual by settingsRepository.uiScaleManual.collectAsState(initial = SettingsRepository.DEFAULT_UI_SCALE)
-            val context = LocalContext.current
-            val configuration = LocalConfiguration.current
+            val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
+            val uiScaleManual by settingsRepository.uiScaleManual.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE)
+            val resources = androidx.compose.ui.platform.LocalResources.current
             val baseDensity = LocalDensity.current
-            val uiScale = remember(uiScaleAuto, uiScaleManual, configuration) {
-                val info = DisplayScale.analyze(context.resources.displayMetrics)
+            val uiScale = remember(uiScaleAuto, uiScaleManual, resources) {
+                val info = DisplayScale.analyze(resources.displayMetrics)
                 DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
             }
             CompositionLocalProvider(
@@ -99,7 +95,7 @@ class MainActivity : ComponentActivity() {
                 YandexMusicTheme {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                        color = com.korenskoy.yandexmusic.presentation.hifi.HiFi.Ground
                     ) {
                         // Skip the splash when the app is re-entered with a session already on screen
                         AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal)
@@ -146,7 +142,7 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
-    val isAuthorized by mainViewModel.isAuthorized.collectAsState()
+    val isAuthorized by mainViewModel.isAuthorized.collectAsStateWithLifecycle()
     // Music is playing or a session was restored: open straight to the player UI, like Apple Music.
     val startDestination = remember {
         val hasSession = mainViewModel.currentTrack.value != null

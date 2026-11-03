@@ -133,7 +133,7 @@ fun Modifier.hifiRecessed(cornerRadius: Dp): Modifier = this.drawWithCache {
 /** Dark anodized metal with a thin steel edge — the "selected" material (no glowing dots). */
 fun Modifier.hifiAnodized(shape: Shape): Modifier = this
     .clip(shape)
-    .background(Brush.radialGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)), radius = 600f, center = Offset(0f, 0f)))
+    .background(Brush.radialGradient(listOf(HiFi.AnodizedLight, HiFi.AnodizedDark), radius = 600f, center = Offset(0f, 0f)))
     .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Transparent)))
     .border(BorderStroke(1.dp, Brush.verticalGradient(HiFi.MetalEdge.map { it.copy(alpha = 0.65f) })), shape)
 

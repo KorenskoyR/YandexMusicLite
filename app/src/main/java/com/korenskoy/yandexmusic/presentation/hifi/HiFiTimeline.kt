@@ -230,7 +230,7 @@ fun HiFiTimeline(
                     drawCircle(Color.Black.copy(alpha = 0.45f), beadR + u(3f).toPx(), c + Offset(0f, u(3f).toPx()))
                     drawCircle(Brush.sweepGradient(HiFi.MetalSweep, center = c), beadR, c)
                     drawCircle(
-                        Brush.radialGradient(listOf(Color(0xFF3A3F4B), Color(0xFF16181E)), center = c + Offset(0f, -beadR * 0.4f), radius = beadR * 1.3f),
+                        Brush.radialGradient(listOf(Color(0xFF3A3F4B), HiFi.AnodizedDark), center = c + Offset(0f, -beadR * 0.4f), radius = beadR * 1.3f),
                         beadR - u(1.5f).toPx(),
                         c
                     )
