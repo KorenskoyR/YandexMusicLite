@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.shape.CircleShape
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.activity.compose.BackHandler
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
@@ -87,6 +94,9 @@ fun TrackContextMenu(
 ) {
     var picking by remember { mutableStateOf(startWithPlaylists) }
     var naming by remember { mutableStateOf(false) }
+    // The picker opened from the actions steps back to them; opened on its own (the player's "add to
+    // playlist") it is the whole menu
+    val pickerStepsBack = picking && !startWithPlaylists
 
     if (naming) {
         PlaylistNameDialog(
@@ -96,31 +106,54 @@ fun TrackContextMenu(
                 onCreatePlaylist(name)
                 onDismiss()
             },
-            onDismiss = onDismiss
+            onDismiss = { naming = false }
         )
         return
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    // A tap outside or a swipe down closes the menu; Back goes one step back (handled below, because the
+    // sheet's own Back would hide it first)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults.Container
+        containerColor = com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults.Container,
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
     ) {
+        BackHandler {
+            if (pickerStepsBack) picking = false
+            else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 32.dp)
         ) {
-            Text(
-                text = track.title ?: stringResource(R.string.bez_nazvaniya),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 17.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (pickerStepsBack) 12.dp else 24.dp, end = 24.dp, top = 4.dp)) {
+                if (pickerStepsBack) {
+                    // Back to the track's actions
+                    val backLabel = stringResource(R.string.cd_nazad)
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable(role = Role.Button, onClickLabel = backLabel) { picking = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = backLabel, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    text = track.title ?: stringResource(R.string.bez_nazvaniya),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
                 text = if (picking) stringResource(R.string.track_context_menu_dobavit_v_pleylist)
                 else track.artists.joinToString { it.name.orEmpty() },

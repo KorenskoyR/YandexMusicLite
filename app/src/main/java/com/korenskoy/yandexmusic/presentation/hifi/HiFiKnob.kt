@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import kotlin.math.floor
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
@@ -43,9 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.sin
 
@@ -149,25 +148,46 @@ fun PlayPauseGlyph(isPlaying: Boolean, size: Dp, tint: Color = HiFi.OnMetal) {
 
 enum class RingMode { Playing, Paused, Loading }
 
-/** Bar lengths of the spectrum ring. Pure and deterministic so the look is unit-tested. */
+/**
+ * Bar lengths of the spectrum ring. Pure and deterministic so the look is unit-tested.
+ *
+ * The ring never turns: nothing in it travels round the circle. While playing, every bar keeps its own
+ * rhythm (its own speed and starting point), its length follows a smooth outline that stays in place,
+ * and the whole ring breathes together. While loading, all bars rise and fall at once.
+ */
 object SpectrumMath {
+    private const val TWO_PI = 2.0 * PI
+
     /** Length 0..1 of bar [i] of [n] at time [t] seconds. Paused bars collapse to dots (0). */
     fun level(i: Int, n: Int, t: Float, mode: RingMode): Float = when (mode) {
         RingMode.Paused -> 0f
         RingMode.Playing -> {
-            val base = 0.5f + 0.5f * sin(i * 0.42f + t * 2.2f)
-            val envelope = 0.55f + 0.45f * sin(i * 0.13f + t * 0.9f + 2.1f)
-            val jitter = abs(sin(i * 1.7f + t * 3.1f)) * 0.18f
-            (base * base * envelope * 0.82f + jitter).coerceIn(0.08f, 1f)
+            val theta = TWO_PI * i / n
+            // A calm outline round the ring (three soft lobes) with a little per-bar variety
+            val outline = 0.55 + 0.25 * (0.5 + 0.5 * cos(3 * theta + 0.7)) + 0.2 * hash(i, 1)
+            // The bar's own rhythm: up and down in 0.6–1.3 s, from its own starting point
+            val halfPeriod = 0.62 + 0.7 * hash(i, 2)
+            val low = 0.18 + 0.2 * hash(i, 3)
+            val swing = 0.5 - 0.5 * cos(PI * t / halfPeriod + TWO_PI * hash(i, 4))
+            val own = low + (1 - low) * swing
+            (outline * own * breath(t, BREATH_S, 0.86, 1.04) * 0.96).toFloat().coerceIn(0.08f, 1f)
         }
-        RingMode.Loading -> {
-            // A bright wave running around the ring
-            val head = (t * 0.6f) % 1f
-            var d = abs(i.toFloat() / n - head)
-            if (d > 0.5f) d = 1f - d
-            (0.06f + 0.94f * exp(-(d * d) / 0.006f)).coerceIn(0f, 1f)
-        }
+        // Every bar at once, each a touch different in length
+        RingMode.Loading -> ((0.79 + 0.21 * hash(i, 5)) * breath(t, LOADING_BREATH_S, 0.22, 1.0)).toFloat().coerceIn(0f, 1f)
     }
+
+    /** The whole ring's breath: from [low] to [high] and back in [periodS] seconds, the same for every bar. */
+    private fun breath(t: Float, periodS: Double, low: Double, high: Double): Double =
+        low + (high - low) * (0.5 - 0.5 * cos(TWO_PI * t / periodS))
+
+    /** A fixed pseudo-random number 0..1 per bar (and [salt]): the ring looks the same on every launch. */
+    private fun hash(i: Int, salt: Int): Double {
+        val x = sin(i * 12.9898 + salt * 78.233) * 43758.5453
+        return x - floor(x)
+    }
+
+    private const val BREATH_S = 3.2
+    private const val LOADING_BREATH_S = 1.4
 
     /** Whether bar [i] of [n] lies in the already played arc (clockwise from the top). */
     fun isPlayed(i: Int, n: Int, progress: Float): Boolean = i.toFloat() / n < progress

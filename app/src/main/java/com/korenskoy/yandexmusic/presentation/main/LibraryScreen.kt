@@ -48,7 +48,7 @@ import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -207,7 +207,7 @@ fun LibraryScreen(
                             Spacer(Modifier.width(10.dp))
                         }
                         GlassCircleButton(onClick = { showSettings = true }, contentDescription = stringResource(R.string.library_settings)) {
-                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                            Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
                 }

@@ -194,18 +194,12 @@ fun CacheMenuBottomSheet(
 
                     val account: @Composable ColumnScope.() -> Unit = {
                         SettingsGroup(stringResource(R.string.settings_group_account)) {
-                            AccountCard(accountName, avatarUrl, hasPlus, onSwitch = {
-                                onAccountManagementClick()
-                                close()
-                            })
+                            AccountCard(accountName, avatarUrl, hasPlus, onSwitch = onAccountManagementClick)
                             SettingsRow(
                                 icon = Icons.Rounded.Star,
                                 title = stringResource(R.string.settings_startup_profile),
                                 value = defaultAccountName ?: stringResource(R.string.settings_startup_ask),
-                                onClick = {
-                                    onAccountManagementClick()
-                                    close()
-                                }
+                                onClick = onAccountManagementClick
                             )
                             SettingsRow(icon = Icons.AutoMirrored.Rounded.Login, title = stringResource(R.string.settings_add_account), onClick = {
                                 onAddAccount()
@@ -235,10 +229,7 @@ fun CacheMenuBottomSheet(
                                 onClick = { onEnableAutoDownload(!autoDownloadEnabled) },
                                 trailing = { HiFiSwitch(checked = autoDownloadEnabled, onCheckedChange = onEnableAutoDownload) }
                             )
-                            SettingsRow(icon = Icons.Rounded.CloudDownload, title = stringResource(R.string.settings_download_all), onClick = {
-                                onDownloadAllClick()
-                                close()
-                            })
+                            SettingsRow(icon = Icons.Rounded.CloudDownload, title = stringResource(R.string.settings_download_all), onClick = onDownloadAllClick)
                             SettingsRow(
                                 icon = Icons.Rounded.Storage,
                                 title = stringResource(R.string.settings_storage),

@@ -99,13 +99,53 @@ class HiFiLogicTest {
         assertTrue(a != b)
     }
 
+    /**
+     * How much a ring pattern drifts clockwise (> 0) or anticlockwise (< 0) between two frames [dt] apart:
+     * the correlation of each frame with the next one shifted a bar either way.
+     */
+    private fun drift(n: Int, dt: Float, level: (Int, Float) -> Float): Double {
+        var cw = 0.0
+        var ccw = 0.0
+        var same = 0.0
+        var t = 0f
+        repeat(400) {
+            val a = (0 until n).map { level(it, t).toDouble() }
+            val b = (0 until n).map { level(it, t + dt).toDouble() }
+            val ma = a.average()
+            val mb = b.average()
+            for (i in 0 until n) {
+                val x = a[i] - ma
+                cw += x * (b[(i + 1) % n] - mb)
+                ccw += x * (b[(i - 1 + n) % n] - mb)
+                same += x * (b[i] - mb)
+            }
+            t += 0.137f
+        }
+        return (cw - ccw) / kotlin.math.abs(same).coerceAtLeast(1e-9)
+    }
+
     @Test
-    fun loadingWaveHasOneBrightHeadThatRuns() {
-        fun head(t: Float) = (0 until 72).maxByOrNull { SpectrumMath.level(it, 72, t, RingMode.Loading) }!!
-        val levels = (0 until 72).map { SpectrumMath.level(it, 72, 0.5f, RingMode.Loading) }
-        assertTrue("bright head", levels.max() > 0.9f)
-        assertTrue("quiet rest", levels.count { it < 0.2f } > 50)
-        assertTrue("the head moves", head(0.2f) != head(0.8f))
+    fun driftMeasureSeesATravellingWave() {
+        // The old playing formula: the same shape moving to lower bars, i.e. anticlockwise
+        val old = drift(72, 0.19f) { i, t -> 0.5f + 0.5f * kotlin.math.sin(i * 0.42f + t * 2.2f) }
+        assertTrue("anticlockwise: $old", old < -0.25)
+    }
+
+    @Test
+    fun playingRingDoesNotTurn() {
+        val d = drift(72, 0.19f) { i, t -> SpectrumMath.level(i, 72, t, RingMode.Playing) }
+        assertTrue("no direction: $d", kotlin.math.abs(d) < 0.1)
+    }
+
+    @Test
+    fun loadingRingPulsesTogetherWithoutTurning() {
+        val d = drift(72, 0.05f) { i, t -> SpectrumMath.level(i, 72, t, RingMode.Loading) }
+        assertTrue("no direction: $d", kotlin.math.abs(d) < 0.1)
+        // All bars rise and fall at once: at the low point every bar is short, at the high point every bar is long
+        val low = (0 until 72).map { SpectrumMath.level(it, 72, 0f, RingMode.Loading) }
+        val high = (0 until 72).map { SpectrumMath.level(it, 72, 0.7f, RingMode.Loading) }
+        assertTrue(low.max() < 0.25f)
+        assertTrue(high.min() > 0.75f)
     }
 
     @Test
