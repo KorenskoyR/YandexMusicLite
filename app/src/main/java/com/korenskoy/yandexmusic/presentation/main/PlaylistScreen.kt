@@ -73,6 +73,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.korenskoy.yandexmusic.presentation.hifi.GlassPillButton
+import com.korenskoy.yandexmusic.presentation.hifi.MetalPillButton
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import com.korenskoy.yandexmusic.presentation.main.components.DeletePlaylistDialog
@@ -431,6 +433,7 @@ private fun ReorderList(
     }
 }
 
+/** "Слушать" is the Hi-Fi metal capsule, "Перемешать" glass — the same pair as on "Моя музыка". */
 @Composable
 private fun PlaylistAction(
     icon: ImageVector,
@@ -440,21 +443,6 @@ private fun PlaylistAction(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier = modifier
-            .height(42.dp)
-            .clip(CircleShape)
-            .background(
-                if (primary) Brush.linearGradient(listOf(Color(0xFF3D8BFF), Color(0xFF0A6CFF), Color(0xFF0A55D6)))
-                else Brush.verticalGradient(listOf(Color(0x352A2A38), Color(0x201E1E28)))
-            )
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = if (primary) 0.6f else 0.25f)), CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-    }
+    if (primary) MetalPillButton(label, onClick, modifier, icon = icon, height = 48.dp, enabled = enabled)
+    else GlassPillButton(label, onClick, modifier, icon = icon, height = 48.dp, enabled = enabled)
 }

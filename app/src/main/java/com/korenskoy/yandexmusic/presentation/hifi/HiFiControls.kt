@@ -194,12 +194,14 @@ fun MetalPillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    height: Dp = 52.dp
+    height: Dp = 52.dp,
+    enabled: Boolean = true
 ) {
     val view = LocalView.current
     Box(
         modifier = modifier
             .height(height)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
             .shadow(14.dp, CircleShape, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(CircleShape)
             .background(Brush.verticalGradient(HiFi.MetalEdge))
@@ -207,7 +209,7 @@ fun MetalPillButton(
             .clip(CircleShape)
             .background(Brush.radialGradient(HiFi.KnobFace, center = Offset(0f, 0f), radius = 900f))
             .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent)))
-            .clickable(role = Role.Button) {
+            .clickable(enabled = enabled, role = Role.Button) {
                 view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                 onClick()
             },
@@ -224,13 +226,15 @@ fun GlassPillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    height: Dp = 52.dp
+    height: Dp = 52.dp,
+    enabled: Boolean = true
 ) {
     Box(
         modifier = modifier
             .height(height)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
             .hifiGlass(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         PillLabel(text, icon)
