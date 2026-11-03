@@ -84,6 +84,7 @@ class MainViewModel @Inject constructor(
     val isBuffering: StateFlow<Boolean> = playbackController.isBuffering
     val progress: StateFlow<Long> = playbackController.progress
     val isFetchingMoreQueue: StateFlow<Boolean> = playbackController.isFetchingMoreQueue
+    val wavePreview: StateFlow<List<com.korenskoy.yandexmusic.data.dto.TrackDetailsDto>> = playbackController.wavePreview
     val streamQuality: StateFlow<String?> = playbackController.streamQuality
     val sleepTimer: StateFlow<SleepTimerState?> = playbackController.sleepTimer
     val playbackMessages: SharedFlow<String> = playbackController.messages
@@ -186,6 +187,8 @@ class MainViewModel @Inject constructor(
     // region Playback: delegated to the process-wide PlaybackController
 
     fun playMyVibe() = playbackController.playMyVibe()
+    fun playWaveFrom(trackId: String) = playbackController.playWaveFrom(trackId)
+    fun ensureWavePreview() = playbackController.ensureWavePreview()
 
     fun loadMoreQueue() = playbackController.loadMoreQueue()
 

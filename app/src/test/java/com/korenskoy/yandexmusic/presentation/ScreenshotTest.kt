@@ -39,6 +39,7 @@ import com.korenskoy.yandexmusic.presentation.main.LibraryScreen
 import com.korenskoy.yandexmusic.presentation.main.OpenedPlaylist
 import com.korenskoy.yandexmusic.presentation.main.PlaylistScreen
 import com.korenskoy.yandexmusic.presentation.main.HomeScreen
+import com.korenskoy.yandexmusic.presentation.main.waveShelfOf
 import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
 import com.korenskoy.yandexmusic.presentation.hifi.LocalArtworkTint
@@ -183,7 +184,8 @@ class ScreenshotTest {
         show {
             HomeScreen(
                 waveTrack = tracks[0], isPlaying = true, isLoading = false, isLiked = true, progress = { 70_000L },
-                upNext = tracks.drop(1), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+                shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
             )
         }
         snap("wave_playing")
@@ -194,7 +196,8 @@ class ScreenshotTest {
         show {
             HomeScreen(
                 waveTrack = tracks[0], isPlaying = false, isLoading = false, isLiked = false, progress = { 70_000L },
-                upNext = tracks.drop(1), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+                shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
             )
         }
         snap("wave_paused")
@@ -205,10 +208,24 @@ class ScreenshotTest {
         show {
             HomeScreen(
                 waveTrack = null, isPlaying = false, isLoading = false, isLiked = false, progress = { 0L },
-                upNext = emptyList(), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+                shelf = waveShelfOf(false, emptyList(), tracks), shimmer = false,
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
             )
         }
         snap("wave_idle")
+    }
+
+    /** First launch: nothing saved yet — the shelf keeps its place with placeholders. */
+    @Test
+    fun waveLoading() {
+        show {
+            HomeScreen(
+                waveTrack = null, isPlaying = false, isLoading = true, isLiked = false, progress = { 0L },
+                shelf = waveShelfOf(false, emptyList(), emptyList()), shimmer = false,
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
+            )
+        }
+        snap("wave_loading")
     }
 
     @Test
@@ -421,12 +438,20 @@ class ScreenshotTest {
     }
 
     @Composable
-    private fun car(isLandscape: Boolean, steeringWheelOnLeft: Boolean = true) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
-        currentTrack = tracks[0], isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
+    private fun car(isLandscape: Boolean, steeringWheelOnLeft: Boolean = true, track: TrackDetailsDto = tracks[0]) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }) { CarScreen(
+        currentTrack = track, isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
         onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
         onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = steeringWheelOnLeft, progress = { 82_000L }, durationMs = 286_000,
         nextTrack = tracks[2], source = com.korenskoy.yandexmusic.data.player.PlaylistSource.VIBE
     ) }
+
+    /** Radio in the car: no timeline, the on-air line instead. */
+    @Test
+    @Config(qualifiers = "+land")
+    fun carRadio() {
+        show { car(isLandscape = true, track = tracks[0].copy(id = JsonPrimitive("radio_europa"), title = "Европа Плюс", isRadio = true)) }
+        snap("car_radio")
+    }
 
     private companion object {
         /** 21.10.2026 10:30 MSK: the car clock in the screenshots. */

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
@@ -90,7 +91,7 @@ fun MiniPlayer(
             .height(62.dp)
             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
             .graphicsLayer { alpha = 1f - (abs(offsetX.value) / (300f * density.density)).coerceIn(0f, 0.8f) }
-            .shadow(elevation = 18.dp, shape = MiniShape, spotColor = Color(0x99000000), ambientColor = Color(0x55000000))
+            .hifiSoftShadow(MiniShape, 18.dp)
             .clip(MiniShape)
             .background(HiFi.BarFill)
             .border(1.dp, Color.White.copy(alpha = 0.12f), MiniShape)

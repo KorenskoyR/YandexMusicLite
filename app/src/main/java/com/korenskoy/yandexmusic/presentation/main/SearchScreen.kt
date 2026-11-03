@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.dto.AlbumDto
 import com.korenskoy.yandexmusic.data.dto.ArtistDto
@@ -547,7 +548,7 @@ private fun BestResultCard(title: String, subtitle: String, coverUri: String?, r
         Modifier
             .fillMaxWidth()
             .height(104.dp)
-            .shadow(16.dp, shape)
+            .hifiSoftShadow(shape, 16.dp)
             .clip(shape)
             .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(tint.primary.copy(alpha = 0.55f), tint.secondary.copy(alpha = 0.55f), Color(0xFF12141C))))
             .hifiGlass(shape, fill = Color.Black.copy(alpha = 0.18f), border = Color.White.copy(alpha = 0.12f))

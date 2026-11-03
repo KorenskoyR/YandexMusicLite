@@ -38,6 +38,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -115,6 +116,14 @@ class PlaybackController @Inject constructor(
     }.stateIn(scope, SharingStarted.Eagerly, 0L)
 
     private val wavePlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
+
+    /**
+     * What the wave will play when it is started: its saved queue without what was just heard. Shown on
+     * the wave page when the wave is not playing, so its "next up" shelf is never empty.
+     */
+    val wavePreview: StateFlow<List<TrackDetailsDto>> = wavePlaylist
+        .map { list -> list.filter { it.idString !in recentPlayedTrackIds }.ifEmpty { list }.take(WAVE_PREVIEW_SIZE) }
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
     private var libraryTracks: List<TrackDetailsDto> = emptyList()
     private val recentPlayedTrackIds = ArrayDeque<String>(RECENT_LIMIT)
 
@@ -233,6 +242,22 @@ class PlaybackController @Inject constructor(
 
         resolveAndPlay(track, crossfade, startPositionMs)
         scope.launch { persistSession() }
+    }
+
+    /** Starts the wave from a track of its preview (the wave page's "next up" shelf). */
+    fun playWaveFrom(trackId: String) {
+        val waveList = wavePlaylist.value
+        if (waveList.none { it.idString == trackId }) {
+            playMyVibe()
+            return
+        }
+        _currentSource.value = PlaylistSource.VIBE
+        playTrack(trackId, waveList, PlaylistSource.VIBE)
+    }
+
+    /** Fills the wave's preview in the background when nothing is saved yet (first launch). */
+    fun ensureWavePreview() {
+        if (wavePlaylist.value.isEmpty() && !_isFetchingMoreQueue.value) fetchMoreVibeTracks()
     }
 
     fun playMyVibe() {
@@ -662,8 +687,8 @@ class PlaybackController @Inject constructor(
         val playlist = _currentPlaylist.value
         val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
 
-        // Proactively refill Vibe queue if remaining tracks <= 5
-        if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 5) {
+        // Proactively refill the wave while 10 tracks are still ahead: the "next up" shelf never runs dry
+        if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 10) {
             fetchMoreVibeTracks()
         }
 
@@ -836,6 +861,7 @@ class PlaybackController @Inject constructor(
     }
 
     companion object {
+        const val WAVE_PREVIEW_SIZE = 10
         private const val TAG = "PlaybackController"
         private const val RECENT_LIMIT = 100
         private const val MAX_FAILED_TRACKS = 3

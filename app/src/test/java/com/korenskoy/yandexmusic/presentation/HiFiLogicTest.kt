@@ -5,7 +5,9 @@ import com.korenskoy.yandexmusic.domain.model.RadioCategory
 import com.korenskoy.yandexmusic.domain.model.RadioStation
 import com.korenskoy.yandexmusic.presentation.car.CarSource
 import com.korenskoy.yandexmusic.presentation.car.carSourceOf
-import com.korenskoy.yandexmusic.presentation.car.carTimeReadout
+import com.korenskoy.yandexmusic.presentation.car.TimelineMath
+import com.korenskoy.yandexmusic.presentation.main.waveShelfOf
+import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLitePolicy
 import com.korenskoy.yandexmusic.presentation.hifi.RingMode
 import com.korenskoy.yandexmusic.presentation.hifi.SpectrumMath
@@ -18,7 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
 
-/** Pure logic of the Hi-Fi redesign (1.8.0): lite mode, cover tint, spectrum ring, FM dial, car readouts. */
+/** Pure logic of the Hi-Fi redesign: lite mode, cover tint, spectrum ring, FM dial, car timeline, wave shelf. */
 class HiFiLogicTest {
 
     // --- Lite mode -------------------------------------------------------------------------------
@@ -156,14 +158,68 @@ class HiFiLogicTest {
         assertNull(carSourceOf(PlaylistSource.NONE, false))
     }
 
+    // --- Car timeline ----------------------------------------------------------------------------
+
     @Test
-    fun timeReadoutShowsElapsedAndRemaining() {
-        assertEquals("1:22" to "−3:24", carTimeReadout(82_000, 286_000))
-        assertEquals("0:00" to "−4:46", carTimeReadout(0, 286_000))
-        assertEquals("0:05" to "−0:00", carTimeReadout(5_400, 5_400))
-        assertEquals("clamped past the end", "4:46" to "−0:00", carTimeReadout(400_000, 286_000))
-        assertEquals("negative position", "0:00" to "−1:00", carTimeReadout(-50, 60_000))
-        assertEquals("unknown duration", "0:00" to "−0:00", carTimeReadout(10_000, 0))
-        assertEquals("long tracks", "61:01" to "−0:00", carTimeReadout(3_661_000, 3_661_000))
+    fun timelineFractionFollowsThePosition() {
+        assertEquals(0.5f, TimelineMath.fraction(143_000, 286_000), 0.0001f)
+        assertEquals("clamped past the end", 1f, TimelineMath.fraction(400_000, 286_000), 0f)
+        assertEquals("negative position", 0f, TimelineMath.fraction(-50, 60_000), 0f)
+        assertEquals("unknown duration", 0f, TimelineMath.fraction(10_000, 0), 0f)
+    }
+
+    @Test
+    fun fingerPositionBecomesASeekTarget() {
+        assertEquals(0.25f, TimelineMath.fractionAt(150f, 600f), 0.0001f)
+        assertEquals("left of the groove", 0f, TimelineMath.fractionAt(-20f, 600f), 0f)
+        assertEquals("right of the groove", 1f, TimelineMath.fractionAt(700f, 600f), 0f)
+        assertEquals("not laid out yet", 0f, TimelineMath.fractionAt(10f, 0f), 0f)
+        assertEquals(71_500L, TimelineMath.seekPosition(0.25f, 286_000))
+        assertEquals(286_000L, TimelineMath.seekPosition(1.5f, 286_000))
+        assertEquals(0L, TimelineMath.seekPosition(0.5f, 0))
+    }
+
+    @Test
+    fun onlyLargeChangesAreJumps() {
+        // 100 ms of playback on a 30-second track is far below a jump; a new track from the middle is one
+        val tick = TimelineMath.fraction(100, 30_000)
+        assertTrue(tick < TimelineMath.JUMP)
+        assertTrue(TimelineMath.fraction(143_000, 286_000) - TimelineMath.fraction(0, 200_000) > TimelineMath.JUMP)
+    }
+
+    // --- Wave page shelf -------------------------------------------------------------------------
+
+    private fun track(id: String) = TrackDetailsDto(id = kotlinx.serialization.json.JsonPrimitive(id), title = "T$id")
+
+    @Test
+    fun playingWaveShowsWhatComesNext() {
+        val state = waveShelfOf(waveActive = true, upcoming = listOf(track("2"), track("3")), preview = listOf(track("9")))
+        assertNull("the playing track is shown above, not a start track", state.startsWith)
+        assertEquals(listOf("2", "3"), state.shelf.map { it.idString })
+        assertFalse(state.loading)
+    }
+
+    @Test
+    fun playingWaveAtTheEndOfItsBatchKeepsTheShelfAsPlaceholders() {
+        val state = waveShelfOf(waveActive = true, upcoming = emptyList(), preview = listOf(track("9")))
+        assertTrue(state.loading)
+    }
+
+    @Test
+    fun idleWavePreviewsWhereItStarts() {
+        val state = waveShelfOf(waveActive = false, upcoming = listOf(track("x")), preview = listOf(track("1"), track("2"), track("3")))
+        assertEquals("1", state.startsWith?.idString)
+        assertEquals("the start track is not repeated on the shelf", listOf("2", "3"), state.shelf.map { it.idString })
+        assertFalse(state.loading)
+    }
+
+    @Test
+    fun idleWaveWithoutAQueueYetShowsPlaceholders() {
+        val empty = waveShelfOf(waveActive = false, upcoming = emptyList(), preview = emptyList())
+        assertNull(empty.startsWith)
+        assertTrue(empty.loading)
+        val single = waveShelfOf(waveActive = false, upcoming = emptyList(), preview = listOf(track("1")))
+        assertEquals("1", single.startsWith?.idString)
+        assertTrue(single.loading)
     }
 }

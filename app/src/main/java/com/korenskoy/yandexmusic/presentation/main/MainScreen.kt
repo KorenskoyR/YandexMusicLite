@@ -202,6 +202,13 @@ fun MainScreen(
         val index = currentPlaylist.indexOfFirst { it.idString == currentTrackId }
         if (index < 0) emptyList() else currentPlaylist.drop(index + 1).take(10)
     }
+    val wavePreview by viewModel.wavePreview.collectAsState()
+    val isFetchingWave by viewModel.isFetchingMoreQueue.collectAsState()
+    val waveShelf = remember(waveActive, upcoming, wavePreview) { waveShelfOf(waveActive, upcoming, wavePreview) }
+    // First launch: fill the wave's preview so the wave page is never empty
+    LaunchedEffect(currentTab == MainTab.HOME && !waveActive && wavePreview.isEmpty()) {
+        if (currentTab == MainTab.HOME && !waveActive && wavePreview.isEmpty()) viewModel.ensureWavePreview()
+    }
     val tabStates = rememberSaveableStateHolder()
     val contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp
     // The mini-player stays out of the way on the wave page, which already shows the playing wave
@@ -250,7 +257,8 @@ fun MainScreen(
                         isLoading = isBuffering && currentSource == PlaylistSource.VIBE,
                         isLiked = currentTrackId?.let { likedTrackIds.contains(it) } == true,
                         progress = { progressState.value },
-                        upNext = if (waveActive) upcoming else emptyList(),
+                        shelf = waveShelf,
+                        shimmer = isFetchingWave || isBuffering,
                         onPlayPause = {
                             // Like Yandex Music: the wave knob controls the wave; from any other context it starts the wave.
                             if (waveActive) {
@@ -262,7 +270,10 @@ fun MainScreen(
                         onLike = { currentTrack?.let { viewModel.toggleLike(it) } },
                         onDislike = { currentTrack?.let { viewModel.dislikeTrack(it) } },
                         onOpenQueue = { isPlayerExpanded = true },
-                        onUpNextClick = { viewModel.playTrack(it.idString, currentPlaylist, PlaylistSource.VIBE) },
+                        onShelfClick = {
+                            if (waveActive) viewModel.playTrack(it.idString, currentPlaylist, PlaylistSource.VIBE)
+                            else viewModel.playWaveFrom(it.idString)
+                        },
                         contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom
                     )
                     MainTab.SEARCH -> SearchScreen(

@@ -2,7 +2,12 @@ package com.korenskoy.yandexmusic.presentation.main
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -11,10 +16,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,9 +32,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
@@ -36,16 +41,24 @@ import androidx.compose.material.icons.rounded.HeartBroken
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,17 +78,43 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiLargeTitle
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiSectionHeader
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiTextAction
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
 import com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph
 import com.korenskoy.yandexmusic.presentation.hifi.RingMode
 import com.korenskoy.yandexmusic.presentation.hifi.SpectrumRing
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 
 /**
- * "Моя волна" — the face of the app: a metal knob inside a spectrum ring (equalizer and track progress
- * in one), the playing track and what comes next. Nothing else on the screen.
+ * What the wave page shows under the knob. Pure; unit-tested.
  *
- * [waveTrack] is the current track only while the wave is the playing source; otherwise the page shows
- * just the knob, which starts the wave.
+ * - The wave plays: the tracks after the current one; while the queue refills, placeholders.
+ * - The wave is not playing (not started, or another source plays): a preview of the saved wave —
+ *   [startsWith] is the track the knob starts with, [shelf] what follows it.
+ *
+ * The shelf is never simply missing: when there is nothing to show yet, [loading] keeps its place.
+ */
+data class WaveShelfState(
+    val startsWith: TrackDetailsDto?,
+    val shelf: List<TrackDetailsDto>,
+    val loading: Boolean
+)
+
+fun waveShelfOf(waveActive: Boolean, upcoming: List<TrackDetailsDto>, preview: List<TrackDetailsDto>): WaveShelfState =
+    if (waveActive) {
+        WaveShelfState(startsWith = null, shelf = upcoming, loading = upcoming.isEmpty())
+    } else {
+        val shelf = preview.drop(1)
+        WaveShelfState(startsWith = preview.firstOrNull(), shelf = shelf, loading = shelf.isEmpty())
+    }
+
+/**
+ * "Моя волна" — the face of the app: a metal knob inside a spectrum ring (equalizer and track progress
+ * in one) in the upper part, the track and the "next up" shelf at the bottom, right above the tab bar.
+ * The page never scrolls: the knob shrinks on short screens so everything always fits.
+ *
+ * [waveTrack] is the current track only while the wave is the playing source; otherwise [shelf] tells
+ * which track the knob starts with.
  */
 @Composable
 fun HomeScreen(
@@ -84,18 +123,19 @@ fun HomeScreen(
     isLoading: Boolean,
     isLiked: Boolean,
     progress: () -> Long,
-    upNext: List<TrackDetailsDto>,
+    shelf: WaveShelfState,
+    shimmer: Boolean,
     onPlayPause: () -> Unit,
     onLike: () -> Unit,
     onDislike: () -> Unit,
     onOpenQueue: () -> Unit,
-    onUpNextClick: (TrackDetailsDto) -> Unit,
+    onShelfClick: (TrackDetailsDto) -> Unit,
     contentBottom: Dp = 100.dp
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val minDim = minOf(windowSize.widthDp, windowSize.heightDp).toFloat()
-    val knobSize = (minDim * if (isLandscape) 0.34f else 0.36f).dp.coerceIn(120.dp, 200.dp)
+    val preferredKnob = (minDim * if (isLandscape) 0.34f else 0.41f).dp.coerceIn(120.dp, 210.dp)
 
     val duration = (waveTrack?.durationMs ?: 0L).coerceAtLeast(0L)
     val progressFraction = { if (duration > 0) progress().toFloat() / duration else 0f }
@@ -104,15 +144,12 @@ fun HomeScreen(
         waveTrack != null && isPlaying -> RingMode.Playing
         else -> RingMode.Paused
     }
+    val playing = waveTrack != null && isPlaying
 
-    val instrument: @Composable () -> Unit = {
-        WaveInstrument(
-            knobSize = knobSize,
-            mode = mode,
-            isPlaying = waveTrack != null && isPlaying,
-            progress = progressFraction,
-            onPlayPause = onPlayPause
-        )
+    // The knob fits the space it is given: ring = 1.72 × knob
+    val instrument: @Composable (Dp) -> Unit = { maxRing ->
+        val knob = minOf(preferredKnob, maxRing / 1.72f).coerceAtLeast(84.dp)
+        WaveInstrument(knobSize = knob, mode = mode, isPlaying = playing, progress = progressFraction, onPlayPause = onPlayPause)
     }
 
     if (isLandscape) {
@@ -121,15 +158,17 @@ fun HomeScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(start = 140.dp, end = 24.dp, top = 16.dp, bottom = contentBottom),
+                .padding(start = 140.dp, end = 24.dp, top = 12.dp, bottom = contentBottom),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { instrument() }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                instrument(minOf(maxWidth, maxHeight))
+            }
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom) {
                 HiFiLargeTitle(stringResource(R.string.wave_title))
-                Spacer(Modifier.height(20.dp))
-                WaveTrackInfo(waveTrack, isLiked, onLike, onDislike)
-                WaveUpNext(upNext, onOpenQueue, onUpNextClick, horizontalPadding = 0.dp)
+                Spacer(Modifier.weight(1f))
+                WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
+                WaveShelf(shelf, shimmer, onOpenQueue, onShelfClick, horizontalPadding = 0.dp, cardSize = 112.dp)
             }
         }
     } else {
@@ -137,18 +176,17 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
                 .padding(bottom = contentBottom)
         ) {
             HiFiLargeTitle(
                 stringResource(R.string.wave_title),
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)
             )
-            Spacer(Modifier.height(18.dp))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { instrument() }
-            Spacer(Modifier.height(22.dp))
-            Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, isLiked, onLike, onDislike) }
-            WaveUpNext(upNext, onOpenQueue, onUpNextClick, horizontalPadding = 20.dp)
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                instrument(minOf(maxWidth, maxHeight))
+            }
+            Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
+            WaveShelf(shelf, shimmer, onOpenQueue, onShelfClick, horizontalPadding = 20.dp, cardSize = 132.dp)
         }
     }
 }
@@ -176,20 +214,41 @@ private fun WaveInstrument(knobSize: Dp, mode: RingMode, isPlaying: Boolean, pro
     }
 }
 
+private val TrackInfoHeight = 56.dp
+
+/** The playing track with dislike/like; or, before the wave plays, the track it starts with. Fixed height. */
 @Composable
-private fun WaveTrackInfo(track: TrackDetailsDto?, isLiked: Boolean, onLike: () -> Unit, onDislike: () -> Unit) {
+private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?, isLiked: Boolean, onLike: () -> Unit, onDislike: () -> Unit) {
     AnimatedContent(
-        targetState = track,
-        contentKey = { it?.idString },
+        targetState = track to startsWith,
+        contentKey = { (playing, next) -> playing?.idString ?: ("idle:" + next?.idString) },
         transitionSpec = {
             (fadeIn(HiFiMotion.large()) + slideInVertically(HiFiMotion.large()) { it / 8 }) togetherWith fadeOut(HiFiMotion.quick())
         },
+        modifier = Modifier.fillMaxWidth().height(TrackInfoHeight),
         label = "wave_track"
-    ) { shown ->
+    ) { (shown, next) ->
         if (shown == null) {
-            Spacer(Modifier.fillMaxWidth().height(1.dp))
+            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                if (next == null) {
+                    Text(stringResource(R.string.wave_loading).uppercase(), style = HiFiType.SectionCaps)
+                    return@Column
+                }
+                Text(stringResource(R.string.wave_starts_with).uppercase(), style = HiFiType.SectionCaps)
+                Text(
+                    text = listOfNotNull(next.title, next.artists.firstOrNull()?.name).joinToString(" · "),
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.02).em,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
         } else {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                 GlassCircleButton(onClick = onDislike, contentDescription = stringResource(R.string.cd_ne_nravitsya), size = 48.dp) {
                     Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
                 }
@@ -209,6 +268,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, isLiked: Boolean, onLike: () 
                         text = shown.artists.joinToString { it.name ?: "" },
                         color = Color.White.copy(alpha = 0.70f),
                         fontSize = 17.sp,
+                        lineHeight = 22.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
@@ -227,30 +287,35 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, isLiked: Boolean, onLike: () 
     }
 }
 
+/** "Дальше в волне": always in place, with the same height whether it shows tracks or placeholders. */
 @Composable
-private fun WaveUpNext(
-    upNext: List<TrackDetailsDto>,
+private fun WaveShelf(
+    state: WaveShelfState,
+    shimmer: Boolean,
     onOpenQueue: () -> Unit,
     onClick: (TrackDetailsDto) -> Unit,
-    horizontalPadding: Dp
+    horizontalPadding: Dp,
+    cardSize: Dp
 ) {
-    AnimatedVisibility(visible = upNext.isNotEmpty(), enter = fadeIn(HiFiMotion.large()), exit = fadeOut(HiFiMotion.quick())) {
-        Column {
-            Spacer(Modifier.height(22.dp))
-            HiFiSectionHeader(
-                text = stringResource(R.string.wave_next_up),
-                modifier = Modifier.padding(start = horizontalPadding, end = (horizontalPadding - 8.dp).coerceAtLeast(0.dp))
-            ) {
-                HiFiTextAction(text = stringResource(R.string.wave_queue), onClick = onOpenQueue)
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.height(6.dp))
+    Column {
+        Spacer(Modifier.height(14.dp))
+        HiFiSectionHeader(
+            text = stringResource(R.string.wave_next_up),
+            modifier = Modifier.padding(start = horizontalPadding, end = (horizontalPadding - 8.dp).coerceAtLeast(0.dp))
+        ) {
+            HiFiTextAction(text = stringResource(R.string.wave_queue), onClick = onOpenQueue)
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.height(4.dp))
+        if (state.loading) {
+            SkeletonRow(cardSize, horizontalPadding, animated = shimmer && !LocalHiFiLite.current)
+        } else {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = horizontalPadding),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(upNext, key = { it.idString }, contentType = { "up_next" }) { track ->
-                    UpNextCard(track) { onClick(track) }
+                items(state.shelf, key = { it.idString }, contentType = { "up_next" }) { track ->
+                    UpNextCard(track, cardSize) { onClick(track) }
                 }
             }
         }
@@ -258,11 +323,11 @@ private fun WaveUpNext(
 }
 
 @Composable
-private fun UpNextCard(track: TrackDetailsDto, onClick: () -> Unit) {
+private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
     val context = LocalContext.current
     Column(
         modifier = Modifier
-            .width(104.dp)
+            .width(size)
             .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
             .clickable(role = Role.Button, onClick = onClick)
     ) {
@@ -271,13 +336,72 @@ private fun UpNextCard(track: TrackDetailsDto, onClick: () -> Unit) {
             contentDescription = track.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(104.dp)
-                .shadow(10.dp, RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
+                .size(size)
+                .shadow(12.dp, RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(Color(0xFF1C1F28))
         )
-        Spacer(Modifier.height(7.dp))
-        Text(track.title ?: "Без названия", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(track.artists.joinToString { it.name ?: "" }, color = HiFi.TextSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(8.dp))
+        Text(track.title ?: "Без названия", color = Color.White, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.artists.joinToString { it.name ?: "" }, color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/**
+ * Placeholders in the exact size of the cards. The shimmer is read only while drawing (no
+ * recomposition per frame) and runs only while the wave is really being fetched.
+ */
+@Composable
+private fun SkeletonRow(cardSize: Dp, horizontalPadding: Dp, animated: Boolean) {
+    val loadingText = stringResource(R.string.wave_loading)
+    val phase: State<Float>? = if (animated) {
+        rememberInfiniteTransition(label = "wave_skeleton").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
+            label = "wave_skeleton_phase"
+        )
+    } else null
+    val base = remember { Color.White.copy(alpha = 0.06f) }
+    val bright = remember { Color.White.copy(alpha = 0.14f) }
+    Row(
+        modifier = Modifier
+            .padding(start = horizontalPadding)
+            .semantics { contentDescription = loadingText },
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        repeat(3) {
+            Column(Modifier.width(cardSize)) {
+                // Exactly a card's height (cover + 8 + 18 + 17): the shelf doesn't jump when tracks arrive
+                SkeletonBlock(Modifier.size(cardSize), 14.dp, phase, base, bright)
+                Spacer(Modifier.height(11.dp))
+                SkeletonBlock(Modifier.width(cardSize * 0.72f).height(12.dp), 6.dp, phase, base, bright)
+                Spacer(Modifier.height(7.dp))
+                SkeletonBlock(Modifier.width(cardSize * 0.48f).height(10.dp), 5.dp, phase, base, bright)
+                Spacer(Modifier.height(3.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkeletonBlock(modifier: Modifier, radius: Dp, phase: State<Float>?, base: Color, bright: Color) {
+    Box(
+        modifier.drawWithCache {
+            val r = CornerRadius(radius.toPx())
+            val w = size.width
+            onDrawBehind {
+                val p = phase?.value
+                if (p == null) {
+                    drawRoundRect(base, cornerRadius = r)
+                } else {
+                    val x = -w + p * 3f * w
+                    drawRoundRect(
+                        Brush.linearGradient(listOf(base, bright, base), start = Offset(x, 0f), end = Offset(x + w, 0f)),
+                        cornerRadius = r
+                    )
+                }
+            }
+        }
+    )
 }

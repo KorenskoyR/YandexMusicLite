@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
 
@@ -56,7 +57,7 @@ private val BarShape = RoundedCornerShape(32.dp)
 private val IndicatorShape = RoundedCornerShape(27.dp)
 
 private fun Modifier.glassBar(): Modifier = this
-    .shadow(elevation = 18.dp, shape = BarShape, spotColor = Color(0x99000000), ambientColor = Color(0x55000000))
+    .hifiSoftShadow(BarShape, 18.dp)
     .clip(BarShape)
     .background(HiFi.BarFill)
     .border(1.dp, Color.White.copy(alpha = 0.14f), BarShape)

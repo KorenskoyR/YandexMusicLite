@@ -193,6 +193,8 @@
     <string name="wave_queue">Очередь</string>
     <string name="wave_play">Слушать Мою волну</string>
     <string name="wave_pause">Пауза</string>
+    <string name="wave_starts_with">Начнётся с</string>
+    <string name="wave_loading">Загружаем волну</string>
     <string name="library_title">Моя музыка</string>
     <string name="library_listen">Слушать</string>
     <string name="library_shuffle">Перемешать</string>
@@ -225,7 +227,7 @@
     <string name="car_source_hits">Хиты</string>
     <string name="car_source_downloaded">Скачанные</string>
     <string name="car_exit">Выйти из режима В авто</string>
-    <string name="car_time_elapsed_remaining">Прошло %1$s, осталось %2$s</string>
+    <string name="car_timeline">Позиция в треке</string>
     <string name="settings_title">Настройки</string>
     <string name="settings_group_account">Аккаунт</string>
     <string name="settings_group_playback">Воспроизведение</string>

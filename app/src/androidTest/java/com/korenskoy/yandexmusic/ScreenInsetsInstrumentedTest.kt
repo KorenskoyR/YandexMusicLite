@@ -81,7 +81,8 @@ class ScreenInsetsInstrumentedTest {
     fun home() {
         show { HomeScreen(
                 waveTrack = null, isPlaying = false, isLoading = false, isLiked = false, progress = { 0L },
-                upNext = emptyList(), onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onUpNextClick = {}
+                shelf = com.korenskoy.yandexmusic.presentation.main.waveShelfOf(false, emptyList(), emptyList()), shimmer = false,
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
             ) }
         assertBelowStatusBar("Home")
     }

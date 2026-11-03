@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -73,21 +81,52 @@ object HiFiType {
 fun Modifier.hifiGlass(shape: Shape, fill: Color = HiFi.GlassFill, border: Color = HiFi.GlassBorder): Modifier =
     this.clip(shape).background(fill).border(1.dp, border, shape)
 
+/**
+ * A soft drop shadow drawn only OUTSIDE [shape]. A platform elevation shadow under a translucent glass
+ * surface shows through it as a dark band along the bottom edge; this one never does. The blur is
+ * computed once per size, and the trailing layer keeps redraws of the content (a progress line, a
+ * sliding indicator) from re-recording the shadow. Skipped in lite mode and where the hardware
+ * renderer cannot blur (Android 8.1 and older).
+ */
+fun Modifier.hifiSoftShadow(
+    shape: Shape,
+    elevation: Dp,
+    color: Color = Color.Black.copy(alpha = 0.55f),
+    enabled: Boolean = true
+): Modifier {
+    if (!enabled || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) return this
+    return this
+        .drawWithCache {
+            val outline = shape.createOutline(size, layoutDirection, this)
+            val body = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
+            val shadow = androidx.compose.ui.graphics.Path().apply { addPath(body, Offset(0f, elevation.toPx() / 3f)) }
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color.toArgb()
+                maskFilter = android.graphics.BlurMaskFilter(elevation.toPx().coerceAtLeast(1f), android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
+            onDrawBehind {
+                clipPath(body, androidx.compose.ui.graphics.ClipOp.Difference) {
+                    drawIntoCanvas { it.nativeCanvas.drawPath(shadow.asAndroidPath(), paint) }
+                }
+            }
+        }
+        .graphicsLayer()
+}
+
 /** A "recessed" window: dark, with an inner shadow at the top and a light lip at the bottom. */
 fun Modifier.hifiRecessed(cornerRadius: Dp): Modifier = this.drawWithCache {
     val r = CornerRadius(cornerRadius.toPx())
     val fill = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.58f), Color.Black.copy(alpha = 0.36f)))
     val innerShadow = Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.18f to Color.Transparent)
+    val lip = 1.dp.toPx()
     onDrawBehind {
         drawRoundRect(fill, cornerRadius = r)
         drawRoundRect(innerShadow, cornerRadius = r)
-        drawRoundRect(
-            color = Color.White.copy(alpha = 0.10f),
-            topLeft = Offset(0f, size.height - 1.dp.toPx()),
-            size = androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx()),
-            cornerRadius = r
-        )
         drawRoundRect(color = Color.White.copy(alpha = 0.06f), cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+        // The light lip follows the rounded bottom edge (a straight line used to poke out past the corners)
+        clipRect(top = size.height - r.y) {
+            drawRoundRect(color = Color.White.copy(alpha = 0.10f), cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(lip))
+        }
     }
 }
 

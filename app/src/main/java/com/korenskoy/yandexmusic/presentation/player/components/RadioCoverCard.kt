@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.LinearEasing
@@ -126,11 +127,7 @@ fun RadioCoverCard(
                     scaleX = scale
                     scaleY = scale
                 }
-                .shadow(
-                    elevation = 16.dp,
-                    shape = CircleShape,
-                    spotColor = Color.Black.copy(alpha = 0.6f)
-                )
+                .hifiSoftShadow(CircleShape, 16.dp, Color.Black.copy(alpha = 0.6f))
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center

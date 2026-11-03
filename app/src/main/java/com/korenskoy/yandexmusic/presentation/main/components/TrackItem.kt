@@ -160,44 +160,17 @@ fun TrackItem(
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .shadow(
-                    elevation = if (isLiked) 6.dp else 2.dp,
-                    shape = CircleShape,
-                    spotColor = if (isLiked) Color(0xFF0A6CFF).copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.3f)
-                )
+                // Hi-Fi glass: no platform shadow under the translucent fill (it showed through as a dark
+                // band) and no blue glow — the heart alone carries the accent
                 .clip(CircleShape)
-                .background(
-                    if (isLiked) {
-                        Brush.verticalGradient(
-                            listOf(Color(0x440A6CFF), Color(0x220A55D6))
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(Color(0x252A2A38), Color(0x151E1E28))
-                        )
-                    }
-                )
-                .border(
-                    BorderStroke(
-                        1.dp,
-                        if (isLiked) {
-                            Brush.verticalGradient(
-                                listOf(Color(0xFF0A6CFF), Color(0x660A6CFF))
-                            )
-                        } else {
-                            Brush.verticalGradient(
-                                listOf(Color(0x35FFFFFF), Color(0x10FFFFFF))
-                            )
-                        }
-                    ),
-                    CircleShape
-                )
+                .background(Brush.verticalGradient(listOf(Color(0x252A2A38), Color(0x151E1E28))))
+                .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x35FFFFFF), Color(0x10FFFFFF)))), CircleShape)
                 .clickable { onToggleLike() },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.45f),
+                tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.6f),
                 contentDescription = stringResource(R.string.cd_nravitsya),
                 modifier = Modifier.size(17.dp)
             )

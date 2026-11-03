@@ -43,7 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,7 +89,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.SpectrumRing
 import com.korenskoy.yandexmusic.presentation.hifi.hifiAnodized
 import com.korenskoy.yandexmusic.presentation.hifi.hifiGlass
 import com.korenskoy.yandexmusic.presentation.hifi.hifiGrain
-import com.korenskoy.yandexmusic.presentation.hifi.hifiRecessed
 import com.korenskoy.yandexmusic.utils.browserUserAgent
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 import kotlinx.coroutines.delay
@@ -111,16 +109,6 @@ fun carSourceOf(source: PlaylistSource, isRadio: Boolean): CarSource? = when {
     source == PlaylistSource.LIBRARY -> CarSource.LIKED
     source == PlaylistSource.TRENDS -> CarSource.HITS
     else -> null
-}
-
-/** "1:22" / "−3:24": elapsed and remaining time of the readout. Pure; unit-tested. */
-fun carTimeReadout(positionMs: Long, durationMs: Long): Pair<String, String> {
-    fun fmt(ms: Long): String {
-        val total = (ms.coerceAtLeast(0L) / 1000L)
-        return "${total / 60}:${(total % 60).toString().padStart(2, '0')}"
-    }
-    val position = positionMs.coerceIn(0L, durationMs.coerceAtLeast(0L))
-    return fmt(position) to "−" + fmt((durationMs - position).coerceAtLeast(0L))
 }
 
 /**
@@ -247,7 +235,7 @@ fun CarScreen(
                             ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
                             onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
                             onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
-                            sources = sources, active = active,
+                            sources = sources, active = active, onSeek = onSeek,
                             modifier = Modifier.width(u(652f)).fillMaxHeight()
                         )
                     }
@@ -270,7 +258,7 @@ fun CarScreen(
                         ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
                         onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
                         onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
-                        sources = sources, active = active,
+                        sources = sources, active = active, onSeek = onSeek,
                         modifier = Modifier.width(u(560f)).weight(1f),
                         compactDock = true
                     )
@@ -282,7 +270,7 @@ fun CarScreen(
 }
 
 /** dp sizes of the 1280×720 design, scaled to the screen. */
-private class Scale(val factor: Float) {
+internal class Scale(val factor: Float) {
     operator fun invoke(v: Float): Dp = (v * factor).dp
     fun sp(v: Float): TextUnit = (v * factor).sp
 }
@@ -358,6 +346,7 @@ private fun DriverPanel(
     onDislike: () -> Unit,
     sources: List<DockItem>,
     active: CarSource?,
+    onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
     compactDock: Boolean = false
 ) {
@@ -434,44 +423,11 @@ private fun DriverPanel(
                 )
             }
         }
-        Box(Modifier.fillMaxWidth().padding(top = u(6f)), contentAlignment = Alignment.Center) {
-            if (isRadio) LiveReadout(u) else TimeReadout(u, progress, durationMs)
-        }
+        // A timeline without digits under the gauge; radio is live and shows the on-air line
+        if (isRadio) CarLiveLine(u, Modifier.padding(top = u(10f)))
+        else CarTimeline(u, progress, durationMs, isPlaying, onSeek, Modifier.padding(top = u(10f)))
         Spacer(Modifier.weight(1f))
         Dock(u, sources, active, compact = compactDock)
-    }
-}
-
-/** Recessed display window: elapsed time in white, remaining dimmed; tabular digits don't jump. */
-@Composable
-private fun TimeReadout(u: Scale, progress: () -> Long, durationMs: Long) {
-    // Recomposes once a second, not on every progress tick
-    val seconds by remember(durationMs) { derivedStateOf { progress() / 1000L } }
-    val (elapsed, remaining) = carTimeReadout(seconds * 1000L, durationMs)
-    val description = stringResource(R.string.car_time_elapsed_remaining, elapsed, remaining.removePrefix("−"))
-    Row(
-        Modifier
-            .height(u(42f))
-            .hifiRecessed(u(21f))
-            .padding(horizontal = u(6f))
-            .semantics(mergeDescendants = true) { contentDescription = description },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(elapsed, color = Color.White, fontSize = u.sp(21f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.03.em, style = Tabular, modifier = Modifier.width(u(88f)), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        Box(Modifier.width(1.dp).height(u(20f)).background(Color.White.copy(alpha = 0.18f)))
-        Text(remaining, color = Color.White.copy(alpha = 0.60f), fontSize = u.sp(21f), fontWeight = FontWeight.Medium, letterSpacing = 0.03.em, style = Tabular, modifier = Modifier.width(u(88f)), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-    }
-}
-
-@Composable
-private fun LiveReadout(u: Scale) {
-    Row(
-        Modifier.height(u(42f)).hifiRecessed(u(21f)).padding(horizontal = u(18f)),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(u(8f)).clip(CircleShape).background(HiFi.Live))
-        Spacer(Modifier.width(u(10f)))
-        Text(stringResource(R.string.radio_on_air), color = Color.White, fontSize = u.sp(16f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em)
     }
 }
 

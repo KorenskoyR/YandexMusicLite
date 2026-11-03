@@ -4,6 +4,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material.icons.filled.Bedtime
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
@@ -243,7 +244,7 @@ fun FullScreenPlayer(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .shadow(6.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
+                            .hifiSoftShadow(CircleShape, 6.dp, Color.Black.copy(alpha = 0.45f))
                             .clip(CircleShape)
                             .background(
                                 Brush.verticalGradient(
@@ -294,7 +295,7 @@ fun FullScreenPlayer(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .shadow(6.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
+                                .hifiSoftShadow(CircleShape, 6.dp, Color.Black.copy(alpha = 0.45f))
                                 .clip(CircleShape)
                                 .background(
                                     Brush.verticalGradient(
@@ -549,7 +550,7 @@ fun FullScreenPlayer(
                     onClick = onPrevClick,
                     modifier = Modifier
                         .size(56.dp)
-                        .shadow(10.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.5f))
+                        .hifiSoftShadow(CircleShape, 10.dp, Color.Black.copy(alpha = 0.5f))
                         .clip(CircleShape)
                         .background(
                             Brush.verticalGradient(
@@ -588,7 +589,7 @@ fun FullScreenPlayer(
                     onClick = onNextClick,
                     modifier = Modifier
                         .size(56.dp)
-                        .shadow(10.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.5f))
+                        .hifiSoftShadow(CircleShape, 10.dp, Color.Black.copy(alpha = 0.5f))
                         .clip(CircleShape)
                         .background(
                             Brush.verticalGradient(
@@ -939,7 +940,7 @@ fun LikeHeartButton(
         modifier = Modifier
             .size(48.dp)
             // Hi-Fi glass, the same as on "Моя волна": the heart alone carries the accent, no glow
-            .shadow(8.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
+            .hifiSoftShadow(CircleShape, 8.dp, Color.Black.copy(alpha = 0.45f))
             .clip(CircleShape)
             .background(Brush.verticalGradient(listOf(Color(0x352A2A38), Color(0x201E1E28))))
             .border(BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x10FFFFFF)))), CircleShape)
@@ -1127,7 +1128,7 @@ fun DislikeButton(
         },
         modifier = Modifier
             .size(48.dp)
-            .shadow(8.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.4f))
+            .hifiSoftShadow(CircleShape, 8.dp, Color.Black.copy(alpha = 0.45f))
             .clip(CircleShape)
             .background(
                 Brush.verticalGradient(
