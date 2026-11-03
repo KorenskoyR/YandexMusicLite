@@ -52,13 +52,10 @@
     <string name="cd_ochered">Очередь</string>
     <string name="cd_predyduschiy_trek">Предыдущий трек</string>
     <string name="cd_sleduyuschiy_trek">Следующий трек</string>
-    <string name="full_player_ochered_vosproizvedeniya">Очередь воспроизведения</string>
     <string name="cd_udalit_iz_ocheredi">Удалить из очереди</string>
     <string name="full_player_fm_stereo_128_kbps">FM STEREO • 128 KBPS</string>
-    <string name="cd_oblozhka_sleduyuschego_treka">Обложка следующего трека</string>
     <string name="full_player_dalee">ДАЛЕЕ</string>
     <string name="cd_ne_nravitsya">Не нравится</string>
-    <string name="radio_cover_card_live">LIVE</string>
     <string name="cd_logotip_radiostantsii">Логотип радиостанции</string>
     <string name="cd_v_izbrannoe">В избранное</string>
     <string name="cd_logotip_prilozheniya">Логотип приложения</string>
@@ -81,7 +78,6 @@
     <string name="download_progress_count">Скачано %1$d из %2$d</string>
     <string name="download_progress_waiting_title">Ожидание сети</string>
     <string name="download_progress_waiting_hint">Скачивание начнётся при подключении к интернету</string>
-    <string name="player_queue_count">Треков в очереди: %1$d</string>
     <string name="msg_wave_load_failed">Не удалось загрузить «Мою волну». Проверьте подключение к интернету</string>
     <string name="msg_station_unavailable">Радиостанция недоступна</string>
     <string name="msg_playback_failed">Не удаётся воспроизвести музыку. Проверьте подключение к интернету</string>
@@ -188,6 +184,7 @@
     <string name="cd_razvernut_pleer">Открыть плеер</string>
     <string name="mini_player_live">Прямой эфир</string>
     <string name="cd_next_station">Следующая станция</string>
+    <string name="cd_prev_station">Предыдущая станция</string>
     <string name="wave_title">Моя волна</string>
     <string name="wave_next_up">Дальше в волне</string>
     <string name="wave_queue">Очередь</string>
@@ -260,4 +257,13 @@
     <string name="settings_version">Версия %1$s</string>
     <string name="settings_check_updates">Нажмите, чтобы проверить обновления</string>
     <string name="settings_cancel">Отмена</string>
+    <string name="player_unknown_artist">Неизвестный исполнитель</string>
+    <string name="player_queue_title">Очередь</string>
+    <string name="player_queue_loading">Загружаем ещё</string>
+    <plurals name="player_queue_tracks">
+        <item quantity="one">%1$d трек</item>
+        <item quantity="few">%1$d трека</item>
+        <item quantity="many">%1$d треков</item>
+        <item quantity="other">%1$d трека</item>
+    </plurals>
 </resources>

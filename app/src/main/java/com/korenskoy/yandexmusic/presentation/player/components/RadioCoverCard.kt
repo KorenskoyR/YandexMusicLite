@@ -28,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -37,6 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
+import androidx.compose.foundation.layout.height
 import coil3.request.crossfade
 import com.korenskoy.yandexmusic.utils.browserUserAgent
 import coil3.compose.SubcomposeAsyncImage
@@ -55,65 +56,60 @@ fun RadioCoverCard(
 
     Box(
         modifier = modifier
-            .shadow(
-                elevation = 20.dp,
-                shape = RoundedCornerShape(24.dp),
-                spotColor = Color(0xFF0A6CFF).copy(alpha = 0.25f),
-                ambientColor = Color.Black.copy(alpha = 0.5f)
-            )
+            .hifiSoftShadow(RoundedCornerShape(24.dp), 28.dp, Color.Black.copy(alpha = 0.55f))
             .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF282836),
-                        Color(0xFF14141A)
+                        Color(0xFF2A2E39),
+                        Color(0xFF111318)
                     ),
                     radius = 900f
                 )
             )
             .border(
-                BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
                 RoundedCornerShape(24.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
 
-        // Live badge in top-right corner
+        // "В ЭФИРЕ" in the top-left corner; the dot blinks only while effects are on
         if (showLiveBadge) {
-            val infiniteTransitionLive = rememberInfiniteTransition(label = "live_pulse")
-            val alphaLive by infiniteTransitionLive.animateFloat(
-                initialValue = 0.4f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "alpha_live"
-            )
+            val lite = com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite.current
+            val blink = if (!lite) {
+                rememberInfiniteTransition(label = "live_pulse").animateFloat(
+                    initialValue = 1f,
+                    targetValue = 0.35f,
+                    animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Reverse),
+                    label = "alpha_live"
+                )
+            } else null
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(14.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .height(30.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x73080A14))
+                    .padding(horizontal = 12.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
+                        .size(8.dp)
+                        .graphicsLayer { alpha = blink?.value ?: 1f }
                         .clip(CircleShape)
-                        .background(Color(0xFFFF2D55).copy(alpha = alphaLive))
+                        .background(com.korenskoy.yandexmusic.presentation.hifi.HiFi.Live)
                 )
-                Spacer(modifier = Modifier.width(5.dp))
+                Spacer(modifier = Modifier.width(7.dp))
                 Text(
-                    text = stringResource(R.string.radio_cover_card_live),
+                    text = stringResource(R.string.radio_on_air),
                     color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.12.em
                 )
             }
         }

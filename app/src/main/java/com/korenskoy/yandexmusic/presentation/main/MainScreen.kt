@@ -123,7 +123,7 @@ fun MainScreen(
     val currentTrackId by viewModel.currentTrackId.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isBuffering by viewModel.isBuffering.collectAsState()
-    // Progress ticks 10x per second: keep the State and read it only inside WithProgress,
+    // Progress ticks 10x per second: keep the State and hand out `{ progressState.value }`, read only where drawn,
     // so the whole screen (lists included) is not recomposed on every tick.
     val progressState = viewModel.progress.collectAsState()
     
@@ -479,7 +479,7 @@ fun MainScreen(
                                 Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
                             }
                         )
-                    }
+                }
                 }
             } else {
                 // Portrait Unified Bottom Overlay: MiniPlayer stacked cleanly above FloatingGlassBottomBar
@@ -534,53 +534,54 @@ fun MainScreen(
                     } else {
                         likedTrackIds.contains(shownTrack.idString)
                     }
-                    WithProgress(progressState) { progress ->
-                        FullScreenPlayer(
-                            track = shownTrack,
-                            isPlaying = isPlaying,
-                            isLiked = isPlayerLiked,
-                            progress = progress,
-                            queue = currentPlaylist,
-                            onPlayPauseClick = {
-                                viewModel.togglePlayPause()
-                            },
-                            onToggleLike = {
-                                if (currentTrack?.isRadio == true) {
-                                    radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
-                                } else {
-                                    viewModel.toggleLike(shownTrack)
-                                }
-                            },
-                            onNextClick = { viewModel.playNext() },
-                            onPrevClick = { viewModel.playPrev() },
-                            onSeekTo = { position -> viewModel.seekTo(position) },
-                            onTrackSelect = { id -> viewModel.playTrack(id, currentPlaylist) },
-                            onRemoveFromQueue = { id -> viewModel.removeFromQueue(id) },
-                            onCollapse = { isPlayerExpanded = false },
-                            onCloseAndClear = { 
-                                isPlayerExpanded = false
-                                viewModel.stopAndClearPlayer()
-                            },
-                            onDislikeClick = {
-                                if (currentTrack?.isRadio == true) {
-                                    radioVm.removeFavorite(shownTrack.idString.removePrefix("radio_"))
-                                } else {
-                                    viewModel.dislikeTrack(shownTrack)
-                                }
-                            },
-                            onLoadMoreQueue = { viewModel.loadMoreQueue() },
-                            isFetchingMoreQueue = isFetchingMoreQueue,
-                            sleepTimer = sleepTimer,
-                            onSleepTimer = { viewModel.setSleepTimer(it) },
-                            onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
-                            onCancelSleepTimer = { viewModel.cancelSleepTimer() },
-                            onAddToPlaylist = { trackMenu = TrackMenuRequest(shownTrack, null, pickPlaylist = true) },
-                            onQualityClick = { qualityDetails = viewModel.qualityDetails() },
-                            coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
-                                Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
+                    val playerSource = com.korenskoy.yandexmusic.presentation.player.playerSourceLabelRes(currentSource, shownTrack.isRadio)
+                        ?.let { androidx.compose.ui.res.stringResource(it) }.orEmpty()
+                    FullScreenPlayer(
+                        track = shownTrack,
+                        isPlaying = isPlaying,
+                        isLiked = isPlayerLiked,
+                        progress = { progressState.value },
+                        queue = currentPlaylist,
+                        sourceLabel = playerSource,
+                        onPlayPauseClick = {
+                            viewModel.togglePlayPause()
+                        },
+                        onToggleLike = {
+                            if (currentTrack?.isRadio == true) {
+                                radioVm.toggleFavorite(shownTrack.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.toggleLike(shownTrack)
                             }
-                        )
-                    }
+                        },
+                        onNextClick = { viewModel.playNext() },
+                        onPrevClick = { viewModel.playPrev() },
+                        onSeekTo = { position -> viewModel.seekTo(position) },
+                        onTrackSelect = { id -> viewModel.playTrack(id, currentPlaylist) },
+                        onRemoveFromQueue = { id -> viewModel.removeFromQueue(id) },
+                        onCollapse = { isPlayerExpanded = false },
+                        onCloseAndClear = { 
+                            isPlayerExpanded = false
+                            viewModel.stopAndClearPlayer()
+                        },
+                        onDislikeClick = {
+                            if (currentTrack?.isRadio == true) {
+                                radioVm.removeFavorite(shownTrack.idString.removePrefix("radio_"))
+                            } else {
+                                viewModel.dislikeTrack(shownTrack)
+                            }
+                        },
+                        onLoadMoreQueue = { viewModel.loadMoreQueue() },
+                        isFetchingMoreQueue = isFetchingMoreQueue,
+                        sleepTimer = sleepTimer,
+                        onSleepTimer = { viewModel.setSleepTimer(it) },
+                        onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
+                        onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                        onAddToPlaylist = { trackMenu = TrackMenuRequest(shownTrack, null, pickPlaylist = true) },
+                        onQualityClick = { qualityDetails = viewModel.qualityDetails() },
+                        coverModifier = if (lite || shownTrack.isRadio) Modifier else with(sharedScope) {
+                            Modifier.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), this@AnimatedVisibility)
+                        }
+                    )
                 }
             }
 
@@ -711,12 +712,6 @@ fun MainScreen(
         }
         }
     }
-}
-
-/** Reads the progress state in its own recomposition scope so only [content] recomposes on each tick. */
-@Composable
-private fun WithProgress(progress: State<Long>, content: @Composable (Long) -> Unit) {
-    content(progress.value)
 }
 
 /** What the track menu was opened for; [pickPlaylist] goes straight to the playlist picker. */

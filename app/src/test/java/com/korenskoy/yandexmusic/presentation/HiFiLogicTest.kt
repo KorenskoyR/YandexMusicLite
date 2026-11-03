@@ -5,7 +5,7 @@ import com.korenskoy.yandexmusic.domain.model.RadioCategory
 import com.korenskoy.yandexmusic.domain.model.RadioStation
 import com.korenskoy.yandexmusic.presentation.car.CarSource
 import com.korenskoy.yandexmusic.presentation.car.carSourceOf
-import com.korenskoy.yandexmusic.presentation.car.TimelineMath
+import com.korenskoy.yandexmusic.presentation.hifi.TimelineMath
 import com.korenskoy.yandexmusic.presentation.main.waveShelfOf
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLitePolicy
@@ -185,6 +185,27 @@ class HiFiLogicTest {
         val tick = TimelineMath.fraction(100, 30_000)
         assertTrue(tick < TimelineMath.JUMP)
         assertTrue(TimelineMath.fraction(143_000, 286_000) - TimelineMath.fraction(0, 200_000) > TimelineMath.JUMP)
+    }
+
+    @Test
+    fun playerReadoutShowsElapsedAndRemaining() {
+        assertEquals("1:22" to "−3:24", TimelineMath.readout(82_000, 286_000))
+        assertEquals("start of a track", "0:00" to "−4:46", TimelineMath.readout(0, 286_000))
+        assertEquals("position past the end is clamped", "4:46" to "−0:00", TimelineMath.readout(300_000, 286_000))
+        assertEquals("long mixes get hours", "1:02:05", TimelineMath.clock(3_725_000))
+        assertEquals("unknown duration", "0:00" to "−0:00", TimelineMath.readout(5_000, 0))
+    }
+
+    @Test
+    fun playerQueueSplitsCurrentAndNext() {
+        val q = listOf(track("1"), track("2"), track("3"), track("4"))
+        val split = com.korenskoy.yandexmusic.presentation.player.queueSplitOf(q, "2")
+        assertEquals("2", split.current?.idString)
+        assertEquals(listOf("3", "4"), split.next.map { it.idString })
+        val unknown = com.korenskoy.yandexmusic.presentation.player.queueSplitOf(q, "9")
+        assertEquals("current not in the queue: the whole queue is next", null, unknown.current)
+        assertEquals(4, unknown.next.size)
+        assertEquals("last track: nothing next", 0, com.korenskoy.yandexmusic.presentation.player.queueSplitOf(q, "4").next.size)
     }
 
     // --- Wave page shelf -------------------------------------------------------------------------

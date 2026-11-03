@@ -341,16 +341,55 @@ class ScreenshotTest {
         snap("mini_player_bottom_bar")
     }
 
-    @Test
-    fun fullPlayer() {
-        show {
+    @Composable
+    private fun Player(
+        track: TrackDetailsDto = tracks[0],
+        isPlaying: Boolean = true,
+        quality: String? = "MP3 · 320 кбит/с",
+        queueOpen: Boolean = false,
+        fetchingMore: Boolean = false,
+        source: String = "Моя волна"
+    ) {
+        CompositionLocalProvider(com.korenskoy.yandexmusic.utils.LocalStreamQuality provides quality) {
             FullScreenPlayer(
-                track = tracks[0], isPlaying = true, isLiked = true, progress = 60_000, queue = tracks,
+                track = track, isPlaying = isPlaying, isLiked = true, progress = { 82_000L }, queue = tracks,
                 onPlayPauseClick = {}, onToggleLike = {}, onNextClick = {}, onPrevClick = {}, onSeekTo = {},
-                onTrackSelect = {}, onRemoveFromQueue = {}, onCollapse = {}, onCloseAndClear = {}, onDislikeClick = {}
+                onTrackSelect = {}, onRemoveFromQueue = {}, onCollapse = {}, onCloseAndClear = {}, onDislikeClick = {},
+                sourceLabel = source, isFetchingMoreQueue = fetchingMore, initialQueueOpen = queueOpen
             )
         }
+    }
+
+    @Test
+    fun fullPlayer() {
+        show { Player() }
         snap("full_player")
+    }
+
+    @Test
+    fun fullPlayerPaused() {
+        show { Player(isPlaying = false, quality = null) }
+        snap("full_player_paused")
+    }
+
+    /** Radio: the station card with "В ЭФИРЕ", the live line instead of the timeline, no "Далее". */
+    @Test
+    fun fullPlayerRadio() {
+        show { Player(track = tracks[0].copy(id = JsonPrimitive("radio_europa"), title = "Европа Плюс", isRadio = true, artists = emptyList()), source = "Радио") }
+        snap("full_player_radio")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun fullPlayerLandscape() {
+        show { Player() }
+        snap("full_player_land")
+    }
+
+    @Test
+    fun playerQueue() {
+        show { Player(queueOpen = true, fetchingMore = true) }
+        snap("player_queue")
     }
 
     /** Bundled station logos on their cards: the 1.4.x "empty square" regression shows up here. */

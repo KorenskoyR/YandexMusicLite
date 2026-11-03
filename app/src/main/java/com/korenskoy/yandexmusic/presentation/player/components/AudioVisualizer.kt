@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -80,7 +79,7 @@ fun AudioVisualizer(
                         }
                     }
                     .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(androidx.compose.ui.graphics.Color.White)
             )
         }
     }
