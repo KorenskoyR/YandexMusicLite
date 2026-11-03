@@ -205,10 +205,6 @@ fun MainScreen(
     val wavePreview by viewModel.wavePreview.collectAsState()
     val isFetchingWave by viewModel.isFetchingMoreQueue.collectAsState()
     val waveShelf = remember(waveActive, upcoming, wavePreview) { waveShelfOf(waveActive, upcoming, wavePreview) }
-    // First launch: fill the wave's preview so the wave page is never empty
-    LaunchedEffect(currentTab == MainTab.HOME && !waveActive && wavePreview.isEmpty()) {
-        if (currentTab == MainTab.HOME && !waveActive && wavePreview.isEmpty()) viewModel.ensureWavePreview()
-    }
     val tabStates = rememberSaveableStateHolder()
     val contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp
     // The mini-player stays out of the way on the wave page, which already shows the playing wave
@@ -269,7 +265,7 @@ fun MainScreen(
                         },
                         onLike = { currentTrack?.let { viewModel.toggleLike(it) } },
                         onDislike = { currentTrack?.let { viewModel.dislikeTrack(it) } },
-                        onOpenQueue = { isPlayerExpanded = true },
+                        onOpenPlayer = if (shownTrack != null) { { isPlayerExpanded = true } } else null,
                         onShelfClick = {
                             if (waveActive) viewModel.playTrack(it.idString, currentPlaylist, PlaylistSource.VIBE)
                             else viewModel.playWaveFrom(it.idString)

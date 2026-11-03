@@ -53,6 +53,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -128,7 +130,7 @@ fun HomeScreen(
     onPlayPause: () -> Unit,
     onLike: () -> Unit,
     onDislike: () -> Unit,
-    onOpenQueue: () -> Unit,
+    onOpenPlayer: (() -> Unit)?,
     onShelfClick: (TrackDetailsDto) -> Unit,
     contentBottom: Dp = 100.dp
 ) {
@@ -148,7 +150,7 @@ fun HomeScreen(
 
     // The knob fits the space it is given: ring = 1.72 × knob
     val instrument: @Composable (Dp) -> Unit = { maxRing ->
-        val knob = minOf(preferredKnob, maxRing / 1.72f).coerceAtLeast(84.dp)
+        val knob = waveKnobSize(preferredKnob, maxRing)
         WaveInstrument(knobSize = knob, mode = mode, isPlaying = playing, progress = progressFraction, onPlayPause = onPlayPause)
     }
 
@@ -168,28 +170,66 @@ fun HomeScreen(
                 HiFiLargeTitle(stringResource(R.string.wave_title))
                 Spacer(Modifier.weight(1f))
                 WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
-                WaveShelf(shelf, shimmer, onOpenQueue, onShelfClick, horizontalPadding = 0.dp, cardSize = 112.dp)
+                WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = 112.dp)
             }
         }
     } else {
-        Column(
+        // The knob stays centred in the space between the title and the bottom block, as if that block sat
+        // at the very bottom; the block itself is lifted up to just under the ring, so the track and the
+        // "next up" cards keep away from the tab bar. On short screens it stays at the bottom.
+        Layout(
+            contents = listOf(
+                {
+                    HiFiLargeTitle(
+                        stringResource(R.string.wave_title),
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)
+                    )
+                },
+                {
+                    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        instrument(minOf(maxWidth, maxHeight))
+                    }
+                },
+                {
+                    Column {
+                        Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
+                        WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 20.dp, cardSize = 132.dp)
+                    }
+                }
+            ),
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .padding(bottom = contentBottom)
-        ) {
-            HiFiLargeTitle(
-                stringResource(R.string.wave_title),
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)
-            )
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                instrument(minOf(maxWidth, maxHeight))
+        ) { (titleSlot, instrumentSlot, bottomSlot), constraints ->
+            val width = constraints.maxWidth
+            val height = constraints.maxHeight
+            val loose = Constraints(maxWidth = width)
+            val title = titleSlot.first().measure(loose)
+            val bottom = bottomSlot.first().measure(loose)
+            val pad = WaveInstrumentPadding.roundToPx()
+            val innerHeight = (height - title.height - bottom.height - 2 * pad).coerceAtLeast(0)
+            val instrumentPlaceable = instrumentSlot.first().measure(Constraints.fixed(width, innerHeight))
+            val ring = waveRingSize(preferredKnob, minOf(width, innerHeight).toDp()).roundToPx()
+            val centerY = title.height + pad + innerHeight / 2
+            val bottomY = minOf(centerY + ring / 2 + WaveRingToTrackGap.roundToPx(), height - bottom.height)
+            layout(width, height) {
+                title.place(0, 0)
+                instrumentPlaceable.place(0, title.height + pad)
+                bottom.place(0, bottomY)
             }
-            Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
-            WaveShelf(shelf, shimmer, onOpenQueue, onShelfClick, horizontalPadding = 20.dp, cardSize = 132.dp)
         }
     }
 }
+
+private val WaveInstrumentPadding = 8.dp
+/** From the bottom of the spectrum ring to the track title. */
+private val WaveRingToTrackGap = 18.dp
+
+/** The knob for the space it is given; the ring around it is 1.72 × the knob. */
+private fun waveKnobSize(preferred: Dp, maxRing: Dp): Dp = minOf(preferred, maxRing / 1.72f).coerceAtLeast(84.dp)
+
+private fun waveRingSize(preferredKnob: Dp, maxRing: Dp): Dp = waveKnobSize(preferredKnob, maxRing) * 1.72f
 
 /** Knob + ring. The ring is ~1.7× the knob: room for the longest bars. */
 @Composable
@@ -278,7 +318,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                     Icon(
                         if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         contentDescription = null,
-                        tint = if (isLiked) HiFi.Accent else Color.White.copy(alpha = 0.86f),
+                        tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.86f),
                         modifier = Modifier.size(21.dp)
                     )
                 }
@@ -292,7 +332,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
 private fun WaveShelf(
     state: WaveShelfState,
     shimmer: Boolean,
-    onOpenQueue: () -> Unit,
+    onOpenPlayer: (() -> Unit)?,
     onClick: (TrackDetailsDto) -> Unit,
     horizontalPadding: Dp,
     cardSize: Dp
@@ -303,8 +343,14 @@ private fun WaveShelf(
             text = stringResource(R.string.wave_next_up),
             modifier = Modifier.padding(start = horizontalPadding, end = (horizontalPadding - 8.dp).coerceAtLeast(0.dp))
         ) {
-            HiFiTextAction(text = stringResource(R.string.wave_queue), onClick = onOpenQueue)
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            // Opens the full-screen player; hidden while there is nothing to open
+            if (onOpenPlayer != null) {
+                HiFiTextAction(text = stringResource(R.string.wave_player), onClick = onOpenPlayer)
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            } else {
+                // Keeps the header as tall as with the action, so the shelf does not shift
+                Spacer(Modifier.height(44.dp))
+            }
         }
         Spacer(Modifier.height(4.dp))
         if (state.loading) {

@@ -187,7 +187,7 @@
     <string name="cd_prev_station">Предыдущая станция</string>
     <string name="wave_title">Моя волна</string>
     <string name="wave_next_up">Дальше в волне</string>
-    <string name="wave_queue">Очередь</string>
+    <string name="wave_player">Плеер</string>
     <string name="wave_play">Слушать Мою волну</string>
     <string name="wave_pause">Пауза</string>
     <string name="wave_starts_with">Начнётся с</string>

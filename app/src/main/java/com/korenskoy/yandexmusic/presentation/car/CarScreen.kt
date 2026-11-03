@@ -418,7 +418,7 @@ private fun DriverPanel(
                 Icon(
                     if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                     contentDescription = null,
-                    tint = if (isLiked) HiFi.Accent else Color.White.copy(alpha = 0.88f),
+                    tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.88f),
                     modifier = Modifier.size(u(28f))
                 )
             }

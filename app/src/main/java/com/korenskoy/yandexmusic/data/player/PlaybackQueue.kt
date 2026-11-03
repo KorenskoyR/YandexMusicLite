@@ -50,6 +50,21 @@ object PlaybackQueue {
         return null
     }
 
+    /** The wave page wants at least this many tracks in its "next up" shelf. */
+    const val WAVE_SHELF_MIN = 3
+
+    /**
+     * Is the wave page's "next up" shelf short of tracks? While the wave plays it shows the queue after the
+     * current track; while it is idle, the saved wave without its first track (that one starts the wave).
+     */
+    fun waveShelfIsShort(waveActive: Boolean, currentId: String?, queue: List<String>, wave: List<String>): Boolean =
+        if (waveActive) {
+            val index = queue.indexOf(currentId)
+            index < 0 || queue.size - index - 1 < WAVE_SHELF_MIN
+        } else {
+            wave.size - 1 < WAVE_SHELF_MIN
+        }
+
     fun <T> snapshotWindow(queue: List<T>, currentIndex: Int): List<T> {
         if (currentIndex < 0) return queue.take(SNAPSHOT_AFTER)
         val from = (currentIndex - SNAPSHOT_BEFORE).coerceAtLeast(0)

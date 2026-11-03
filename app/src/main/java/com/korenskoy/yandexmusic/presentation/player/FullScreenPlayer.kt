@@ -764,7 +764,7 @@ fun LikeHeartButton(isLiked: Boolean, onToggleLike: () -> Unit, size: Dp = 52.dp
         Icon(
             imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
             contentDescription = null,
-            tint = if (isLiked) HiFi.Accent else Color.White.copy(alpha = 0.86f),
+            tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.86f),
             modifier = Modifier
                 .size(size * 0.43f)
                 .graphicsLayer {

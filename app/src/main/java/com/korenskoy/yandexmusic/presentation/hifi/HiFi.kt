@@ -36,6 +36,8 @@ object HiFi {
     val SheetFill = Color(0xF010121A)
     val Danger = Color(0xFFFF6B6B)
     val Live = Color(0xFFFF4D4D)
+    /** A liked track or a favourite station: the heart is always this red, everywhere. */
+    val Love = Color(0xFFFF3B5C)
 
     /** The metal rim: a sweep through light and dark steel. */
     val MetalSweep = listOf(

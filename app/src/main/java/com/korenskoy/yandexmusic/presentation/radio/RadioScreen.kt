@@ -247,7 +247,7 @@ private fun OnAirCard(
             }
             Spacer(Modifier.weight(1f))
             GlassCircleButton(onClick = onToggleFavorite, contentDescription = stringResource(R.string.cd_v_izbrannoe)) {
-                Icon(if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, contentDescription = null, tint = if (isFavorite) HiFi.Love else Color.White, modifier = Modifier.size(18.dp))
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -379,7 +379,7 @@ private fun StationRow(
             Icon(
                 if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = stringResource(R.string.cd_v_izbrannoe),
-                tint = if (isFavorite) HiFi.Accent else Color.White.copy(alpha = 0.8f),
+                tint = if (isFavorite) HiFi.Love else Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.size(20.dp)
             )
         }

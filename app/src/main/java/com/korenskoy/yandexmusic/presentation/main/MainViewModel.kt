@@ -188,7 +188,6 @@ class MainViewModel @Inject constructor(
 
     fun playMyVibe() = playbackController.playMyVibe()
     fun playWaveFrom(trackId: String) = playbackController.playWaveFrom(trackId)
-    fun ensureWavePreview() = playbackController.ensureWavePreview()
 
     fun loadMoreQueue() = playbackController.loadMoreQueue()
 

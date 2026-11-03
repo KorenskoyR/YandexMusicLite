@@ -185,7 +185,7 @@ class ScreenshotTest {
             HomeScreen(
                 waveTrack = tracks[0], isPlaying = true, isLoading = false, isLiked = true, progress = { 70_000L },
                 shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
-                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {}
             )
         }
         snap("wave_playing")
@@ -197,7 +197,7 @@ class ScreenshotTest {
             HomeScreen(
                 waveTrack = tracks[0], isPlaying = false, isLoading = false, isLiked = false, progress = { 70_000L },
                 shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
-                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {}
             )
         }
         snap("wave_paused")
@@ -209,7 +209,7 @@ class ScreenshotTest {
             HomeScreen(
                 waveTrack = null, isPlaying = false, isLoading = false, isLiked = false, progress = { 0L },
                 shelf = waveShelfOf(false, emptyList(), tracks), shimmer = false,
-                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {}
             )
         }
         snap("wave_idle")
@@ -222,7 +222,7 @@ class ScreenshotTest {
             HomeScreen(
                 waveTrack = null, isPlaying = false, isLoading = true, isLiked = false, progress = { 0L },
                 shelf = waveShelfOf(false, emptyList(), emptyList()), shimmer = false,
-                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenQueue = {}, onShelfClick = {}
+                onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {}
             )
         }
         snap("wave_loading")

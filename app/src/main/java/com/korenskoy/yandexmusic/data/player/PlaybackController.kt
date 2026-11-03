@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -188,6 +189,8 @@ class PlaybackController @Inject constructor(
             }
             .launchIn(scope)
 
+        keepWaveShelfFilled()
+
         // Persist the position while playing so a killed process resumes close to where it stopped.
         scope.launch {
             while (true) {
@@ -253,11 +256,6 @@ class PlaybackController @Inject constructor(
         }
         _currentSource.value = PlaylistSource.VIBE
         playTrack(trackId, waveList, PlaylistSource.VIBE)
-    }
-
-    /** Fills the wave's preview in the background when nothing is saved yet (first launch). */
-    fun ensureWavePreview() {
-        if (wavePlaylist.value.isEmpty() && !_isFetchingMoreQueue.value) fetchMoreVibeTracks()
     }
 
     fun playMyVibe() {
@@ -709,6 +707,45 @@ class PlaybackController @Inject constructor(
         }
     }
 
+    /**
+     * The wave page's "next up" shelf must never stay empty. Whenever it is short (first launch, a restored
+     * paused wave with nothing after the current track, a failed request) more of the wave is fetched, again
+     * after a growing pause if a request fails, and at once when the network comes back. Waits for the saved
+     * session, so the first request does not race the restore.
+     */
+    private fun keepWaveShelfFilled() {
+        scope.launch {
+            sessionRestored.await()
+            combine(
+                _currentSource,
+                _currentTrack,
+                _currentPlaylist,
+                wavePlaylist,
+                networkMonitor.isConnectedFlow
+            ) { source, track, queue, wave, online ->
+                online && PlaybackQueue.waveShelfIsShort(
+                    waveActive = source == PlaylistSource.VIBE && track != null,
+                    currentId = track?.idString,
+                    queue = queue.map { it.idString },
+                    wave = wave.map { it.idString }
+                )
+            }.collectLatest { short ->
+                if (!short) return@collectLatest
+                var pause = WAVE_RETRY_START_MS
+                // A successful request changes the lists, which re-checks the shelf from the top
+                while (!fetchMoreVibeTracksAwait()) {
+                    delay(pause)
+                    pause = (pause * 2).coerceAtMost(WAVE_RETRY_MAX_MS)
+                }
+            }
+        }
+    }
+
+    /** [fetchMoreVibeTracks] as a suspend call: true when new tracks were added. */
+    private suspend fun fetchMoreVibeTracksAwait(): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        fetchMoreVibeTracks { added -> if (cont.isActive) cont.resumeWith(Result.success(added)) }
+    }
+
     private fun fetchMoreVibeTracks(onFetched: ((Boolean) -> Unit)? = null) {
         if (isOffline()) {
             onFetched?.invoke(false)
@@ -862,6 +899,8 @@ class PlaybackController @Inject constructor(
 
     companion object {
         const val WAVE_PREVIEW_SIZE = 10
+        const val WAVE_RETRY_START_MS = 2_000L
+        const val WAVE_RETRY_MAX_MS = 60_000L
         private const val TAG = "PlaybackController"
         private const val RECENT_LIMIT = 100
         private const val MAX_FAILED_TRACKS = 3

@@ -170,7 +170,8 @@ fun TrackContextMenu(
                 }
                 ContextMenuItem(
                     if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    stringResource(if (isLiked) R.string.track_menu_unlike else R.string.track_menu_like)
+                    stringResource(if (isLiked) R.string.track_menu_unlike else R.string.track_menu_like),
+                    iconTint = if (isLiked) com.korenskoy.yandexmusic.presentation.hifi.HiFi.Love else Color.White.copy(alpha = 0.75f)
                 ) {
                     onToggleLike()
                     onDismiss()
@@ -220,6 +221,7 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
 private fun ContextMenuItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
+    iconTint: Color = Color.White.copy(alpha = 0.75f),
     onClick: () -> Unit
 ) {
     Row(
@@ -232,7 +234,7 @@ private fun ContextMenuItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.75f)
+            tint = iconTint
         )
         Spacer(modifier = Modifier.width(16.dp))
         Text(

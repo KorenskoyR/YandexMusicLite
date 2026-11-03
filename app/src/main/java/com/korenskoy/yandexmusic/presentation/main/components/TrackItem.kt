@@ -177,7 +177,7 @@ fun TrackItem(
             ) {
                 Icon(
                     imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    tint = if (isLiked) Color(0xFF0A6CFF) else Color.White.copy(alpha = 0.6f),
+                    tint = if (isLiked) com.korenskoy.yandexmusic.presentation.hifi.HiFi.Love else Color.White.copy(alpha = 0.6f),
                     contentDescription = stringResource(R.string.cd_nravitsya),
                     modifier = Modifier.size(17.dp)
                 )

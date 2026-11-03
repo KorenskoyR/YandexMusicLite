@@ -1,7 +1,9 @@
 package com.korenskoy.yandexmusic.data.player
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaybackQueueTest {
@@ -62,5 +64,19 @@ class PlaybackQueueTest {
         assertEquals(500 + PlaybackQueue.SNAPSHOT_AFTER - 1, window.last())
         assertEquals(listOf(0, 1, 2), PlaybackQueue.snapshotWindow(listOf(0, 1, 2), 1))
         assertEquals(0, PlaybackQueue.snapshotWindow(queue, 0).first())
+    }
+
+    @Test
+    fun waveShelfAsksForTracksWhenItWouldBeEmpty() {
+        val ids = (1..10).map { "t$it" }
+        // Playing wave: the shelf is the queue after the current track
+        assertFalse(PlaybackQueue.waveShelfIsShort(true, "t2", ids, emptyList()))
+        assertTrue("near the end of the queue", PlaybackQueue.waveShelfIsShort(true, "t8", ids, ids))
+        assertTrue("restored wave with nothing after the current track", PlaybackQueue.waveShelfIsShort(true, "t1", listOf("t1"), emptyList()))
+        assertTrue("current track not in the queue", PlaybackQueue.waveShelfIsShort(true, "x", ids, ids))
+        // Idle wave: the saved wave without the track it starts with
+        assertTrue("first launch, nothing saved", PlaybackQueue.waveShelfIsShort(false, null, emptyList(), emptyList()))
+        assertTrue("one starting track only", PlaybackQueue.waveShelfIsShort(false, null, emptyList(), listOf("t1", "t2")))
+        assertFalse(PlaybackQueue.waveShelfIsShort(false, "other", listOf("other"), ids))
     }
 }
