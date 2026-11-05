@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import androidx.datastore.preferences.core.stringPreferencesKey
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -71,6 +72,15 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setUiScaleManual(scale: Float) {
         context.dataStore.edit { prefs ->
             prefs[UI_SCALE_MANUAL_KEY] = scale.coerceIn(SettingsRepository.MIN_UI_SCALE, SettingsRepository.MAX_UI_SCALE)
+        }
+    }
+
+    private val SKIPPED_UPDATE_KEY = stringPreferencesKey("skipped_update_version")
+    override val skippedUpdateVersion: Flow<String?> = context.dataStore.data.map { prefs -> prefs[SKIPPED_UPDATE_KEY] }
+
+    override suspend fun setSkippedUpdateVersion(version: String?) {
+        context.dataStore.edit { prefs ->
+            if (version == null) prefs.remove(SKIPPED_UPDATE_KEY) else prefs[SKIPPED_UPDATE_KEY] = version
         }
     }
 

@@ -18,6 +18,8 @@ interface SettingsRepository {
     val uiScaleAuto: Flow<Boolean>
     /** Manual UI-scale multiplier used when [uiScaleAuto] is off ([MIN_UI_SCALE]…[MAX_UI_SCALE]). */
     val uiScaleManual: Flow<Float>
+    /** The update the user chose to skip ("1.9.3"); the launch check does not offer it again. */
+    val skippedUpdateVersion: Flow<String?>
 
     suspend fun setDarkTheme(enabled: Boolean)
     suspend fun setAutoDownloadLikedTracks(enabled: Boolean)
@@ -27,6 +29,7 @@ interface SettingsRepository {
     suspend fun setSteeringWheelOnLeft(onLeft: Boolean)
     suspend fun setUiScaleAuto(enabled: Boolean)
     suspend fun setUiScaleManual(scale: Float)
+    suspend fun setSkippedUpdateVersion(version: String?)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3

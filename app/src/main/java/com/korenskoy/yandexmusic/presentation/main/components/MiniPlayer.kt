@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -56,7 +58,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiKnob
 import com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph
 import com.korenskoy.yandexmusic.utils.browserUserAgent
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -201,7 +202,7 @@ fun MiniPlayer(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(track.coverUri.toCoverUrl("200x200"))
+                        .cover(track.coverUri, CoverSize.Small)
                         .crossfade(true)
                         .apply { if (track.isRadio) browserUserAgent() }
                         .build(),

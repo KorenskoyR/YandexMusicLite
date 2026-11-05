@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.widget
 
+import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -86,7 +87,7 @@ class NowPlayingWidget : GlanceAppWidget() {
 
     private suspend fun loadCover(context: Context, track: TrackDetailsDto): Bitmap? {
         val uri = track.coverUri ?: return null
-        val data = if (uri.startsWith("android.resource") || uri.startsWith("http")) uri else uri.toCoverUrl("200x200")
+        val data = if (uri.startsWith("android.resource") || uri.startsWith("http")) uri else uri.toCoverUrl(CoverSize.Small)
         val request = ImageRequest.Builder(context).data(data).size(200).allowHardware(false).build()
         return (SingletonImageLoader.get(context).execute(request) as? SuccessResult)?.image?.toBitmap()
     }

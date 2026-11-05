@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import kotlinx.coroutines.flow.first
 import com.korenskoy.yandexmusic.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,6 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     private val updateManager: GitHubUpdateManager,
+    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository,
     @param:dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
@@ -53,8 +55,13 @@ class UpdateViewModel @Inject constructor(
                 _statusMessage.value = context.getString(R.string.update_status_checking)
             }
             val result = updateManager.checkForUpdates()
-            if (!silent || result is UpdateCheckResult.UpdateAvailable) {
-                _checkResult.value = result
+            val skipped = settingsRepository.skippedUpdateVersion.first()
+            val available = result as? UpdateCheckResult.UpdateAvailable
+            when {
+                // The launch check keeps quiet about a skipped version; Settings say it is there
+                available != null && !UpdatePolicy.offerOnLaunch(available.versionName, skipped, silent) ->
+                    _statusMessage.value = context.getString(R.string.update_status_skipped, available.versionName)
+                !silent || available != null -> _checkResult.value = result
             }
             if (result is UpdateCheckResult.UpToDate && !silent) {
                 _statusMessage.value = context.getString(R.string.update_status_latest)
@@ -114,6 +121,14 @@ class UpdateViewModel @Inject constructor(
 
     fun openInstallPermissionSettings() {
         updateManager.openInstallPermissionSettings()
+    }
+
+    /** "Пропустить эту версию": no more offers of it at launch; a newer version is offered again. */
+    fun skip() {
+        val version = (_checkResult.value as? UpdateCheckResult.UpdateAvailable)?.versionName ?: return
+        viewModelScope.launch { settingsRepository.setSkippedUpdateVersion(version) }
+        dismiss()
+        _statusMessage.value = context.getString(R.string.update_status_skipped, version)
     }
 
     fun dismiss() {

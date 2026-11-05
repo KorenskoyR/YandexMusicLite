@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -54,7 +56,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
 import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
 import com.korenskoy.yandexmusic.presentation.hifi.hifiGlass
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 import kotlin.math.sin
 
 /**
@@ -102,7 +103,7 @@ fun TrackItem(
         ) {
             AsyncImage(
                 // Asked for at the size it is shown: a list never decodes full-size covers
-                model = ImageRequest.Builder(context).data(track.coverUri.toCoverUrl("100x100")).size(150).build(),
+                model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Small).build(),
                 contentDescription = stringResource(R.string.cd_oblozhka),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

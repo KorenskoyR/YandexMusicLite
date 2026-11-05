@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
@@ -64,7 +65,7 @@ class MediaLibraryTree @Inject constructor(
             DOWNLOADED_ID -> downloaded().map { trackItem(DOWNLOADED_PREFIX, it) }
             PLAYLISTS_ID -> playlistsRepository.playlists.value.map { playlist ->
                 folder(PLAYLIST_PREFIX + playlist.kindString, playlist.title.orEmpty(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
-                    .withArtwork(playlist.coverUri.toCoverUrl("400x400"))
+                    .withArtwork(playlist.coverUri.toCoverUrl(CoverSize.Medium))
             }
             RADIO_ID -> radioRepository.getBuiltinStations().map { station ->
                 playable(
@@ -162,7 +163,7 @@ class MediaLibraryTree @Inject constructor(
         prefix + track.idString,
         track.title.orEmpty(),
         track.artists.joinToString(", ") { it.name.orEmpty() },
-        artwork = track.coverUri.toCoverUrl("400x400")?.let(Uri::parse),
+        artwork = track.coverUri.toCoverUrl(CoverSize.Medium)?.let(Uri::parse),
         mediaType = MediaMetadata.MEDIA_TYPE_MUSIC
     )
 

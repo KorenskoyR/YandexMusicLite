@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.ImageRequest
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiSectionHeader
 import androidx.compose.ui.semantics.Role
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
@@ -66,7 +70,6 @@ import com.korenskoy.yandexmusic.data.dto.AlbumDto
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 import com.korenskoy.yandexmusic.utils.russianQuantityString
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 
 /** What every catalog page needs from the main screen. */
 class CatalogActions(
@@ -243,7 +246,7 @@ internal fun Cover(uri: String?, placeholder: ImageVector, shape: Shape, size: D
     ) {
         Icon(placeholder, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(size / 3))
         AsyncImage(
-            model = uri.toCoverUrl("400x400"),
+            model = ImageRequest.Builder(LocalContext.current).cover(uri, CoverSize.Medium).build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()

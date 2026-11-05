@@ -95,7 +95,8 @@ internal fun UpdateHost(updateVm: UpdateViewModel) {
         onStartDownload = { updateVm.startDownload(update.apkDownloadUrl) },
         onInstall = { updateVm.installDownloaded(forceSystemInstall = true) },
         onShareOrSave = { updateVm.shareOrSaveDownloadedApk() },
-        onDismiss = { updateVm.dismiss() }
+        onDismiss = { updateVm.dismiss() },
+        onSkip = { updateVm.skip() }
     )
 }
 

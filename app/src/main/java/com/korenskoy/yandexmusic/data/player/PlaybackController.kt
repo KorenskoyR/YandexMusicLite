@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.utils.toCoverUrl
 import com.korenskoy.yandexmusic.R
 import androidx.core.net.toUri
 import android.content.Context
@@ -831,7 +832,7 @@ class PlaybackController @Inject constructor(
     }
 
     private fun coverUrlFor(track: TrackDetailsDto): String? = track.coverUri?.let { uri ->
-        if (uri.startsWith("http") || uri.startsWith("android.resource")) uri else "https://${uri.replace("%%", "1000x1000")}"
+        if (uri.startsWith("android.resource")) uri else uri.toCoverUrl(com.korenskoy.yandexmusic.utils.CoverSize.Medium)
     }
 
     /** User-facing playback errors; the visible UI shows them as a Snackbar. */

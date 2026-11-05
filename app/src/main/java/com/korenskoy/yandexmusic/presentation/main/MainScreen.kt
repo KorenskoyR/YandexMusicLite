@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -141,6 +142,7 @@ fun MainScreen(
     // Another tab: the catalog pages belong to where they were opened
     LaunchedEffect(currentTab) { catalogVm.closeAll() }
     InstallDownloadedUpdateOnResume(updateVm)
+    PrefetchCovers(viewModel, currentTrack)
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -153,7 +155,7 @@ fun MainScreen(
             ArtworkTint(Color(TintMath.normalize(it.brandColorStart.toInt())), Color(TintMath.normalize(it.brandColorEnd.toInt())))
         }
     }
-    val coverForTint = if (currentTrack?.isRadio == true) null else currentTrack?.coverUri.toCoverUrl("200x200")
+    val coverForTint = if (currentTrack?.isRadio == true) null else currentTrack?.coverUri.toCoverUrl(CoverSize.Small)
     val appTint = rememberArtworkTint(coverForTint, stationTint)
     val tabStates = rememberSaveableStateHolder()
     val contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp
@@ -173,7 +175,7 @@ fun MainScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 // One living background under every tab: it does not blink when tabs change
                 if (currentTab != MainTab.CAR) {
-                    HiFiBackdrop(coverUrl = coverForTint?.let { currentTrack?.coverUri.toCoverUrl("400x400") })
+                    HiFiBackdrop(coverUrl = coverForTint)
                 }
                 AnimatedContent(
                     targetState = currentTab,
@@ -381,7 +383,7 @@ private fun PlayerHost(
         queue = queue,
         sourceLabel = playerSourceLabelRes(now.source, track.isRadio)?.let { stringResource(it) }.orEmpty(),
         onPlayPauseClick = { viewModel.togglePlayPause() },
-        onToggleLike = { if (track.isRadio) radioVm.toggleFavorite(stationId) else viewModel.toggleLike(track) },
+        onToggleLike = { viewModel.toggleLike(track) },
         onNextClick = { viewModel.playNext() },
         onPrevClick = { viewModel.playPrev() },
         onSeekTo = { viewModel.seekTo(it) },
@@ -393,7 +395,7 @@ private fun PlayerHost(
             onCollapse()
             viewModel.stopAndClearPlayer()
         },
-        onDislikeClick = { if (track.isRadio) radioVm.removeFavorite(stationId) else viewModel.dislikeTrack(track) },
+        onDislikeClick = { viewModel.dislikeTrack(track) },
         onLoadMoreQueue = { viewModel.loadMoreQueue() },
         isFetchingMoreQueue = isFetchingMoreQueue,
         sleepTimer = sleepTimer,
@@ -413,6 +415,24 @@ private fun Modifier.sharedCover(scope: SharedTransitionScope, visibility: Anima
     if (!enabled) this else with(scope) {
         this@sharedCover.sharedElement(rememberSharedContentState(PLAYER_COVER_KEY), visibility)
     }
+
+/**
+ * Covers are fetched before they are needed: the playing track and the next two (player and small
+ * size), and the wave's "next up" cards — opening the player or moving on finds them ready.
+ */
+@Composable
+private fun PrefetchCovers(viewModel: MainViewModel, track: TrackDetailsDto?) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
+    val wavePreview by viewModel.wavePreview.collectAsStateWithLifecycle()
+    val ahead = remember(queue, track?.idString) { listOfNotNull(track) + upcomingOf(queue, track?.idString, limit = 2) }
+    LaunchedEffect(ahead) {
+        com.korenskoy.yandexmusic.utils.prefetchCovers(context, ahead, listOf(CoverSize.Large, CoverSize.Small))
+    }
+    LaunchedEffect(wavePreview) {
+        com.korenskoy.yandexmusic.utils.prefetchCovers(context, wavePreview.take(5), listOf(CoverSize.Medium))
+    }
+}
 
 /** Back from the system installer's permission screen: continue the update that was waiting for it. */
 @Composable

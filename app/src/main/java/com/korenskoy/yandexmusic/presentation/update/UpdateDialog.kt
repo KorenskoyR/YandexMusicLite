@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material.icons.rounded.SkipNext
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiProgressBar
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
@@ -58,7 +62,9 @@ fun UpdateDialog(
     onStartDownload: () -> Unit,
     onInstall: () -> Unit,
     onShareOrSave: () -> Unit = {},
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** "Пропустить эту версию"; offered until a download starts. */
+    onSkip: (() -> Unit)? = null
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -419,6 +425,31 @@ fun UpdateDialog(
                             }
                         }
                     }
+                }
+
+                // Not now and not this version: quiet, below the main actions, until a download starts
+                if (onSkip != null && downloadProgress < 0f) {
+                    Box(Modifier.fillMaxWidth().padding(top = 14.dp).height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(role = Role.Button, onClick = onSkip)
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.update_skip_version), color = Color.White.copy(alpha = 0.78f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(
+                        stringResource(R.string.update_skip_hint),
+                        style = HiFiType.Caption.copy(fontSize = 12.sp, lineHeight = 17.sp),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    )
                 }
             }
         }

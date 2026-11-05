@@ -307,4 +307,10 @@
     <string name="tab_car">В авто</string>
     <string name="radio_live_frequency">Прямой эфир • %1$s</string>
     <string name="search_nothing_found_hint">Попробуйте написать иначе или короче.</string>
+    <string name="notification_unlike">Убрать из «Мне нравится»</string>
+    <string name="notification_station_favorite">Станцию в избранное</string>
+    <string name="notification_station_unfavorite">Убрать станцию из избранного</string>
+    <string name="update_skip_version">Пропустить эту версию</string>
+    <string name="update_skip_hint">Окно больше не появится для этой версии — напомним, когда выйдет следующая. Обновиться можно в настройках.</string>
+    <string name="update_status_skipped">Доступна %1$s · пропущена — нажмите, чтобы показать</string>
 </resources>

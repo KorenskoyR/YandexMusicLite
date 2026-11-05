@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.ImageRequest
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.shape.CircleShape
@@ -59,7 +63,6 @@ import coil3.compose.AsyncImage
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import com.korenskoy.yandexmusic.utils.russianQuantityString
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 
 /** Opens the track menu. MainScreen provides it, so every [TrackItem] shows the "⋮" button. */
 fun interface TrackMenuLauncher {
@@ -233,7 +236,7 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
         ) {
             Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(22.dp))
             AsyncImage(
-                model = playlist.coverUri.toCoverUrl("100x100"),
+                model = ImageRequest.Builder(LocalContext.current).cover(playlist.coverUri, CoverSize.Small).build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
@@ -90,7 +92,6 @@ import com.korenskoy.yandexmusic.presentation.main.components.DownloadProgressMo
 import com.korenskoy.yandexmusic.presentation.main.components.PlaylistNameDialog
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 import com.korenskoy.yandexmusic.utils.russianQuantityString
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 
 private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS }
 
@@ -428,7 +429,7 @@ internal fun CoverCard(track: TrackDetailsDto, modifier: Modifier = Modifier, on
             .hifiPress(onClick)
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context).data(track.coverUri.toCoverUrl("400x400")).size(400).crossfade(true).build(),
+            model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Medium).crossfade(true).build(),
             contentDescription = track.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier

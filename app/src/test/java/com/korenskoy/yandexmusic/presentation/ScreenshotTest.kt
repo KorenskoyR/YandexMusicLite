@@ -283,10 +283,10 @@ class ScreenshotTest {
         show {
             com.korenskoy.yandexmusic.presentation.update.UpdateDialog(
                 updateInfo = com.korenskoy.yandexmusic.data.updater.UpdateCheckResult.UpdateAvailable(
-                    versionName = "1.8.2", title = "Yandex Music Lite 1.8.2", changelog = "• Новый дизайн диалогов",
+                    versionName = "1.9.3", title = "Yandex Music Lite 1.9.3", changelog = "• Лайк и дизлайк в шторке\n• Пропуск версии\n• Обложки быстрее",
                     apkDownloadUrl = "", apkSizeBytes = 8_000_000
                 ),
-                downloadProgress = -1f, onStartDownload = {}, onInstall = {}, onDismiss = {}
+                downloadProgress = -1f, onStartDownload = {}, onInstall = {}, onDismiss = {}, onSkip = {}
             )
         }
         snapScreen("dialog_update")

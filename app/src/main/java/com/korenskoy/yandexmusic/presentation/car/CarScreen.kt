@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -168,7 +170,7 @@ fun CarScreen(
         CarSource.HITS -> stringResource(R.string.car_source_hits)
         else -> ""
     }
-    val coverUrl = currentTrack?.coverUri.toCoverUrl("400x400")
+    val coverUrl = currentTrack?.coverUri.toCoverUrl(CoverSize.Medium)
     val tint = LocalArtworkTint.current
     val ringMode = when {
         isBuffering -> RingMode.Loading
@@ -498,8 +500,7 @@ private fun CoverWithNext(u: Scale, track: TrackDetailsDto?, next: TrackDetailsD
         ) { uri ->
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(uri.toCoverUrl("800x800"))
-                    .size(800)
+                    .cover(uri, CoverSize.Large)
                     .crossfade(true)
                     .apply { if (track?.isRadio == true) browserUserAgent() }
                     .build(),
@@ -555,7 +556,7 @@ private fun NextPlate(u: Scale, next: TrackDetailsDto) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(shown.coverUri.toCoverUrl("200x200")).size(200).crossfade(true).build(),
+                model = ImageRequest.Builder(context).cover(shown.coverUri, CoverSize.Small).crossfade(true).build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

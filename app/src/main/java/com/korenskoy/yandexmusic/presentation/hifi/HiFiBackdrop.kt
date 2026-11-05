@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import com.korenskoy.yandexmusic.utils.CoverSize
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -76,7 +77,8 @@ fun HiFiBackdrop(
         if (liveBlur) {
             val context = LocalContext.current
             AsyncImage(
-                model = ImageRequest.Builder(context).data(coverUrl).size(160).build(),
+                // The small cover, shared with the mini-player and the rows: it is blurred anyway
+                model = ImageRequest.Builder(context).data(coverUrl).size(CoverSize.Small.px).memoryCacheKey(CoverSize.Small.memoryKey(coverUrl)).build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

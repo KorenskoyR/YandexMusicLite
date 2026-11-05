@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.ImageRequest
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import com.korenskoy.yandexmusic.presentation.hifi.appearOnce
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAppearance
@@ -89,7 +93,6 @@ import com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenuPlay
 import com.korenskoy.yandexmusic.presentation.main.components.PlaylistNameDialog
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 import com.korenskoy.yandexmusic.utils.russianQuantityString
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 
 @Composable
 internal fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
@@ -106,7 +109,7 @@ internal fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
             modifier = Modifier.size(36.dp)
         )
         AsyncImage(
-            model = playlist.coverUri.toCoverUrl("400x400"),
+            model = ImageRequest.Builder(LocalContext.current).cover(playlist.coverUri, CoverSize.Medium).build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()

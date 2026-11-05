@@ -47,6 +47,7 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLiveLine
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
 import com.korenskoy.yandexmusic.presentation.hifi.rememberPredictiveBack
+import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 import kotlinx.coroutines.launch
 
@@ -211,7 +212,7 @@ fun FullScreenPlayer(
     ) {
         // Living background: the app tint and (Android 12+) the cover itself, blurred; then a vignette
         // around the cover and a fade to the ground under the controls
-        HiFiBackdrop(coverUrl = if (track.isRadio) null else track.coverUri.toCoverUrl("400x400"), bottomFade = false)
+        HiFiBackdrop(coverUrl = if (track.isRadio) null else track.coverUri.toCoverUrl(CoverSize.Small), bottomFade = false)
         Box(
             Modifier
                 .fillMaxSize()

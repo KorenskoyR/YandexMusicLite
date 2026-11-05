@@ -2,6 +2,10 @@ package com.korenskoy.yandexmusic.presentation
 
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.player.PlaybackQueue
+import com.korenskoy.yandexmusic.data.player.SessionButtons
+import com.korenskoy.yandexmusic.presentation.update.UpdatePolicy
+import com.korenskoy.yandexmusic.utils.CoverSize
+import com.korenskoy.yandexmusic.utils.toCoverUrl
 import com.korenskoy.yandexmusic.data.player.WaveQueue
 import com.korenskoy.yandexmusic.presentation.hifi.LoadState
 import com.korenskoy.yandexmusic.presentation.main.components.MiniGesture
@@ -105,5 +109,37 @@ class InteractionLogicTest {
         assertEquals(LoadState.Loading, LoadState.of(emptyList<Int>(), isEmpty = true, loading = true, failed = true))
         assertEquals(LoadState.Failed, LoadState.of(emptyList<Int>(), isEmpty = true, loading = false, failed = true))
         assertEquals(LoadState.Empty, LoadState.of(emptyList<Int>(), isEmpty = true, loading = false, failed = false))
+    }
+
+    // --- 1.9.3: the notification's buttons, skipping an update, cover sizes ------------------------------
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    @Test
+    fun notificationShowsDislikeAndHeartForTracksAndOnlyTheHeartForStations() {
+        assertEquals(listOf(SessionButtons.Kind.DISLIKE, SessionButtons.Kind.LIKE), SessionButtons.kindsFor(track("1"), liked = false))
+        assertEquals(listOf(SessionButtons.Kind.DISLIKE, SessionButtons.Kind.UNLIKE), SessionButtons.kindsFor(track("1"), liked = true))
+        assertEquals(listOf(SessionButtons.Kind.UNLIKE), SessionButtons.kindsFor(track("radio_x").copy(isRadio = true), liked = true))
+        assertTrue("nothing plays", SessionButtons.kindsFor(null, liked = false).isEmpty())
+    }
+
+    @Test
+    fun aSkippedVersionIsNotOfferedAtLaunchButANewerOneIs() {
+        assertFalse("skipped, at launch", UpdatePolicy.offerOnLaunch("1.9.3", skipped = "1.9.3", silent = true))
+        assertTrue("a newer one", UpdatePolicy.offerOnLaunch("1.9.4", skipped = "1.9.3", silent = true))
+        assertTrue("asked for in Settings", UpdatePolicy.offerOnLaunch("1.9.3", skipped = "1.9.3", silent = false))
+        assertTrue("nothing skipped", UpdatePolicy.offerOnLaunch("1.9.3", skipped = null, silent = true))
+    }
+
+    @Test
+    fun coversComeInThreeSizesOnly() {
+        assertEquals(CoverSize.Small, CoverSize.forPixels(100))
+        assertEquals(CoverSize.Small, CoverSize.forPixels(200))
+        assertEquals(CoverSize.Medium, CoverSize.forPixels(300))
+        assertEquals(CoverSize.Large, CoverSize.forPixels(800))
+        assertEquals("https://avatars.yandex.net/get/1/200x200",
+            "avatars.yandex.net/get/1/%%".toCoverUrl(CoverSize.Small))
+        assertEquals("a bundled logo stays as it is", "android.resource://x/1",
+            "android.resource://x/1".toCoverUrl(CoverSize.Large))
+        assertTrue("one memory key per size", CoverSize.Small.memoryKey("u") != CoverSize.Large.memoryKey("u"))
     }
 }

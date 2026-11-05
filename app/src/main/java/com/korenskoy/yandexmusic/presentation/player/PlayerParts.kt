@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.animateFloat
@@ -307,7 +309,7 @@ internal fun PlayerCover(
         ) {
             if (track.isRadio) {
                 RadioCoverCard(
-                    coverUrl = track.coverUri.toCoverUrl("1000x1000") ?: "",
+                    coverUrl = track.coverUri.toCoverUrl(CoverSize.Large) ?: "",
                     stationName = track.title.orEmpty(),
                     modifier = Modifier.fillMaxSize()
                 )
@@ -328,7 +330,7 @@ internal fun PlayerCover(
                         label = "cover_change"
                     ) { shown ->
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(shown.coverUri.toCoverUrl("1000x1000")).crossfade(true).build(),
+                            model = ImageRequest.Builder(context).cover(shown.coverUri, CoverSize.Large).crossfade(true).build(),
                             contentDescription = stringResource(R.string.cd_oblozhka),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -492,7 +494,7 @@ internal fun NextPlate(next: TrackDetailsDto, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context).data(next.coverUri.toCoverUrl("100x100")).size(140).crossfade(true).build(),
+            model = ImageRequest.Builder(context).cover(next.coverUri, CoverSize.Small).crossfade(true).build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier

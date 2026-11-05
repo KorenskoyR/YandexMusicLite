@@ -48,6 +48,60 @@ class PlaybackLifecycleInstrumentedTest {
         return vm
     }
 
+    /**
+     * The player in the notification shows the heart (for a station: its favourite). Pressing it through the
+     * media session, as the shade does, favourites the station and fills the heart; pressing again undoes it.
+     */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    @Test
+    fun notificationHeartFavouritesTheStation() {
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val radio = radioOf(scenario)
+        val vm = viewModelOf(scenario)
+        val station = radio.stations.value.first { it.id == "record" }
+        instrumentation.runOnMainSync { radio.play(station) }
+        waitUntil(30_000, "station is the current item") { vm.currentTrack.value?.idString == "radio_${station.id}" }
+
+        val token = SessionToken(context, ComponentName(context, MusicService::class.java))
+        val future = MediaController.Builder(context, token).buildAsync()
+        val controller = future.get(10, TimeUnit.SECONDS)
+        fun heart(): androidx.media3.session.CommandButton? {
+            var button: androidx.media3.session.CommandButton? = null
+            instrumentation.runOnMainSync {
+                button = controller.mediaButtonPreferences.firstOrNull { it.sessionCommand?.customAction?.endsWith(".LIKE") == true }
+            }
+            return button
+        }
+        try {
+            waitUntil(10_000, "the heart is offered") { heart() != null }
+            instrumentation.runOnMainSync {
+                // A station has no "Не нравится" in the shade
+                assertTrue(controller.mediaButtonPreferences.none { it.sessionCommand?.customAction?.endsWith(".DISLIKE") == true })
+            }
+            // The heart is drawn from the station's favourite: a filled heart is a favourite station
+            val wasFavourite = heart()?.icon == androidx.media3.session.CommandButton.ICON_HEART_FILLED
+
+            val press = heart()!!.sessionCommand!!
+            instrumentation.runOnMainSync { controller.sendCustomCommand(press, android.os.Bundle.EMPTY) }
+            waitUntil(10_000, "the station's favourite flips and the heart follows") {
+                (heart()?.icon == androidx.media3.session.CommandButton.ICON_HEART_FILLED) != wasFavourite
+            }
+
+            // Back as it was
+            val pressAgain = heart()!!.sessionCommand!!
+            instrumentation.runOnMainSync { controller.sendCustomCommand(pressAgain, android.os.Bundle.EMPTY) }
+            waitUntil(10_000, "the favourite is restored") {
+                (heart()?.icon == androidx.media3.session.CommandButton.ICON_HEART_FILLED) == wasFavourite
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                controller.pause()
+                MediaController.releaseFuture(future)
+            }
+            scenario.close()
+        }
+    }
+
     @Test
     fun notificationControlsWorkAfterActivityIsDestroyed() {
         if (Build.VERSION.SDK_INT >= 33) {

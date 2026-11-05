@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.data.player
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
+import androidx.media3.session.SessionResult
+import androidx.media3.session.SessionCommand
 import com.korenskoy.yandexmusic.R
 
 import android.app.Notification
@@ -44,6 +48,9 @@ class MusicService : MediaLibraryService() {
 
     @Inject
     lateinit var libraryTree: MediaLibraryTree
+
+    @Inject
+    lateinit var reactions: TrackReactions
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
@@ -216,7 +223,14 @@ class MusicService : MediaLibraryService() {
                 controller: MediaSession.ControllerInfo
             ): MediaSession.ConnectionResult {
                 if (controller.isTrusted || controller.packageName == packageName || controller.packageName in CAR_HOSTS) {
-                    return super.onConnect(session, controller)
+                    // Everything, plus the heart and "Не нравится" of the notification and the car
+                    val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+                        .add(SessionButtons.LIKE)
+                        .add(SessionButtons.DISLIKE)
+                        .build()
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                        .setAvailableSessionCommands(commands)
+                        .build()
                 }
                 val transportOnly = Player.Commands.Builder()
                     .addAll(
@@ -292,6 +306,22 @@ class MusicService : MediaLibraryService() {
                 return future
             }
 
+            override fun onCustomCommand(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                customCommand: SessionCommand,
+                args: android.os.Bundle
+            ): ListenableFuture<SessionResult> {
+                val track = playbackController.currentTrack.value
+                    ?: return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
+                when (customCommand.customAction) {
+                    SessionButtons.LIKE.customAction -> reactions.toggleLike(track)
+                    SessionButtons.DISLIKE.customAction -> reactions.dislike(track)
+                    else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+
             // Headset/Bluetooth Play or the system media card when the app process is not running
             override fun onPlaybackResumption(
                 mediaSession: MediaSession,
@@ -317,8 +347,20 @@ class MusicService : MediaLibraryService() {
                 .build()
             mediaLibrarySession = session
             addSession(session)
+            showReactionButtons(session)
         } else {
             mediaLibrarySession?.player = forwardingPlayer
+        }
+    }
+
+    /** The heart and "Не нравится" follow the playing track and its like (from here or from the app). */
+    private fun showReactionButtons(session: MediaSession) {
+        serviceScope.launch {
+            combine(playbackController.currentTrack, reactions.likedTrackIds, reactions.favoriteStationIds) { track, _, _ ->
+                SessionButtons.buttonsFor(this@MusicService, track, track != null && reactions.isLiked(track))
+            }
+                .distinctUntilChanged()
+                .collect { session.setMediaButtonPreferences(it) }
         }
     }
 

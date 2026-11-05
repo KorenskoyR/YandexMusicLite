@@ -17,7 +17,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -38,7 +37,8 @@ class MainViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
-    networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor
+    networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor,
+    private val reactions: com.korenskoy.yandexmusic.data.player.TrackReactions
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -122,26 +122,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { session.syncLikes() }
     }
 
-    fun toggleLike(track: TrackDetailsDto) {
-        val trackId = track.idString
-        val like = trackId !in likedTrackIds.value
-        libraryRepository.setLiked(track, like) { ok ->
-            if (!ok) return@setLiked
-            viewModelScope.launch {
-                if (!like) {
-                    downloadManager.removeTrack(trackId)
-                } else if (settingsRepository.autoDownloadLikedTracks.first()) {
-                    downloadScheduler.downloadTrack(trackId)
-                }
-            }
-        }
-    }
+    /** The heart: a track's like, or a station's favourite (shared with the player in the notification). */
+    fun toggleLike(track: TrackDetailsDto) = reactions.toggleLike(track)
 
-    fun dislikeTrack(track: TrackDetailsDto) {
-        libraryRepository.dislike(track)
-        playbackController.onTrackDisliked(track.idString)
-        viewModelScope.launch { downloadManager.removeTrack(track.idString) }
-    }
+    /** "Не нравится": a track leaves the wave and the next one plays; a station leaves the favourites. */
+    fun dislikeTrack(track: TrackDetailsDto) = reactions.dislike(track)
 
     /** Offline downloads run in WorkManager: they continue after the app is closed. */
     fun downloadAllLikedTracks() {

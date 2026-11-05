@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import android.content.res.Configuration
@@ -84,7 +86,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
 import com.korenskoy.yandexmusic.presentation.hifi.PlayPauseGlyph
 import com.korenskoy.yandexmusic.presentation.hifi.RingMode
 import com.korenskoy.yandexmusic.presentation.hifi.SpectrumRing
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 
 /**
  * What the wave page shows under the knob. Pure; unit-tested.
@@ -376,7 +377,7 @@ private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
             .hifiPress(onClick)
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context).data(track.coverUri.toCoverUrl("300x300")).crossfade(true).size(320).build(),
+            model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Medium).crossfade(true).size(320).build(),
             contentDescription = track.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier

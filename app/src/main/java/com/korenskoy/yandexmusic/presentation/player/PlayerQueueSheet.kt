@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.utils.cover
+import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.animateFloat
@@ -23,7 +25,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.korenskoy.yandexmusic.presentation.hifi.hifiAnodized
 import com.korenskoy.yandexmusic.presentation.hifi.hifiGlass
-import com.korenskoy.yandexmusic.utils.toCoverUrl
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.fillMaxSize
@@ -303,7 +304,7 @@ private fun QueueCaption(text: String, top: Dp) {
 private fun QueueCover(track: TrackDetailsDto) {
     val context = LocalContext.current
     AsyncImage(
-        model = ImageRequest.Builder(context).data(track.coverUri.toCoverUrl("100x100")).size(140).build(),
+        model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Small).build(),
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier
