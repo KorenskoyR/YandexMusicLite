@@ -10,6 +10,7 @@
 [![Android](https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
 [![Release](https://img.shields.io/badge/Release-Latest-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
 [![Performance](https://img.shields.io/badge/Performance-Ultra%20Fast-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite)
+[![License](https://img.shields.io/badge/License-GPL--3.0-0A6CFF.svg?style=for-the-badge)](LICENSE)
 [![Language](https://img.shields.io/badge/Kotlin-100%25-7F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 
@@ -139,4 +140,6 @@ cd YandexMusicLite
 
 ## 📄 Лицензия
 
-Распространяется бесплатно для личного использования. Все права на товарные знаки и аудиоматериалы принадлежат их законным правообладателям.
+Код проекта распространяется под лицензией [GNU GPL v3.0](LICENSE): его можно использовать и изменять, а если вы распространяете свою версию, она должна выходить под той же лицензией и с открытым кодом.
+
+Лицензия относится только к коду этого проекта и не даёт прав на сервисы, ключи и материалы третьих лиц. Все права на товарные знаки и аудиоматериалы принадлежат их законным правообладателям.
