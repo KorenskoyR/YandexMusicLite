@@ -7,37 +7,37 @@
   --bg-primary: #07090E;
   --bg-surface: #0E121B;
   --bg-surface-elevated: #151A26;
-  
+
   --glass-bg: rgba(18, 22, 33, 0.65);
   --glass-bg-hover: rgba(26, 32, 48, 0.75);
   --glass-border: rgba(255, 255, 255, 0.09);
   --glass-border-hover: rgba(255, 153, 0, 0.4);
   --glass-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--glass-border);
   --glass-shadow-glow: 0 20px 60px rgba(255, 120, 0, 0.2), 0 0 0 1px var(--glass-border-hover);
-  
+
   --neon-gold: #FF9900;
   --neon-orange: #FF5500;
   --neon-pink: #FF2A85;
   --neon-purple: #7928CA;
   --neon-cyan: #00E5FF;
-  
+
   --gradient-neon: linear-gradient(135deg, #FF9900 0%, #FF5500 55%, #FF2A85 100%);
   --gradient-text: linear-gradient(135deg, #FFFFFF 30%, #FFB049 80%, #FF5500 100%);
   --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-  
+
   --text-primary: #FFFFFF;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
-  
+
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  
+
   --container-max: 1240px;
   --radius-xl: 28px;
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 8px;
-  
+
   --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-smooth: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-slow: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
@@ -363,6 +363,11 @@ h1, h2, h3, h4 {
   gap: 60px;
 }
 
+/* The tab pill scrolls inside its column instead of widening the page */
+.hero-grid > * {
+  min-width: 0;
+}
+
 .hero-badge {
   display: inline-flex;
   align-items: center;
@@ -481,7 +486,7 @@ h1, h2, h3, h4 {
 .phone-screen-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 1008 / 2080;
+  aspect-ratio: 1344 / 2992;
   background-color: #0B0D14;
   border-radius: 36px;
   overflow: hidden;
@@ -687,7 +692,7 @@ h1, h2, h3, h4 {
 
 .car-spotlight-panel {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 0.85fr 1.15fr;
   align-items: center;
   gap: 48px;
   padding: 56px;
@@ -773,7 +778,7 @@ h1, h2, h3, h4 {
 
 .car-device-frame {
   width: 100%;
-  max-width: 360px;
+  max-width: 680px;
   background: #0E121B;
   border-radius: 26px;
   padding: 14px;
@@ -792,39 +797,6 @@ h1, h2, h3, h4 {
 @keyframes carAmbientFloat {
   0% { transform: translateY(0); }
   100% { transform: translateY(-8px); }
-}
-
-.car-device-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 8px 10px;
-  font-size: 0.75rem;
-  color: #94A3B8;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-.car-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: #22C55E;
-  box-shadow: 0 0 8px #22C55E;
-  display: inline-block;
-  margin-right: 6px;
-}
-
-.car-status-title {
-  display: flex;
-  align-items: center;
-  color: #CBD5E1;
-}
-
-.car-status-clock {
-  font-family: var(--font-heading);
-  font-weight: 700;
-  color: var(--neon-gold);
 }
 
 .car-screen-inner {
@@ -1173,20 +1145,20 @@ h1, h2, h3, h4 {
   .hero-title {
     font-size: 3.25rem;
   }
-  
+
   .bento-span-8 {
     grid-column: span 12;
   }
-  
+
   .bento-span-4 {
     grid-column: span 6;
   }
-  
+
   .car-spotlight-panel {
     grid-template-columns: 1fr;
     padding: 40px 32px;
   }
-  
+
   .car-visual-wrapper {
     margin-top: 24px;
   }
@@ -1196,38 +1168,38 @@ h1, h2, h3, h4 {
   .nav-links {
     display: none;
   }
-  
+
   .hero-grid {
     grid-template-columns: 1fr;
     gap: 48px;
     text-align: center;
   }
-  
+
   .hero-description {
     margin: 0 auto 36px;
   }
-  
+
   .hero-actions {
     justify-content: center;
   }
-  
+
   .hero-specs {
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
   }
-  
+
   .bento-span-4, .bento-span-6 {
     grid-column: span 12;
   }
-  
+
   .steps-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .section-title {
     font-size: 2.125rem;
   }
-  
+
   .footer-top, .footer-bottom {
     flex-direction: column;
     align-items: flex-start;
@@ -1238,7 +1210,7 @@ h1, h2, h3, h4 {
   .hero-title {
     font-size: 2.5rem;
   }
-  
+
   .btn {
     width: 100%;
   }
