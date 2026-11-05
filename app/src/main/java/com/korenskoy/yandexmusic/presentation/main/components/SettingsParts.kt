@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.rounded.Route
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -211,6 +216,76 @@ internal fun SegmentedRow(icon: androidx.compose.ui.graphics.vector.ImageVector,
         Spacer(Modifier.height(12.dp))
         control()
     }
+}
+
+/** The road reserve: its size, what that means in tracks and hours, how full it is. */
+@Composable
+internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes: Long, onClear: () -> Unit) {
+    val sizes = SettingsRepository.ROAD_RESERVE_SIZES_MB
+    val enabled = sizeMb > 0
+    val labels = sizes.map { mb ->
+        when {
+            mb == 0 -> stringResource(R.string.settings_reserve_off)
+            mb >= 1024 -> stringResource(R.string.settings_reserve_gb, mb / 1024)
+            else -> stringResource(R.string.settings_reserve_mb, mb)
+        }
+    }
+    SegmentedRow(Icons.Rounded.Route, stringResource(R.string.settings_reserve_size)) {
+        Text(stringResource(R.string.settings_reserve_hint), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+        Spacer(Modifier.height(12.dp))
+        HiFiSegmented(
+            options = labels,
+            selectedIndex = sizes.indexOf(sizeMb).coerceAtLeast(0),
+            onSelect = { onSizeChange(sizes[it]) },
+            fontSize = 13.sp
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            stringResource(
+                when (sizeMb) {
+                    0 -> R.string.settings_reserve_estimate_off
+                    100 -> R.string.settings_reserve_estimate_100
+                    300 -> R.string.settings_reserve_estimate_300
+                    500 -> R.string.settings_reserve_estimate_500
+                    else -> R.string.settings_reserve_estimate_1024
+                }
+            ),
+            color = Color.White.copy(alpha = 0.86f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 20.sp
+        )
+        if (enabled) {
+            val limitBytes = sizeMb * 1024L * 1024L
+            val fraction = (usedBytes.toFloat() / limitBytes).coerceIn(0f, 1f)
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.Black.copy(alpha = 0.45f))) {
+                Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(Brush.verticalGradient(listOf(HiFi.Paper, HiFi.SteelEdge))))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(stringResource(R.string.settings_reserve_used, formatSize(usedBytes), labels[sizes.indexOf(sizeMb).coerceAtLeast(0)]), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+        }
+    }
+    if (enabled) {
+        SettingsRow(
+            icon = Icons.Rounded.DeleteOutline,
+            title = stringResource(R.string.settings_reserve_clear_title),
+            chevron = false,
+            onClick = null,
+            trailing = {
+                TextButton(onClick = onClear) {
+                    Text(stringResource(R.string.settings_clear), color = HiFi.Danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
+    }
+    Text(
+        stringResource(R.string.settings_reserve_note),
+        color = HiFi.TextTertiary,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 12.dp)
+    )
 }
 
 /** UI scale for screens whose reported density is wrong (dense car head units); applied in MainActivity. */

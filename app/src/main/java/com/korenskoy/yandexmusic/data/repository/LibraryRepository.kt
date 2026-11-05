@@ -62,6 +62,7 @@ class LibraryRepository @Inject constructor(
     val popularTracks: StateFlow<List<TrackDetailsDto>> = _popularTracks.asStateFlow()
 
     private val likesMutex = Mutex()
+    private val pendingMutex = Mutex()
     private var likesSync: Deferred<Boolean>? = null
     private var chartsLoad: Deferred<Unit>? = null
     private var chartsLoadedThisSession = false
@@ -103,6 +104,8 @@ class LibraryRepository @Inject constructor(
         _isSyncingLikes.value = true
         try {
             loadCached()
+            // First what was done without a connection, or the sync would take it back
+            flushPendingReactions()
             val folder = activeFolder
             val uid = resolveUid()
             val response = try {
@@ -202,10 +205,17 @@ class LibraryRepository @Inject constructor(
         val folder = activeFolder
         scope.launch {
             cacheManager.saveLikedTracks(folder, _likedTracks.value)
-            val ok = runCatching {
+            val outcome = runCatching {
                 val uid = resolveUid()
                 if (liked) api.likeTrack(uid, id) else api.unlikeTrack(uid, id)
-            }.onFailure { Log.e(TAG, "Like change failed for $id", it) }.isSuccess
+            }.onFailure { Log.e(TAG, "Like change failed for $id", it) }
+            // No connection: the like stands and is sent later. The server refusing it is another matter
+            if (outcome.exceptionOrNull() is java.io.IOException) {
+                addPendingReaction(folder, PendingReaction(id, if (liked) PendingReaction.Kind.LIKE else PendingReaction.Kind.UNLIKE))
+                onDone(true)
+                return@launch
+            }
+            val ok = outcome.isSuccess
             if (!ok) {
                 _likedTracks.value = previousTracks
                 _likedIds.value = previousIds
@@ -227,7 +237,50 @@ class LibraryRepository @Inject constructor(
                 val uid = resolveUid()
                 if (wasLiked) api.unlikeTrack(uid, id)
                 api.dislikeTrack(uid, id)
-            }.onFailure { Log.e(TAG, "Dislike failed for $id", it) }
+            }.onFailure {
+                Log.e(TAG, "Dislike failed for $id", it)
+                if (it is java.io.IOException) addPendingReaction(folder, PendingReaction(id, PendingReaction.Kind.DISLIKE))
+            }
+        }
+    }
+
+    private suspend fun addPendingReaction(folder: String, reaction: PendingReaction) {
+        pendingMutex.withLock {
+            val queue = cacheManager.loadPendingReactions(folder).mapNotNull(PendingReactions::parse)
+            cacheManager.savePendingReactions(folder, PendingReactions.add(queue, reaction).map { it.saved })
+        }
+    }
+
+    /** Sends what was liked and disliked without a connection, oldest first; what still cannot go stays. */
+    suspend fun flushPendingReactions() {
+        val folder = activeFolder
+        pendingMutex.withLock {
+            val queue = cacheManager.loadPendingReactions(folder).mapNotNull(PendingReactions::parse)
+            if (queue.isEmpty()) return
+            val uid = resolveUid()
+            var left = queue
+            for (reaction in queue) {
+                try {
+                    when (reaction.kind) {
+                        PendingReaction.Kind.LIKE -> api.likeTrack(uid, reaction.trackId)
+                        PendingReaction.Kind.UNLIKE -> api.unlikeTrack(uid, reaction.trackId)
+                        PendingReaction.Kind.DISLIKE -> {
+                            api.unlikeTrack(uid, reaction.trackId)
+                            api.dislikeTrack(uid, reaction.trackId)
+                        }
+                    }
+                } catch (e: java.io.IOException) {
+                    Log.w(TAG, "Still no connection for the saved reactions", e)
+                    break
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // The server refused this one: sending it again will not help
+                    Log.e(TAG, "Saved reaction refused for ${reaction.trackId}", e)
+                }
+                left = left - reaction
+            }
+            cacheManager.savePendingReactions(folder, left.map { it.saved })
         }
     }
 

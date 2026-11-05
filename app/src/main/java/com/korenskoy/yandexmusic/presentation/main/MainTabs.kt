@@ -156,6 +156,8 @@ internal fun LibraryTab(
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
     val uiScaleAuto by viewModel.uiScaleAuto.collectAsStateWithLifecycle()
     val uiScaleManual by viewModel.uiScaleManual.collectAsStateWithLifecycle()
+    val roadReserveMb by viewModel.roadReserveMb.collectAsStateWithLifecycle()
+    val reserveUsedBytes by viewModel.reserveUsedBytes.collectAsStateWithLifecycle()
     val activeAccount by accountVm.activeAccount.collectAsStateWithLifecycle()
     val accountName by accountVm.accountName.collectAsStateWithLifecycle()
     val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsStateWithLifecycle()
@@ -197,6 +199,10 @@ internal fun LibraryTab(
         uiScaleManual = uiScaleManual,
         onUiScaleManualChange = { viewModel.setUiScaleManual(it) },
         onUpgradeDownloads = { viewModel.upgradeDownloadedQuality() },
+        reserveMb = roadReserveMb,
+        onReserveChange = { viewModel.setRoadReserveMb(it) },
+        reserveUsedBytes = reserveUsedBytes,
+        onClearReserve = { viewModel.clearRoadReserve() },
         crashReports = crashReports.size,
         onOpenCrashLog = onOpenCrashLog,
         onCancelDownload = { viewModel.cancelDownloadAll() },

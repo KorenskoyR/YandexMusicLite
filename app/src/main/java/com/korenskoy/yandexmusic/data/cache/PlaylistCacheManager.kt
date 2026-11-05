@@ -110,6 +110,20 @@ class PlaylistCacheManager @Inject constructor(
     suspend fun loadRecentTrackIds(userFolder: String): List<String> =
         io { dao().loadIds(sanitizeUserFolder(userFolder), RECENT) }.orEmpty()
 
+    /** Likes and dislikes that have not reached the server yet, in their saved form. */
+    suspend fun savePendingReactions(userFolder: String, reactions: List<String>) {
+        val owner = sanitizeUserFolder(userFolder)
+        io {
+            database.withTransaction {
+                dao().deleteList(owner, PENDING_REACTIONS)
+                dao().insertItems(reactions.mapIndexed { i, saved -> ListItemEntity(owner, PENDING_REACTIONS, i, saved) })
+            }
+        }
+    }
+
+    suspend fun loadPendingReactions(userFolder: String): List<String> =
+        io { dao().loadIds(sanitizeUserFolder(userFolder), PENDING_REACTIONS) }.orEmpty()
+
     suspend fun clearUserCache(userFolder: String): Boolean {
         val owner = sanitizeUserFolder(userFolder)
         return io {
@@ -219,6 +233,7 @@ class PlaylistCacheManager @Inject constructor(
         const val LIKED = "liked"
         const val WAVE = "wave"
         const val RECENT = "recent"
+        const val PENDING_REACTIONS = "pending_reactions"
         const val WEEKLY_HITS = "weekly_hits"
         const val TRENDS = "trends"
         const val POPULAR = "popular"

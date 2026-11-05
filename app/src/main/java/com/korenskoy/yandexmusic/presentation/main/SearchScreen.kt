@@ -1,5 +1,26 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlin.math.roundToInt
+import com.korenskoy.yandexmusic.presentation.hifi.rememberHeaderCollapse
+import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
+import com.korenskoy.yandexmusic.presentation.hifi.hifiMachined
+import com.korenskoy.yandexmusic.presentation.hifi.fadeUnderHeader
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiCollapsingTitle
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.animation.core.animateFloatAsState
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiSkeletonRows
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -68,9 +89,9 @@ import com.korenskoy.yandexmusic.presentation.hifi.hifiRecessed
 internal enum class SearchFilter { ALL, TRACKS, ARTISTS, ALBUMS }
 
 /**
- * Search, in the same frame as "Моя музыка": a recessed field with a history button (recent queries
- * pop out of it on demand instead of taking room), weekly hits and trends as covers, results with
- * filters and a "best result".
+ * Search: the field is a well cut into the page with the history button in its edge (recent queries pop
+ * out of it on demand). The header stays in place, the title gives way to the field when the page
+ * scrolls or the field is in use, and the list dissolves under it. Results get their filters in the header.
  */
 @Composable
 fun SearchScreen(
@@ -100,6 +121,8 @@ fun SearchScreen(
 ) {
     val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val density = LocalDensity.current
     val contentStart = if (isLandscape) 140.dp else 20.dp
     val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
     val focusManager = LocalFocusManager.current
@@ -111,36 +134,31 @@ fun SearchScreen(
         if (history.isEmpty() || query.isNotEmpty()) historyPanel.targetState = false
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            HiFiLargeTitle(stringResource(R.string.search_title), modifier = Modifier.padding(start = contentStart, end = 20.dp, top = 14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = contentStart, end = 20.dp, top = 18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SearchField(
-                    query = query,
-                    onQueryChange = onQueryChange,
-                    onSubmit = {
-                        onSubmit()
-                        focusManager.clearFocus()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-                if (query.isNotEmpty()) {
-                    Spacer(Modifier.width(6.dp))
-                    HiFiTextAction(stringResource(R.string.search_cancel), onClick = {
-                        onQueryChange("")
-                        focusManager.clearFocus()
-                    }, color = Color.White)
-                } else if (history.isNotEmpty()) {
-                    Spacer(Modifier.width(10.dp))
-                    HistoryButton(open = historyOpen, onClick = { historyPanel.targetState = !historyOpen })
-                }
-            }
+    var focused by remember { mutableStateOf(false) }
+    var filterName by rememberSaveable { mutableStateOf(SearchFilter.ALL.name) }
+    val filters = if (query.isEmpty() || isSearching) emptyList() else availableFilters(results, artists, albums)
+    val discoverList = rememberLazyListState()
+    val scrolled by rememberHeaderCollapse(discoverList)
+    val inUse by animateFloatAsState(if (focused || query.isNotEmpty()) 1f else 0f, HiFiMotion.standard(), label = "search_in_use")
+    val collapse = { if (isLandscape) 0f else maxOf(scrolled, inUse) }
+    val fieldTopRest = if (isLandscape) SearchHeaderTop else SearchHeaderTop + TitleHeight + TitleToField
+    val filterSpace = if (filters.isEmpty()) 0.dp else FieldToFilters + FilterHeight
+    // Where the list starts to show: under the field and, with results, under the filters
+    val fadeStartPx = {
+        with(density) {
+            (statusBar + fieldTopRest + SearchFieldHeight + filterSpace + FadeGap).toPx() - collapse() * CollapseShift.toPx()
+        }
+    }
+    val fieldShiftPx = { with(density) { -(collapse() * if (isLandscape) 0f else CollapseShift.toPx()).roundToInt() } }
+    val listTop = statusBar + fieldTopRest + SearchFieldHeight + filterSpace + FadeGap + FadeLength -
+        if (query.isEmpty()) 0.dp else CollapseShift + ResultsLift
 
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().fadeUnderHeader(fadeStartPx, with(density) { FadeLength.toPx() })) {
             when {
                 query.isEmpty() -> DiscoverList(
+                    list = discoverList,
+                    top = listTop,
                     weeklyHits = weeklyHits,
                     trendTracks = trendTracks,
                     contentStart = contentStart,
@@ -150,8 +168,10 @@ fun SearchScreen(
                     onLoadMoreHits = onLoadMoreHits,
                     onLoadMoreTrends = onLoadMoreTrends
                 )
-                isSearching -> HiFiSkeletonRows(Modifier.padding(top = 16.dp), count = 6)
+                isSearching -> HiFiSkeletonRows(Modifier.padding(top = listTop), count = 6)
                 else -> ResultsList(
+                    top = listTop,
+                    filter = SearchFilter.valueOf(filterName),
                     results = results,
                     artists = artists,
                     albums = albums,
@@ -167,6 +187,63 @@ fun SearchScreen(
                     onAlbumClick = onAlbumClick
                 )
             }
+        }
+
+        if (!isLandscape) {
+            HiFiCollapsingTitle(
+                stringResource(R.string.search_title),
+                collapse = collapse,
+                modifier = Modifier
+                    .padding(start = contentStart, end = 20.dp, top = statusBar + SearchHeaderTop)
+                    .graphicsLayer {
+                        alpha = (1f - collapse() * 1.8f).coerceAtLeast(0f)
+                        translationY = -collapse() * 14.dp.toPx()
+                    }
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(0, fieldShiftPx()) }
+                .padding(start = contentStart, end = 20.dp, top = statusBar + fieldTopRest),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isLandscape) {
+                HiFiLargeTitle(stringResource(R.string.search_title))
+                Spacer(Modifier.width(20.dp))
+            }
+            SearchField(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSubmit = {
+                    onSubmit()
+                    focusManager.clearFocus()
+                },
+                focused = focused,
+                onFocusChange = { focused = it },
+                hasHistory = history.isNotEmpty(),
+                historyOpen = historyOpen,
+                onHistory = { historyPanel.targetState = !historyOpen },
+                modifier = Modifier.weight(1f)
+            )
+            if (focused || query.isNotEmpty()) {
+                Spacer(Modifier.width(6.dp))
+                HiFiTextAction(stringResource(R.string.search_cancel), onClick = {
+                    onQueryChange("")
+                    focusManager.clearFocus()
+                }, color = Color.White)
+            }
+        }
+        if (filters.isNotEmpty()) {
+            SearchFilterRow(
+                filters = filters,
+                selected = SearchFilter.valueOf(filterName),
+                onSelect = { filterName = it.name },
+                contentStart = contentStart,
+                modifier = Modifier
+                    .offset { IntOffset(0, fieldShiftPx()) }
+                    .padding(top = statusBar + fieldTopRest + SearchFieldHeight + FieldToFilters)
+            )
         }
 
         // Recent queries: a glass panel that grows out of the history button over a dimmed page
@@ -189,8 +266,8 @@ fun SearchScreen(
             exit = scaleOut(HiFiMotion.quick(), targetScale = 0.95f, transformOrigin = TransformOrigin(1f, 0f)) + fadeOut(HiFiMotion.quick()),
             modifier = Modifier
                 .liftAboveCards()
-                .statusBarsPadding()
-                .padding(start = contentStart, end = 20.dp, top = 128.dp)
+                .offset { IntOffset(0, fieldShiftPx()) }
+                .padding(start = contentStart, end = 20.dp, top = statusBar + fieldTopRest + SearchFieldHeight + 10.dp)
                 .align(Alignment.TopEnd)
         ) {
             RecentPanel(
@@ -211,64 +288,81 @@ fun SearchScreen(
     }
 }
 
+private val SearchHeaderTop = 14.dp
+private val TitleHeight = 36.dp
+private val TitleToField = 16.dp
+private val SearchFieldHeight = 54.dp
+/** How far the field rises when the title gives way. */
+private val CollapseShift = TitleHeight + TitleToField
+private val FieldToFilters = 10.dp
+private val FilterHeight = 36.dp
+private val FadeGap = 2.dp
+private val FadeLength = 26.dp
+/** Results have small headers of their own: they start a little higher than the discover list. */
+private val ResultsLift = 14.dp
+
 @Composable
-internal fun SearchField(query: String, onQueryChange: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    focused: Boolean,
+    onFocusChange: (Boolean) -> Unit,
+    hasHistory: Boolean,
+    historyOpen: Boolean,
+    onHistory: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val lit by animateFloatAsState(if (focused) 1f else 0f, HiFiMotion.standard(), label = "field_rim")
     Row(
         modifier = modifier
-            .height(52.dp)
-            .hifiRecessed(26.dp)
-            .padding(horizontal = 18.dp),
+            .height(SearchFieldHeight)
+            .hifiSoftShadow(RoundedCornerShape(27.dp), 26.dp)
+            .hifiMachined(27.dp, lit = { lit })
+            .padding(start = 16.dp, end = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (query.isEmpty()) {
-                Text(stringResource(R.string.search_treki_artisty_albomy), color = Color.White.copy(alpha = 0.6f), fontSize = 17.sp, maxLines = 1)
+                Text(stringResource(R.string.search_treki_artisty_albomy), color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 17.sp),
+                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
                 cursorBrush = SolidColor(HiFi.Accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().onFocusChanged { onFocusChange(it.isFocused) }
             )
         }
-        if (query.isNotEmpty()) {
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .clickable(role = Role.Button) { onQueryChange("") },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_ochistit), tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+        when {
+            query.isNotEmpty() -> FieldIconButton(onClick = { onQueryChange("") }, description = stringResource(R.string.cd_ochistit)) {
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
+            }
+            hasHistory -> {
+                Spacer(Modifier.size(width = 1.dp, height = 24.dp).background(Color.White.copy(alpha = 0.14f)))
+                FieldIconButton(onClick = onHistory, description = stringResource(R.string.search_recent_button), selected = historyOpen) {
+                    Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White.copy(alpha = if (historyOpen) 1f else 0.78f), modifier = Modifier.size(20.dp))
+                }
             }
         }
     }
 }
 
 @Composable
-internal fun HistoryButton(open: Boolean, onClick: () -> Unit) {
-    val description = stringResource(R.string.search_recent_button)
-    if (open) {
-        Box(
-            Modifier
-                .size(52.dp)
-                .hifiAnodized(CircleShape)
-                .clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Rounded.History, contentDescription = description, tint = Color.White, modifier = Modifier.size(22.dp))
-        }
-    } else {
-        GlassCircleButton(onClick = onClick, contentDescription = description, size = 52.dp) {
-            Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-        }
-    }
+private fun FieldIconButton(onClick: () -> Unit, description: String, selected: Boolean = false, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .then(if (selected) Modifier.hifiAnodized(CircleShape) else Modifier.clip(CircleShape))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) { content() }
 }
 
 /**

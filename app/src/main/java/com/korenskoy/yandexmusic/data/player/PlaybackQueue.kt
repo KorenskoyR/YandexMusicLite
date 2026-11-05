@@ -10,7 +10,9 @@ data class SleepTimerState(val endsAtElapsedMs: Long?, val atEndOfTrack: Boolean
 
 /** What to do when the stream of the current track fails. */
 enum class Recovery {
-    /** No network and the track is not on the device: go on with downloaded music. */
+    /** The stream does not get through, but the road reserve has this track: go on from the same second. */
+    RESUME_FROM_COPY,
+    /** No connection and the track is not on the device: go on with what is. */
     CONTINUE_OFFLINE,
     /** First failure of this track: fetch a fresh link and resume where it stopped (links expire). */
     RETRY,
@@ -49,14 +51,11 @@ object PlaybackQueue {
         if (progressMs > RESTART_ON_PREV_THRESHOLD_MS || currentIndex <= 0) null else currentIndex - 1
 
     /**
-     * Index of the first item after [currentIndex] (wrapping around, never [currentIndex] itself) that
-     * satisfies [accept], or null. Used offline to jump to the next downloaded track.
+     * Index of the first item after [currentIndex] that satisfies [accept], or null. Used without a
+     * connection to jump to the next track on the device; what was already heard is not gone back to.
      */
     fun <T> nextMatching(queue: List<T>, currentIndex: Int, accept: (T) -> Boolean): Int? {
-        if (queue.isEmpty()) return null
-        for (step in 1..queue.size) {
-            val index = Math.floorMod(currentIndex + step, queue.size)
-            if (index == currentIndex) return null
+        for (index in (currentIndex + 1) until queue.size) {
             if (accept(queue[index])) return index
         }
         return null
@@ -66,9 +65,20 @@ object PlaybackQueue {
     const val MAX_FAILED_TRACKS = 3
 
     /** Pure; unit-tested. [failedTracksInARow] counts this failure too. */
-    fun recoveryFor(offline: Boolean, isRadio: Boolean, isDownloaded: Boolean, alreadyRetried: Boolean, failedTracksInARow: Int): Recovery = when {
-        offline && !isRadio && !isDownloaded -> Recovery.CONTINUE_OFFLINE
+    fun recoveryFor(
+        offline: Boolean,
+        isRadio: Boolean,
+        isDownloaded: Boolean,
+        alreadyRetried: Boolean,
+        failedTracksInARow: Int,
+        hasCopy: Boolean = false,
+        weakLink: Boolean = false
+    ): Recovery = when {
+        offline && !isRadio && !isDownloaded -> if (hasCopy) Recovery.RESUME_FROM_COPY else Recovery.CONTINUE_OFFLINE
         !alreadyRetried -> Recovery.RETRY
+        // A fresh link did not help, and this is not the track's fault when the link is weak
+        hasCopy && !isRadio && !isDownloaded -> Recovery.RESUME_FROM_COPY
+        weakLink && !isRadio && !isDownloaded -> Recovery.CONTINUE_OFFLINE
         isRadio || failedTracksInARow >= MAX_FAILED_TRACKS -> Recovery.STOP
         else -> Recovery.SKIP
     }

@@ -244,6 +244,8 @@ class PlayerRepositoryImpl(
     private suspend fun resolvePlayUri(trackId: String, url: String): String? {
         val localFile = withContext(Dispatchers.IO) { downloadManager.getLocalTrackFile(trackId) }
         if (localFile != null) return android.net.Uri.fromFile(localFile).toString()
+        // A copy from the road reserve was chosen on purpose: a resolved stream must not replace it
+        if (url.startsWith("file:")) return url
         return (preloadManager.getResolvedUrl(trackId) ?: url).takeIf { it.isNotBlank() }
     }
 

@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation
 
+import com.korenskoy.yandexmusic.presentation.hifi.LocalLinkState
+import com.korenskoy.yandexmusic.data.player.LinkState
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import android.app.Application
 import android.os.Looper
 import androidx.compose.foundation.background
@@ -404,6 +408,90 @@ class ScreenshotTest {
             )
         }
         snap("radio")
+    }
+
+    /** The list carried up under the header, as a finger does it. */
+    private fun scrollBy(px: Float) {
+        compose.onRoot().performTouchInput {
+            down(center)
+            repeat(12) { moveBy(Offset(0f, -px / 12), delayMillis = 16) }
+            advanceEventTime(200)
+            up()
+        }
+        repeat(10) {
+            compose.mainClock.advanceTimeBy(100)
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    @Test
+    fun searchScrolled() {
+        show {
+            SearchScreen(
+                query = "", onQueryChange = {}, results = emptyList(), weeklyHits = tracks, trendTracks = tracks,
+                isSearching = false, currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(),
+                onTrackClick = { _, _ -> }, onToggleLike = {}, history = listOf("кино")
+            )
+        }
+        scrollBy(500f)
+        snap("search_scrolled")
+    }
+
+    @Test
+    fun libraryScrolled() {
+        show {
+            LibraryScreen(
+                tracks = tracks, isLoading = false, autoDownloadEnabled = false,
+                currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1", "2", "3"), downloadedTrackIds = setOf("2"),
+                cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {},
+                accountName = "Тестовый Аккаунт", playlists = playlists
+            )
+        }
+        scrollBy(500f)
+        snap("library_scrolled")
+    }
+
+    /** Down in the list: the station on air and its knob in the header, the genres pinned under it. */
+    @Test
+    fun radioScrolled() {
+        val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
+        show {
+            RadioScreen(
+                stations = stations, allStations = stations, selectedCategory = RadioCategory.ALL,
+                onCategorySelect = {}, currentStationId = stations.first().id, isPlaying = true,
+                favoriteStationIds = setOf(stations[1].id, stations[2].id), onStationClick = {}, onToggleFavorite = {}, onPlayPause = {}
+            )
+        }
+        scrollBy(1100f)
+        snap("radio_scrolled")
+    }
+
+    @Test
+    fun waveWeakLink() {
+        show {
+            CompositionLocalProvider(LocalLinkState provides LinkState.WEAK) {
+                HomeScreen(
+                    waveTrack = tracks[0], isPlaying = true, isLoading = false, isLiked = true, progress = { 70_000L },
+                    shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
+                    onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {}
+                )
+            }
+        }
+        snap("wave_weak_link")
+    }
+
+    @Test
+    fun playerNoConnection() {
+        show { CompositionLocalProvider(LocalLinkState provides LinkState.NONE) { Player() } }
+        snap("player_no_connection")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carWeakLink() {
+        show { CompositionLocalProvider(LocalLinkState provides LinkState.WEAK) { Car(isLandscape = true) } }
+        snap("car_weak_link")
     }
 
     private val album = AlbumDto(

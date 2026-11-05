@@ -38,7 +38,8 @@ class MainViewModel @Inject constructor(
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
     networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor,
-    private val reactions: com.korenskoy.yandexmusic.data.player.TrackReactions
+    private val reactions: com.korenskoy.yandexmusic.data.player.TrackReactions,
+    private val roadReserve: com.korenskoy.yandexmusic.data.reserve.RoadReserve
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -78,6 +79,10 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_UI_SCALE)
     val crossfadeSeconds: StateFlow<Int> = settingsRepository.crossfadeSeconds
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_CROSSFADE_SECONDS)
+    val roadReserveMb: StateFlow<Int> = settingsRepository.roadReserveMb
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_ROAD_RESERVE_MB)
+    val reserveUsedBytes: StateFlow<Long> = roadReserve.usedBytes
+    val linkState = playbackController.linkState
 
     // endregion
 
@@ -168,6 +173,14 @@ class MainViewModel @Inject constructor(
 
     /** What plays now and what the server offered, for the quality details in the player. */
     fun qualityDetails() = playbackController.qualityDetails()
+
+    fun setRoadReserveMb(megabytes: Int) {
+        viewModelScope.launch { settingsRepository.setRoadReserveMb(megabytes) }
+    }
+
+    fun clearRoadReserve() {
+        viewModelScope.launch { roadReserve.clear() }
+    }
 
     fun setCrossfadeSeconds(seconds: Int) {
         viewModelScope.launch { settingsRepository.setCrossfadeSeconds(seconds) }

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.hifi.LocalLinkState
 import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
@@ -105,6 +106,7 @@ fun MainScreen(
     val likedTrackIds by viewModel.likedTrackIds.collectAsStateWithLifecycle()
     val favoriteStationIds by radioVm.favoriteStationIds.collectAsStateWithLifecycle()
     val streamQuality by viewModel.streamQuality.collectAsStateWithLifecycle()
+    val linkState by viewModel.linkState.collectAsStateWithLifecycle()
     val catalogStack by catalogVm.stack.collectAsStateWithLifecycle()
     val radioStations by radioVm.stations.collectAsStateWithLifecycle()
     // Progress ticks 10× a second: the State is handed out as `{ progressState.value }` and read only where
@@ -166,6 +168,7 @@ fun MainScreen(
 
     CompositionLocalProvider(
         LocalStreamQuality provides streamQuality,
+        LocalLinkState provides linkState,
         LocalTrackMenu provides trackMenuLauncher,
         LocalHiFiLite provides lite,
         LocalArtworkTint provides appTint

@@ -1,5 +1,17 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
+import com.korenskoy.yandexmusic.presentation.hifi.rememberHeaderCollapse
+import com.korenskoy.yandexmusic.presentation.hifi.fadeUnderHeader
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiCollapsingTitle
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import android.view.HapticFeedbackConstants
@@ -104,6 +116,13 @@ object RadioDial {
             .minByOrNull { (_, f) -> abs(f - fraction) }?.first
 }
 
+private val RadioFadeStart = 72.dp
+private val RadioFadeLength = 24.dp
+/** With the title small the list comes up this much closer. */
+private val RadioFadeRise = 10.dp
+private val RadioPinnedGenresTop = 62.dp
+private val RadioGenresPadding = 18.dp
+
 /**
  * FM radio as a real receiver: the station on air on a card in its brand colors with a metal knob and
  * a tuning window (88–108 MHz) — swipe the window to tune to a neighbouring station, each station
@@ -132,16 +151,34 @@ fun RadioScreen(
     val hero = current ?: allStations.firstOrNull { it.id in favoriteStationIds } ?: allStations.firstOrNull()
     val favorites = remember(allStations, favoriteStationIds) { allStations.filter { it.id in favoriteStationIds } }
 
-    LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(bottom = contentBottom)) {
-        item(key = "header") {
-            Column(Modifier.padding(start = contentStart + 4.dp, end = 20.dp, top = 14.dp)) {
-                HiFiLargeTitle(stringResource(R.string.radio_title))
-                Text(
-                    russianQuantityString(allStations.size, R.string.stations_count_one, R.string.stations_count_few, R.string.stations_count_many),
-                    style = HiFiType.Caption.copy(fontSize = 15.sp)
-                )
-            }
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val density = LocalDensity.current
+    val list = rememberLazyListState()
+    val collapseState = rememberHeaderCollapse(list)
+    val pinTopPx = with(density) { (statusBar + RadioPinnedGenresTop).toPx() }
+    val genresTopInsidePx = with(density) { RadioGenresPadding.toPx() }
+    // The genres stop under the header once the list has carried them up to it
+    val genresPinned by remember(list, pinTopPx, genresTopInsidePx) {
+        derivedStateOf {
+            val info = list.layoutInfo
+            val genres = info.visibleItemsInfo.firstOrNull { it.key == "genres" }
+            if (genres != null) genres.offset - info.viewportStartOffset + genresTopInsidePx <= pinTopPx
+            else list.firstVisibleItemIndex >= 1
         }
+    }
+    val fadeStartPx = {
+        with(density) {
+            val start = if (genresPinned) RadioPinnedGenresTop + 36.dp + 2.dp else RadioFadeStart - RadioFadeRise * collapseState.value
+            (statusBar + start).toPx()
+        }
+    }
+
+    Box(modifier.fillMaxSize()) {
+    LazyColumn(
+        state = list,
+        modifier = Modifier.fillMaxSize().fadeUnderHeader(fadeStartPx, with(density) { RadioFadeLength.toPx() }),
+        contentPadding = PaddingValues(top = statusBar + RadioFadeStart + RadioFadeLength + 2.dp, bottom = contentBottom)
+    ) {
         if (hero != null) {
             item(key = "hero") {
                 OnAirCard(
@@ -153,22 +190,13 @@ fun RadioScreen(
                     onToggleFavorite = { onToggleFavorite(hero.id) },
                     onTune = onStationClick,
                     modifier = Modifier
-                        .padding(start = contentStart, end = 16.dp, top = 16.dp)
+                        .padding(start = contentStart, end = 16.dp)
                         .widthIn(max = 720.dp)
                 )
             }
         }
         item(key = "genres") {
-            LazyRow(contentPadding = PaddingValues(start = contentStart, end = 16.dp, top = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(RadioCategory.entries, key = { it.name }) { category ->
-                    HiFiFilterPill(
-                        text = category.title,
-                        selected = category == selectedCategory,
-                        onClick = { onCategorySelect(category) },
-                        icon = if (category == RadioCategory.FAVORITES) Icons.Rounded.Favorite else null
-                    )
-                }
-            }
+            GenreRow(selectedCategory, onCategorySelect, contentStart, Modifier.padding(top = RadioGenresPadding))
         }
         if (favorites.isNotEmpty() && selectedCategory == RadioCategory.ALL) {
             item(key = "fav_title") {
@@ -201,6 +229,83 @@ fun RadioScreen(
                 onClick = { onStationClick(station) },
                 onToggleFavorite = { onToggleFavorite(station.id) },
                 modifier = Modifier.padding(start = contentStart + 4.dp, end = 12.dp)
+            )
+        }
+    }
+
+    HiFiCollapsingTitle(
+        stringResource(R.string.radio_title),
+        collapse = { collapseState.value },
+        modifier = Modifier
+            .padding(start = contentStart + 4.dp, end = 76.dp, top = statusBar + 14.dp)
+            .graphicsLayer { translationY = -collapseState.value * 6.dp.toPx() }
+    )
+    Text(
+        russianQuantityString(allStations.size, R.string.stations_count_one, R.string.stations_count_few, R.string.stations_count_many),
+        style = HiFiType.Caption.copy(fontSize = 15.sp),
+        modifier = Modifier
+            .padding(start = contentStart + 4.dp, top = statusBar + 50.dp)
+            .graphicsLayer {
+                alpha = if (current != null) (1f - collapseState.value * 1.8f).coerceAtLeast(0f) else 1f
+                translationY = -collapseState.value * 12.dp.toPx()
+            }
+    )
+    // Down in the list the station on air stays in reach: its name and a small knob in the header
+    if (current != null) {
+        Row(
+            Modifier
+                .padding(start = contentStart + 4.dp, end = 76.dp, top = statusBar + 50.dp)
+                .height(20.dp)
+                .graphicsLayer {
+                    alpha = (collapseState.value * 1.8f - 0.8f).coerceIn(0f, 1f)
+                    translationY = -collapseState.value * 12.dp.toPx()
+                },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isPlaying) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(HiFi.Live))
+                Spacer(Modifier.width(7.dp))
+            }
+            Text(
+                stringResource(R.string.radio_on_air_station, current.name),
+                color = Color.White.copy(alpha = 0.84f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        val knobShown by remember(collapseState) { derivedStateOf { collapseState.value > 0.45f } }
+        AnimatedVisibility(
+            visible = knobShown,
+            enter = fadeIn(HiFiMotion.standard()),
+            exit = fadeOut(HiFiMotion.quick()),
+            modifier = Modifier.align(Alignment.TopEnd).padding(end = 20.dp, top = statusBar + 10.dp)
+        ) {
+            HiFiKnob(onClick = onPlayPause, contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza), size = 44.dp) {
+                PlayPauseGlyph(isPlaying = isPlaying, size = 22.dp)
+            }
+        }
+    }
+    if (genresPinned) {
+        GenreRow(selectedCategory, onCategorySelect, contentStart, Modifier.padding(top = statusBar + RadioPinnedGenresTop))
+    }
+    }
+}
+
+@Composable
+private fun GenreRow(selected: RadioCategory, onSelect: (RadioCategory) -> Unit, contentStart: Dp, modifier: Modifier = Modifier) {
+    LazyRow(
+        modifier = modifier,
+        contentPadding = PaddingValues(start = contentStart, end = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(RadioCategory.entries, key = { it.name }) { category ->
+            HiFiFilterPill(
+                text = category.title,
+                selected = category == selected,
+                onClick = { onSelect(category) },
+                icon = if (category == RadioCategory.FAVORITES) Icons.Rounded.Favorite else null
             )
         }
     }

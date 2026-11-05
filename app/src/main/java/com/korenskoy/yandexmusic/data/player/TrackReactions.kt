@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.data.player
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import android.util.Log
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn
 import com.korenskoy.yandexmusic.data.download.DownloadScheduler
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
@@ -32,6 +37,13 @@ class TrackReactions @Inject constructor(
     private val settingsRepository: SettingsRepository
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    init {
+        // What was liked and disliked without a connection goes out as soon as there is one
+        playbackController.linkState
+            .onEach { if (it == LinkState.GOOD) flushPendingReactions() }
+            .launchIn(scope)
+    }
 
     val likedTrackIds: StateFlow<Set<String>> = libraryRepository.likedIds
     val favoriteStationIds: StateFlow<Set<String>> = radioRepository.favoriteStationIds
@@ -69,5 +81,19 @@ class TrackReactions @Inject constructor(
         scope.launch { downloadManager.removeTrack(track.idString) }
     }
 
+    private suspend fun flushPendingReactions() {
+        try {
+            withContext(Dispatchers.IO) { libraryRepository.flushPendingReactions() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Saved reactions stay for the next time", e)
+        }
+    }
+
     private fun stationId(track: TrackDetailsDto) = track.idString.removePrefix("radio_")
+
+    private companion object {
+        const val TAG = "TrackReactions"
+    }
 }

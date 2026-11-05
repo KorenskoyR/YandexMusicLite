@@ -81,6 +81,26 @@ class TrackPreloadManager @Inject constructor(
         }
     }
 
+    /**
+     * The ordinary stream the service offers this app, for the road reserve: full tracks only (without a
+     * subscription there are just previews, so null), and only what download-info lists.
+     */
+    suspend fun resolveOrdinaryStream(trackId: String): ResolvedStream? = withContext(Dispatchers.IO) {
+        try {
+            val offered = api.getTrackDownloadInfo(trackId).result.orEmpty()
+            StreamVariants.ranked(offered).filter { !it.preview }.firstNotNullOfOrNull { variant ->
+                resolveXmlToStreamUrl(variant.downloadInfoUrl, variant.codec)?.let { url ->
+                    ResolvedStream(url, StreamQuality(variant.codec, variant.bitrateInKbps))
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("TrackPreloadManager", "No ordinary stream for $trackId", e)
+            null
+        }
+    }
+
     /** Tries the offered variants from the best down until one gives a link. */
     private suspend fun resolveBest(trackId: String): ResolvedStream? {
         // STEP 1: Attempt to get true Lossless (FLAC)
@@ -287,6 +307,13 @@ class TrackPreloadManager @Inject constructor(
         return null
     }
 
+    /** For tests: a stream that needs no account. */
+    @androidx.annotation.VisibleForTesting
+    internal fun seedForTest(trackId: String, url: String, quality: StreamQuality) {
+        resolvedUrls[trackId] = CachedTrackUrl(url, System.currentTimeMillis())
+        qualities[trackId] = quality
+    }
+
     fun evictUrl(trackId: String) {
         resolvedUrls.remove(trackId)
         inFlightRequests.remove(trackId)?.cancel()
@@ -344,7 +371,7 @@ class TrackPreloadManager @Inject constructor(
         inFlightRequests.values.forEach { it.cancel() }
         inFlightRequests.clear()
     }
-    
+
     private suspend fun resolveXmlToStreamUrl(infoUrl: String, codec: String): String? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url(infoUrl).build()

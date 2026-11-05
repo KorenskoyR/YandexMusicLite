@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -69,7 +70,7 @@ import androidx.compose.ui.unit.sp
 
 /** Text styles of the Hi-Fi language. */
 object HiFiType {
-    val LargeTitle = TextStyle(fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.025).em, color = Color.White)
+    val LargeTitle = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em, color = Color.White)
     val SectionCaps = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.1.em, color = HiFi.TextSecondary)
     val RowTitle = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
     val CardTitle = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -137,7 +138,7 @@ fun Modifier.hifiAnodized(shape: Shape): Modifier = this
     .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Transparent)))
     .border(BorderStroke(1.dp, Brush.verticalGradient(HiFi.MetalEdge.map { it.copy(alpha = 0.65f) })), shape)
 
-/** Page title, 34/800. */
+/** Page title, 30/700. */
 @Composable
 fun HiFiLargeTitle(text: String, modifier: Modifier = Modifier) {
     Text(text = text, style = HiFiType.LargeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
@@ -302,7 +303,7 @@ fun IconPlaque(icon: ImageVector, modifier: Modifier = Modifier, size: Dp = 34.d
 
 /** Segmented control: a recessed track with a metal piece sliding under the selected option. */
 @Composable
-fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp) {
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
@@ -333,7 +334,7 @@ fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> 
                     Text(
                         label,
                         color = if (selected) Color.White else Color.White.copy(alpha = 0.70f),
-                        fontSize = 15.sp,
+                        fontSize = fontSize,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1
                     )

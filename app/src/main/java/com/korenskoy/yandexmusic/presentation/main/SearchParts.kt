@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.rounded.SearchOff
 import com.korenskoy.yandexmusic.presentation.hifi.appearOnce
@@ -109,6 +110,8 @@ internal fun RecentPanel(history: List<String>, onPick: (String) -> Unit, onRemo
 
 @Composable
 internal fun DiscoverList(
+    list: LazyListState,
+    top: Dp,
     weeklyHits: List<TrackDetailsDto>,
     trendTracks: List<TrackDetailsDto>,
     contentStart: Dp,
@@ -121,10 +124,10 @@ internal fun DiscoverList(
     val hits = weeklyHits.ifEmpty { trendTracks.take(20) }
     val trends = trendTracks.ifEmpty { weeklyHits }
     if (hits.isEmpty() && trends.isEmpty()) {
-        HiFiSkeletonRows(Modifier.padding(top = 16.dp), count = 6)
+        HiFiSkeletonRows(Modifier.padding(top = top), count = 6)
         return
     }
-    val columnState = rememberLazyListState()
+    val columnState = list
     val rowState = rememberLazyListState()
     LaunchedEffect(rowState) {
         snapshotFlow { rowState.layoutInfo.visibleItemsInfo.lastOrNull()?.index to rowState.layoutInfo.totalItemsCount }
@@ -134,10 +137,10 @@ internal fun DiscoverList(
         snapshotFlow { columnState.layoutInfo.visibleItemsInfo.lastOrNull()?.index to columnState.layoutInfo.totalItemsCount }
             .collect { (last, total) -> if (last != null && total > 0 && last >= total - 2) onLoadMoreTrends() }
     }
-    LazyColumn(state = columnState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = contentBottom)) {
+    LazyColumn(state = columnState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = contentBottom)) {
         if (hits.isNotEmpty()) {
             item(key = "hits_title") {
-                HiFiSectionHeader(stringResource(R.string.search_hity_nedeli), Modifier.padding(start = contentStart, end = 20.dp, top = 26.dp, bottom = 12.dp))
+                HiFiSectionHeader(stringResource(R.string.search_hity_nedeli), Modifier.padding(start = contentStart, end = 20.dp, bottom = 12.dp))
             }
             item(key = "hits") {
                 LazyRow(state = rowState, contentPadding = PaddingValues(start = contentStart, end = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -161,8 +164,53 @@ internal fun DiscoverList(
     }
 }
 
+/** The filters worth offering for these results; nothing found, nothing to filter. */
+internal fun availableFilters(results: List<TrackDetailsDto>, artists: List<ArtistDto>, albums: List<AlbumDto>): List<SearchFilter> =
+    if (results.isEmpty() && artists.isEmpty() && albums.isEmpty()) {
+        emptyList()
+    } else {
+        buildList {
+            add(SearchFilter.ALL)
+            if (results.isNotEmpty()) add(SearchFilter.TRACKS)
+            if (artists.isNotEmpty()) add(SearchFilter.ARTISTS)
+            if (albums.isNotEmpty()) add(SearchFilter.ALBUMS)
+        }
+    }
+
+@Composable
+internal fun SearchFilterRow(
+    filters: List<SearchFilter>,
+    selected: SearchFilter,
+    onSelect: (SearchFilter) -> Unit,
+    contentStart: Dp,
+    modifier: Modifier = Modifier
+) {
+    LazyRow(
+        modifier = modifier,
+        contentPadding = PaddingValues(start = contentStart, end = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(filters, key = { it.name }) { f ->
+            HiFiFilterPill(
+                text = stringResource(
+                    when (f) {
+                        SearchFilter.ALL -> R.string.search_filter_all
+                        SearchFilter.TRACKS -> R.string.search_filter_tracks
+                        SearchFilter.ARTISTS -> R.string.search_filter_artists
+                        SearchFilter.ALBUMS -> R.string.search_filter_albums
+                    }
+                ),
+                selected = f == selected,
+                onClick = { onSelect(f) }
+            )
+        }
+    }
+}
+
 @Composable
 internal fun ResultsList(
+    top: Dp,
+    filter: SearchFilter,
     results: List<TrackDetailsDto>,
     artists: List<ArtistDto>,
     albums: List<AlbumDto>,
@@ -177,47 +225,18 @@ internal fun ResultsList(
     onArtistClick: (ArtistDto) -> Unit,
     onAlbumClick: (AlbumDto) -> Unit
 ) {
-    var filterName by rememberSaveable { mutableStateOf(SearchFilter.ALL.name) }
-    val filter = SearchFilter.valueOf(filterName)
     if (results.isEmpty() && artists.isEmpty() && albums.isEmpty()) {
         HiFiEmptyState(
             icon = Icons.Rounded.SearchOff,
             title = stringResource(R.string.search_nothing_found),
             message = stringResource(R.string.search_nothing_found_hint),
-            modifier = Modifier.padding(start = contentStart - 20.dp)
+            modifier = Modifier.padding(start = contentStart - 20.dp, top = top)
         )
         return
     }
     // A new set of results rises in row by row
     val appearance = rememberAppearance(results)
-    val available = buildList {
-        add(SearchFilter.ALL)
-        if (results.isNotEmpty()) add(SearchFilter.TRACKS)
-        if (artists.isNotEmpty()) add(SearchFilter.ARTISTS)
-        if (albums.isNotEmpty()) add(SearchFilter.ALBUMS)
-    }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = contentBottom)) {
-        item(key = "filters") {
-            LazyRow(
-                contentPadding = PaddingValues(start = contentStart, end = 20.dp, top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(available, key = { it.name }) { f ->
-                    HiFiFilterPill(
-                        text = stringResource(
-                            when (f) {
-                                SearchFilter.ALL -> R.string.search_filter_all
-                                SearchFilter.TRACKS -> R.string.search_filter_tracks
-                                SearchFilter.ARTISTS -> R.string.search_filter_artists
-                                SearchFilter.ALBUMS -> R.string.search_filter_albums
-                            }
-                        ),
-                        selected = f == filter,
-                        onClick = { filterName = f.name }
-                    )
-                }
-            }
-        }
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = contentBottom)) {
         if (filter == SearchFilter.ALL) {
             item(key = "best_title") {
                 HiFiSectionHeader(stringResource(R.string.search_best_result), Modifier.padding(start = contentStart, end = 20.dp, top = 22.dp, bottom = 12.dp))

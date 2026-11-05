@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.heightIn
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
@@ -167,7 +169,10 @@ fun HomeScreen(
                 instrument(minOf(maxWidth, maxHeight))
             }
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom) {
-                HiFiLargeTitle(stringResource(R.string.wave_title))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HiFiLargeTitle(stringResource(R.string.wave_title), modifier = Modifier.weight(1f))
+                    HiFiLinkBadge()
+                }
                 Spacer(Modifier.weight(1f))
                 WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
                 WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = 112.dp)
@@ -180,10 +185,14 @@ fun HomeScreen(
         Layout(
             contents = listOf(
                 {
-                    HiFiLargeTitle(
-                        stringResource(R.string.wave_title),
-                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)
-                    )
+                    // The knob's place is counted from this height: it must not change with the title
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp).heightIn(min = 40.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HiFiLargeTitle(stringResource(R.string.wave_title), modifier = Modifier.weight(1f))
+                        HiFiLinkBadge()
+                    }
                 },
                 {
                     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

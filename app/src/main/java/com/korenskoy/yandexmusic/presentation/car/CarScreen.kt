@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
@@ -299,6 +300,8 @@ private fun CarHeader(u: Scale, onExit: () -> Unit) {
         }
         Spacer(Modifier.width(u(16f)))
         Text(stringResource(R.string.car_label), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
+        Spacer(Modifier.width(u(14f)))
+        HiFiLinkBadge(height = u(32f), fontSize = u.sp(14f))
         Spacer(Modifier.weight(1f))
         CarClock(u)
     }

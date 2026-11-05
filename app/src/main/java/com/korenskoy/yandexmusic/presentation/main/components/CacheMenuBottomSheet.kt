@@ -113,6 +113,10 @@ fun CacheMenuBottomSheet(
     uiScaleManual: Float = 1f,
     onUiScaleManualChange: (Float) -> Unit = {},
     onUpgradeDownloads: () -> Unit = {},
+    reserveMb: Int = 100,
+    onReserveChange: (Int) -> Unit = {},
+    reserveUsedBytes: Long = 0L,
+    onClearReserve: () -> Unit = {},
     crashReports: Int = 0,
     onOpenCrashLog: () -> Unit = {}
 ) {
@@ -219,6 +223,11 @@ fun CacheMenuBottomSheet(
                             )
                         }
                     }
+                    val reserve: @Composable ColumnScope.() -> Unit = {
+                        SettingsGroup(stringResource(R.string.settings_group_reserve)) {
+                            RoadReserveRows(reserveMb, onReserveChange, reserveUsedBytes, onClearReserve)
+                        }
+                    }
                     val downloads: @Composable ColumnScope.() -> Unit = {
                         SettingsGroup(stringResource(R.string.settings_group_downloads)) {
                             SettingsRow(
@@ -283,7 +292,7 @@ fun CacheMenuBottomSheet(
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Column(Modifier.weight(1f)) { account(); car() }
-                            Column(Modifier.weight(1f)) { playback(); downloads(); about() }
+                            Column(Modifier.weight(1f)) { playback(); reserve(); downloads(); about() }
                         }
                     } else {
                         Column(
@@ -294,7 +303,7 @@ fun CacheMenuBottomSheet(
                                 .navigationBarsPadding()
                                 .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
                         ) {
-                            account(); playback(); downloads(); car(); about()
+                            account(); playback(); reserve(); downloads(); car(); about()
                             Text(
                                 "YANDEX MUSIC LITE",
                                 style = HiFiType.SectionCaps.copy(color = Color.White.copy(alpha = 0.40f), fontSize = 12.sp),

@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -43,28 +42,16 @@ class NetworkMonitor @Inject constructor(
                 trySend(true)
             }
 
-            override fun onLosing(network: Network, maxMsToLive: Int) {
-                super.onLosing(network, maxMsToLive)
-                trySend(false)
-            }
-
+            // The default network: moving from Wi-Fi to mobile data only replaces it, and this comes when
+            // there is no network left at all
             override fun onLost(network: Network) {
                 super.onLost(network)
-                trySend(false)
-            }
-
-            override fun onUnavailable() {
-                super.onUnavailable()
                 trySend(false)
             }
         }
 
         try {
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-
-            connectivityManager.registerNetworkCallback(request, callback)
+            connectivityManager.registerDefaultNetworkCallback(callback)
 
             // Initial state
             val activeNetwork = connectivityManager.activeNetwork
@@ -89,10 +76,10 @@ class NetworkMonitor @Inject constructor(
         }
     }.distinctUntilChanged()
 
-    suspend fun isYandexReachable(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun isYandexReachable(timeoutMs: Int = 1500): Boolean = withContext(Dispatchers.IO) {
         try {
             Socket().use { socket ->
-                socket.connect(InetSocketAddress("oauth.yandex.ru", 443), 1500)
+                socket.connect(InetSocketAddress("oauth.yandex.ru", 443), timeoutMs)
             }
             true
         } catch (e: java.io.IOException) {

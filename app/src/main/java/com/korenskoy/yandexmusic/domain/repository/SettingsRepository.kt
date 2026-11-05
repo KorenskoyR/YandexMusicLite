@@ -20,6 +20,8 @@ interface SettingsRepository {
     val uiScaleManual: Flow<Float>
     /** The update the user chose to skip ("1.9.3"); the launch check does not offer it again. */
     val skippedUpdateVersion: Flow<String?>
+    /** The road reserve in megabytes, one of [ROAD_RESERVE_SIZES_MB]; 0 turns it off. */
+    val roadReserveMb: Flow<Int>
 
     suspend fun setDarkTheme(enabled: Boolean)
     suspend fun setAutoDownloadLikedTracks(enabled: Boolean)
@@ -30,6 +32,7 @@ interface SettingsRepository {
     suspend fun setUiScaleAuto(enabled: Boolean)
     suspend fun setUiScaleManual(scale: Float)
     suspend fun setSkippedUpdateVersion(version: String?)
+    suspend fun setRoadReserveMb(megabytes: Int)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3
@@ -41,5 +44,7 @@ interface SettingsRepository {
         const val DEFAULT_UI_SCALE = 1.0f
         const val MIN_UI_SCALE = 0.5f
         const val MAX_UI_SCALE = 2.0f
+        const val DEFAULT_ROAD_RESERVE_MB = 100
+        val ROAD_RESERVE_SIZES_MB = listOf(0, 100, 300, 500, 1024)
     }
 }

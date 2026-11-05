@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
@@ -362,6 +363,8 @@ internal fun PlayerCover(
                     )
                 }
             }
+            // A station's cover has "В эфире" in this corner
+            HiFiLinkBadge(Modifier.align(if (track.isRadio) Alignment.TopEnd else Alignment.TopStart).padding(14.dp), height = 30.dp)
         }
     }
 }

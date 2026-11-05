@@ -1,5 +1,14 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.hifi.rememberHeaderCollapse
+import com.korenskoy.yandexmusic.presentation.hifi.fadeUnderHeader
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiWellButton
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiCollapsingTitle
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -95,6 +104,10 @@ import com.korenskoy.yandexmusic.utils.russianQuantityString
 
 private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS }
 
+/** The list starts to show under the header; below it, nothing is cut by a hard line. */
+private val LibraryFadeStart = 56.dp
+private val LibraryFadeLength = 22.dp
+
 /**
  * "Моя музыка": play/shuffle, the three library sections (each opens its own page) and recently
  * added covers. Settings — the only entry to the account — sit behind the button in the header.
@@ -126,6 +139,10 @@ fun LibraryScreen(
     uiScaleManual: Float = 1f,
     onUiScaleManualChange: (Float) -> Unit = {},
     onUpgradeDownloads: () -> Unit = {},
+    reserveMb: Int = 100,
+    onReserveChange: (Int) -> Unit = {},
+    reserveUsedBytes: Long = 0L,
+    onClearReserve: () -> Unit = {},
     crashReports: Int = 0,
     onOpenCrashLog: () -> Unit = {},
     onCancelDownload: () -> Unit,
@@ -197,23 +214,20 @@ fun LibraryScreen(
     ) { shown ->
         val listPadding = PaddingValues(start = contentStart, end = 20.dp, bottom = contentBottom)
         when (shown) {
-            null -> LazyColumn(modifier = Modifier.fillMaxSize().statusBarsPadding(), contentPadding = listPadding) {
-                item(key = "header") {
-                    Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        HiFiLargeTitle(stringResource(R.string.library_title), modifier = Modifier.weight(1f))
-                        if (downloadState == DownloadQueueState.RUNNING) {
-                            GlassCircleButton(onClick = { showProgressModal = true }, contentDescription = stringResource(R.string.download_progress_modal_zagruzka_kollektsii)) {
-                                HiFiActivityIndicator(size = 18.dp)
-                            }
-                            Spacer(Modifier.width(10.dp))
-                        }
-                        GlassCircleButton(onClick = { showSettings = true }, contentDescription = stringResource(R.string.library_settings)) {
-                            Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
+            null -> Box(Modifier.fillMaxSize()) {
+            val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val density = LocalDensity.current
+            val list = rememberLazyListState()
+            val collapse by rememberHeaderCollapse(list)
+            LazyColumn(
+                state = list,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .fadeUnderHeader({ with(density) { (statusBar + LibraryFadeStart).toPx() } }, with(density) { LibraryFadeLength.toPx() }),
+                contentPadding = PaddingValues(start = contentStart, end = 20.dp, top = statusBar + LibraryFadeStart + LibraryFadeLength + 2.dp, bottom = contentBottom)
+            ) {
                 item(key = "buttons") {
-                    Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MetalPillButton(stringResource(R.string.library_listen), onPlayAllClick, Modifier.weight(1f), icon = Icons.Rounded.PlayArrow)
                         GlassPillButton(stringResource(R.string.library_shuffle), onShuffleClick, Modifier.weight(1f), icon = Icons.Rounded.Shuffle)
                     }
@@ -248,6 +262,22 @@ fun LibraryScreen(
                         )
                     }
                 }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(start = contentStart, end = 20.dp, top = statusBar + 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HiFiCollapsingTitle(stringResource(R.string.library_title), collapse = { collapse }, modifier = Modifier.weight(1f))
+                if (downloadState == DownloadQueueState.RUNNING) {
+                    HiFiWellButton(onClick = { showProgressModal = true }, contentDescription = stringResource(R.string.download_progress_modal_zagruzka_kollektsii)) {
+                        HiFiActivityIndicator(size = 18.dp)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                }
+                HiFiWellButton(onClick = { showSettings = true }, contentDescription = stringResource(R.string.library_settings)) {
+                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(20.dp))
+                }
+            }
             }
             LibrarySection.LIKED, LibrarySection.DOWNLOADED -> {
                 val list = if (shown == LibrarySection.LIKED) tracks else downloaded
@@ -320,6 +350,10 @@ fun LibraryScreen(
             uiScaleManual = uiScaleManual,
             onUiScaleManualChange = onUiScaleManualChange,
             onUpgradeDownloads = onUpgradeDownloads,
+            reserveMb = reserveMb,
+            onReserveChange = onReserveChange,
+            reserveUsedBytes = reserveUsedBytes,
+            onClearReserve = onClearReserve,
             crashReports = crashReports,
             onOpenCrashLog = onOpenCrashLog,
             onDownloadAllClick = {
