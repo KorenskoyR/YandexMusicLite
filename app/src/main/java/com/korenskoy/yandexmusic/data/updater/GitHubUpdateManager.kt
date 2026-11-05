@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import com.korenskoy.yandexmusic.BuildConfig
 import com.korenskoy.yandexmusic.data.dto.GitHubReleaseDto
+import com.korenskoy.yandexmusic.di.UpdateClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,7 +52,7 @@ sealed class UpdateCheckResult {
 @Singleton
 class GitHubUpdateManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val okHttpClient: OkHttpClient
+    @param:UpdateClient private val okHttpClient: OkHttpClient
 ) {
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 

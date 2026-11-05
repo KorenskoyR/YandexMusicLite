@@ -18,7 +18,12 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import java.io.File
 import java.util.concurrent.TimeUnit
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+/** The client for GitHub: everything that isn't Yandex must not see the Yandex token. */
+@Qualifier
+annotation class UpdateClient
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -57,6 +62,15 @@ object NetworkModule {
             .readTimeout(15, TimeUnit.SECONDS)
             .build()
     }
+
+    /** The shared client with its cache, pool and timeouts, minus the Yandex auth headers. */
+    @Provides
+    @Singleton
+    @UpdateClient
+    fun provideUpdateClient(client: OkHttpClient): OkHttpClient =
+        client.newBuilder()
+            .apply { interceptors().removeAll { it is AuthInterceptor } }
+            .build()
 
     @Provides
     @Singleton
