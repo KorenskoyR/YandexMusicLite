@@ -18,14 +18,6 @@ class LayoutSafetyTest {
     private val sourceDir = File("src/main/java/com/korenskoy/yandexmusic")
 
     @Test
-    fun testAndroid7CanInstallTheApp() {
-        // Android 7 refuses a permission whose full name starts with a capital letter, and the package name does
-        val manifest = File("src/main/AndroidManifest.xml").readText()
-        assertTrue("AndroidX's generated permission must stay out of the manifest",
-            manifest.contains("""<permission android:name="${'$'}{applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />"""))
-    }
-
-    @Test
     fun testPortraitBottomOverlayIsCoordinatedColumn() {
         val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
         // Ensure MiniPlayer and FloatingGlassBottomBar are placed inside a Column in portrait mode
