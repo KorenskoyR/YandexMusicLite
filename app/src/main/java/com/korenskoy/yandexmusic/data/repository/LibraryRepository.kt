@@ -175,7 +175,7 @@ class LibraryRepository @Inject constructor(
      */
     internal suspend fun resolveUid(): String {
         val account = authRepository.getActiveAccount()
-        account?.uid?.takeIf { it.isNotBlank() && it != "me" }?.let { return it }
+        account?.takeIf { it.hasRealUid }?.let { return it.uid }
         val status = runCatching { api.getAccountStatus().result }.getOrNull() ?: return "me"
         val uid = status.uidString.takeIf { it.isNotEmpty() } ?: return "me"
         val token = authRepository.getToken().orEmpty()

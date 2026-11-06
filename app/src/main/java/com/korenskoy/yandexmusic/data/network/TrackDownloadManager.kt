@@ -39,14 +39,15 @@ class TrackDownloadManager @Inject constructor(
     private val _downloadProgress = MutableStateFlow<DownloadProgressInfo?>(null)
     val downloadProgress = _downloadProgress.asStateFlow()
 
+    // Before init: declared after it, this empty value would overwrite what init reads from the disk
+    @Volatile
+    private var savedQualities: Map<String, TrackPreloadManager.StreamQuality> = emptyMap()
+
     init {
         // Remove leftover temp files from a download the previous process did not finish.
         tracksDir.listFiles()?.filter { it.extension == "tmp" }?.forEach { it.delete() }
         updateCacheStats()
     }
-
-    @Volatile
-    private var savedQualities: Map<String, TrackPreloadManager.StreamQuality> = emptyMap()
 
     private fun updateCacheStats() {
         val all = tracksDir.listFiles()?.toList().orEmpty()

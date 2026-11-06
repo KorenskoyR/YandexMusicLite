@@ -242,7 +242,7 @@ class PlayerRepositoryImpl(
     override fun getPlayer(): Player = activePlayer
 
     private suspend fun resolvePlayUri(trackId: String, url: String): String? {
-        val localFile = withContext(Dispatchers.IO) { downloadManager.getLocalTrackFile(trackId) }
+        val localFile = withContext(Dispatchers.IO) { preloadManager.playableCopy(trackId) }
         if (localFile != null) return android.net.Uri.fromFile(localFile).toString()
         // A copy from the road reserve was chosen on purpose: a resolved stream must not replace it
         if (url.startsWith("file:")) return url
@@ -278,6 +278,16 @@ class PlayerRepositoryImpl(
             standby.prepare()
             preloadedTrackId = trackId
             Log.d(TAG, "Preloaded warm standby player with trackId = $trackId")
+        }
+    }
+
+    override fun dropStandby() {
+        scope.launch {
+            if (outgoingPlayer != null) return@launch
+            preloadedTrackId = null
+            hasEmittedPrepareForCurrent = false
+            standbyPlayer.stop()
+            standbyPlayer.clearMediaItems()
         }
     }
 

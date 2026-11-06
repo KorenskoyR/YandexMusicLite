@@ -33,6 +33,7 @@ object HiFi {
     val GlassFill = Color.White.copy(alpha = 0.08f)
     val GlassBorder = Color.White.copy(alpha = 0.16f)
     val BarFill = Color(0xB81C1E26)
+    val Scrim = Color(0xE605060A)
     val SheetFill = Color(0xFF10121A)
     val Danger = Color(0xFFFF6B6B)
     val Live = Color(0xFFFF4D4D)

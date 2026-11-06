@@ -18,6 +18,14 @@ class LayoutSafetyTest {
     private val sourceDir = File("src/main/java/com/korenskoy/yandexmusic")
 
     @Test
+    fun testAndroid7CanInstallTheApp() {
+        // Android 7 refuses a permission whose full name starts with a capital letter, and the package name does
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        assertTrue("AndroidX's generated permission must stay out of the manifest",
+            manifest.contains("""<permission android:name="${'$'}{applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />"""))
+    }
+
+    @Test
     fun testPortraitBottomOverlayIsCoordinatedColumn() {
         val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
         // Ensure MiniPlayer and FloatingGlassBottomBar are placed inside a Column in portrait mode
@@ -26,10 +34,10 @@ class LayoutSafetyTest {
     }
 
     @Test
-    fun testLandscapeMiniPlayerIsCentered() {
+    fun testLandscapeMiniPlayerSharesTheDockWithTheTabs() {
         val mainScreen = File(sourceDir, "presentation/main/MainScreen.kt").readText()
-        assertTrue("MainScreen landscape MiniPlayer must be aligned to BottomCenter",
-            mainScreen.contains(".align(Alignment.BottomCenter)"))
+        assertTrue("In landscape the tabs and the mini-player must be one row along the bottom",
+            mainScreen.contains("FloatingGlassDock(") && mainScreen.contains("player = mini"))
     }
 
     @Test
@@ -383,10 +391,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 43",
-            buildGradle.contains("versionCode = 43"))
-        assertTrue("build.gradle.kts must be versionName 1.10.0",
-            buildGradle.contains("versionName = \"1.10.0\""))
+        assertTrue("build.gradle.kts must be versionCode 44",
+            buildGradle.contains("versionCode = 44"))
+        assertTrue("build.gradle.kts must be versionName 1.11.0",
+            buildGradle.contains("versionName = \"1.11.0\""))
     }
 
     @Test

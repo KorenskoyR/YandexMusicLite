@@ -38,6 +38,7 @@ class LikedTracksDownloadWorker(
         fun libraryRepository(): LibraryRepository
         fun downloadManager(): TrackDownloadManager
         fun preloadManager(): TrackPreloadManager
+        fun soundMode(): com.korenskoy.yandexmusic.data.player.SoundMode
     }
 
     private val deps = EntryPointAccessors.fromApplication(context.applicationContext, Dependencies::class.java)
@@ -69,7 +70,9 @@ class LikedTracksDownloadWorker(
                     !upgrade -> downloads.downloadTrack(track.idString, stream.url, stream.quality)
                     else -> {
                         val saved = downloads.downloadedQuality(track.idString) ?: stream.bestMp3
-                        saved != null && !StreamVariants.isBetter(stream.quality, saved) ||
+                        // A FLAC file is silent on a device in compatible sound, so the ordinary one is an upgrade
+                        val silentFile = saved?.isLossless == true && deps.soundMode().isCompatible()
+                        saved != null && !silentFile && !StreamVariants.isBetter(stream.quality, saved) ||
                             downloads.downloadTrack(track.idString, stream.url, stream.quality, replace = true)
                     }
                 }

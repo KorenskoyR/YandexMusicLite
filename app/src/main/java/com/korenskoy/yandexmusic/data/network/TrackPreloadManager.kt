@@ -20,7 +20,8 @@ class TrackPreloadManager @Inject constructor(
     private val api: YandexMusicApi,
     private val downloadManager: TrackDownloadManager,
     private val okHttpClient: OkHttpClient,
-    private val authRepository: com.korenskoy.yandexmusic.domain.repository.AuthRepository
+    private val authRepository: com.korenskoy.yandexmusic.domain.repository.AuthRepository,
+    private val soundMode: com.korenskoy.yandexmusic.data.player.SoundMode
 ) {
     private data class CachedTrackUrl(val url: String, val fetchedAtMs: Long)
 
@@ -72,7 +73,7 @@ class TrackPreloadManager @Inject constructor(
      */
     suspend fun resolveForDownload(trackId: String): ResolvedStream? = withContext(Dispatchers.IO) {
         try {
-            resolveBest(trackId)
+            if (soundMode.isCompatible()) resolveCompatible(trackId) else resolveBest(trackId)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -100,6 +101,29 @@ class TrackPreloadManager @Inject constructor(
             null
         }
     }
+
+    /** Compatible sound: what download-info offers, from the best down, previews included as usual. */
+    private suspend fun resolveCompatible(trackId: String): ResolvedStream? {
+        val offeredList = api.getTrackDownloadInfo(trackId).result.orEmpty()
+        offered[trackId] = StreamVariants.describe(offeredList)
+        val bestMp3 = offeredList.filter { !it.preview && it.codec.equals("mp3", ignoreCase = true) }
+            .maxByOrNull { it.bitrateInKbps }?.let { StreamQuality(it.codec, it.bitrateInKbps) }
+        return StreamVariants.ranked(offeredList).firstNotNullOfOrNull { variant ->
+            resolveXmlToStreamUrl(variant.downloadInfoUrl, variant.codec)?.let { url ->
+                ResolvedStream(url, StreamQuality(variant.codec, variant.bitrateInKbps), bestMp3)
+            }
+        }
+    }
+
+    /** The downloaded file to play. In compatible sound a FLAC file does not count: on this device it would be silent. */
+    fun playableCopy(trackId: String): java.io.File? =
+        downloadManager.getLocalTrackFile(trackId)?.takeUnless { isSilentCopy(trackId) }
+
+    /** Main-thread friendly [playableCopy]: answers from memory. */
+    fun hasPlayableCopy(trackId: String): Boolean = downloadManager.isKnownDownloaded(trackId) && !isSilentCopy(trackId)
+
+    private fun isSilentCopy(trackId: String): Boolean =
+        soundMode.compatible.value && downloadManager.downloadedQuality(trackId)?.isLossless == true
 
     /** Tries the offered variants from the best down until one gives a link. */
     private suspend fun resolveBest(trackId: String): ResolvedStream? {
@@ -337,7 +361,7 @@ class TrackPreloadManager @Inject constructor(
 
     private suspend fun fetchOrAwait(trackId: String): String? {
         if (trackId.startsWith("radio_")) return null
-        if (downloadManager.isTrackDownloaded(trackId)) return null
+        if (playableCopy(trackId) != null) return null
         // Reuse a cached link unless its quality was neither lossless nor 320k — then re-resolve to try for better.
         resolvedUrls[trackId]?.takeIf {
             qualities[trackId]?.isLossless == true || (qualities[trackId]?.bitrateKbps ?: 0) >= 320
@@ -346,7 +370,7 @@ class TrackPreloadManager @Inject constructor(
         val deferred = inFlightRequests.computeIfAbsent(trackId) {
             scope.async(Dispatchers.IO) {
                 try {
-                    val stream = resolveBest(trackId) ?: return@async null
+                    val stream = (if (soundMode.isCompatible()) resolveCompatible(trackId) else resolveBest(trackId)) ?: return@async null
                     resolvedUrls[trackId] = CachedTrackUrl(stream.url, System.currentTimeMillis())
                     qualities[trackId] = stream.quality
                     stream.url

@@ -81,6 +81,8 @@ class AccountSessionManager @Inject constructor(
             val avatar = status.avatarUrl ?: runCatching { api.getYandexLoginInfo().avatarUrl }.getOrNull()
             authRepository.saveOrUpdateAccount(
                 active.copy(
+                    // The server has just said who this is: a provisional id gives way to the real one
+                    uid = status.uidString.takeIf { !active.hasRealUid && it.isNotEmpty() } ?: active.uid,
                     displayName = status.displayUserName.ifBlank { active.displayName },
                     login = status.account?.login?.ifBlank { active.login } ?: active.login,
                     avatarUrl = avatar ?: active.avatarUrl,

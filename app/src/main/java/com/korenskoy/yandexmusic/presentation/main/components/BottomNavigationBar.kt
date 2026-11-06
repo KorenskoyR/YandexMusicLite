@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.res.stringResource
 import com.korenskoy.yandexmusic.R
 import androidx.compose.animation.animateColorAsState
@@ -71,13 +75,14 @@ private fun Modifier.glassBar(): Modifier = this
 fun FloatingGlassBottomBar(
     currentRoute: String,
     onNavigate: (MainTab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fixedTabHeight: Dp? = null
 ) {
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
-    val scaleFactor = (windowSize.widthDp / 400f).coerceIn(0.9f, 1.2f)
+    val scaleFactor = if (fixedTabHeight != null) 1f else (windowSize.widthDp / 400f).coerceIn(0.9f, 1.2f)
     val tabs = MainTab.entries
     val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
-    val tabHeight = (54.dp * scaleFactor).coerceIn(50.dp, 62.dp)
+    val tabHeight = fixedTabHeight ?: (54.dp * scaleFactor).coerceIn(50.dp, 62.dp)
 
     Box(
         modifier = modifier
@@ -111,49 +116,64 @@ fun FloatingGlassBottomBar(
     }
 }
 
-/** The same tabs as a vertical capsule for landscape screens (phones on their side, tablets). */
+/**
+ * The landscape dock: the same tabs and the mini-player in one row along the bottom. That row is taken
+ * by the mini-player anyway, so a page loses no height and gets the whole width. The tabs keep their
+ * place when there is no mini-player.
+ */
 @Composable
-fun FloatingGlassNavigationRail(
+fun FloatingGlassDock(
     currentRoute: String,
     onNavigate: (MainTab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    player: @Composable () -> Unit
 ) {
-    val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
-    val scaleFactor = (windowSize.widthDp / 800f).coerceIn(0.9f, 1.3f)
-    val railWidth = (88.dp * scaleFactor).coerceIn(80.dp, 106.dp)
-    val tabHeight = (62.dp * scaleFactor).coerceIn(56.dp, 70.dp)
-    val spacing = 6.dp
-    val tabs = MainTab.entries
-    val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
-    val indicatorY by animateDpAsState((tabHeight + spacing) * activeIndex, HiFiMotion.spring(), label = "rail_indicator")
-
-    Box(
-        modifier = modifier
-            .width(railWidth)
-            .glassBar()
-            .padding(5.dp)
+    val widthDp = com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp
+    Row(
+        modifier = modifier.fillMaxWidth().height(DockHeight),
+        horizontalArrangement = Arrangement.spacedBy(DockGap),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(0, indicatorY.roundToPx()) }
-                .fillMaxWidth()
-                .height(tabHeight)
-                .clip(IndicatorShape)
-                .background(Color.White.copy(alpha = 0.13f))
+        FloatingGlassBottomBar(
+            currentRoute = currentRoute,
+            onNavigate = onNavigate,
+            modifier = Modifier.width(dockTabsWidth(widthDp).dp),
+            fixedTabHeight = DockHeight - 10.dp
         )
-        Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-            tabs.forEach { tab ->
-                TabItem(
-                    tab = tab,
-                    selected = tab.route == currentRoute,
-                    scaleFactor = scaleFactor,
-                    modifier = Modifier.fillMaxWidth().height(tabHeight),
-                    onClick = { onNavigate(tab) }
-                )
-            }
-        }
+        Box(Modifier.weight(1f)) { player() }
     }
 }
+
+/**
+ * Lists fade out before they reach the dock: rows showing through the tabs are hard to read at a glance.
+ * Draws only, so touches pass through to the page.
+ */
+@Composable
+fun DockScrim(modifier: Modifier = Modifier) {
+    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(navigationBar + DockClearance + 36.dp)
+            .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to HiFi.Scrim, 1f to HiFi.Scrim))
+    )
+}
+
+/** Five roomy tabs on a head unit, tighter on a phone on its side, and never all of a very narrow window. */
+internal fun dockTabsWidth(windowWidthDp: Int): Int = when {
+    windowWidthDp >= 960 -> 430
+    else -> minOf(330, (windowWidthDp * 0.52f).toInt())
+}
+
+/** Rows of covers on a side: the wider the screen, the more of them, so a cover stays a cover and not a poster. */
+internal fun landscapeColumns(windowWidthDp: Int): Int = (windowWidthDp / 210).coerceIn(4, 6)
+
+val DockHeight = 62.dp
+val DockBottomGap = 10.dp
+private val DockGap = 12.dp
+
+/** How far a landscape page keeps its content from the bottom: the dock and some air above it. */
+val DockClearance = DockHeight + DockBottomGap + 12.dp
 
 @Composable
 private fun TabItem(tab: MainTab, selected: Boolean, scaleFactor: Float, modifier: Modifier, onClick: () -> Unit) {

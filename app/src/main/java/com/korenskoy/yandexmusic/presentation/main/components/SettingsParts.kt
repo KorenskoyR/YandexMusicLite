@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.GraphicEq
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.rounded.Route
@@ -201,6 +202,26 @@ internal fun CrossfadeRow(seconds: Int, onChange: (Int) -> Unit) {
             onValueChangeFinished = { onChange(value.roundToInt()) },
             valueRange = 0f..12f,
             steps = 11
+        )
+    }
+}
+
+/** For a device that plays FLAC in silence: the app cannot hear that by itself, so the user chooses. */
+@Composable
+internal fun SoundQualityRow(compatible: Boolean, onChange: (Boolean) -> Unit) {
+    SegmentedRow(Icons.Rounded.GraphicEq, stringResource(R.string.settings_sound_quality)) {
+        HiFiSegmented(
+            options = listOf(stringResource(R.string.settings_sound_max), stringResource(R.string.settings_sound_compatible)),
+            selectedIndex = if (compatible) 1 else 0,
+            onSelect = { onChange(it == 1) },
+            fontSize = 13.sp
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            stringResource(if (compatible) R.string.settings_sound_compatible_note else R.string.settings_sound_max_note),
+            color = HiFi.TextSecondary,
+            fontSize = 13.sp,
+            lineHeight = 18.sp
         )
     }
 }

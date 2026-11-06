@@ -105,6 +105,8 @@ fun CacheMenuBottomSheet(
     onAddAccount: () -> Unit = {},
     onLogout: () -> Unit = {},
     crossfadeSeconds: Int = 3,
+    compatibleSound: Boolean = false,
+    onCompatibleSoundChange: (Boolean) -> Unit = {},
     onCrossfadeChange: (Int) -> Unit = {},
     steeringWheelOnLeft: Boolean = true,
     onSteeringWheelChange: (Boolean) -> Unit = {},
@@ -214,6 +216,7 @@ fun CacheMenuBottomSheet(
                     }
                     val playback: @Composable ColumnScope.() -> Unit = {
                         SettingsGroup(stringResource(R.string.settings_group_playback)) {
+                            SoundQualityRow(compatibleSound, onCompatibleSoundChange)
                             CrossfadeRow(crossfadeSeconds, onCrossfadeChange)
                             SettingsRow(
                                 icon = Icons.Rounded.UploadFile,

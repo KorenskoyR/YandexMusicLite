@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
+import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
+import androidx.compose.foundation.layout.navigationBars
 import com.korenskoy.yandexmusic.presentation.hifi.rememberHeaderCollapse
 import com.korenskoy.yandexmusic.presentation.hifi.fadeUnderHeader
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiWellButton
@@ -131,6 +134,8 @@ fun LibraryScreen(
     onDownloadAllClick: () -> Unit,
     onEnableAutoDownload: (Boolean) -> Unit,
     crossfadeSeconds: Int = 3,
+    compatibleSound: Boolean = false,
+    onCompatibleSoundChange: (Boolean) -> Unit = {},
     onCrossfadeChange: (Int) -> Unit = {},
     steeringWheelOnLeft: Boolean = true,
     onSteeringWheelChange: (Boolean) -> Unit = {},
@@ -179,9 +184,10 @@ fun LibraryScreen(
 
     val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val contentStart = if (isLandscape) 140.dp else 20.dp
-    val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
-    val columns = if (isLandscape) 4 else 2
+    val contentStart = 20.dp
+    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
+    val columns = if (isLandscape) landscapeColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp) else 2
     val downloaded = remember(tracks, downloadedTrackIds) { tracks.filter { downloadedTrackIds.contains(it.idString) } }
 
     if (openedPlaylist != null) {
@@ -191,7 +197,8 @@ fun LibraryScreen(
             isPlaying = isPlaying,
             likedTrackIds = likedTrackIds,
             downloadedTrackIds = downloadedTrackIds,
-            contentBottom = contentBottom,
+            // The page keeps above the navigation bar itself
+            contentBottom = if (isLandscape) DockClearance else contentBottom,
             onBack = onClosePlaylist,
             onPlay = onPlayPlaylist,
             onTrackClick = onPlaylistTrackClick,
@@ -256,7 +263,7 @@ fun LibraryScreen(
                             HiFiSectionHeader(stringResource(R.string.library_recent), Modifier.padding(top = 26.dp, bottom = 12.dp))
                         }
                         coverGrid(
-                            tracks = tracks.take(if (isLandscape) 8 else 6),
+                            tracks = tracks.take(if (isLandscape) columns * 2 else 6),
                             columns = columns,
                             onClick = { onTrackClick(it.idString) }
                         )
@@ -282,7 +289,7 @@ fun LibraryScreen(
             LibrarySection.LIKED, LibrarySection.DOWNLOADED -> {
                 val list = if (shown == LibrarySection.LIKED) tracks else downloaded
                 val appearance = rememberAppearance(shown)
-                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).statusBarsPadding(), contentPadding = PaddingValues(start = if (isLandscape) 132.dp else 8.dp, end = 8.dp, bottom = contentBottom)) {
+                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).statusBarsPadding(), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)) {
                     item(key = "header") {
                         SectionHeader(
                             title = stringResource(if (shown == LibrarySection.LIKED) R.string.library_liked else R.string.library_downloaded),
@@ -342,6 +349,8 @@ fun LibraryScreen(
             autoDownloadEnabled = autoDownloadEnabled,
             onEnableAutoDownload = onEnableAutoDownload,
             crossfadeSeconds = crossfadeSeconds,
+            compatibleSound = compatibleSound,
+            onCompatibleSoundChange = onCompatibleSoundChange,
             onCrossfadeChange = onCrossfadeChange,
             steeringWheelOnLeft = steeringWheelOnLeft,
             onSteeringWheelChange = onSteeringWheelChange,

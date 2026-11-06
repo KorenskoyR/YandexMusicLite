@@ -34,6 +34,10 @@ interface SettingsRepository {
     suspend fun setSkippedUpdateVersion(version: String?)
     suspend fun setRoadReserveMb(megabytes: Int)
 
+    /** True: only the ordinary stream, for a device that plays FLAC in silence. Null: nothing chosen yet. */
+    val compatibleSound: Flow<Boolean?>
+    suspend fun setCompatibleSound(enabled: Boolean)
+
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3
         const val MAX_CROSSFADE_SECONDS = 12

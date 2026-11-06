@@ -139,6 +139,7 @@ data class TrackAlbumDto(
 /** A user's playlist from `users/{uid}/playlists/list` (without tracks) or `playlists/{kind}` (with tracks). */
 @Serializable
 data class UserPlaylistDto(
+    @SerialName("uid") val uid: JsonElement? = null,
     @SerialName("kind") val kind: JsonElement? = null,
     @SerialName("title") val title: String? = null,
     @SerialName("trackCount") val trackCount: Int = 0,
@@ -153,6 +154,10 @@ data class UserPlaylistDto(
 
     val kindString: String
         get() = (kind as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+
+    /** Whose playlist this is, as the server said; null for lists cached before 1.11. */
+    val ownerUid: String?
+        get() = (uid as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "0" }
 
     /** Cover template ("avatars.yandex.net/...%%"): the custom/first-track cover, else the mosaic's first tile. */
     val coverUri: String?

@@ -34,6 +34,8 @@ interface PlayerRepository {
         startPositionMs: Long = 0L
     )
     fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
+    /** Forgets the warmed-up next track: what it was prepared with no longer holds. */
+    fun dropStandby()
     fun pause()
     /** Lowers the volume to silence over [durationMs], then pauses (sleep timer). */
     fun fadeOutAndPause(durationMs: Long)

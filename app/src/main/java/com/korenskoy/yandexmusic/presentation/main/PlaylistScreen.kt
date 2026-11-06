@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiWideHeader
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.utils.cover
@@ -161,33 +162,25 @@ fun PlaylistScreen(
             onDismiss = { deleting = false }
         )
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .predictiveBack(back)
-    ) {
-        Row(
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val backButton: @Composable () -> Unit = {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(40.dp)
+                .hifiGlass(CircleShape)
+                .hifiPress(onBack),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .hifiGlass(CircleShape)
-                    .hifiPress(onBack),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.cd_nazad),
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.cd_nazad),
+                tint = Color.White,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+    val menu: @Composable () -> Unit = {
             editedOrder?.let { order ->
                 Text(
                     text = stringResource(R.string.playlist_reorder_done),
@@ -245,56 +238,99 @@ fun PlaylistScreen(
                     )
                 }
             }
+    }
+    // While it loads or after a failure the list says nothing, and the playlist itself knows its size
+    val trackCount = if (opened.isLoading || opened.failed) playlist.trackCount else opened.tracks.size
+    val details: @Composable () -> Unit = {
+        Text(
+            text = russianQuantityString(trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 14.sp
+        )
+        if (playlist.isPublic) {
+            Text(
+                text = stringResource(R.string.playlist_public_badge).uppercase(),
+                color = Color.White.copy(alpha = 0.66f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.1.em
+            )
         }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .predictiveBack(back)
+    ) {
+        if (isLandscape) {
+            HiFiWideHeader(
+                title = playlist.title.orEmpty(),
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                back = backButton,
+                cover = { size -> PlaylistCover(playlist, Modifier.size(size)) },
+                details = { details() },
+                actions = {
+                    if (editedOrder == null) {
+                        val enabled = opened.tracks.isNotEmpty()
+                        PlaylistAction(Icons.Default.PlayArrow, stringResource(R.string.cd_slushat), primary = true, enabled = enabled,
+                            modifier = Modifier.weight(1f)) { onPlay(false) }
+                        PlaylistAction(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, enabled = enabled,
+                            modifier = Modifier.weight(1f)) { onPlay(true) }
+                    }
+                },
+                trailing = {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    menu()
+                }
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                backButton()
+                Spacer(modifier = Modifier.weight(1f))
+                menu()
+            }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PlaylistCover(playlist, Modifier.size(112.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = playlist.title.orEmpty(),
-                    style = HiFiType.LargeTitle.copy(fontSize = 26.sp, lineHeight = 32.sp),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = russianQuantityString(
-                        if (opened.isLoading) playlist.trackCount else opened.tracks.size,
-                        R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many
-                    ),
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 14.sp
-                )
-                if (playlist.isPublic) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlaylistCover(playlist, Modifier.size(112.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
                     Text(
-                        text = stringResource(R.string.playlist_public_badge).uppercase(),
-                        color = Color.White.copy(alpha = 0.66f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.1.em
+                        text = playlist.title.orEmpty(),
+                        style = HiFiType.LargeTitle.copy(fontSize = 26.sp, lineHeight = 32.sp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    details()
                 }
             }
-        }
 
-        if (editedOrder == null) Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            val enabled = opened.tracks.isNotEmpty()
-            PlaylistAction(Icons.Default.PlayArrow, stringResource(R.string.cd_slushat), primary = true, enabled = enabled,
-                modifier = Modifier.weight(1f)) { onPlay(false) }
-            PlaylistAction(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, enabled = enabled,
-                modifier = Modifier.weight(1f)) { onPlay(true) }
+            if (editedOrder == null) Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val enabled = opened.tracks.isNotEmpty()
+                PlaylistAction(Icons.Default.PlayArrow, stringResource(R.string.cd_slushat), primary = true, enabled = enabled,
+                    modifier = Modifier.weight(1f)) { onPlay(false) }
+                PlaylistAction(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, enabled = enabled,
+                    modifier = Modifier.weight(1f)) { onPlay(true) }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
         }
-        Spacer(modifier = Modifier.height(12.dp))
 
         // The menu of a track listed here also offers "remove from playlist"
         CompositionLocalProvider(LocalTrackMenuPlaylist provides playlist) {
@@ -307,7 +343,11 @@ fun PlaylistScreen(
                     onMove = { from, to -> editedOrder = order.toMutableList().apply { add(to, removeAt(from)) } }
                 )
                 opened.isLoading -> HiFiSkeletonRows(Modifier.padding(top = 8.dp), count = 6)
-                opened.failed -> HiFiErrorState(onRetry = onRetry, message = stringResource(R.string.playlist_load_failed))
+                opened.failed -> HiFiErrorState(
+                    onRetry = onRetry,
+                    message = stringResource(R.string.playlist_load_failed) + opened.failReason?.let { "\n" + stringResource(R.string.playlist_error_code, it) }.orEmpty(),
+                    modifier = if (isLandscape) Modifier.padding(bottom = contentBottom) else Modifier
+                )
                 opened.tracks.isEmpty() -> HiFiEmptyState(
                     icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
                     title = stringResource(R.string.playlist_empty)

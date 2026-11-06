@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
+import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
+import androidx.compose.foundation.layout.navigationBars
 import kotlin.math.roundToInt
 import com.korenskoy.yandexmusic.presentation.hifi.rememberHeaderCollapse
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
@@ -123,8 +126,9 @@ fun SearchScreen(
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
-    val contentStart = if (isLandscape) 140.dp else 20.dp
-    val contentBottom = if (isLandscape) 90.dp else (if (hasActiveTrack) 168.dp else 100.dp)
+    val contentStart = 20.dp
+    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
     val focusManager = LocalFocusManager.current
     val historyPanel = remember { MutableTransitionState(initiallyShowHistory) }
     val historyOpen = historyPanel.targetState
@@ -163,7 +167,7 @@ fun SearchScreen(
                     trendTracks = trendTracks,
                     contentStart = contentStart,
                     contentBottom = contentBottom,
-                    columns = if (isLandscape) 4 else 2,
+                    columns = if (isLandscape) landscapeColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp) else 2,
                     onTrackClick = onTrackClick,
                     onLoadMoreHits = onLoadMoreHits,
                     onLoadMoreTrends = onLoadMoreTrends

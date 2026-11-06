@@ -162,7 +162,7 @@ class AuthRepositoryImpl @Inject constructor(
         // Check if an existing account already has this token
         val currentAccounts = _allAccounts.value.toMutableList()
         val existingIndex = currentAccounts.indexOfFirst { it.token == token }
-        
+
         val active: UserAccount
         if (existingIndex >= 0) {
             val updated = currentAccounts[existingIndex].copy(lastActiveTimestamp = System.currentTimeMillis())
@@ -203,8 +203,10 @@ class AuthRepositoryImpl @Inject constructor(
         if (account.token.isBlank()) return
         val currentAccounts = _allAccounts.value.toMutableList()
 
-        // Remove any temporary provisional account that carried the same token
-        currentAccounts.removeAll { it.token == account.token && it.uid != account.uid && it.uid.startsWith("temp_") }
+        // Remove any provisional account that carried the same token; the choice of a default account goes with it
+        val replaced = currentAccounts.filter { it.token == account.token && it.uid != account.uid && !it.hasRealUid }
+        currentAccounts.removeAll(replaced)
+        if (replaced.any { it.uid == _defaultAccountUid.value }) setDefaultAccountUid(account.uid)
 
         val existingIndex = currentAccounts.indexOfFirst { it.uid == account.uid }
         val updated = if (existingIndex >= 0) {

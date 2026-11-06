@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -221,5 +227,50 @@ private fun SignalMark(litBars: Int, size: Dp) {
                 cornerRadius = CornerRadius(width / 2.5f)
             )
         }
+    }
+}
+
+/**
+ * The head of an inner page on a side (head unit, phone on its side): back, cover, name and actions in
+ * one row, because on a wide screen height is what is short.
+ */
+@Composable
+fun HiFiWideHeader(
+    title: String,
+    back: @Composable () -> Unit,
+    cover: @Composable (Dp) -> Unit,
+    modifier: Modifier = Modifier,
+    details: @Composable ColumnScope.() -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val short = window.heightDp < 480
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        back()
+        Spacer(Modifier.width(if (short) 12.dp else 16.dp))
+        cover(if (short) 52.dp else 88.dp)
+        Spacer(Modifier.width(if (short) 12.dp else 16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = HiFiType.LargeTitle.copy(
+                    fontSize = if (short) 20.sp else 26.sp,
+                    lineHeight = if (short) 26.sp else 32.sp
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            details()
+        }
+        Spacer(Modifier.width(12.dp))
+        Row(
+            // Room for "Перемешать" in full, and always some left for the name
+            Modifier.width(minOf(if (short) 340f else 380f, window.widthDp * 0.46f).dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = actions
+        )
+        trailing()
     }
 }

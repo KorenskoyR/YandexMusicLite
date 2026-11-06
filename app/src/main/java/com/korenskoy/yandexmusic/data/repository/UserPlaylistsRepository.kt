@@ -63,16 +63,28 @@ class UserPlaylistsRepository @Inject constructor(
         }
     }
 
-    /** Tracks in playlist order. Throws on a network error when nothing is cached for this revision. */
+    /**
+     * Tracks in playlist order. When the server fails, the copy saved last, even of an older revision;
+     * throws only when nothing was ever saved for this playlist.
+     */
     suspend fun tracks(playlist: UserPlaylistDto): List<TrackDetailsDto> {
         val folder = activeFolder
         val kind = playlist.kindString
         cacheManager.loadPlaylistTracks(folder, kind, playlist.revision).takeIf { it.isNotEmpty() }?.let { return it }
 
-        val full = api.getUserPlaylist(libraryRepository.resolveUid(), kind).result ?: return emptyList()
-        val tracks = resolveTracks(folder, full)
-        if (tracks.isNotEmpty()) cacheManager.savePlaylistTracks(folder, kind, full.revision, tracks)
-        return tracks
+        return try {
+            val full = api.getUserPlaylist(playlist.ownerUid ?: libraryRepository.resolveUid(), kind).result ?: return emptyList()
+            val tracks = resolveTracks(folder, full)
+            if (tracks.isNotEmpty()) cacheManager.savePlaylistTracks(folder, kind, full.revision, tracks)
+            tracks
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val last = cacheManager.loadLastPlaylistTracks(folder, kind)
+            if (last.isEmpty()) throw e
+            Log.w(TAG, "Playlist $kind failed, showing the copy saved last", e)
+            last
+        }
     }
 
     /** Track metadata of a playlist fetched with its track list: cached for that revision, else embedded + fetched. */

@@ -39,7 +39,8 @@ class MainViewModel @Inject constructor(
     private val downloadScheduler: DownloadScheduler,
     networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor,
     private val reactions: com.korenskoy.yandexmusic.data.player.TrackReactions,
-    private val roadReserve: com.korenskoy.yandexmusic.data.reserve.RoadReserve
+    private val roadReserve: com.korenskoy.yandexmusic.data.reserve.RoadReserve,
+    private val soundMode: com.korenskoy.yandexmusic.data.player.SoundMode
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -82,6 +83,7 @@ class MainViewModel @Inject constructor(
     val roadReserveMb: StateFlow<Int> = settingsRepository.roadReserveMb
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_ROAD_RESERVE_MB)
     val reserveUsedBytes: StateFlow<Long> = roadReserve.usedBytes
+    val compatibleSound: StateFlow<Boolean> = soundMode.compatible
     val linkState = playbackController.linkState
 
     // endregion
@@ -173,6 +175,13 @@ class MainViewModel @Inject constructor(
 
     /** What plays now and what the server offered, for the quality details in the player. */
     fun qualityDetails() = playbackController.qualityDetails()
+
+    fun setCompatibleSound(enabled: Boolean) {
+        viewModelScope.launch {
+            soundMode.choose(enabled)
+            playbackController.onSoundModeChanged(enabled)
+        }
+    }
 
     fun setRoadReserveMb(megabytes: Int) {
         viewModelScope.launch { settingsRepository.setRoadReserveMb(megabytes) }

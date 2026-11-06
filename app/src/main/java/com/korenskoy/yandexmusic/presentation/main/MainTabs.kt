@@ -158,6 +158,7 @@ internal fun LibraryTab(
     val uiScaleManual by viewModel.uiScaleManual.collectAsStateWithLifecycle()
     val roadReserveMb by viewModel.roadReserveMb.collectAsStateWithLifecycle()
     val reserveUsedBytes by viewModel.reserveUsedBytes.collectAsStateWithLifecycle()
+    val compatibleSound by viewModel.compatibleSound.collectAsStateWithLifecycle()
     val activeAccount by accountVm.activeAccount.collectAsStateWithLifecycle()
     val accountName by accountVm.accountName.collectAsStateWithLifecycle()
     val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsStateWithLifecycle()
@@ -199,6 +200,8 @@ internal fun LibraryTab(
         uiScaleManual = uiScaleManual,
         onUiScaleManualChange = { viewModel.setUiScaleManual(it) },
         onUpgradeDownloads = { viewModel.upgradeDownloadedQuality() },
+        compatibleSound = compatibleSound,
+        onCompatibleSoundChange = { viewModel.setCompatibleSound(it) },
         reserveMb = roadReserveMb,
         onReserveChange = { viewModel.setRoadReserveMb(it) },
         reserveUsedBytes = reserveUsedBytes,

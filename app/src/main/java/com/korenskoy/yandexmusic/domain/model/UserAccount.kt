@@ -13,6 +13,14 @@ data class UserAccount(
     val hasPlus: Boolean = false
 ) {
     /**
+     * False until the server has told who this is: right after sign-in the account carries a provisional
+     * "temp_..." id, and an account from the old single-token storage carries "me". The server does not
+     * accept either in the address of a playlist.
+     */
+    val hasRealUid: Boolean
+        get() = uid.isNotBlank() && uid != "me" && !uid.startsWith("temp_")
+
+    /**
      * Sanitized user folder name suitable for directory paths in Android filesystem:
      * e.g. "roman_korenskoy" or "user123".
      */

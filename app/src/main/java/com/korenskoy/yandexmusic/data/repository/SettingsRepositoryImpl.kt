@@ -101,6 +101,13 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    private val COMPATIBLE_SOUND_KEY = booleanPreferencesKey("compatible_sound")
+    override val compatibleSound: Flow<Boolean?> = context.dataStore.data.map { prefs -> prefs[COMPATIBLE_SOUND_KEY] }
+
+    override suspend fun setCompatibleSound(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[COMPATIBLE_SOUND_KEY] = enabled }
+    }
+
     override suspend fun setRoadReserveMb(megabytes: Int) {
         context.dataStore.edit { prefs ->
             prefs[ROAD_RESERVE_MB_KEY] = megabytes

@@ -73,7 +73,7 @@ class PlaylistsViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Playlist load failed", e)
-                OpenedPlaylist(playlist, isLoading = false, failed = true)
+                OpenedPlaylist(playlist, isLoading = false, failed = true, failReason = failureReason(e))
             }
             if (_opened.value?.playlist?.kindString == playlist.kindString) _opened.value = loaded
         }
@@ -182,5 +182,21 @@ data class OpenedPlaylist(
     val playlist: UserPlaylistDto,
     val tracks: List<TrackDetailsDto> = emptyList(),
     val isLoading: Boolean = true,
-    val failed: Boolean = false
+    val failed: Boolean = false,
+    /** Short and technical: a tester's screenshot should say what to fix. */
+    val failReason: String? = null
 )
+
+/** What went wrong with a request, in the fewest words: the HTTP status and the server's own error name, or the kind of failure. */
+internal fun failureReason(e: Throwable): String = when (e) {
+    is retrofit2.HttpException -> {
+        val name = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
+            ?.let { Regex(""""name"\s*:\s*"([^"]+)"""").find(it)?.groupValues?.get(1) }
+        "HTTP ${e.code()}" + name?.let { " $it" }.orEmpty()
+    }
+    is java.net.SocketTimeoutException -> "TIMEOUT"
+    is java.net.UnknownHostException -> "NO_DNS"
+    is java.io.IOException -> "NETWORK"
+    is kotlinx.serialization.SerializationException -> "BAD_RESPONSE"
+    else -> e::class.java.simpleName
+}

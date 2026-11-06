@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiWideHeader
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.utils.cover
@@ -95,6 +96,8 @@ fun CatalogPageScreen(
     val isArtist = state.page is CatalogPage.Artist
     val tracks = state.artist?.popularTracks ?: state.album?.tracks.orEmpty()
     val appearance = rememberAppearance(state.page)
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = contentBottom),
@@ -104,7 +107,38 @@ fun CatalogPageScreen(
             .navigationBarsPadding()
     ) {
         item(key = "header") {
-            Column(
+            if (isLandscape) {
+                HiFiWideHeader(
+                    title = state.artist?.artist?.name ?: state.album?.title ?: state.page.title,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    back = {
+                        GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                    },
+                    cover = { size ->
+                        Cover(
+                            uri = if (isArtist) state.artist?.artist?.coverUri else state.album?.coverUri,
+                            placeholder = if (isArtist) Icons.Default.Person else Icons.Default.Album,
+                            shape = if (isArtist) CircleShape else RoundedCornerShape(12.dp),
+                            size = size
+                        )
+                    },
+                    details = { state.album?.let { album -> AlbumSubtitle(album, actions) } },
+                    actions = {
+                        if (tracks.isNotEmpty()) {
+                            PlayButton(Icons.Default.PlayArrow, stringResource(R.string.cd_slushat), primary = true, Modifier.weight(1f)) {
+                                actions.onPlay(tracks, null, false)
+                            }
+                            PlayButton(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, Modifier.weight(1f)) {
+                                actions.onPlay(tracks, null, true)
+                            }
+                        }
+                    }
+                )
+            } else Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()

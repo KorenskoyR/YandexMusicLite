@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.DockScrim
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.presentation.hifi.LocalLinkState
 import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.res.Configuration
@@ -23,7 +31,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -63,7 +70,9 @@ import com.korenskoy.yandexmusic.presentation.hifi.TintMath
 import com.korenskoy.yandexmusic.presentation.hifi.rememberArtworkTint
 import com.korenskoy.yandexmusic.presentation.hifi.rememberHiFiLite
 import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
-import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassNavigationRail
+import com.korenskoy.yandexmusic.presentation.main.components.DockBottomGap
+import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
+import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassDock
 import com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu
 import com.korenskoy.yandexmusic.presentation.main.components.MainTab
 import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
@@ -160,7 +169,9 @@ fun MainScreen(
     val coverForTint = if (currentTrack?.isRadio == true) null else currentTrack?.coverUri.toCoverUrl(CoverSize.Small)
     val appTint = rememberArtworkTint(coverForTint, stationTint)
     val tabStates = rememberSaveableStateHolder()
-    val contentBottom = if (isLandscape) 90.dp else if (currentTrack != null) 168.dp else 100.dp
+    val contentBottom = if (isLandscape) DockClearance else if (currentTrack != null) 168.dp else 100.dp
+    // On a side a notch or a three-button bar sits next to the page, and the pages run edge to edge
+    val sideInsets = WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal)
     // The mini-player stays out of the way on the wave page, which already shows the playing wave
     val showMini = currentTrack != null && currentTab != MainTab.CAR && !(currentTab == MainTab.HOME && now.waveActive)
     val snackbar = remember { SnackbarHostState() }
@@ -197,7 +208,8 @@ fun MainScreen(
                             targetState = depth to catalogStack.lastOrNull()?.takeIf { depth > 0 },
                             contentKey = { (_, page) -> page?.page },
                             transitionSpec = { catalogTransition(forward = targetState.first > initialState.first, lite = lite) },
-                            label = "catalog_page"
+                            label = "catalog_page",
+                            modifier = if (isLandscape && tab != MainTab.CAR) Modifier.windowInsetsPadding(sideInsets) else Modifier
                         ) { (_, catalogTop) ->
                         if (catalogTop != null) {
                             CatalogPageScreen(
@@ -251,23 +263,17 @@ fun MainScreen(
                         }
                     }
                     if (isLandscape) {
-                        FloatingGlassNavigationRail(
+                        DockScrim(Modifier.align(Alignment.BottomCenter))
+                        FloatingGlassDock(
                             currentRoute = currentTab.route,
                             onNavigate = { currentTab = it },
                             modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(start = 14.dp, top = 16.dp, bottom = 16.dp)
-                                .statusBarsPadding()
-                                .navigationBarsPadding()
-                        )
-                        Box(
-                            Modifier
                                 .align(Alignment.BottomCenter)
+                                .windowInsetsPadding(sideInsets)
                                 .navigationBarsPadding()
-                                .padding(bottom = 12.dp)
-                                .widthIn(max = 580.dp)
-                                .fillMaxWidth()
-                        ) { mini() }
+                                .padding(start = 16.dp, end = 16.dp, bottom = DockBottomGap),
+                            player = mini
+                        )
                     } else {
                         Column(
                             modifier = Modifier
@@ -322,7 +328,7 @@ fun MainScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = if (currentTrack != null) 160.dp else 90.dp)
+                        .padding(bottom = if (isLandscape) DockClearance else if (currentTrack != null) 160.dp else 90.dp)
                 ) { data -> com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar(data.visuals.message) }
 
                 if (showCrashLog) CrashLogHost(crashVm) { showCrashLog = false }

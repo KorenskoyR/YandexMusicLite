@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation
 
+import com.korenskoy.yandexmusic.presentation.main.components.DockScrim
+import androidx.compose.ui.Alignment
+import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassDock
+import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
+import com.korenskoy.yandexmusic.presentation.main.components.DockBottomGap
 import com.korenskoy.yandexmusic.presentation.hifi.LocalLinkState
 import com.korenskoy.yandexmusic.data.player.LinkState
 import androidx.compose.ui.test.performTouchInput
@@ -499,6 +504,150 @@ class ScreenshotTest {
         artists = listOf(ArtistDto(id = JsonPrimitive(7), name = "Кино")), volumes = listOf(tracks)
     )
 
+    private val longList = (1..12).map { track("$it", "Песня номер $it", "Кино") }
+
+    /** A page on a side, as the app lays it out: tabs and mini-player along the bottom. */
+    @Composable
+    private fun Docked(route: String, mini: Boolean = true, page: @Composable () -> Unit) {
+        Box(Modifier.fillMaxSize()) {
+            page()
+            DockScrim(Modifier.align(Alignment.BottomCenter))
+            FloatingGlassDock(
+                currentRoute = route,
+                onNavigate = {},
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = DockBottomGap),
+                player = {
+                    if (mini) MiniPlayer(
+                        track = tracks[0], isPlaying = true, progress = { 60_000L },
+                        onPlayPauseClick = {}, onNextClick = {}, onClick = {}, onDismiss = {}
+                    )
+                }
+            )
+        }
+    }
+
+    private fun dockedArtist(name: String) {
+        show {
+            Docked("library") {
+                CatalogPageScreen(
+                    state = CatalogPageState(
+                        CatalogPage.Artist("7", "Кино"),
+                        artist = ArtistBriefDto(ArtistDto(id = JsonPrimitive(7), name = "Кино"), longList, listOf(album)),
+                        isLoading = false
+                    ),
+                    currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1"), contentBottom = DockClearance, actions = catalogActions
+                )
+            }
+        }
+        snap(name)
+    }
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitArtist() = dockedArtist("head_artist")
+
+    @Test
+    @Config(qualifiers = OLD_HEAD_UNIT)
+    fun oldHeadUnitArtist() = dockedArtist("head_old_artist")
+
+    @Test
+    @Config(qualifiers = PHONE_ON_SIDE)
+    fun phoneOnItsSideArtist() = dockedArtist("phone_side_artist")
+
+    private fun dockedPlaylist(name: String, opened: OpenedPlaylist) {
+        show {
+            Docked("library") {
+                PlaylistScreen(
+                    opened = opened,
+                    currentTrackId = null, isPlaying = false, likedTrackIds = setOf("1"), downloadedTrackIds = emptySet(),
+                    contentBottom = DockClearance, onBack = {}, onPlay = {}, onTrackClick = {}, onToggleLike = {}, onRetry = {},
+                    onRename = {}, onDelete = {}
+                )
+            }
+        }
+        snap(name)
+    }
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitPlaylist() = dockedPlaylist("head_playlist", OpenedPlaylist(playlists[0], longList, isLoading = false))
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitPlaylistFailed() = dockedPlaylist(
+        "head_playlist_failed",
+        OpenedPlaylist(playlists[0], isLoading = false, failed = true, failReason = "HTTP 400 playlistIdBindingError")
+    )
+
+    private fun dockedWave(name: String) {
+        show {
+            Docked("home", mini = false) {
+                HomeScreen(
+                    waveTrack = tracks[0], isPlaying = true, isLoading = false, isLiked = true, progress = { 70_000L },
+                    shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
+                    onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {},
+                    contentBottom = DockClearance
+                )
+            }
+        }
+        snap(name)
+    }
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitWave() = dockedWave("head_wave")
+
+    @Test
+    @Config(qualifiers = PHONE_ON_SIDE)
+    fun phoneOnItsSideWave() = dockedWave("phone_side_wave")
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitLibrary() {
+        show {
+            Docked("library") {
+                LibraryScreen(
+                    tracks = longList, isLoading = false, autoDownloadEnabled = false,
+                    currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1"), downloadedTrackIds = emptySet(),
+                    cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                    onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {}
+                )
+            }
+        }
+        snap("head_library")
+    }
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitSearch() {
+        show {
+            Docked("search") {
+                SearchScreen(
+                    query = "", onQueryChange = {}, results = emptyList(), weeklyHits = longList, trendTracks = longList,
+                    isSearching = false, currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(),
+                    onTrackClick = { _, _ -> }, onToggleLike = {}, history = listOf("кино")
+                )
+            }
+        }
+        snap("head_search")
+    }
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun headUnitRadio() {
+        val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
+        show {
+            Docked("radio") {
+                RadioScreen(
+                    stations = stations, allStations = stations, selectedCategory = RadioCategory.ALL,
+                    onCategorySelect = {}, currentStationId = stations.first().id, isPlaying = true,
+                    favoriteStationIds = setOf(stations[1].id, stations[2].id), onStationClick = {}, onToggleFavorite = {}, onPlayPause = {}
+                )
+            }
+        }
+        snap("head_radio")
+    }
+
     @Test
     fun artistPage() {
         show {
@@ -618,5 +767,8 @@ class ScreenshotTest {
     private companion object {
         /** 21.10.2026 10:30 MSK: the car clock in the screenshots. */
         const val FIXED_TIME = 1_792_567_800_000L
+        const val HEAD_UNIT = "w1280dp-h720dp-land-mdpi"
+        const val OLD_HEAD_UNIT = "w1024dp-h600dp-land-mdpi"
+        const val PHONE_ON_SIDE = "w800dp-h360dp-land-xhdpi"
     }
 }

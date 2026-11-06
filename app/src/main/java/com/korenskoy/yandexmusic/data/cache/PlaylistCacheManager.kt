@@ -78,6 +78,10 @@ class PlaylistCacheManager @Inject constructor(
         return loadList(owner, playlistList(kind))
     }
 
+    /** What was saved for this playlist last, whatever its revision: better than nothing when the server fails. */
+    suspend fun loadLastPlaylistTracks(userFolder: String, kind: String): List<TrackDetailsDto> =
+        loadList(sanitizeUserFolder(userFolder), playlistList(kind))
+
     /** Drops every cached revision of a deleted playlist. */
     suspend fun deletePlaylistTracks(userFolder: String, kind: String) {
         val owner = sanitizeUserFolder(userFolder)

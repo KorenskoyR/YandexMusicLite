@@ -176,7 +176,7 @@ class PlaybackController @Inject constructor(
         streamNeedsTheLine = { isBuffering.value },
         upcoming = { upcomingTracks() },
         moreTracks = { wave.tracks.value },
-        isDownloaded = downloadManager::isKnownDownloaded,
+        isDownloaded = preloadManager::hasPlayableCopy,
         fetchMore = { wave.fetchMoreAwait() },
         onStored = { prefetchCovers(context, listOf(it), listOf(CoverSize.Small, CoverSize.Medium, CoverSize.Large)) }
     )
@@ -617,7 +617,7 @@ class PlaybackController @Inject constructor(
             return
         }
 
-        val downloaded = downloadManager.isKnownDownloaded(trackId)
+        val downloaded = preloadManager.hasPlayableCopy(trackId)
         if (downloaded) {
             publishQuality(trackId)
             streamingTrackId = null
@@ -659,6 +659,31 @@ class PlaybackController @Inject constructor(
                 if (_currentTrack.value?.idString != trackId) return@launch
                 onPlaybackFailure(PlaybackFailure(trackId, startPositionMs, "URL_RESOLVE"))
             }
+        }
+    }
+
+    /**
+     * The sound mode changed. Links and the warmed-up next track came from the old mode. A FLAC track
+     * playing in silence is the reason for the switch, so it goes on from the same second at once;
+     * anything else plays on, and the next tracks follow the new mode.
+     */
+    fun onSoundModeChanged(compatible: Boolean) {
+        val track = _currentTrack.value?.takeIf { !it.isRadio }
+        val id = track?.idString
+        val playingFlac = id != null && playingCopyId != id && if (streamingTrackId == id) {
+            preloadManager.qualityOf(id)?.isLossless == true
+        } else {
+            downloadManager.downloadedQuality(id)?.isLossless == true
+        }
+        preloadManager.clearCache()
+        playerRepository.dropStandby()
+        if (!compatible || track == null || !playingFlac) return
+        if (isPlaying.value) {
+            resolveAndPlay(track, crossfade = false, startPositionMs = progress.value)
+        } else {
+            // On pause: Play starts it again from here
+            restoredPositionMs.value = progress.value
+            playerRepository.stop()
         }
     }
 
@@ -774,7 +799,7 @@ class PlaybackController @Inject constructor(
         val action = PlaybackQueue.recoveryFor(
             offline = isOffline(),
             isRadio = current.isRadio,
-            isDownloaded = downloadManager.isKnownDownloaded(current.idString),
+            isDownloaded = preloadManager.hasPlayableCopy(current.idString),
             alreadyRetried = retriedTrackId == failure.trackId,
             failedTracksInARow = consecutiveFailedTracks + 1,
             hasCopy = !copyFailed && reserve.has(failure.trackId),
@@ -833,7 +858,7 @@ class PlaybackController @Inject constructor(
     }
 
     private fun publishQuality(trackId: String) {
-        _streamQuality.value = if (downloadManager.isKnownDownloaded(trackId)) {
+        _streamQuality.value = if (preloadManager.hasPlayableCopy(trackId)) {
             val q = downloadManager.downloadedQuality(trackId)
             if (q != null) {
                 if (q.codec.startsWith("flac", ignoreCase = true)) "FLAC · ОФЛАЙН"
@@ -853,7 +878,7 @@ class PlaybackController @Inject constructor(
 
     private fun currentLink(): LinkState = if (isOffline()) LinkState.NONE else link.state
 
-    private fun isOnDevice(trackId: String): Boolean = downloadManager.isKnownDownloaded(trackId) || reserve.has(trackId)
+    private fun isOnDevice(trackId: String): Boolean = preloadManager.hasPlayableCopy(trackId) || reserve.has(trackId)
 
     /**
      * No connection and the queue has nothing more on the device: the rest of the reserve (what has not
@@ -862,8 +887,8 @@ class PlaybackController @Inject constructor(
     private fun playOfflineMix(leaving: ReturnPoint) {
         val reserved = ReservePolicy.playOrder(reserve.entries.value.values) { it in recentPlayedTrackIds }
             .map { it.track }
-            .filterNot { downloadManager.isKnownDownloaded(it.idString) }
-        val downloaded = libraryTracks.filter { downloadManager.isKnownDownloaded(it.idString) }.shuffled()
+            .filterNot { preloadManager.hasPlayableCopy(it.idString) }
+        val downloaded = libraryTracks.filter { preloadManager.hasPlayableCopy(it.idString) }.shuffled()
         val mix = (reserved + downloaded).distinctBy { it.idString }
         if (mix.isEmpty()) {
             _isStarting.value = false
@@ -915,7 +940,7 @@ class PlaybackController @Inject constructor(
         scope.launch {
             val nextId = track.idString
             val url = when {
-                downloadManager.isKnownDownloaded(nextId) -> ""
+                preloadManager.hasPlayableCopy(nextId) -> ""
                 RoadPlan.originFor(currentLink(), link.mayTryStream(), reserve.has(nextId)) == TrackOrigin.COPY -> copyUri(nextId) ?: return@launch
                 currentLink() == LinkState.NONE -> return@launch
                 else -> preloadManager.getOrFetchUrl(nextId)?.let { stream ->

@@ -162,7 +162,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(start = 140.dp, end = 24.dp, top = 12.dp, bottom = contentBottom),
+                .padding(start = 20.dp, end = 24.dp, top = 12.dp, bottom = contentBottom),
             verticalAlignment = Alignment.CenterVertically
         ) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
@@ -175,7 +175,7 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.weight(1f))
                 WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
-                WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = 112.dp)
+                WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = if (windowSize.heightDp < 480) 84.dp else 112.dp)
             }
         }
     } else {
