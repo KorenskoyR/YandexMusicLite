@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.WindowInsets
@@ -64,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -162,7 +164,9 @@ fun CarScreen(
     progress: () -> Long = { 0L },
     durationMs: Long = 0L,
     onSeek: (Long) -> Unit = {},
-    nextTrack: TrackDetailsDto? = null,
+    upcoming: List<TrackDetailsDto> = emptyList(),
+    upcomingLoading: Boolean = false,
+    onUpcomingClick: (TrackDetailsDto) -> Unit = {},
     source: PlaylistSource = PlaylistSource.NONE,
     isLiked: Boolean = currentTrack?.let { likedTrackIds.contains(it.idString) } == true,
     isBuffering: Boolean = false,
@@ -189,6 +193,11 @@ fun CarScreen(
     val playPause = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() }
     val isRadio = currentTrack?.isRadio == true
     val active = carSourceOf(source, isRadio)
+    val nextCaption = when {
+        source == PlaylistSource.VIBE && trackWaveSeed != null -> stringResource(R.string.car_next_track_wave)
+        source == PlaylistSource.VIBE -> stringResource(R.string.car_next_wave)
+        else -> stringResource(R.string.car_next)
+    }
     val sourceLabel = when {
         trackWaveSeed != null && active == CarSource.WAVE -> stringResource(R.string.wave_by_track_car, trackWaveSeed.title.orEmpty())
         else -> null
@@ -226,13 +235,12 @@ fun CarScreen(
             }
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { playPause() }) }
     ) {
-        // Scale the 1280×720 (landscape) or 600×1140 (portrait: 1060 + the row of wave buttons) layout to this
-        // head unit. Standing, the height is what runs out (the Geely's 960×1280): count only what the system
-        // bars leave, or the source dock at the bottom gets squeezed
+        // Scale the 1280×720 (landscape) or 600×1200 (portrait: cover, track, controls, the "next" row, sources)
+        // layout to this head unit. Standing, the height is what runs out (the Geely's 960×1280): count only what
+        // the system bars leave, or the source dock at the bottom gets squeezed
         val bars = WindowInsets.systemBars.asPaddingValues()
         val usableHeight = maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding()
-        val s = if (isLandscape) minOf(maxWidth / 1280.dp, maxHeight / 720.dp) else minOf(maxWidth / 600.dp, usableHeight / 1140.dp)
-        val u = Scale(s.coerceIn(0.55f, 2f))
+        val u = Scale(carScaleOf(maxWidth, maxHeight, usableHeight, isLandscape))
         val farFocus = if (isLandscape) Offset(if (steeringWheelOnLeft) 0.78f else 0.22f, 0.45f) else Offset(0.5f, 0.25f)
         HiFiBackdrop(tint = tint, coverUrl = coverUrl, glowCenter = farFocus, bottomFade = !isLandscape)
         if (isLandscape) {
@@ -329,9 +337,30 @@ fun CarScreen(
                             modifier = Modifier.width(u(652f)).fillMaxHeight()
                         )
                     }
+                    // The cover alone, and under it the covers of what comes next: nothing lies on the cover
                     val far: @Composable () -> Unit = {
-                        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            CoverWithNext(u, currentTrack, nextTrack, Modifier.size(u(500f)))
+                        // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
+                        Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
+                            if (isRadio) {
+                                CarCover(u, currentTrack, Modifier.size(u(500f)))
+                            } else {
+                                Column(
+                                    Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(u(22f), Alignment.CenterVertically)
+                                ) {
+                                    // Gets what the row leaves, never more than 300: the row is measured first
+                                    CarCover(
+                                        u, currentTrack,
+                                        Modifier
+                                            .weight(1f, fill = false)
+                                            .sizeIn(maxWidth = u(300f), maxHeight = u(300f))
+                                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                                    )
+                                    NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(152f), gap = u(22f), onClick = onUpcomingClick)
+                                }
+                            }
                         }
                     }
                     if (steeringWheelOnLeft) { driver(); far() } else { far(); driver() }
@@ -341,26 +370,33 @@ fun CarScreen(
                     Modifier.fillMaxSize().padding(horizontal = u(28f)).padding(bottom = u(24f)),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // The panel stands where the cover is; its height is kept at least the cover's, so nothing below moves
+                    // As on the phone's wave page: cover, track, controls, then "next" right above the sources.
+                    // "Настроить волну" takes the place of the cover and the "next" row (more room than it needs),
+                    // so the controls and the sources stay reachable
                     androidx.compose.animation.Crossfade(
                         targetState = tuneOpen,
-                        modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth().height(u(400f)),
+                        modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth(),
                         label = "car_tune"
                     ) { open ->
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                             if (open) tunePanel(Modifier.fillMaxWidth(), true)
-                            else CoverWithNext(u, currentTrack, nextTrack, Modifier.size(u(400f)))
+                            else CarCover(u, currentTrack, Modifier.size(u(if (isRadio) 400f else 220f)))
                         }
                     }
-                    Spacer(Modifier.height(u(28f)))
+                    Spacer(Modifier.height(u(24f)))
                     DriverPanel(
                         u = u, track = currentTrack, sourceLabel = sourceLabel, isPlaying = isPlaying, isLiked = isLiked,
                         ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
                         onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
                         onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
                         sources = sources, active = active, onSeek = onSeek,
-                        modifier = Modifier.width(u(560f)).weight(1f),
-                        compactDock = true
+                        // At most 560 wide and centred: on a wide standing screen (the Geely's 960) the controls
+                        // stay together instead of spreading to the edges
+                        modifier = Modifier.widthIn(max = u(560f)).fillMaxWidth().weight(1f),
+                        compactDock = true,
+                        beforeDock = if (isRadio || tuneOpen) null else {
+                            { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(168f), gap = u(20f), onClick = onUpcomingClick) }
+                        }
                     )
                 }
             }
@@ -388,6 +424,21 @@ fun CarScreen(
         }
         }
     }
+}
+
+/** The car layout's scale for a screen: the 1280×720 design lying, 600×1200 standing (by the height the bars leave). */
+internal fun carScaleOf(maxWidth: Dp, maxHeight: Dp, usableHeight: Dp, isLandscape: Boolean): Float {
+    val s = if (isLandscape) minOf(maxWidth / 1280.dp, maxHeight / 720.dp) else minOf(maxWidth / 600.dp, usableHeight / 1200.dp)
+    return s.coerceIn(0.55f, 2f)
+}
+
+/**
+ * How high the source dock reaches from the bottom of the car screen above the navigation bar, plus a gap:
+ * a message placed over this never covers the sources. Lying: 28 + 96 + 12; standing: 24 + 88 + 12.
+ */
+fun carDockClearance(maxWidth: Dp, maxHeight: Dp, usableHeight: Dp, isLandscape: Boolean): Dp {
+    val s = carScaleOf(maxWidth, maxHeight, usableHeight, isLandscape)
+    return ((if (isLandscape) 136f else 124f) * s).dp
 }
 
 /** dp sizes of the 1280×720 design, scaled to the screen. */
@@ -480,7 +531,8 @@ private fun DriverPanel(
     active: CarSource?,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
-    compactDock: Boolean = false
+    compactDock: Boolean = false,
+    beforeDock: (@Composable () -> Unit)? = null
 ) {
     Column(modifier) {
         if (sourceLabel.isNotEmpty()) {
@@ -498,8 +550,8 @@ private fun DriverPanel(
                 Text(
                     shown?.title ?: stringResource(R.string.car_source_wave),
                     color = Color.White,
-                    fontSize = u.sp(56f),
-                    lineHeight = u.sp(62f),
+                    fontSize = u.sp(if (compactDock) 44f else 56f),
+                    lineHeight = u.sp(if (compactDock) 50f else 62f),
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.03).em,
                     maxLines = 1,
@@ -517,43 +569,49 @@ private fun DriverPanel(
             }
         }
 
-        // The gauge cluster; in portrait (560 wide) the side controls shrink so all five fit
-        val sideSize = if (compactDock) 64f else 72f
-        val skipSize = if (compactDock) 88f else 96f
+        // The gauge cluster. Standing (544 wide) all of it is smaller, so the five never touch:
+        // 60 + 80 + 196 + 80 + 60 = 476, about 17 between neighbours; lying (652 wide) 19 between them
+        val sideSize = if (compactDock) 60f else 72f
+        val skipSize = if (compactDock) 80f else 96f
+        val ringSize = if (compactDock) 196f else 240f
+        val knobSize = if (compactDock) 144f else 176f
+        val sideIcon = if (compactDock) 24f else 28f
+        val skipIcon = if (compactDock) 32f else 38f
         Row(
-            Modifier.fillMaxWidth().height(u(240f)).padding(top = u(0f)),
+            Modifier.fillMaxWidth().height(u(ringSize + 4f)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             GlassRound(u(sideSize), stringResource(R.string.cd_ne_nravitsya), onDislike) {
-                Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(u(28f)))
+                Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(u(sideIcon)))
             }
             HiFiKnob(onClick = onPrev, contentDescription = stringResource(R.string.cd_predyduschiy_trek), size = u(skipSize)) {
-                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(38f)))
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(skipIcon)))
             }
-            Box(Modifier.size(u(240f)), contentAlignment = Alignment.Center) {
+            // The ring's bars end inside its own square: inner radius + the longest bar < half of it
+            Box(Modifier.size(u(ringSize)), contentAlignment = Alignment.Center) {
                 SpectrumRing(
                     mode = ringMode,
                     progress = fraction,
                     bars = if (LocalHiFiLite.current) 60 else 90,
-                    innerRadius = u(98f),
-                    maxLength = u(20f),
+                    innerRadius = u(if (compactDock) 80f else 98f),
+                    maxLength = u(if (compactDock) 16f else 20f),
                     barWidth = u(3f),
-                    modifier = Modifier.size(u(240f))
+                    modifier = Modifier.size(u(ringSize))
                 )
-                HiFiKnob(onClick = onPlayPause, contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza), size = u(176f)) {
-                    PlayPauseGlyph(isPlaying = isPlaying, size = u(56f))
+                HiFiKnob(onClick = onPlayPause, contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza), size = u(knobSize)) {
+                    PlayPauseGlyph(isPlaying = isPlaying, size = u(if (compactDock) 46f else 56f))
                 }
             }
             HiFiKnob(onClick = onNext, contentDescription = stringResource(R.string.cd_sleduyuschiy_trek), size = u(skipSize)) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(38f)))
+                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(skipIcon)))
             }
             GlassRound(u(sideSize), stringResource(R.string.cd_nravitsya), onLike) {
                 Icon(
                     if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                     contentDescription = null,
                     tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.88f),
-                    modifier = Modifier.size(u(28f))
+                    modifier = Modifier.size(u(sideIcon))
                 )
             }
         }
@@ -561,6 +619,10 @@ private fun DriverPanel(
         if (isRadio) CarLiveLine(u, Modifier.padding(top = u(10f)))
         else CarTimeline(u, progress, durationMs, isPlaying, onSeek, Modifier.padding(top = u(10f)))
         Spacer(Modifier.weight(1f))
+        if (beforeDock != null) {
+            beforeDock()
+            Spacer(Modifier.height(u(18f)))
+        }
         Dock(u, sources, active, compact = compactDock)
     }
 }
@@ -611,9 +673,9 @@ private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: B
     }
 }
 
-/** The cover with a gloss and a coloured shadow; the next track sits on a glass plate over its lower edge. */
+/** The cover with a gloss and a coloured shadow. Nothing lies on it: what comes next has its own row. */
 @Composable
-private fun CoverWithNext(u: Scale, track: TrackDetailsDto?, next: TrackDetailsDto?, modifier: Modifier) {
+private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
     val context = LocalContext.current
     val tint: ArtworkTint = LocalArtworkTint.current
     val shape = RoundedCornerShape(u(30f))
@@ -655,53 +717,104 @@ private fun CoverWithNext(u: Scale, track: TrackDetailsDto?, next: TrackDetailsD
                     }
                 }
         )
-        AnimatedVisibility(
-            visible = next != null,
-            enter = fadeIn(HiFiMotion.large()),
-            exit = fadeOut(HiFiMotion.quick()),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            if (next != null) NextPlate(u, next)
+    }
+}
+
+/**
+ * What comes next: up to three covers with title and artist, like the wave page on a phone. Fixed, not a
+ * carousel: a swipe on the car screen switches tracks, and nothing slides under the driver's finger. While
+ * the wave is still fetching, placeholders of the same size keep the place.
+ */
+@Composable
+private fun NextRow(
+    u: Scale,
+    caption: String,
+    tracks: List<TrackDetailsDto>,
+    loading: Boolean,
+    maxCard: Dp,
+    gap: Dp,
+    onClick: (TrackDetailsDto) -> Unit
+) {
+    if (tracks.isEmpty() && !loading) return
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val card = ((maxWidth - gap * 2) / 3).coerceAtMost(maxCard)
+        Column(Modifier.width(card * 3 + gap * 2)) {
+            Text(
+                caption.uppercase(),
+                color = Color.White.copy(alpha = 0.66f),
+                fontSize = u.sp(13f),
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.16.em,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(u(12f)))
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                repeat(3) { slot ->
+                    AnimatedContent(
+                        targetState = tracks.getOrNull(slot),
+                        contentKey = { it?.idString },
+                        transitionSpec = { fadeIn(HiFiMotion.large()) togetherWith fadeOut(HiFiMotion.quick()) },
+                        label = "car_next_$slot"
+                    ) { track ->
+                        when {
+                            track != null -> NextCard(u, track, card) { onClick(track) }
+                            loading -> NextCardPlaceholder(u, card)
+                            else -> Spacer(Modifier.width(card))
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun NextPlate(u: Scale, next: TrackDetailsDto) {
+private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(u(22f))
-    AnimatedContent(
-        targetState = next,
-        contentKey = { it.idString },
-        transitionSpec = { fadeIn(HiFiMotion.large()) togetherWith fadeOut(HiFiMotion.quick()) },
-        label = "car_next"
-    ) { shown ->
-        Row(
-            Modifier
-                .padding(u(14f))
-                .fillMaxWidth()
-                .height(u(84f))
-                .hifiGlass(shape, fill = Color(0x8C080A14), border = Color.White.copy(alpha = 0.16f))
-                .hifiGrain(enabled = !LocalHiFiLite.current, alpha = 0.25f)
-                .padding(start = u(12f), end = u(20f)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(context).cover(shown.coverUri, CoverSize.Small).crossfade(true).build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(u(60f))
-                    .hifiSoftShadow(RoundedCornerShape(u(13f)), u(10f))
-                    .clip(RoundedCornerShape(u(13f)))
-                    .background(HiFi.Placeholder)
-            )
-            Spacer(Modifier.width(u(14f)))
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.car_next), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(11f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.18.em)
-                Text(shown.title ?: "", color = Color.White, fontSize = u.sp(21f), lineHeight = u.sp(26f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(shown.artists.joinToString { it.name ?: "" }, color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(16f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+    val shape = RoundedCornerShape(u(18f))
+    val title = track.title ?: stringResource(R.string.bez_nazvaniya)
+    val description = stringResource(R.string.car_next_play_cd, title)
+    Column(
+        Modifier
+            .width(size)
+            .clip(RoundedCornerShape(u(18f)))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Medium).crossfade(true).build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(size)
+                .hifiSoftShadow(shape, u(16f))
+                .clip(shape)
+                .background(HiFi.Placeholder)
+        )
+        Spacer(Modifier.height(u(10f)))
+        Text(title, color = Color.White, fontSize = u.sp(17f), lineHeight = u.sp(22f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            track.artists.joinToString { it.name ?: "" },
+            color = Color.White.copy(alpha = 0.66f),
+            fontSize = u.sp(15f),
+            lineHeight = u.sp(20f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** Exactly a card's height (cover, 10, two lines), so the row does not jump when the tracks arrive. */
+@Composable
+private fun NextCardPlaceholder(u: Scale, size: Dp) {
+    val fill = Color.White.copy(alpha = 0.06f)
+    Column(Modifier.width(size)) {
+        Box(Modifier.size(size).clip(RoundedCornerShape(u(18f))).background(fill))
+        Spacer(Modifier.height(u(15f)))
+        Box(Modifier.width(size * 0.72f).height(u(12f)).clip(RoundedCornerShape(u(6f))).background(fill))
+        Spacer(Modifier.height(u(10f)))
+        Box(Modifier.width(size * 0.48f).height(u(10f)).clip(RoundedCornerShape(u(5f))).background(fill))
+        Spacer(Modifier.height(u(5f)))
     }
 }

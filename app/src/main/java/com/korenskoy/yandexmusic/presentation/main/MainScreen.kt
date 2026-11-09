@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
 import kotlinx.coroutines.launch
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarDuration
@@ -364,18 +366,30 @@ fun MainScreen(
                         }
                     }
                 }
+                // In the car the message sits right above the big source dock, never over it
+                val bars = WindowInsets.systemBars.asPaddingValues()
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                val snackBottom = when {
+                    currentTab == MainTab.CAR -> com.korenskoy.yandexmusic.presentation.car.carDockClearance(
+                        maxWidth, maxHeight, maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(), isLandscape
+                    )
+                    isLandscape -> DockClearance
+                    currentTrack != null -> 160.dp
+                    else -> 90.dp
+                }
                 SnackbarHost(
                     hostState = snackbar,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(bottom = if (isLandscape) DockClearance else if (currentTrack != null) 160.dp else 90.dp)
+                        .padding(bottom = snackBottom)
                 ) { data ->
                     com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar(
                         message = data.visuals.message,
                         actionLabel = data.visuals.actionLabel,
                         onAction = { data.performAction() }
                     )
+                }
                 }
 
                 if (showCrashLog) CrashLogHost(crashVm) { showCrashLog = false }

@@ -232,7 +232,7 @@
     <string name="radio_favorites">Избранные</string>
     <string name="radio_all_stations">Все станции</string>
     <string name="car_label">В АВТО</string>
-    <string name="car_next">ДАЛЕЕ</string>
+    <string name="car_next">Далее</string>
     <string name="car_source_wave">Моя волна</string>
     <string name="car_source_liked">Любимое</string>
     <string name="car_source_radio">Радио</string>
@@ -449,4 +449,7 @@
     <string name="auth_webview_still_missing">WebView всё ещё недоступен</string>
     <string name="crash_offer_title">Приложение закрылось с ошибкой</string>
     <string name="auth_phone_minutes">Он действует %1$d мин</string>
+    <string name="car_next_wave">Далее в волне</string>
+    <string name="car_next_track_wave">Далее · волна по треку</string>
+    <string name="car_next_play_cd">Включить «%1$s»</string>
 </resources>

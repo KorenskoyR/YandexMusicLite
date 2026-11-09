@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.data.player.PlaybackQueue
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.runtime.Composable
@@ -292,8 +293,13 @@ internal fun CarTab(
     val showClock by viewModel.carClock.collectAsStateWithLifecycle()
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
+    val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
     val track = now.track
-    val nextTrack = remember(queue, now.trackId) { if (track?.isRadio == true) null else upcomingOf(queue, now.trackId, 1).firstOrNull() }
+    // What will really play next, by the player's own rule (explicit passed over, a playlist goes on from its start)
+    val upcoming = remember(queue, now.trackId, now.source, skipExplicit, track?.isRadio) {
+        if (track == null || track.isRadio) emptyList()
+        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, 3) { skipExplicit && it.isExplicit }
+    }
     CarScreen(
         currentTrack = track,
         isPlaying = now.isPlaying,
@@ -314,7 +320,10 @@ internal fun CarTab(
         progress = progress,
         durationMs = track?.durationMs ?: 0L,
         onSeek = { viewModel.seekTo(it) },
-        nextTrack = nextTrack,
+        upcoming = upcoming,
+        // The wave with nothing fetched yet ahead: placeholders keep the row's place
+        upcomingLoading = now.source == PlaylistSource.VIBE && track != null && !track.isRadio && upcoming.isEmpty(),
+        onUpcomingClick = { viewModel.playTrack(it.idString, queue, now.source, byUser = false) },
         source = now.source,
         isBuffering = now.isBuffering,
         showClock = showClock,

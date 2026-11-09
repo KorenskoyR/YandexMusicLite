@@ -127,4 +127,22 @@ class NewPlaybackRulesTest {
         assertEquals(WaveKnob.Press(WaveKnob.Action.TOGGLE, false), WaveKnob.press(waveActive = true, isPlaying = true, hasPlayed = true))
         assertEquals(WaveKnob.Press(WaveKnob.Action.TOGGLE, false), WaveKnob.press(waveActive = true, isPlaying = false, hasPlayed = true))
     }
+
+    private fun ids(list: List<TrackDetailsDto>) = list.map { it.idString }
+
+    @Test
+    fun theCarShowsWhatWillReallyPlayNext() {
+        val queue = listOf(t("a"), t("b", explicit = true), t("c"), t("d"), t("e"))
+        // Explicit passed over with the filter on, kept with it off
+        assertEquals(listOf("c", "d", "e"), ids(PlaybackQueue.upcoming(queue, 0, PlaylistSource.LIBRARY, 3) { it.isExplicit }))
+        assertEquals(listOf("b", "c", "d"), ids(PlaybackQueue.upcoming(queue, 0, PlaylistSource.LIBRARY, 3) { false }))
+        // A playlist goes on from its start, without the current track and without repeats
+        assertEquals(listOf("e", "a", "c"), ids(PlaybackQueue.upcoming(queue, 3, PlaylistSource.LIBRARY, 3) { it.isExplicit }))
+        assertEquals(listOf("a"), ids(PlaybackQueue.upcoming(listOf(t("a"), t("b")), 1, PlaylistSource.LIBRARY, 3) { false }))
+        // The wave shows only what it has fetched
+        assertEquals(listOf("e"), ids(PlaybackQueue.upcoming(queue, 3, PlaylistSource.VIBE, 3) { false }))
+        assertEquals(emptyList<String>(), ids(PlaybackQueue.upcoming(queue, 4, PlaylistSource.VIBE, 3) { false }))
+        // Unknown current track: nothing
+        assertEquals(emptyList<String>(), ids(PlaybackQueue.upcoming(queue, -1, PlaylistSource.LIBRARY, 3) { false }))
+    }
 }

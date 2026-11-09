@@ -60,6 +60,25 @@ object PlaybackQueue {
         else -> NextAction.FallbackLibrary
     }
 
+    /**
+     * What will really play after [currentIndex], by the same rule as "next": tracks [skip] rejects are
+     * passed over, a playlist goes on from its start, the wave stops at what it has fetched. At most
+     * [limit] tracks, never the current one, never one twice.
+     */
+    fun <T> upcoming(queue: List<T>, currentIndex: Int, source: PlaylistSource, limit: Int, skip: (T) -> Boolean): List<T> {
+        if (currentIndex !in queue.indices) return emptyList()
+        val result = mutableListOf<T>()
+        val seen = mutableSetOf(currentIndex)
+        var index = currentIndex
+        while (result.size < limit) {
+            val next = nextAction(queue, index, source, skip) as? NextAction.PlayIndex ?: break
+            if (!seen.add(next.index)) break
+            result += queue[next.index]
+            index = next.index
+        }
+        return result
+    }
+
     /** Index of the previous track, or null when "previous" should restart the current one. */
     fun previousIndex(currentIndex: Int, progressMs: Long): Int? =
         if (progressMs > RESTART_ON_PREV_THRESHOLD_MS || currentIndex <= 0) null else currentIndex - 1

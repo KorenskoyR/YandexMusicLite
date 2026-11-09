@@ -231,6 +231,10 @@ class MainViewModel @Inject constructor(
     val openPlayerRequests: Flow<Unit> = playRequests.userStarted
         .filter { settingsRepository.expandPlayerOnPlay.first() }
 
+    /** "Без ненормативной лексики": what is shown as coming next leaves out what will be passed over. */
+    val skipExplicit: StateFlow<Boolean> = settingsRepository.skipExplicit
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     val swipeToCloseMiniPlayer: StateFlow<Boolean> = settingsRepository.swipeToCloseMiniPlayer
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val carClock: StateFlow<Boolean> = settingsRepository.carClock

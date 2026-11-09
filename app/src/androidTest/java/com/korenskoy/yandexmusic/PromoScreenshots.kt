@@ -206,7 +206,7 @@ class PromoScreenshots {
                     onPlayPauseClick = {}, onNextClick = {}, onPrevClick = {}, onToggleLike = {}, onDislikeClick = {},
                     onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {}, onPlayDownloaded = {}, onPlayRadio = {}, onExit = {},
                     isLandscape = true, steeringWheelOnLeft = true, progress = { 82_000L }, durationMs = 286_000,
-                    nextTrack = tracks[1], source = PlaylistSource.VIBE
+                    upcoming = tracks.drop(1).take(3), source = PlaylistSource.VIBE
                 )
             }
         }

@@ -782,7 +782,7 @@ class ScreenshotTest {
         currentTrack = track, isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
         onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
         onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = steeringWheelOnLeft, progress = { 82_000L }, durationMs = 286_000,
-        nextTrack = tracks[2], source = com.korenskoy.yandexmusic.data.player.PlaylistSource.VIBE
+        upcoming = listOf(tracks[2], tracks[1], tracks[0]), source = com.korenskoy.yandexmusic.data.player.PlaylistSource.VIBE
     ) }
 
     /** Radio in the car: no timeline, the on-air line instead. */

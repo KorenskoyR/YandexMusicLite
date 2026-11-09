@@ -340,13 +340,17 @@ class Screenshots112Test {
         tuneOpen: Boolean = false,
         seedTrack: TrackDetailsDto? = null,
         clock: Boolean = true,
-        tuning: WaveTuning = tuned
+        tuning: WaveTuning = tuned,
+        next: List<TrackDetailsDto> = listOf(tracks[2], tracks[1], tracks[0]),
+        loading: Boolean = false,
+        source: PlaylistSource = PlaylistSource.VIBE,
+        current: TrackDetailsDto = tracks[0]
     ) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }, LocalLinkState provides LinkState.WEAK) {
         CarScreen(
-            currentTrack = tracks[0], isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
+            currentTrack = current, isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
             onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
             onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = wheelOnLeft,
-            progress = { 82_000L }, durationMs = 286_000, nextTrack = tracks[2], source = PlaylistSource.VIBE,
+            progress = { 82_000L }, durationMs = 286_000, upcoming = next, upcomingLoading = loading, source = source,
             showClock = clock, waveTuning = tuning, trackWaveSeed = seedTrack, initialTuneOpen = tuneOpen
         )
     }
@@ -451,6 +455,52 @@ class Screenshots112Test {
             }
         }
         snap("v112_car_scaled_tune")
+    }
+
+    // --- 1.12.2: "Далее" as a row of covers ---
+
+    private val radio = tracks[0].copy(id = JsonPrimitive("radio_europa"), title = "Европа Плюс", isRadio = true)
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carNextLoading() {
+        show { Car(isLandscape = true, next = emptyList(), loading = true) }
+        snap("v1122_car_next_loading")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carOneNextFromAPlaylist() {
+        show { Car(isLandscape = true, next = listOf(tracks[1]), source = PlaylistSource.LIBRARY) }
+        snap("v1122_car_one_next")
+    }
+
+    @Test
+    @Config(qualifiers = OLD_HEAD_UNIT)
+    fun oldHeadUnitCarNext() {
+        show { Car(isLandscape = true, wheelOnLeft = false) }
+        snap("v1122_head_old_car_next")
+    }
+
+    @Test
+    @Config(qualifiers = PHONE_ON_SIDE)
+    fun phoneOnItsSideCarNext() {
+        show { Car(isLandscape = true) }
+        snap("v1122_phone_side_car_next")
+    }
+
+    @Test
+    @Config(qualifiers = GEELY)
+    fun geelyCarRadio() {
+        show { Car(isLandscape = false, current = radio, next = emptyList(), source = PlaylistSource.RADIO) }
+        snap("v1122_geely_car_radio")
+    }
+
+    @Test
+    @Config(qualifiers = GEELY)
+    fun geelyCarNextLoading() {
+        show { Car(isLandscape = false, next = emptyList(), loading = true, clock = false) }
+        snap("v1122_geely_car_loading")
     }
 
     // --- Sign-in by code (no WebView) ---
