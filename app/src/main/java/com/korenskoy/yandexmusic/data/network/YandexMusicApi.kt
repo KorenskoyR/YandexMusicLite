@@ -168,18 +168,33 @@ interface YandexMusicApi {
         @retrofit2.http.Field("track-ids") trackIds: String
     ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 
-    @GET("rotor/station/user:onyourwave/tracks")
-    suspend fun getMyWaveTracks(
+    /** Tracks of a rotor station: "user:onyourwave" (My Wave) or "track:<id>" (a wave by a track). */
+    @GET("rotor/station/{station}/tracks")
+    suspend fun getStationTracks(
+        @Path("station", encoded = true) station: String,
         @retrofit2.http.Query("queue") queue: String? = null
     ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.RotorStationTracksResponseDto>
 
-    @retrofit2.http.POST("rotor/station/user:onyourwave/feedback")
+    @retrofit2.http.POST("rotor/station/{station}/feedback")
     @retrofit2.http.FormUrlEncoded
-    suspend fun sendRotorFeedback(
+    suspend fun sendStationFeedback(
+        @Path("station", encoded = true) station: String,
         @retrofit2.http.Field("type") type: String,
         @retrofit2.http.Field("trackId") trackId: String,
         @retrofit2.http.Field("albumId") albumId: String? = null,
-        @retrofit2.http.Field("from") from: String = "radio-user-onyourwave",
+        @retrofit2.http.Field("from") from: String,
         @retrofit2.http.Field("totalPlayedSeconds") totalPlayedSeconds: Double? = null
+    ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
+
+    /** The station and the user's settings for it (character, mood, language). */
+    @GET("rotor/station/{station}/info")
+    suspend fun getStationInfo(
+        @Path("station", encoded = true) station: String
+    ): ResponseWrapper<List<com.korenskoy.yandexmusic.data.dto.RotorStationInfoDto>>
+
+    @retrofit2.http.POST("rotor/station/{station}/settings2")
+    suspend fun setStationSettings(
+        @Path("station", encoded = true) station: String,
+        @retrofit2.http.Body settings: kotlinx.serialization.json.JsonObject
     ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 }

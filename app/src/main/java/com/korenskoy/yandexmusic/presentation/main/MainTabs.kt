@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -60,6 +62,12 @@ internal fun HomeTab(
     val upcoming = remember(queue, now.trackId) { upcomingOf(queue, now.trackId) }
     val shelf = remember(now.waveActive, upcoming, wavePreview) { waveShelfOf(now.waveActive, upcoming, wavePreview) }
     val waveActive = now.waveActive
+    val tuning by viewModel.waveTuning.collectAsStateWithLifecycle()
+    val seed by viewModel.waveSeed.collectAsStateWithLifecycle()
+    var tuneOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (tuneOpen) {
+        com.korenskoy.yandexmusic.presentation.main.components.WaveTuneSheet(tuning, onChange = viewModel::setWaveTuning, onDismiss = { tuneOpen = false })
+    }
     HomeScreen(
         waveTrack = if (waveActive) now.track else null,
         isPlaying = now.isPlaying,
@@ -74,10 +82,14 @@ internal fun HomeTab(
         onDislike = { now.track?.let { viewModel.dislikeTrack(it) } },
         onOpenPlayer = onOpenPlayer,
         onShelfClick = {
-            if (waveActive) viewModel.playTrack(it.idString, queue, PlaylistSource.VIBE)
+            if (waveActive) viewModel.playTrack(it.idString, queue, PlaylistSource.VIBE, byUser = false)
             else viewModel.playWaveFrom(it.idString)
         },
-        contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom
+        contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom,
+        tuning = tuning,
+        trackWaveSeed = seed?.takeIf { waveActive },
+        onTune = { tuneOpen = true },
+        onBackToMyWave = viewModel::returnToMyWave
     )
 }
 
@@ -142,23 +154,16 @@ internal fun LibraryTab(
     now: NowPlaying,
     onOpenAccounts: () -> Unit,
     onOpenCrashLog: () -> Unit,
-    onAddAccount: () -> Unit
+    onAddAccount: () -> Unit,
+    settingsVm: SettingsViewModel = hiltViewModel()
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val loadFailed by viewModel.libraryLoadFailed.collectAsStateWithLifecycle()
     val downloadState by viewModel.downloadAllState.collectAsStateWithLifecycle()
-    val autoDownloadEnabled by viewModel.autoDownloadEnabled.collectAsStateWithLifecycle()
     val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsStateWithLifecycle()
-    val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val crossfadeSeconds by viewModel.crossfadeSeconds.collectAsStateWithLifecycle()
-    val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
-    val uiScaleAuto by viewModel.uiScaleAuto.collectAsStateWithLifecycle()
-    val uiScaleManual by viewModel.uiScaleManual.collectAsStateWithLifecycle()
-    val roadReserveMb by viewModel.roadReserveMb.collectAsStateWithLifecycle()
-    val reserveUsedBytes by viewModel.reserveUsedBytes.collectAsStateWithLifecycle()
-    val compatibleSound by viewModel.compatibleSound.collectAsStateWithLifecycle()
+    val settingsState by settingsVm.state.collectAsStateWithLifecycle()
     val activeAccount by accountVm.activeAccount.collectAsStateWithLifecycle()
     val accountName by accountVm.accountName.collectAsStateWithLifecycle()
     val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsStateWithLifecycle()
@@ -172,56 +177,66 @@ internal fun LibraryTab(
         if (viewModel.tracks.value.isEmpty()) viewModel.loadLikedTracks()
     }
 
-    LibraryScreen(
-        tracks = tracks,
-        isLoading = isLoading,
-        loadFailed = loadFailed,
-        downloadState = downloadState,
-        autoDownloadEnabled = autoDownloadEnabled,
-        currentTrackId = now.trackId,
-        isPlaying = now.isPlaying,
-        likedTrackIds = now.likedTrackIds,
-        downloadedTrackIds = downloadedTrackIds,
-        cacheSizeBytes = cacheSizeBytes,
-        downloadProgress = downloadProgress,
-        onTrackClick = { id -> viewModel.playTrack(id, tracks, PlaylistSource.LIBRARY) },
-        onPlayAllClick = { viewModel.playAllLikedTracks() },
-        onShuffleClick = { viewModel.shuffleLikedTracks() },
-        onDownloadAllClick = { viewModel.downloadAllLikedTracks() },
-        onEnableAutoDownload = { enabled ->
-            if (enabled) viewModel.enableAutoDownloadAndStart() else viewModel.setAutoDownloadLikedTracks(false)
-        },
-        crossfadeSeconds = crossfadeSeconds,
-        onCrossfadeChange = { viewModel.setCrossfadeSeconds(it) },
-        steeringWheelOnLeft = steeringWheelOnLeft,
-        onSteeringWheelChange = { viewModel.setSteeringWheelOnLeft(it) },
-        uiScaleAuto = uiScaleAuto,
-        onUiScaleAutoChange = { viewModel.setUiScaleAuto(it) },
-        uiScaleManual = uiScaleManual,
-        onUiScaleManualChange = { viewModel.setUiScaleManual(it) },
-        onUpgradeDownloads = { viewModel.upgradeDownloadedQuality() },
-        compatibleSound = compatibleSound,
-        onCompatibleSoundChange = { viewModel.setCompatibleSound(it) },
-        reserveMb = roadReserveMb,
-        onReserveChange = { viewModel.setRoadReserveMb(it) },
-        reserveUsedBytes = reserveUsedBytes,
-        onClearReserve = { viewModel.clearRoadReserve() },
-        crashReports = crashReports.size,
-        onOpenCrashLog = onOpenCrashLog,
-        onCancelDownload = { viewModel.cancelDownloadAll() },
-        onClearCache = { viewModel.clearMusicCache() },
-        onToggleLike = { track -> viewModel.toggleLike(track) },
-        onRefresh = { viewModel.loadLikedTracks() },
-        hasActiveTrack = now.hasTrack,
+    val settings = settingsState.copy(
         accountName = accountName,
         avatarUrl = accountAvatarUrl,
         hasPlus = activeAccount?.hasPlus == true,
         defaultAccountName = defaultAccountName,
         updateStatus = updateStatusMessage,
-        onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
-        onAccountManagementClick = onOpenAccounts,
-        onAddAccount = onAddAccount,
-        onLogout = { accountVm.logoutCurrentAccount() },
+        crashReports = crashReports.size
+    )
+    val settingsActions = remember(settingsVm, accountVm, updateVm, viewModel) {
+        SettingsActions(
+            onAccountManagement = onOpenAccounts,
+            onAddAccount = onAddAccount,
+            onLogout = { accountVm.logoutCurrentAccount() },
+            onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
+            onOpenCrashLog = onOpenCrashLog,
+            onCompatibleSoundChange = settingsVm::setCompatibleSound,
+            onCrossfadeChange = settingsVm::setCrossfade,
+            onNormalizeVolumeChange = settingsVm::setNormalizeVolume,
+            onOpenEqualizer = settingsVm::openEqualizer,
+            onStartMusicChange = settingsVm::setStartMusic,
+            onBluetoothAutoplayChange = settingsVm::setBluetoothAutoplay,
+            onSkipExplicitChange = settingsVm::setSkipExplicit,
+            onReserveChange = settingsVm::setReserveMb,
+            onClearReserve = settingsVm::clearReserve,
+            onAutoDownloadChange = settingsVm::setAutoDownload,
+            onDownloadAll = { viewModel.downloadAllLikedTracks() },
+            onUpgradeDownloads = settingsVm::upgradeDownloads,
+            onDownloadsOnCardChange = settingsVm::setDownloadsOnCard,
+            onClearDownloads = { viewModel.clearMusicCache() },
+            onStartPageChange = settingsVm::setStartPage,
+            onExpandPlayerChange = settingsVm::setExpandPlayer,
+            onSwipeToCloseChange = settingsVm::setSwipeToClose,
+            onSteeringWheelChange = settingsVm::setSteeringWheelOnLeft,
+            onCarClockChange = settingsVm::setCarClock,
+            onUiScaleAutoChange = settingsVm::setUiScaleAuto,
+            onUiScaleManualChange = settingsVm::setUiScaleManual,
+            onAnimationModeChange = settingsVm::setAnimationMode
+        )
+    }
+
+    LibraryScreen(
+        tracks = tracks,
+        isLoading = isLoading,
+        loadFailed = loadFailed,
+        downloadState = downloadState,
+        currentTrackId = now.trackId,
+        isPlaying = now.isPlaying,
+        likedTrackIds = now.likedTrackIds,
+        downloadedTrackIds = downloadedTrackIds,
+        downloadProgress = downloadProgress,
+        onTrackClick = { id -> viewModel.playTrack(id, tracks, PlaylistSource.LIBRARY) },
+        onPlayAllClick = { viewModel.playAllLikedTracks() },
+        onShuffleClick = { viewModel.shuffleLikedTracks() },
+        onDownloadAllClick = { viewModel.downloadAllLikedTracks() },
+        onCancelDownload = { viewModel.cancelDownloadAll() },
+        settings = settings,
+        settingsActions = settingsActions,
+        onToggleLike = { track -> viewModel.toggleLike(track) },
+        onRefresh = { viewModel.loadLikedTracks() },
+        hasActiveTrack = now.hasTrack,
         playlists = userPlaylists,
         openedPlaylist = openedPlaylist,
         onOpenPlaylist = { playlistsVm.open(it) },
@@ -274,6 +289,9 @@ internal fun CarTab(
 ) {
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
+    val showClock by viewModel.carClock.collectAsStateWithLifecycle()
+    val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
+    val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val track = now.track
     val nextTrack = remember(queue, now.trackId) { if (track?.isRadio == true) null else upcomingOf(queue, now.trackId, 1).firstOrNull() }
     CarScreen(
@@ -298,6 +316,12 @@ internal fun CarTab(
         onSeek = { viewModel.seekTo(it) },
         nextTrack = nextTrack,
         source = now.source,
-        isBuffering = now.isBuffering
+        isBuffering = now.isBuffering,
+        showClock = showClock,
+        waveTuning = waveTuning,
+        trackWaveSeed = waveSeed,
+        onWaveTuningChange = viewModel::setWaveTuning,
+        onTrackWave = viewModel::startTrackWave,
+        onBackToMyWave = viewModel::returnToMyWave
     )
 }

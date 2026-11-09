@@ -34,7 +34,8 @@ import javax.inject.Inject
 class PlaylistsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: UserPlaylistsRepository,
-    private val playbackController: PlaybackController
+    private val playbackController: PlaybackController,
+    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests
 ) : ViewModel() {
 
     val playlists: StateFlow<List<UserPlaylistDto>> = repository.playlists
@@ -86,11 +87,15 @@ class PlaylistsViewModel @Inject constructor(
 
     fun play(shuffle: Boolean) {
         val tracks = _opened.value?.tracks.orEmpty().let { if (shuffle) it.shuffled() else it }
-        tracks.firstOrNull()?.let { playbackController.playTrack(it.idString, tracks, PlaylistSource.LIBRARY) }
+        tracks.firstOrNull()?.let {
+            playRequests.userStarted()
+            playbackController.playTrack(it.idString, tracks, PlaylistSource.LIBRARY)
+        }
     }
 
     fun playTrack(trackId: String) {
         val tracks = _opened.value?.tracks ?: return
+        playRequests.userStarted()
         playbackController.playTrack(trackId, tracks, PlaylistSource.LIBRARY)
     }
 

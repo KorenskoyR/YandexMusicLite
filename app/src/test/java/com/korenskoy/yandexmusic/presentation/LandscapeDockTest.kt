@@ -98,10 +98,9 @@ class LandscapeDockTest {
 
     private fun libraryPage() = docked {
         LibraryScreen(
-            tracks = tracks, isLoading = false, autoDownloadEnabled = false,
-            currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(), downloadedTrackIds = emptySet(),
-            cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-            onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {}
+            tracks = tracks, isLoading = false, currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(), downloadedTrackIds = emptySet(),
+            downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+            onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {}
         )
     }
 

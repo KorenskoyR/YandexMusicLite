@@ -120,6 +120,7 @@ fun FullScreenPlayer(
     onSleepAtEndOfTrack: () -> Unit = {},
     onCancelSleepTimer: () -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
+    onTrackWave: (() -> Unit)? = null,
     onQualityClick: () -> Unit = {},
     coverModifier: Modifier = Modifier,
     /** Opens with the queue sheet up (screenshots). */
@@ -157,7 +158,7 @@ fun FullScreenPlayer(
         PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier)
     }
     val details = @Composable { compact: Boolean ->
-        TitleRow(track, direction, compact, onAddToPlaylist)
+        TitleRow(track, direction, compact, onAddToPlaylist, onTrackWave)
         Spacer(Modifier.height(10.dp))
         QualityChip(track.isRadio, onQualityClick)
         Spacer(Modifier.height(if (compact) 4.dp else 12.dp))

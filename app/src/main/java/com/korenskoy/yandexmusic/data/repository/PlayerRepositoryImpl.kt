@@ -101,6 +101,23 @@ class PlayerRepositoryImpl(
     // Volume requested by the crossfade, before ducking is applied.
     private val logicalVolume = floatArrayOf(1f, 1f)
     private var duckFactor = 1f
+    @Volatile
+    private var trackGains: Map<String, Float> = emptyMap()
+
+    private fun gainOf(player: ExoPlayer): Float = player.currentMediaItem?.mediaId?.let { trackGains[it] } ?: 1f
+
+    /** The volume the player should have now: crossfade position × ducking × the track's normalization. */
+    private fun applyVolume(player: ExoPlayer) {
+        player.volume = (logicalVolume[indexOf(player)] * duckFactor * gainOf(player)).coerceIn(0f, 1f)
+    }
+
+    override fun setTrackGains(gains: Map<String, Float>) {
+        scope.launch {
+            trackGains = gains
+            applyVolume(playerA)
+            applyVolume(playerB)
+        }
+    }
     private var crossfadeDurationMs = CROSSFADE_DURATION_MS
 
     private var lastSeekTimestamp = 0L
@@ -162,6 +179,11 @@ class PlayerRepositoryImpl(
 
     private fun setupPlayerListener(player: ExoPlayer, playerIdx: Int) {
         player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                // A new track brings its own normalization
+                applyVolume(player)
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 refreshPlaybackState()
                 if (isPlaying && playerIdx == activePlayerIndex && outgoingPlayer == null) {
@@ -521,8 +543,8 @@ class PlayerRepositoryImpl(
 
     override fun setDucked(ducked: Boolean) {
         duckFactor = if (ducked) DUCK_VOLUME else 1f
-        playerA.volume = logicalVolume[0] * duckFactor
-        playerB.volume = logicalVolume[1] * duckFactor
+        applyVolume(playerA)
+        applyVolume(playerB)
     }
 
     override fun setCrossfadeDuration(durationMs: Long) {
@@ -532,9 +554,8 @@ class PlayerRepositoryImpl(
     private fun indexOf(player: ExoPlayer) = if (player === playerA) 0 else 1
 
     private fun setVolume(player: ExoPlayer, volume: Float) {
-        val idx = indexOf(player)
-        logicalVolume[idx] = volume
-        player.volume = volume * duckFactor
+        logicalVolume[indexOf(player)] = volume
+        applyVolume(player)
     }
 
     override fun triggerSkipNext() {

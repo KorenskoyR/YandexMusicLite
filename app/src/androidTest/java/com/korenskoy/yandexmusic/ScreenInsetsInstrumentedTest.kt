@@ -103,10 +103,9 @@ class ScreenInsetsInstrumentedTest {
     fun library() {
         show {
             LibraryScreen(
-                tracks = tracks, isLoading = false, autoDownloadEnabled = false,
-                currentTrackId = null, isPlaying = false, likedTrackIds = setOf("1", "2"), downloadedTrackIds = emptySet(),
-                cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-                onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {}
+                tracks = tracks, isLoading = false, currentTrackId = null, isPlaying = false, likedTrackIds = setOf("1", "2"), downloadedTrackIds = emptySet(),
+                downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {}
             )
         }
         assertBelowStatusBar("Library")

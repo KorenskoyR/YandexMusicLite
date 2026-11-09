@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
+import com.korenskoy.yandexmusic.presentation.main.components.WaveTuneChips
+import com.korenskoy.yandexmusic.domain.model.WaveTuning
 import androidx.compose.foundation.layout.heightIn
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
@@ -134,8 +137,16 @@ fun HomeScreen(
     onDislike: () -> Unit,
     onOpenPlayer: (() -> Unit)?,
     onShelfClick: (TrackDetailsDto) -> Unit,
-    contentBottom: Dp = 100.dp
+    contentBottom: Dp = 100.dp,
+    tuning: WaveTuning = WaveTuning(),
+    trackWaveSeed: TrackDetailsDto? = null,
+    onTune: () -> Unit = {},
+    onBackToMyWave: () -> Unit = {}
 ) {
+    val title = trackWaveSeed?.let { stringResource(R.string.wave_by_track_title, it.title.orEmpty()) } ?: stringResource(R.string.wave_title)
+    val chips: @Composable (Modifier) -> Unit = { modifier ->
+        WaveTuneChips(tuning, trackWave = trackWaveSeed != null, onTune = onTune, onBackToMyWave = onBackToMyWave, modifier = modifier)
+    }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val minDim = minOf(windowSize.widthDp, windowSize.heightDp).toFloat()
@@ -157,6 +168,9 @@ fun HomeScreen(
     }
 
     if (isLandscape) {
+        // A phone on its side (under 480 dp tall): the chips go above the knob, where there is room, so the
+        // "next up" cards keep clear of the tab dock
+        val chipsOverKnob = windowSize.heightDp < 480
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -165,14 +179,18 @@ fun HomeScreen(
                 .padding(start = 20.dp, end = 24.dp, top = 12.dp, bottom = contentBottom),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                instrument(minOf(maxWidth, maxHeight))
+            Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (chipsOverKnob) chips(Modifier.padding(top = 4.dp, bottom = 4.dp))
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    instrument(minOf(maxWidth, maxHeight))
+                }
             }
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    HiFiLargeTitle(stringResource(R.string.wave_title), modifier = Modifier.weight(1f))
+                    HiFiLargeTitle(title, modifier = Modifier.weight(1f))
                     HiFiLinkBadge()
                 }
+                if (!chipsOverKnob) chips(Modifier.padding(top = 10.dp))
                 Spacer(Modifier.weight(1f))
                 WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
                 WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = if (windowSize.heightDp < 480) 84.dp else 112.dp)
@@ -186,12 +204,12 @@ fun HomeScreen(
             contents = listOf(
                 {
                     // The knob's place is counted from this height: it must not change with the title
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp).heightIn(min = 40.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HiFiLargeTitle(stringResource(R.string.wave_title), modifier = Modifier.weight(1f))
-                        HiFiLinkBadge()
+                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp)) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+                            HiFiLargeTitle(title, modifier = Modifier.weight(1f))
+                            HiFiLinkBadge()
+                        }
+                        chips(Modifier.padding(top = 10.dp).height(36.dp))
                     }
                 },
                 {
@@ -202,7 +220,7 @@ fun HomeScreen(
                 {
                     Column {
                         Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
-                        WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 20.dp, cardSize = 132.dp)
+                        WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 20.dp, cardSize = portraitShelfCard(windowSize.widthDp.dp))
                     }
                 }
             ),
@@ -232,6 +250,12 @@ fun HomeScreen(
 }
 
 private val WaveInstrumentPadding = 8.dp
+
+/**
+ * The "next up" cards on a standing screen: 132 dp on a phone, growing with the width so a tablet or a
+ * tall head unit (the Geely's 960 dp) shows about as many cards across as a phone, not a short strip.
+ */
+internal fun portraitShelfCard(width: Dp): Dp = ((width - 40.dp - 36.dp) / 3.4f).coerceIn(132.dp, 200.dp)
 /** From the bottom of the spectrum ring to the track title. */
 private val WaveRingToTrackGap = 18.dp
 
@@ -418,13 +442,15 @@ private fun SkeletonRow(cardSize: Dp, horizontalPadding: Dp, animated: Boolean) 
     } else null
     val base = remember { Color.White.copy(alpha = 0.06f) }
     val bright = remember { Color.White.copy(alpha = 0.14f) }
+    // As many placeholders as cards would fit, so a wide screen is not left with a gap at the end
+    val count = (((currentWindowSizeDp().widthDp.dp - horizontalPadding) / (cardSize + 12.dp)).toInt() + 1).coerceIn(3, 8)
     Row(
         modifier = Modifier
             .padding(start = horizontalPadding)
             .semantics { contentDescription = loadingText },
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        repeat(3) {
+        repeat(count) {
             Column(Modifier.width(cardSize)) {
                 // Exactly a card's height (cover + 8 + 18 + 17): the shelf doesn't jump when tracks arrive
                 SkeletonBlock(Modifier.size(cardSize), 14.dp, phase, base, bright)

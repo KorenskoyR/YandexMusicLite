@@ -67,7 +67,8 @@ class GlassSurfacesInstrumentedTest {
                     Box(Modifier.testTag("mini")) {
                         MiniPlayer(track = track, isPlaying = false, progress = { 0L }, onPlayPauseClick = {}, onNextClick = {}, onClick = {}, onDismiss = {})
                     }
-                    Box(Modifier.testTag("bar")) { FloatingGlassBottomBar(currentRoute = "library", onNavigate = {}) }
+                    // "Волна" selected: its highlight stays at the left end, away from the point measured at 42 %
+                    Box(Modifier.testTag("bar")) { FloatingGlassBottomBar(currentRoute = "home", onNavigate = {}) }
                     Box(Modifier.testTag("track").fillMaxWidth()) { TrackItem(track = track, isPlaying = false, isLiked = true, onClick = {}) }
                     Box(Modifier.testTag("round")) {
                         GlassCircleButton(onClick = {}, contentDescription = "x", size = 56.dp) {

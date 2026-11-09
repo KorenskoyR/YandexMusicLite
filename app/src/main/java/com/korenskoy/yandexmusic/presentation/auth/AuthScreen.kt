@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import com.korenskoy.yandexmusic.presentation.crash.CrashLogDialog
+import com.korenskoy.yandexmusic.presentation.crash.CrashLogViewModel
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.draw.drawBehind
@@ -38,10 +40,30 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 @Composable
 fun AuthScreen(
     onAuthSuccess: () -> Unit,
-    viewModel: AuthViewModel = hiltViewModel()
+    viewModel: AuthViewModel = hiltViewModel(),
+    crashVm: CrashLogViewModel = hiltViewModel()
 ) {
     var isUrlLoaded by remember { mutableStateOf(false) }
     val isNetworkAvailable by viewModel.isNetworkAvailable.collectAsStateWithLifecycle()
+    // Without WebView the login page cannot open (the Geely Galaxy L7 closed here): sign in by a code instead
+    var webViewAvailable by remember { mutableStateOf(WebViewSupport.isAvailable()) }
+    var webViewStillMissing by remember { mutableStateOf(false) }
+    val phoneState by viewModel.phone.collectAsStateWithLifecycle()
+    val signedIn by viewModel.signedIn.collectAsStateWithLifecycle()
+    LaunchedEffect(signedIn) { if (signedIn) onAuthSuccess() }
+
+    // A crash before signing in never reaches the journal in the settings: offer it here, once
+    val crashReports by crashVm.reports.collectAsStateWithLifecycle()
+    val crashUnseen by crashVm.unseen.collectAsStateWithLifecycle()
+    if (crashUnseen && crashReports.isNotEmpty()) {
+        CrashLogDialog(
+            reports = crashReports,
+            onSend = { crashVm.send() },
+            onClear = { crashVm.clear() },
+            onDismiss = { crashVm.markSeen() },
+            title = stringResource(R.string.crash_offer_title)
+        )
+    }
 
     // The Yandex Music OAuth URL for getting the token.
     // We use a known client_id for Yandex Music Android app.
@@ -49,6 +71,23 @@ fun AuthScreen(
 
     if (!isNetworkAvailable) {
         WaitingForInternetScreen()
+    } else if (!webViewAvailable) {
+        if (viewModel.phoneSignInAvailable && phoneState != PhoneSignInState.Misconfigured) {
+            LaunchedEffect(Unit) { viewModel.startPhoneSignIn() }
+            PhoneSignInScreen(phoneState, onNewCode = viewModel::newPhoneCode)
+        } else {
+            NoWebViewScreen(
+                note = when {
+                    webViewStillMissing -> stringResource(R.string.auth_webview_still_missing)
+                    phoneState == PhoneSignInState.Misconfigured -> stringResource(R.string.auth_phone_misconfigured)
+                    else -> null
+                },
+                onRetry = {
+                    webViewAvailable = WebViewSupport.isAvailable()
+                    webViewStillMissing = !webViewAvailable
+                }
+            )
+        }
     } else {
         AndroidView(
         modifier = Modifier.fillMaxSize(),

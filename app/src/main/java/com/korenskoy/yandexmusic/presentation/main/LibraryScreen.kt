@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
 import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
@@ -99,7 +102,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiSectionHeader
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
 import com.korenskoy.yandexmusic.presentation.hifi.IconPlaque
 import com.korenskoy.yandexmusic.presentation.hifi.MetalPillButton
-import com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet
 import com.korenskoy.yandexmusic.presentation.main.components.DownloadProgressModal
 import com.korenskoy.yandexmusic.presentation.main.components.PlaylistNameDialog
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
@@ -121,49 +123,21 @@ fun LibraryScreen(
     isLoading: Boolean,
     loadFailed: Boolean = false,
     downloadState: DownloadQueueState = DownloadQueueState.IDLE,
-    autoDownloadEnabled: Boolean,
     currentTrackId: String?,
     isPlaying: Boolean,
     likedTrackIds: Set<String>,
     downloadedTrackIds: Set<String>,
-    cacheSizeBytes: Long,
     downloadProgress: DownloadProgressInfo?,
     onTrackClick: (String) -> Unit,
     onPlayAllClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onDownloadAllClick: () -> Unit,
-    onEnableAutoDownload: (Boolean) -> Unit,
-    crossfadeSeconds: Int = 3,
-    compatibleSound: Boolean = false,
-    onCompatibleSoundChange: (Boolean) -> Unit = {},
-    onCrossfadeChange: (Int) -> Unit = {},
-    steeringWheelOnLeft: Boolean = true,
-    onSteeringWheelChange: (Boolean) -> Unit = {},
-    uiScaleAuto: Boolean = true,
-    onUiScaleAutoChange: (Boolean) -> Unit = {},
-    uiScaleManual: Float = 1f,
-    onUiScaleManualChange: (Float) -> Unit = {},
-    onUpgradeDownloads: () -> Unit = {},
-    reserveMb: Int = 100,
-    onReserveChange: (Int) -> Unit = {},
-    reserveUsedBytes: Long = 0L,
-    onClearReserve: () -> Unit = {},
-    crashReports: Int = 0,
-    onOpenCrashLog: () -> Unit = {},
     onCancelDownload: () -> Unit,
-    onClearCache: () -> Unit,
+    settings: SettingsUiState = SettingsUiState(),
+    settingsActions: SettingsActions = SettingsActions(),
     onToggleLike: (TrackDetailsDto) -> Unit,
     onRefresh: () -> Unit = {},
     hasActiveTrack: Boolean = false,
-    accountName: String = "",
-    avatarUrl: String? = null,
-    hasPlus: Boolean = false,
-    defaultAccountName: String? = null,
-    updateStatus: String? = null,
-    onCheckForUpdates: () -> Unit = {},
-    onAccountManagementClick: () -> Unit = {},
-    onAddAccount: () -> Unit = {},
-    onLogout: () -> Unit = {},
     playlists: List<UserPlaylistDto> = emptyList(),
     openedPlaylist: OpenedPlaylist? = null,
     onOpenPlaylist: (UserPlaylistDto) -> Unit = {},
@@ -343,42 +317,13 @@ fun LibraryScreen(
     }
 
     if (showSettings) {
-        CacheMenuBottomSheet(
-            onDismiss = { showSettings = false },
-            cacheSizeBytes = cacheSizeBytes,
-            autoDownloadEnabled = autoDownloadEnabled,
-            onEnableAutoDownload = onEnableAutoDownload,
-            crossfadeSeconds = crossfadeSeconds,
-            compatibleSound = compatibleSound,
-            onCompatibleSoundChange = onCompatibleSoundChange,
-            onCrossfadeChange = onCrossfadeChange,
-            steeringWheelOnLeft = steeringWheelOnLeft,
-            onSteeringWheelChange = onSteeringWheelChange,
-            uiScaleAuto = uiScaleAuto,
-            onUiScaleAutoChange = onUiScaleAutoChange,
-            uiScaleManual = uiScaleManual,
-            onUiScaleManualChange = onUiScaleManualChange,
-            onUpgradeDownloads = onUpgradeDownloads,
-            reserveMb = reserveMb,
-            onReserveChange = onReserveChange,
-            reserveUsedBytes = reserveUsedBytes,
-            onClearReserve = onClearReserve,
-            crashReports = crashReports,
-            onOpenCrashLog = onOpenCrashLog,
-            onDownloadAllClick = {
+        SettingsSheet(
+            state = settings,
+            actions = settingsActions.copy(onDownloadAll = {
                 onDownloadAllClick()
                 showProgressModal = true
-            },
-            onClearCache = onClearCache,
-            accountName = accountName,
-            avatarUrl = avatarUrl,
-            hasPlus = hasPlus,
-            defaultAccountName = defaultAccountName,
-            updateStatus = updateStatus,
-            onCheckForUpdates = onCheckForUpdates,
-            onAccountManagementClick = onAccountManagementClick,
-            onAddAccount = onAddAccount,
-            onLogout = onLogout
+            }),
+            onDismiss = { showSettings = false }
         )
     }
 

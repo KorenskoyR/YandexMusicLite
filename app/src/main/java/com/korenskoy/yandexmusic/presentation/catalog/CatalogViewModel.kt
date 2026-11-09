@@ -42,7 +42,8 @@ data class CatalogPageState(
 @HiltViewModel
 class CatalogViewModel @Inject constructor(
     private val repository: CatalogRepository,
-    private val playbackController: PlaybackController
+    private val playbackController: PlaybackController,
+    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests
 ) : ViewModel() {
 
     private val _stack = MutableStateFlow<List<CatalogPageState>>(emptyList())
@@ -74,6 +75,7 @@ class CatalogViewModel @Inject constructor(
     fun play(tracks: List<TrackDetailsDto>, trackId: String? = null, shuffle: Boolean = false) {
         val queue = if (shuffle) tracks.shuffled() else tracks
         val start = trackId ?: queue.firstOrNull()?.idString ?: return
+        playRequests.userStarted()
         playbackController.playTrack(start, queue, PlaylistSource.SEARCH)
     }
 

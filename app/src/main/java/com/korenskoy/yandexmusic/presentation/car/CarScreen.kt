@@ -1,5 +1,21 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Tune
+import com.korenskoy.yandexmusic.presentation.main.components.waveTuningSummary
+import com.korenskoy.yandexmusic.presentation.main.components.WaveTuneChoices
+import com.korenskoy.yandexmusic.presentation.main.components.WavePill
+import com.korenskoy.yandexmusic.domain.model.WaveTuning
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
@@ -149,8 +165,17 @@ fun CarScreen(
     nextTrack: TrackDetailsDto? = null,
     source: PlaylistSource = PlaylistSource.NONE,
     isLiked: Boolean = currentTrack?.let { likedTrackIds.contains(it.idString) } == true,
-    isBuffering: Boolean = false
+    isBuffering: Boolean = false,
+    showClock: Boolean = true,
+    waveTuning: WaveTuning = WaveTuning(),
+    trackWaveSeed: TrackDetailsDto? = null,
+    onWaveTuningChange: (WaveTuning) -> Unit = {},
+    onTrackWave: (TrackDetailsDto) -> Unit = {},
+    onBackToMyWave: () -> Unit = {},
+    initialTuneOpen: Boolean = false
 ) {
+    var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
+    androidx.activity.compose.BackHandler(enabled = tuneOpen) { tuneOpen = false }
     androidx.activity.compose.BackHandler(onBack = onExit)
     val view = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(Unit) {
@@ -164,7 +189,10 @@ fun CarScreen(
     val playPause = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() }
     val isRadio = currentTrack?.isRadio == true
     val active = carSourceOf(source, isRadio)
-    val sourceLabel = when (active) {
+    val sourceLabel = when {
+        trackWaveSeed != null && active == CarSource.WAVE -> stringResource(R.string.wave_by_track_car, trackWaveSeed.title.orEmpty())
+        else -> null
+    } ?: when (active) {
         CarSource.WAVE -> stringResource(R.string.car_source_wave)
         CarSource.LIKED -> stringResource(R.string.library_liked)
         CarSource.RADIO -> stringResource(R.string.car_source_radio)
@@ -198,8 +226,12 @@ fun CarScreen(
             }
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { playPause() }) }
     ) {
-        // Scale the 1280×720 (landscape) or 600×1060 (portrait) layout to this head unit
-        val s = if (isLandscape) minOf(maxWidth / 1280.dp, maxHeight / 720.dp) else minOf(maxWidth / 600.dp, maxHeight / 1060.dp)
+        // Scale the 1280×720 (landscape) or 600×1140 (portrait: 1060 + the row of wave buttons) layout to this
+        // head unit. Standing, the height is what runs out (the Geely's 960×1280): count only what the system
+        // bars leave, or the source dock at the bottom gets squeezed
+        val bars = WindowInsets.systemBars.asPaddingValues()
+        val usableHeight = maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding()
+        val s = if (isLandscape) minOf(maxWidth / 1280.dp, maxHeight / 720.dp) else minOf(maxWidth / 600.dp, usableHeight / 1140.dp)
         val u = Scale(s.coerceIn(0.55f, 2f))
         val farFocus = if (isLandscape) Offset(if (steeringWheelOnLeft) 0.78f else 0.22f, 0.45f) else Offset(0.5f, 0.25f)
         HiFiBackdrop(tint = tint, coverUrl = coverUrl, glowCenter = farFocus, bottomFade = !isLandscape)
@@ -224,8 +256,62 @@ fun CarScreen(
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.material3.LocalTextStyle provides androidx.compose.material3.LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified)
         ) {
+        // "Настроить волну": big enough to hit without aiming. Lying down it opens over the cover column,
+        // standing it takes the cover's place — the controls and the sources are never covered
+        val tunePanel: @Composable (Modifier, Boolean) -> Unit = { panelModifier, segments ->
+            Column(
+                panelModifier
+                    .clip(RoundedCornerShape(u(30f)))
+                    .background(HiFi.SheetFill.copy(alpha = 0.97f))
+                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                    // Never cut: on a cramped screen the panel scrolls inside its place
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = u(24f), end = u(18f), top = u(16f), bottom = u(22f))
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.wave_tune_title), color = Color.White, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                    Box(
+                        Modifier
+                            .size(u(56f))
+                            .hifiGlass(CircleShape)
+                            .clickable(role = Role.Button) { tuneOpen = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+                    }
+                }
+                WaveTuneChoices(waveTuning, onWaveTuningChange, segments = segments, optionHeight = u(56f), fontSize = u.sp(15f), captionSize = u.sp(14f), gap = u(12f))
+            }
+        }
+        // The wave's buttons: in the header on a wide screen, in a row under it on a tall one
+        val onWave = active == CarSource.WAVE
+        val wavePills: @Composable () -> Unit = {
+            val pillHeight = u(56f)
+            val pillFont = u.sp(18f)
+            if (trackWaveSeed != null && onWave) {
+                WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
+                WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !waveTuning.isDefault, height = pillHeight, fontSize = pillFont,
+                    onClick = { tuneOpen = true }, description = stringResource(R.string.wave_tune_title))
+            } else {
+                currentTrack?.takeIf { !it.isRadio }?.let { track ->
+                    WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_by_track), active = false, height = pillHeight, fontSize = pillFont, onClick = { onTrackWave(track) })
+                }
+                if (onWave) {
+                    val summary = waveTuningSummary(waveTuning)
+                    WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), active = summary != null, height = pillHeight, fontSize = pillFont,
+                        onClick = { tuneOpen = true }, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
+                }
+            }
+        }
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
-            CarHeader(u, onExit)
+            CarHeader(u, onExit, showClock, pills = if (isLandscape) wavePills else null)
+            if (!isLandscape) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = u(28f), end = u(28f), bottom = u(14f)),
+                    horizontalArrangement = Arrangement.spacedBy(u(12f))
+                ) { wavePills() }
+            }
             if (isLandscape) {
                 Row(
                     Modifier
@@ -255,7 +341,17 @@ fun CarScreen(
                     Modifier.fillMaxSize().padding(horizontal = u(28f)).padding(bottom = u(24f)),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CoverWithNext(u, currentTrack, nextTrack, Modifier.size(u(440f)))
+                    // The panel stands where the cover is; its height is kept at least the cover's, so nothing below moves
+                    androidx.compose.animation.Crossfade(
+                        targetState = tuneOpen,
+                        modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth().height(u(400f)),
+                        label = "car_tune"
+                    ) { open ->
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                            if (open) tunePanel(Modifier.fillMaxWidth(), true)
+                            else CoverWithNext(u, currentTrack, nextTrack, Modifier.size(u(400f)))
+                        }
+                    }
                     Spacer(Modifier.height(u(28f)))
                     DriverPanel(
                         u = u, track = currentTrack, sourceLabel = sourceLabel, isPlaying = isPlaying, isLiked = isLiked,
@@ -267,6 +363,27 @@ fun CarScreen(
                         compactDock = true
                     )
                 }
+            }
+        }
+        // "Настроить волну" lying down: over the cover column, so the controls and the sources stay free
+        if (tuneOpen && isLandscape) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { tuneOpen = false }
+            )
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+            // Over the cover column only: never wider than what the driver's panel leaves (it is u(652) wide
+            // with u(48) + u(40) + u(40) around it), so the controls and the sources stay uncovered
+            val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+            tunePanel(
+                Modifier
+                    .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                    .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(24f))
+                    .width(panelWidth),
+                // One-line strips need the full width; a narrower panel wraps the choices as chips
+                panelWidth >= u(460f)
+            )
             }
         }
         }
@@ -282,7 +399,7 @@ internal class Scale(val factor: Float) {
 private data class DockItem(val source: CarSource, val icon: ImageVector, val label: String, val onClick: () -> Unit)
 
 @Composable
-private fun CarHeader(u: Scale, onExit: () -> Unit) {
+private fun CarHeader(u: Scale, onExit: () -> Unit, showClock: Boolean, pills: (@Composable () -> Unit)? = null) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -302,8 +419,17 @@ private fun CarHeader(u: Scale, onExit: () -> Unit) {
         Text(stringResource(R.string.car_label), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
         Spacer(Modifier.width(u(14f)))
         HiFiLinkBadge(height = u(32f), fontSize = u.sp(14f))
-        Spacer(Modifier.weight(1f))
-        CarClock(u)
+        if (pills != null) {
+            Spacer(Modifier.width(u(24f)))
+            // Never over the clock: the buttons get what is left and their names shorten first
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(u(12f)), verticalAlignment = Alignment.CenterVertically) { pills() }
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+        if (showClock) {
+            Spacer(Modifier.width(u(16f)))
+            CarClock(u)
+        }
     }
 }
 
@@ -358,7 +484,9 @@ private fun DriverPanel(
 ) {
     Column(modifier) {
         if (sourceLabel.isNotEmpty()) {
-            Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em)
+            // One line always: a long track name in "Волна по треку «…»" must not push the title down
+            Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         AnimatedContent(
             targetState = track,

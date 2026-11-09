@@ -34,6 +34,9 @@ interface PlayerRepository {
         startPositionMs: Long = 0L
     )
     fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
+    /** Volume multipliers by track id (1 = unchanged), for normalization; a track not listed plays as is. */
+    fun setTrackGains(gains: Map<String, Float>)
+
     /** Forgets the warmed-up next track: what it was prepared with no longer holds. */
     fun dropStandby()
     fun pause()

@@ -98,9 +98,14 @@ class RoadFallbackInstrumentedTest {
         setNetwork(true)
         scenario = ActivityScenario.launch(MainActivity::class.java)
         scenario.onActivity { vm = ViewModelProvider(it)[MainViewModel::class.java] }
-        reserve = MainViewModel::class.java.getDeclaredField("roadReserve").run {
+        // The reserve the player itself plays from (the settings page holds the same singleton)
+        val controller = MainViewModel::class.java.getDeclaredField("playbackController").run {
             isAccessible = true
-            get(vm) as RoadReserve
+            get(vm)!!
+        }
+        reserve = controller.javaClass.getDeclaredField("reserve").run {
+            isAccessible = true
+            get(controller) as RoadReserve
         }
         runBlocking { reserve.clear() }
     }

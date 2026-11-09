@@ -22,12 +22,18 @@ import java.text.SimpleDateFormat
 
 /** The recorded crashes (when and where), with sending and clearing. */
 @Composable
-fun CrashLogDialog(reports: List<CrashLog.Report>, onSend: () -> Unit, onClear: () -> Unit, onDismiss: () -> Unit) {
+fun CrashLogDialog(
+    reports: List<CrashLog.Report>,
+    onSend: () -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+    title: String = stringResource(R.string.crash_log_title)
+) {
     val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val format = androidx.compose.runtime.remember(locale) { SimpleDateFormat("dd.MM.yyyy HH:mm", locale) }
     HiFiAlertDialog(
         onDismissRequest = onDismiss,
-        title = stringResource(R.string.crash_log_title),
+        title = title,
         content = {
             Column {
                 if (reports.isEmpty()) {

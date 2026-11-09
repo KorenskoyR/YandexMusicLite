@@ -78,12 +78,16 @@ internal fun ConfirmDialog(title: String, text: String, confirm: String, onConfi
 }
 
 @Composable
-internal fun ColumnScope.SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Text(
-        title.uppercase(),
-        style = HiFiType.SectionCaps.copy(fontSize = 12.sp),
-        modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp)
-    )
+internal fun ColumnScope.SettingsGroup(title: String?, content: @Composable ColumnScope.() -> Unit) {
+    if (title != null) {
+        Text(
+            title.uppercase(),
+            style = HiFiType.SectionCaps.copy(fontSize = 12.sp),
+            modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp)
+        )
+    } else {
+        Spacer(Modifier.height(18.dp))
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -117,7 +121,7 @@ internal fun SettingsRow(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = if (danger) HiFi.Danger else Color.White, fontSize = 16.sp, fontWeight = if (danger) FontWeight.SemiBold else FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         if (value != null) {
             Spacer(Modifier.width(8.dp))
@@ -134,8 +138,14 @@ internal fun SettingsRow(
 }
 
 @Composable
-internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onSwitch: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onSwitch: (() -> Unit)?, onClick: (() -> Unit)? = null) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
             Modifier
                 .size(60.dp)
@@ -153,7 +163,7 @@ internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onS
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(name.ifEmpty { "—" }, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name.ifEmpty { "—" }, color = Color.White, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 stringResource(if (hasPlus) R.string.settings_account_plus else R.string.settings_account_no_plus),
                 color = HiFi.TextSecondary,
@@ -162,20 +172,24 @@ internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onS
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Box(
-            Modifier
-                .height(36.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.10f))
-                .clickable(role = Role.Button, onClick = onSwitch)
-                .padding(horizontal = 14.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.settings_switch_account), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        if (onSwitch != null) {
+            Box(
+                Modifier
+                    .height(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.10f))
+                    .clickable(role = Role.Button, onClick = onSwitch)
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.settings_switch_account), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
             }
+        } else if (onClick != null) {
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
         }
     }
 }

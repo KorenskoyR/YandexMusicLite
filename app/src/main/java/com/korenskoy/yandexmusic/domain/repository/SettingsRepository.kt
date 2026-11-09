@@ -1,12 +1,13 @@
 package com.korenskoy.yandexmusic.domain.repository
 
+import com.korenskoy.yandexmusic.domain.model.StartPage
+import com.korenskoy.yandexmusic.domain.model.StartMusic
+import com.korenskoy.yandexmusic.domain.model.AnimationMode
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
     val isDarkTheme: Flow<Boolean>
     val autoDownloadLikedTracks: Flow<Boolean>
-    val autoStartCarModeVibe: Flow<Boolean>
-    val keepScreenOnInCarMode: Flow<Boolean>
     /** Crossfade between tracks in seconds; 0 turns it off. */
     val crossfadeSeconds: Flow<Int>
     /**
@@ -25,8 +26,6 @@ interface SettingsRepository {
 
     suspend fun setDarkTheme(enabled: Boolean)
     suspend fun setAutoDownloadLikedTracks(enabled: Boolean)
-    suspend fun setAutoStartCarModeVibe(enabled: Boolean)
-    suspend fun setKeepScreenOnInCarMode(enabled: Boolean)
     suspend fun setCrossfadeSeconds(seconds: Int)
     suspend fun setSteeringWheelOnLeft(onLeft: Boolean)
     suspend fun setUiScaleAuto(enabled: Boolean)
@@ -37,6 +36,47 @@ interface SettingsRepository {
     /** True: only the ordinary stream, for a device that plays FLAC in silence. Null: nothing chosen yet. */
     val compatibleSound: Flow<Boolean?>
     suspend fun setCompatibleSound(enabled: Boolean)
+
+    /** What plays by itself when the app starts. */
+    val startMusic: Flow<StartMusic>
+    suspend fun setStartMusic(value: StartMusic)
+
+    /** Which page the app opens on; [lastTab] is remembered for [StartPage.LAST]. */
+    val startPage: Flow<StartPage>
+    suspend fun setStartPage(value: StartPage)
+    val lastTab: Flow<String?>
+    suspend fun setLastTab(route: String)
+
+    /** Open the full player when the user starts music from a list. */
+    val expandPlayerOnPlay: Flow<Boolean>
+    suspend fun setExpandPlayerOnPlay(enabled: Boolean)
+
+    /** Swiping the mini-player away stops the music. */
+    val swipeToCloseMiniPlayer: Flow<Boolean>
+    suspend fun setSwipeToCloseMiniPlayer(enabled: Boolean)
+
+    /** The clock and date in the car mode. */
+    val carClock: Flow<Boolean>
+    suspend fun setCarClock(enabled: Boolean)
+
+    val animationMode: Flow<AnimationMode>
+    suspend fun setAnimationMode(value: AnimationMode)
+
+    /** Quiet the tracks louder than the target so all of them sound alike. */
+    val normalizeVolume: Flow<Boolean>
+    suspend fun setNormalizeVolume(enabled: Boolean)
+
+    /** Start the music when the phone connects to a Bluetooth audio device (the car). */
+    val bluetoothAutoplay: Flow<Boolean>
+    suspend fun setBluetoothAutoplay(enabled: Boolean)
+
+    /** Skip tracks the service marks as explicit in the wave and when moving on by itself. */
+    val skipExplicit: Flow<Boolean>
+    suspend fun setSkipExplicit(enabled: Boolean)
+
+    /** Downloads on the removable SD card (encrypted) instead of the internal storage. */
+    val downloadsOnSdCard: Flow<Boolean>
+    suspend fun setDownloadsOnSdCard(enabled: Boolean)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3

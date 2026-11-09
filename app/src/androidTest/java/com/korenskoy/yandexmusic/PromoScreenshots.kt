@@ -45,7 +45,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.TintMath
 import com.korenskoy.yandexmusic.presentation.main.HomeScreen
 import com.korenskoy.yandexmusic.presentation.main.LibraryScreen
 import com.korenskoy.yandexmusic.presentation.main.SearchScreen
-import com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet
 import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
 import com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu
 import com.korenskoy.yandexmusic.presentation.main.components.MainTab
@@ -150,10 +149,9 @@ class PromoScreenshots {
             UserPlaylistDto(kind = JsonPrimitive(2), title = "Спокойное", trackCount = 18, revision = 1, ogImage = cover("p2", 2, 200f))
         )
         LibraryScreen(
-            tracks = tracks.drop(1), isLoading = false, autoDownloadEnabled = true,
-            currentTrackId = nowPlaying.idString, isPlaying = true, likedTrackIds = liked, downloadedTrackIds = setOf("2", "3", "4", "7"),
-            cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-            onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {},
+            tracks = tracks.drop(1), isLoading = false, currentTrackId = nowPlaying.idString, isPlaying = true, likedTrackIds = liked, downloadedTrackIds = setOf("2", "3", "4", "7"),
+            downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+            onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {},
             hasActiveTrack = true, playlists = playlists
         )
         BottomChrome(MainTab.LIBRARY, mini = true)
@@ -180,11 +178,12 @@ class PromoScreenshots {
 
     @Test
     fun settings() = shoot("settings") {
-        CacheMenuBottomSheet(
-            onDismiss = {}, cacheSizeBytes = 1_288_000_000L, autoDownloadEnabled = true,
-            onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
-            accountName = "Алекс", hasPlus = true, crossfadeSeconds = 3,
-            steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 0
+        com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet(
+            state = com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState(
+                accountName = "Алексей", hasPlus = true, crossfadeSeconds = 3, autoDownload = true, cacheSizeBytes = 1_288_000_000L
+            ),
+            actions = com.korenskoy.yandexmusic.presentation.main.components.SettingsActions(),
+            onDismiss = {}
         )
     }
 

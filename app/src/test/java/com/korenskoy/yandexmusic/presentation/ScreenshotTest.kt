@@ -178,11 +178,10 @@ class ScreenshotTest {
     fun libraryWithPlaylists() {
         show {
             LibraryScreen(
-                tracks = tracks, isLoading = false, autoDownloadEnabled = false,
-                currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1", "2", "3"), downloadedTrackIds = setOf("2"),
-                cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-                onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {},
-                accountName = "Тестовый Аккаунт", playlists = playlists
+                tracks = tracks, isLoading = false, currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1", "2", "3"), downloadedTrackIds = setOf("2"),
+                downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {},
+                playlists = playlists
             )
         }
         snap("library")
@@ -309,32 +308,64 @@ class ScreenshotTest {
         snapScreen("dialog_delete_playlist")
     }
 
-    @Test
-    fun settingsSheet() {
+    private val settingsState = com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState(
+        accountName = "Тестовый Аккаунт", hasPlus = true, defaultAccountName = null, crashReports = 0,
+        crossfadeSeconds = 3, reserveMb = 100, reserveUsedBytes = 64L * 1024 * 1024, autoDownload = true, cacheSizeBytes = 1_288_000_000L,
+        equalizerAvailable = true,
+        storage = com.korenskoy.yandexmusic.data.download.StorageStatus(cardAvailable = true, onCard = false, cardFreeBytes = 21_400_000_000L)
+    )
+
+    private fun settings(name: String, page: com.korenskoy.yandexmusic.presentation.main.components.SettingsPage? = null, state: com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState = settingsState) {
         show {
-            com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(
-                onDismiss = {}, cacheSizeBytes = 1_288_000_000L, autoDownloadEnabled = true,
-                onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
-                accountName = "Тестовый Аккаунт", hasPlus = true, crossfadeSeconds = 3,
-                steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 0
+            com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet(
+                state = state,
+                actions = com.korenskoy.yandexmusic.presentation.main.components.SettingsActions(),
+                onDismiss = {},
+                initialPage = page
             )
         }
-        snapScreen("settings")
+        snapScreen(name)
     }
 
     @Test
+    fun settingsSheet() = settings("settings")
+
+    @Test
+    @Config(qualifiers = "w411dp-h1100dp")
+    fun settingsAccount() = settings("settings_account", com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.ACCOUNT)
+
+    // Tall windows: the whole page in one picture, so nothing below the fold goes unchecked
+    @Test
+    @Config(qualifiers = "w411dp-h2400dp")
+    fun settingsPlayback() = settings("settings_playback", com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.PLAYBACK)
+
+    @Test
+    @Config(qualifiers = "w411dp-h1800dp")
+    fun settingsInterface() = settings("settings_interface", com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.INTERFACE)
+
+    @Test
+    @Config(qualifiers = "w411dp-h1100dp")
+    fun settingsAbout() = settings("settings_about", com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.ABOUT)
+
+    @Test
+    @Config(qualifiers = "w360dp-h2400dp")
+    fun settingsPlaybackNarrow() = settings(
+        "settings_playback_narrow",
+        com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.PLAYBACK,
+        settingsState.copy(storage = settingsState.storage.copy(onCard = true, moving = 37 to 214))
+    )
+
+    @Test
     @Config(qualifiers = "+land")
-    fun settingsSheetLandscape() {
-        show {
-            com.korenskoy.yandexmusic.presentation.main.components.CacheMenuBottomSheet(
-                onDismiss = {}, cacheSizeBytes = 134_000_000L, autoDownloadEnabled = true,
-                onEnableAutoDownload = {}, onDownloadAllClick = {}, onClearCache = {},
-                accountName = "Тестовый Аккаунт", hasPlus = true, crossfadeSeconds = 3,
-                steeringWheelOnLeft = true, uiScaleAuto = true, crashReports = 2
-            )
-        }
-        snapScreen("settings_landscape")
-    }
+    fun settingsSheetLandscape() = settings("settings_landscape")
+
+    @Test
+    @Config(qualifiers = HEAD_UNIT)
+    fun settingsHeadUnit() = settings("head_settings", com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.INTERFACE)
+
+    @Test
+    @Config(qualifiers = PHONE_ON_SIDE)
+    fun settingsPhoneOnItsSide() = settings("phone_side_settings", com.korenskoy.yandexmusic.presentation.main.components.SettingsPage.PLAYBACK)
 
     @Test
     fun miniPlayerAndBottomBar() {
@@ -446,11 +477,10 @@ class ScreenshotTest {
     fun libraryScrolled() {
         show {
             LibraryScreen(
-                tracks = tracks, isLoading = false, autoDownloadEnabled = false,
-                currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1", "2", "3"), downloadedTrackIds = setOf("2"),
-                cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-                onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {},
-                accountName = "Тестовый Аккаунт", playlists = playlists
+                tracks = tracks, isLoading = false, currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1", "2", "3"), downloadedTrackIds = setOf("2"),
+                downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {},
+                playlists = playlists
             )
         }
         scrollBy(500f)
@@ -607,10 +637,9 @@ class ScreenshotTest {
         show {
             Docked("library") {
                 LibraryScreen(
-                    tracks = longList, isLoading = false, autoDownloadEnabled = false,
-                    currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1"), downloadedTrackIds = emptySet(),
-                    cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-                    onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {}
+                    tracks = longList, isLoading = false, currentTrackId = "1", isPlaying = true, likedTrackIds = setOf("1"), downloadedTrackIds = emptySet(),
+                    downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                    onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {}
                 )
             }
         }

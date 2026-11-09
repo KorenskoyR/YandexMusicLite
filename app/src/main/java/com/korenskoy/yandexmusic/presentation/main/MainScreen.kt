@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.launch
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
+import com.korenskoy.yandexmusic.domain.model.AnimationMode
 import com.korenskoy.yandexmusic.presentation.main.components.DockScrim
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.union
@@ -125,10 +129,23 @@ fun MainScreen(
 
     val now = NowPlaying(currentTrack, isPlaying, isBuffering, currentSource, likedTrackIds)
 
-    var currentTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
+    // The tab chosen in this session; before any choice, the one the settings open on
+    var chosenTab by rememberSaveable { mutableStateOf<MainTab?>(null) }
+    val startTab by viewModel.startTab.collectAsStateWithLifecycle()
+    val currentTab = chosenTab ?: startTab ?: MainTab.HOME
+    val tabKnown = chosenTab != null || startTab != null
+    val currentTabState = androidx.compose.runtime.rememberUpdatedState(currentTab)
+    LaunchedEffect(currentTab, tabKnown) { if (tabKnown) viewModel.rememberTab(currentTab) }
+    LaunchedEffect(Unit) { viewModel.applyStartMusic() }
+    val swipeToClose by viewModel.swipeToCloseMiniPlayer.collectAsStateWithLifecycle()
+    val animationMode by viewModel.animationMode.collectAsStateWithLifecycle()
     var isPlayerExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(openPlayerSignal) {
         if (openPlayerSignal > 0 && viewModel.currentTrack.value != null) isPlayerExpanded = true
+    }
+    // "Open the player when the music starts": only for music the user started, never in the car
+    LaunchedEffect(Unit) {
+        viewModel.openPlayerRequests.collect { if (currentTabState.value != MainTab.CAR) isPlayerExpanded = true }
     }
     // Nothing to show: a stale "expanded" would open an empty player with the next track
     LaunchedEffect(currentTrack == null) { if (currentTrack == null) isPlayerExpanded = false }
@@ -158,7 +175,12 @@ fun MainScreen(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     // One tint for the whole app: the playing cover, or the station's brand colours on air
-    val lite = rememberHiFiLite()
+    val autoLite = rememberHiFiLite()
+    val lite = when (animationMode) {
+        AnimationMode.FULL -> false
+        AnimationMode.MINIMUM -> true
+        else -> autoLite
+    }
     val stationTint = remember(currentTrack?.idString, radioStations) {
         val track = currentTrack
         if (track?.isRadio != true) null
@@ -191,7 +213,8 @@ fun MainScreen(
                 if (currentTab != MainTab.CAR) {
                     HiFiBackdrop(coverUrl = coverForTint)
                 }
-                AnimatedContent(
+                // Nothing until the start tab is known: no other tab flashes on the way
+                if (tabKnown) AnimatedContent(
                     targetState = currentTab,
                     transitionSpec = {
                         (fadeIn(HiFiMotion.standard()) + slideInVertically(HiFiMotion.standard()) { it / 100 }) togetherWith
@@ -233,7 +256,7 @@ fun MainScreen(
                                 onAddAccount = onNavigateToAuth
                             )
                             MainTab.RADIO -> RadioTab(viewModel, radioVm, now)
-                            MainTab.CAR -> CarTab(viewModel, radioVm, now, progress, isLandscape, onExit = { currentTab = MainTab.HOME })
+                            MainTab.CAR -> CarTab(viewModel, radioVm, now, progress, isLandscape, onExit = { chosenTab = MainTab.HOME })
                         }
                         }
                     }
@@ -257,6 +280,7 @@ fun MainScreen(
                                     onNextClick = { viewModel.playNext() },
                                     onClick = openPlayer,
                                     onDismiss = { viewModel.stopAndClearPlayer() },
+                                    swipeToDismiss = swipeToClose,
                                     coverModifier = Modifier.sharedCover(sharedScope, this, enabled = !lite && !track.isRadio)
                                 )
                             }
@@ -266,7 +290,7 @@ fun MainScreen(
                         DockScrim(Modifier.align(Alignment.BottomCenter))
                         FloatingGlassDock(
                             currentRoute = currentTab.route,
-                            onNavigate = { currentTab = it },
+                            onNavigate = { chosenTab = it },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .windowInsetsPadding(sideInsets)
@@ -287,7 +311,7 @@ fun MainScreen(
                                 mini()
                                 Spacer(modifier = Modifier.height(10.dp))
                             }
-                            FloatingGlassBottomBar(currentRoute = currentTab.route, onNavigate = { currentTab = it })
+                            FloatingGlassBottomBar(currentRoute = currentTab.route, onNavigate = { chosenTab = it })
                         }
                     }
                 }
@@ -323,13 +347,36 @@ fun MainScreen(
                         merge(viewModel.playbackMessages, playlistsVm.messages).collect { snackbar.showSnackbar(it) }
                     }
                 }
+                // A wave by a track has started: say so, and offer to undo it
+                val resources = androidx.compose.ui.platform.LocalResources.current
+                val undoLabel = stringResource(com.korenskoy.yandexmusic.R.string.action_undo)
+                LaunchedEffect(lifecycleOwner) {
+                    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        viewModel.trackWaveStarted.collect { seed ->
+                            launch {
+                                val result = snackbar.showSnackbar(
+                                    message = resources.getString(com.korenskoy.yandexmusic.R.string.wave_by_track_started, seed.title.orEmpty()),
+                                    actionLabel = undoLabel,
+                                    duration = SnackbarDuration.Long
+                                )
+                                if (result == SnackbarResult.ActionPerformed) viewModel.undoTrackWave()
+                            }
+                        }
+                    }
+                }
                 SnackbarHost(
                     hostState = snackbar,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                         .padding(bottom = if (isLandscape) DockClearance else if (currentTrack != null) 160.dp else 90.dp)
-                ) { data -> com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar(data.visuals.message) }
+                ) { data ->
+                    com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar(
+                        message = data.visuals.message,
+                        actionLabel = data.visuals.actionLabel,
+                        onAction = { data.performAction() }
+                    )
+                }
 
                 if (showCrashLog) CrashLogHost(crashVm) { showCrashLog = false }
                 qualityDetails?.let { details -> QualityDetailsDialog(details) { qualityDetails = null } }
@@ -405,6 +452,7 @@ private fun PlayerHost(
             viewModel.stopAndClearPlayer()
         },
         onDislikeClick = { viewModel.dislikeTrack(track) },
+        onTrackWave = { viewModel.startTrackWave(track) },
         onLoadMoreQueue = { viewModel.loadMoreQueue() },
         isFetchingMoreQueue = isFetchingMoreQueue,
         sleepTimer = sleepTimer,

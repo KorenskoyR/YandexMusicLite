@@ -127,25 +127,20 @@ class GitHubUpdateManager @Inject constructor(
     /**
      * Checks if the app is allowed to request package installations.
      */
-    fun canRequestPackageInstalls(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
-        return context.packageManager.canRequestPackageInstalls()
-    }
+    fun canRequestPackageInstalls(): Boolean = context.packageManager.canRequestPackageInstalls()
 
     /**
      * Opens Android system settings for allowing installation of unknown apps for this package.
      */
     fun openInstallPermissionSettings() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = "package:${context.packageName}".toUri()
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(settingsIntent)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to launch unknown sources settings", e)
+        try {
+            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                data = "package:${context.packageName}".toUri()
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
+            context.startActivity(settingsIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch unknown sources settings", e)
         }
     }
 

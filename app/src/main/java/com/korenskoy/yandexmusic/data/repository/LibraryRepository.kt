@@ -118,8 +118,10 @@ class LibraryRepository @Inject constructor(
             val revision = result.library?.revision ?: result.revision
             var ids = result.allTracks.map { it.idString }.filter { it.isNotEmpty() }.distinct()
 
+            // Tracks saved before 1.12 lack loudness and the explicit mark: fetched again once
+            val metaCurrent = cacheManager.likesMetaIsCurrent(folder)
             // Likes unchanged since the last sync and everything is cached: nothing else to do
-            if (revision != null && revision == cacheManager.loadLikesRevision(folder) &&
+            if (metaCurrent && revision != null && revision == cacheManager.loadLikesRevision(folder) &&
                 ids.toSet() == _likedIds.value && _likedTracks.value.size == ids.size
             ) {
                 Log.d(TAG, "Likes unchanged (revision $revision), ${ids.size} tracks")
@@ -131,7 +133,9 @@ class LibraryRepository @Inject constructor(
                 ids = runCatching { extractTrackIds(api.getPlaylistRaw(uid, "3").result) }.getOrDefault(emptyList())
             }
 
-            val cachedById = _likedTracks.value.associateBy { it.idString }
+            // A failed refresh keeps what was cached: never fewer details than before
+            val previousById = _likedTracks.value.associateBy { it.idString }
+            val cachedById = if (metaCurrent) previousById else emptyMap()
             val embedded = result.allTracks.mapNotNull { it.track }.associateBy { it.idString }
             val missing = ids.filter { it !in cachedById && it !in embedded }
             val fetched = fetchMetadata(missing).associateBy { it.idString }
@@ -139,7 +143,7 @@ class LibraryRepository @Inject constructor(
 
             // Keep the server's order (most recent like first)
             val tracks = ids.map { id ->
-                cachedById[id] ?: embedded[id] ?: fetched[id]
+                cachedById[id] ?: embedded[id] ?: fetched[id] ?: previousById[id]
                     ?: TrackDetailsDto(id = kotlinx.serialization.json.JsonPrimitive(id))
             }
             if (activeFolder != folder) return false // account switched while syncing
@@ -147,6 +151,7 @@ class LibraryRepository @Inject constructor(
             _likedIds.value = ids.toSet()
             cacheManager.saveLikedTracks(folder, tracks)
             revision?.let { cacheManager.saveLikesRevision(folder, it) }
+            if (!metaCurrent && fetched.size >= missing.size / 2) cacheManager.markLikesMetaCurrent(folder)
             return true
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e

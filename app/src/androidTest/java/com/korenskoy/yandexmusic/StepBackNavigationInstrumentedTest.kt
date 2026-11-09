@@ -17,6 +17,8 @@ import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
 import com.korenskoy.yandexmusic.presentation.main.LibraryScreen
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
 import com.korenskoy.yandexmusic.presentation.main.components.TrackContextMenu
 import com.korenskoy.yandexmusic.ui.theme.YandexMusicTheme
 import kotlinx.serialization.json.JsonPrimitive
@@ -43,12 +45,12 @@ class StepBackNavigationInstrumentedTest {
             YandexMusicTheme {
                 var accounts by remember { mutableStateOf(false) }
                 LibraryScreen(
-                    tracks = listOf(track), isLoading = false, autoDownloadEnabled = false,
+                    tracks = listOf(track), isLoading = false,
                     currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(), downloadedTrackIds = emptySet(),
-                    cacheSizeBytes = 0, downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-                    onDownloadAllClick = {}, onEnableAutoDownload = {}, onCancelDownload = {}, onClearCache = {}, onToggleLike = {},
-                    accountName = "Тестовый Аккаунт",
-                    onAccountManagementClick = { accounts = true }
+                    downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                    onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {},
+                    settings = SettingsUiState(accountName = "Тестовый Аккаунт"),
+                    settingsActions = SettingsActions(onAccountManagement = { accounts = true })
                 )
                 // Stands in for the accounts window, which the app shows the same way: a dialog over Settings
                 if (accounts) {
@@ -62,6 +64,9 @@ class StepBackNavigationInstrumentedTest {
         }
         compose.onNodeWithContentDescription("Настройки").performClick()
         compose.waitForIdle()
+        // The account card on the settings' root opens the account page
+        compose.onNodeWithText("Тестовый Аккаунт").performClick()
+        compose.waitForIdle()
         compose.onNodeWithText("Профиль при запуске").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Аккаунты").assertExists()
@@ -70,6 +75,12 @@ class StepBackNavigationInstrumentedTest {
         compose.waitForIdle()
         compose.onNodeWithText("Аккаунты").assertDoesNotExist()
         compose.onNodeWithText("Профиль при запуске").assertExists()
+
+        // Back steps out of the page to the root list, then closes the settings
+        Espresso.pressBack()
+        compose.waitForIdle()
+        compose.onNodeWithText("Профиль при запуске").assertDoesNotExist()
+        compose.onNodeWithText("Воспроизведение").assertExists()
     }
 
     @Test

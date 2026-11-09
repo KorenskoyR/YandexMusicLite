@@ -120,8 +120,14 @@ data class TrackDetailsDto(
     @SerialName("coverUri") val coverUri: String? = null,
     @SerialName("durationMs") val durationMs: Long? = null,
     @kotlinx.serialization.Transient val isRadio: Boolean = false,
-    @SerialName("albums") val albums: List<TrackAlbumDto> = emptyList()
+    @SerialName("albums") val albums: List<TrackAlbumDto> = emptyList(),
+    @SerialName("r128") val r128: R128Dto? = null,
+    @SerialName("contentWarning") val contentWarning: String? = null
 ) {
+    /** Marked 18+ by the service. */
+    val isExplicit: Boolean
+        get() = contentWarning.equals("explicit", ignoreCase = true)
+
     val idString: String
         get() = if (id is kotlinx.serialization.json.JsonPrimitive) id.content else id.toString()
 
@@ -129,6 +135,13 @@ data class TrackDetailsDto(
     val albumId: String?
         get() = (albums.firstOrNull()?.id as? kotlinx.serialization.json.JsonPrimitive)?.content
 }
+
+/** Loudness measured by the service (EBU R128): integrated loudness in LUFS and true peak in dBTP. */
+@Serializable
+data class R128Dto(
+    @SerialName("i") val integrated: Double? = null,
+    @SerialName("tp") val truePeak: Double? = null
+)
 
 @Serializable
 data class TrackAlbumDto(
@@ -298,6 +311,18 @@ data class RotorStationTracksResponseDto(
     @SerialName("radioIsAvailable") val radioIsAvailable: Boolean? = null,
     @SerialName("sequence") val sequence: List<RotorSequenceItemDto> = emptyList(),
     @SerialName("batchId") val batchId: String? = null
+)
+
+@Serializable
+data class RotorStationInfoDto(
+    @SerialName("settings2") val settings2: RotorSettingsDto? = null
+)
+
+@Serializable
+data class RotorSettingsDto(
+    @SerialName("diversity") val diversity: String? = null,
+    @SerialName("moodEnergy") val moodEnergy: String? = null,
+    @SerialName("language") val language: String? = null
 )
 
 @Serializable

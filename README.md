@@ -7,7 +7,7 @@
 # Yandex Music Lite
 
 [![Website](https://img.shields.io/badge/Website-GitHub%20Pages-FF9900.svg?style=for-the-badge&logo=googlechrome&logoColor=white)](https://korenskoyr.github.io/YandexMusicLite/)
-[![Android](https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
+[![Android](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
 [![Release](https://img.shields.io/badge/Release-Latest-FF3366.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite/releases)
 [![Performance](https://img.shields.io/badge/Performance-Ultra%20Fast-00E5FF.svg?style=for-the-badge)](https://github.com/KorenskoyR/YandexMusicLite)
 [![License](https://img.shields.io/badge/License-GPL--3.0-0A6CFF.svg?style=for-the-badge)](LICENSE)
@@ -107,7 +107,7 @@
 
 Для самостоятельной компиляции проекта потребуется:
 - **JDK**: 17 или новее
-- **Android SDK**: API 37 (compileSdk), приложение поддерживает Android 7.0+ (API 24) и нацелено на Android 16 (API 36)
+- **Android SDK**: API 37 (compileSdk), приложение поддерживает Android 8.0+ (API 26) и нацелено на Android 16 (API 36)
 - **Gradle**: 9.x (включён gradlew wrapper)
 
 ```bash

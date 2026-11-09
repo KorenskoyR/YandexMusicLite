@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -172,17 +175,31 @@ fun HiFiActivityIndicator(modifier: Modifier = Modifier, size: Dp = 22.dp, color
 
 /** The one message plate of the app: dark glass with a hairline rim, white text — above the mini-player. */
 @Composable
-fun HiFiSnackbar(message: String, modifier: Modifier = Modifier) {
-    Box(
+fun HiFiSnackbar(message: String, modifier: Modifier = Modifier, actionLabel: String? = null, onAction: () -> Unit = {}) {
+    Row(
         modifier
             .padding(horizontal = 16.dp)
             .widthIn(max = 560.dp)
             .fillMaxWidth()
             .hifiSoftShadow(androidx.compose.foundation.shape.RoundedCornerShape(18.dp), 20.dp)
             .hifiGlass(androidx.compose.foundation.shape.RoundedCornerShape(18.dp), fill = Color(0xF21A1D26), border = HiFi.GlassBorder)
-            .padding(horizontal = 18.dp, vertical = 14.dp)
+            .padding(start = 18.dp, end = if (actionLabel != null) 6.dp else 18.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(message, style = HiFiType.Body)
+        Text(message, style = HiFiType.Body, modifier = Modifier.weight(1f))
+        if (actionLabel != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                actionLabel,
+                color = Color(0xFF8FB6FF),
+                fontSize = 15.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onAction)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            )
+        }
     }
 }
 

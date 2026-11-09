@@ -89,11 +89,9 @@ class LikedTracksDownloadWorker(
 
     private fun foregroundInfo(done: Int, total: Int, title: String, upgrade: Boolean): ForegroundInfo {
         val context = applicationContext
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, context.getString(R.string.download_channel_name), NotificationManager.IMPORTANCE_LOW)
-            )
-        }
+        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.download_channel_name), NotificationManager.IMPORTANCE_LOW)
+        )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(if (upgrade) R.string.download_upgrade_title else R.string.download_notification_title))

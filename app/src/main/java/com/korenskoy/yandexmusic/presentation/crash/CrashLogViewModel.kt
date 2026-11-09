@@ -2,6 +2,7 @@ package com.korenskoy.yandexmusic.presentation.crash
 
 import android.content.Context
 import android.content.Intent
+import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.BuildConfig
@@ -26,6 +27,28 @@ class CrashLogViewModel @Inject constructor(
     private val _reports = MutableStateFlow<List<CrashLog.Report>>(emptyList())
     val reports: StateFlow<List<CrashLog.Report>> = _reports.asStateFlow()
 
+    private val prefs = context.getSharedPreferences("crash_log", Context.MODE_PRIVATE)
+
+    /**
+     * A crash the person has not been told about yet. Shown once on the sign-in screen: a crash before
+     * signing in (the Geely head unit) would otherwise never reach the journal in the settings.
+     */
+    val unseen: StateFlow<Boolean> = MutableStateFlow(false).also { flow ->
+        viewModelScope.launch {
+            _reports.collect { list ->
+                val newest = list.firstOrNull()?.time?.time ?: 0L
+                flow.value = newest > prefs.getLong(KEY_OFFERED_UNTIL, 0L)
+            }
+        }
+    }
+
+    /** The person saw the offer: the same crashes are not offered again. */
+    fun markSeen() {
+        val newest = _reports.value.firstOrNull()?.time?.time ?: return
+        prefs.edit { putLong(KEY_OFFERED_UNTIL, newest) }
+        (unseen as MutableStateFlow).value = false
+    }
+
     init {
         refresh()
     }
@@ -47,6 +70,10 @@ class CrashLogViewModel @Inject constructor(
                 Intent.createChooser(send, context.getString(R.string.crash_log_send)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         }
+    }
+
+    private companion object {
+        const val KEY_OFFERED_UNTIL = "offered_until"
     }
 
     fun clear() {

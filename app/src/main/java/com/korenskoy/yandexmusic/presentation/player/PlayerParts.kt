@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.material.icons.rounded.Waves
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
@@ -134,6 +135,9 @@ internal fun PlayerHeader(
     onSleepAtEndOfTrack: () -> Unit,
     onCancelSleepTimer: () -> Unit
 ) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // On a narrow phone (360 dp) the balancing space would leave the caption too little room for both words
+    val balanced = maxWidth >= 350.dp
     Row(
         modifier = Modifier.fillMaxWidth().height(44.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -143,7 +147,7 @@ internal fun PlayerHeader(
             Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
         }
         // Balances the two buttons on the right, so the caption stays in the middle
-        Spacer(Modifier.width(44.dp))
+        if (balanced) Spacer(Modifier.width(44.dp))
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = stringResource(R.string.full_player_seychas_igraet),
@@ -174,6 +178,7 @@ internal fun PlayerHeader(
                 Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
             }
         }
+    }
     }
 }
 
@@ -372,7 +377,7 @@ internal fun PlayerCover(
 // --- Title, quality, timeline ------------------------------------------------------------------------
 
 @Composable
-internal fun TitleRow(track: TrackDetailsDto, direction: Int, compact: Boolean, onAddToPlaylist: () -> Unit) {
+internal fun TitleRow(track: TrackDetailsDto, direction: Int, compact: Boolean, onAddToPlaylist: () -> Unit, onTrackWave: (() -> Unit)? = null) {
     val lite = LocalHiFiLite.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         AnimatedContent(
@@ -410,6 +415,12 @@ internal fun TitleRow(track: TrackDetailsDto, direction: Int, compact: Boolean, 
                 size = 44.dp
             ) {
                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+            if (onTrackWave != null) {
+                Spacer(Modifier.width(10.dp))
+                GlassCircleButton(onClick = onTrackWave, contentDescription = stringResource(R.string.wave_by_track_cd), size = 44.dp) {
+                    Icon(Icons.Rounded.Waves, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                }
             }
         }
     }

@@ -38,6 +38,20 @@ object PlaybackQueue {
     const val SNAPSHOT_BEFORE = 50
     const val SNAPSHOT_AFTER = 150
 
+    /**
+     * Like [nextAction], passing over the tracks [skip] rejects. When every track would be passed over,
+     * the filter gives way: a queue of only such tracks still plays rather than stopping dead.
+     */
+    fun <T> nextAction(queue: List<T>, currentIndex: Int, source: PlaylistSource, skip: (T) -> Boolean): NextAction {
+        if (queue.none { !skip(it) }) return nextAction(queue.size, currentIndex, source)
+        for (index in (currentIndex + 1) until queue.size) {
+            if (!skip(queue[index])) return NextAction.PlayIndex(index)
+        }
+        if (source == PlaylistSource.VIBE) return NextAction.FetchMoreWave
+        val first = queue.indexOfFirst { !skip(it) }
+        return if (first >= 0) NextAction.PlayIndex(first) else NextAction.FallbackLibrary
+    }
+
     fun nextAction(queueSize: Int, currentIndex: Int, source: PlaylistSource): NextAction = when {
         currentIndex != -1 && currentIndex + 1 < queueSize -> NextAction.PlayIndex(currentIndex + 1)
         source == PlaylistSource.VIBE -> NextAction.FetchMoreWave

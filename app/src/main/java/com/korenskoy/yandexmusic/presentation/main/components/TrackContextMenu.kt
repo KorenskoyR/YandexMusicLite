@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.Waves
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
 import com.korenskoy.yandexmusic.utils.cover
@@ -93,7 +94,8 @@ fun TrackContextMenu(
     onCreatePlaylist: (String) -> Unit,
     onRemoveFromPlaylist: () -> Unit,
     onOpenArtist: (() -> Unit)? = null,
-    onOpenAlbum: (() -> Unit)? = null
+    onOpenAlbum: (() -> Unit)? = null,
+    onTrackWave: (() -> Unit)? = null
 ) {
     var picking by remember { mutableStateOf(startWithPlaylists) }
     var naming by remember { mutableStateOf(false) }
@@ -180,6 +182,12 @@ fun TrackContextMenu(
                     }
                 }
             } else {
+                if (onTrackWave != null && !track.isRadio) {
+                    ContextMenuItem(Icons.Rounded.Waves, stringResource(R.string.wave_by_track)) {
+                        onTrackWave()
+                        onDismiss()
+                    }
+                }
                 ContextMenuItem(Icons.Default.SkipNext, stringResource(R.string.track_context_menu_igrat_sleduyuschim)) {
                     onPlayNext()
                     onDismiss()
@@ -194,7 +202,7 @@ fun TrackContextMenu(
                     }
                 }
                 if (onOpenArtist != null) {
-                    ContextMenuItem(Icons.Default.Person, stringResource(R.string.track_menu_artist, track.artists.first { it.idString != null }.name.orEmpty())) {
+                    ContextMenuItem(Icons.Default.Person, stringResource(R.string.track_menu_artist, (track.artists.firstOrNull { it.idString != null } ?: track.artists.firstOrNull())?.name.orEmpty())) {
                         onOpenArtist()
                         onDismiss()
                     }

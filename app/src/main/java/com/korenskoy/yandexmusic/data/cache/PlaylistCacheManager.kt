@@ -49,6 +49,13 @@ class PlaylistCacheManager @Inject constructor(
     suspend fun saveLikesRevision(userFolder: String, revision: Int) =
         putValue(sanitizeUserFolder(userFolder), LIKES_REVISION, revision.toString())
 
+    /** Whether the liked tracks' details were fetched with loudness and the explicit mark. */
+    suspend fun likesMetaIsCurrent(userFolder: String): Boolean =
+        getValue(sanitizeUserFolder(userFolder), LIKES_META) == LIKES_META_VERSION
+
+    suspend fun markLikesMetaCurrent(userFolder: String) =
+        putValue(sanitizeUserFolder(userFolder), LIKES_META, LIKES_META_VERSION)
+
     suspend fun loadLikesRevision(userFolder: String): Int? =
         getValue(sanitizeUserFolder(userFolder), LIKES_REVISION)?.toIntOrNull()
 
@@ -246,6 +253,9 @@ class PlaylistCacheManager @Inject constructor(
         val LEGACY_PLAYLIST = Regex("""playlist_(.+)_(\d+)\.json""")
 
         fun playlistList(kind: String) = "playlist:$kind"
-        fun playlistRevisionKey(kind: String) = "playlist_revision:$kind"
+        /** ":m2" since 1.12: tracks saved before then lack loudness and the explicit mark, so they are fetched again. */
+        fun playlistRevisionKey(kind: String) = "playlist_revision:$kind:m2"
+        const val LIKES_META = "likes_meta"
+        const val LIKES_META_VERSION = "2"
     }
 }

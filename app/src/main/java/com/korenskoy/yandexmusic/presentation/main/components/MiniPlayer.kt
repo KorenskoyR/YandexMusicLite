@@ -66,7 +66,8 @@ private val MiniShape = RoundedCornerShape(31.dp)
 
 /** What a drag on the mini-player does. Pure; unit-tested. */
 object MiniGesture {
-    enum class Axis { NONE, HORIZONTAL, VERTICAL }
+    /** [LOCKED]: a sideways drag while swiping away is off; it moves nothing. */
+    enum class Axis { NONE, HORIZONTAL, VERTICAL, LOCKED }
     enum class Outcome { NONE, DISMISS, OPEN }
 
     /** Sideways past 100 dp dismisses; up past 48 dp opens the player. */
@@ -102,6 +103,7 @@ fun MiniPlayer(
     onClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    swipeToDismiss: Boolean = true,
     coverModifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -111,6 +113,7 @@ fun MiniPlayer(
     LaunchedEffect(track.idString) { offsetX.snapTo(0f) }
     val open by androidx.compose.runtime.rememberUpdatedState(onClick)
     val dismiss by androidx.compose.runtime.rememberUpdatedState(onDismiss)
+    val swipeToDismissNow by androidx.compose.runtime.rememberUpdatedState(swipeToDismiss)
     val durationMs = (track.durationMs ?: 0L).coerceAtLeast(0L)
 
     Box(
@@ -159,7 +162,11 @@ fun MiniPlayer(
                     }
                 ) { change, drag ->
                     change.consume()
-                    if (axis == MiniGesture.Axis.NONE) axis = MiniGesture.axisOf(drag.x, drag.y)
+                    if (axis == MiniGesture.Axis.NONE) {
+                        axis = MiniGesture.axisOf(drag.x, drag.y)
+                        // Sideways does nothing when swiping away is off: a bump in the car must not stop the music
+                        if (axis == MiniGesture.Axis.HORIZONTAL && !swipeToDismissNow) axis = MiniGesture.Axis.LOCKED
+                    }
                     scope.launch {
                         when (axis) {
                             MiniGesture.Axis.HORIZONTAL -> offsetX.snapTo(offsetX.value + drag.x)
@@ -168,7 +175,7 @@ fun MiniPlayer(
                                 (offsetY.value + drag.y * if (offsetY.value + drag.y < 0) 0.6f else 0.15f)
                                     .coerceIn(-120f * density.density, 12f * density.density)
                             )
-                            MiniGesture.Axis.NONE -> Unit
+                            MiniGesture.Axis.NONE, MiniGesture.Axis.LOCKED -> Unit
                         }
                     }
                 }

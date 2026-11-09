@@ -27,6 +27,11 @@ val yandexSalt = if (rawSalt.isNullOrBlank()) {
     "\"$rawSalt\""
 }
 
+// Sign-in by a code on the phone (devices without WebView) needs the secret of the client the app signs in as.
+// It is never kept in the repository: local.properties or the CI secret. Without it the app explains how to enable WebView.
+val deviceSecret = (localProperties.getProperty("YANDEX_DEVICE_SECRET") ?: System.getenv("YANDEX_DEVICE_SECRET")).orEmpty()
+    .trim().removeSurrounding("\"")
+
 composeCompiler {
     stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("app/compose-stability.conf"))
 }
@@ -46,14 +51,15 @@ android {
 
     defaultConfig {
         applicationId = "YandexMusicLite.KorenskoyR"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
-        versionCode = 44
-        versionName = "1.11.0"
+        versionCode = 45
+        versionName = "1.12.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "YANDEX_SALT", yandexSalt)
+        buildConfigField("String", "YANDEX_DEVICE_SECRET", "\"$deviceSecret\"")
 
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -152,6 +158,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp.logging)
+    implementation(libs.zxing.core)
 
     // Media3
     implementation(libs.media3.exoplayer)

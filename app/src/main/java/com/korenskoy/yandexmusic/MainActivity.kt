@@ -55,6 +55,9 @@ class MainActivity : ComponentActivity() {
     @javax.inject.Inject
     lateinit var settingsRepository: SettingsRepository
 
+    @javax.inject.Inject
+    lateinit var downloadStorage: com.korenskoy.yandexmusic.data.download.DownloadStorage
+
     /** Incremented on each "open the player" request (notification tap); MainScreen reacts to changes. */
     private var openPlayerSignal by mutableIntStateOf(0)
 
@@ -123,11 +126,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        com.korenskoy.yandexmusic.data.player.AppPresence.visibleActivities++
+        downloadStorage.refresh()
         val token = SessionToken(this, ComponentName(this, MusicService::class.java))
         controllerFuture = MediaController.Builder(this, token).buildAsync()
     }
 
     override fun onStop() {
+        com.korenskoy.yandexmusic.data.player.AppPresence.visibleActivities--
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
         super.onStop()

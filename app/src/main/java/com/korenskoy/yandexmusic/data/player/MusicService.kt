@@ -12,7 +12,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.media.AudioManager
-import android.os.Build
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import com.google.common.collect.ImmutableList
@@ -92,9 +91,10 @@ class MusicService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
+        AppPresence.playerServiceRunning = true
         audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        run {
             val channel = NotificationChannel(
                 PLAYBACK_CHANNEL_ID,
                 "Yandex Music Lite",
@@ -147,28 +147,19 @@ class MusicService : MediaLibraryService() {
     /** Returns true when playback may proceed (focus granted now or delayed). */
     private fun requestSystemAudioFocus(): Boolean {
         val result = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val playbackAttributes = android.media.AudioAttributes.Builder()
-                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-                val request = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                    .setAudioAttributes(playbackAttributes)
-                    .setAcceptsDelayedFocusGain(true)
-                    // Ducking is handled by us (both players must duck together)
-                    .setWillPauseWhenDucked(false)
-                    .setOnAudioFocusChangeListener(audioFocusChangeListener)
-                    .build()
-                focusRequest = request
-                audioManager?.requestAudioFocus(request)
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager?.requestAudioFocus(
-                    audioFocusChangeListener,
-                    AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN
-                )
-            }
+            val playbackAttributes = android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+            val request = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(playbackAttributes)
+                .setAcceptsDelayedFocusGain(true)
+                // Ducking is handled by us (both players must duck together)
+                .setWillPauseWhenDucked(false)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build()
+            focusRequest = request
+            audioManager?.requestAudioFocus(request)
         } catch (e: Exception) {
             android.util.Log.e("MusicService", "Unexpected error", e)
             null
@@ -191,12 +182,7 @@ class MusicService : MediaLibraryService() {
     private fun abandonSystemAudioFocus() {
         hasAudioFocus = false
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager?.abandonAudioFocus(audioFocusChangeListener)
-            }
+            focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
         } catch (e: Exception) {
             android.util.Log.e("MusicService", "Unexpected error", e)
         }
@@ -465,6 +451,7 @@ class MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        AppPresence.playerServiceRunning = false
         serviceScope.cancel()
         abandonSystemAudioFocus()
         mediaLibrarySession?.run {

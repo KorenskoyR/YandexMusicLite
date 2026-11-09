@@ -60,6 +60,7 @@ internal fun TrackMenuHost(
         onAddTo = { playlistsVm.addTrack(it, track) },
         onCreatePlaylist = { playlistsVm.create(it, thenAdd = track) },
         onRemoveFromPlaylist = { request.playlist?.let { playlistsVm.removeTrack(it, track.idString) } },
+        onTrackWave = { viewModel.startTrackWave(track) },
         onOpenArtist = track.artists.firstNotNullOfOrNull { artist -> artist.idString?.let { id -> id to artist.name.orEmpty() } }
             ?.let { (id, name) ->
                 {

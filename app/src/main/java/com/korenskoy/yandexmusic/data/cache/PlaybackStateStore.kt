@@ -17,7 +17,9 @@ data class PlaybackSnapshot(
     val source: String,
     val queue: List<TrackDetailsDto>,
     val currentTrackId: String,
-    val positionMs: Long
+    val positionMs: Long,
+    /** The track a "wave by track" was started from; null for My Wave and everything else. */
+    val waveSeed: TrackDetailsDto? = null
 )
 
 @Singleton
