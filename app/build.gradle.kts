@@ -53,8 +53,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 26
         targetSdk = 36
-        versionCode = 45
-        versionName = "1.12.0"
+        versionCode = 46
+        versionName = "1.12.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

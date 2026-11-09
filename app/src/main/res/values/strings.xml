@@ -380,7 +380,7 @@
     <string name="settings_open_car">В авто</string>
     <string name="settings_open_car_hint">Сразу режим для магнитолы</string>
     <string name="settings_expand_player">Разворачивать плеер</string>
-    <string name="settings_expand_player_hint">Когда вы включаете трек, плейлист или альбом</string>
+    <string name="settings_expand_player_hint">Когда вы включаете музыку: трек, плейлист, альбом или волну</string>
     <string name="settings_swipe_close">Закрывать смахиванием</string>
     <string name="settings_swipe_close_hint">Смахните мини-плеер в сторону, чтобы остановить музыку</string>
     <string name="settings_car_clock">Часы и дата</string>

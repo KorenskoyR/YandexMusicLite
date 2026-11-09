@@ -115,4 +115,16 @@ class NewPlaybackRulesTest {
         assertEquals(MiniGesture.Outcome.DISMISS, MiniGesture.outcome(MiniGesture.Axis.HORIZONTAL, 900f, 0f, 2f))
         assertTrue(abs(Loudness.TARGET_LUFS + 14) < 1e-9)
     }
+
+    @Test
+    fun theWaveKnobOpensThePlayerOnlyWhenItSwitchesMusicOn() {
+        // Starting the wave from another source or from nothing
+        assertEquals(WaveKnob.Press(WaveKnob.Action.START_WAVE, true), WaveKnob.press(waveActive = false, isPlaying = false, hasPlayed = false))
+        assertEquals(WaveKnob.Press(WaveKnob.Action.START_WAVE, true), WaveKnob.press(waveActive = false, isPlaying = true, hasPlayed = true))
+        // The wave restored at launch, played for the first time
+        assertEquals(WaveKnob.Press(WaveKnob.Action.TOGGLE, true), WaveKnob.press(waveActive = true, isPlaying = false, hasPlayed = false))
+        // A pause, and a play after the user's own pause
+        assertEquals(WaveKnob.Press(WaveKnob.Action.TOGGLE, false), WaveKnob.press(waveActive = true, isPlaying = true, hasPlayed = true))
+        assertEquals(WaveKnob.Press(WaveKnob.Action.TOGGLE, false), WaveKnob.press(waveActive = true, isPlaying = false, hasPlayed = true))
+    }
 }

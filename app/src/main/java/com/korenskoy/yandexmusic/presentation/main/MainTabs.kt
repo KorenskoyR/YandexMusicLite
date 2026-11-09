@@ -77,12 +77,12 @@ internal fun HomeTab(
         shelf = shelf,
         shimmer = isFetchingWave || now.isBuffering,
         // Like Yandex Music: the knob controls the wave; from any other context it starts the wave
-        onPlayPause = { if (waveActive) viewModel.togglePlayPause() else viewModel.playMyVibe() },
+        onPlayPause = { viewModel.waveKnob(waveActive) },
         onLike = { now.track?.let { viewModel.toggleLike(it) } },
         onDislike = { now.track?.let { viewModel.dislikeTrack(it) } },
         onOpenPlayer = onOpenPlayer,
         onShelfClick = {
-            if (waveActive) viewModel.playTrack(it.idString, queue, PlaylistSource.VIBE, byUser = false)
+            if (waveActive) viewModel.playTrack(it.idString, queue, PlaylistSource.VIBE)
             else viewModel.playWaveFrom(it.idString)
         },
         contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom,

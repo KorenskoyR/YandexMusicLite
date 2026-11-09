@@ -11,6 +11,7 @@ import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
 import com.korenskoy.yandexmusic.data.player.PlayRequests
+import com.korenskoy.yandexmusic.data.player.WaveKnob
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.account.AccountSessionManager
@@ -69,6 +70,10 @@ class MainViewModel @Inject constructor(
     init {
         networkMonitor.isConnectedFlow
             .onEach { online -> if (online && libraryRepository.likesSyncFailed.value) loadLikedTracks() }
+            .launchIn(viewModelScope)
+        // Once music has sounded, the wave knob's play is a resume (see waveKnob)
+        playbackController.isPlaying
+            .onEach { if (it) playRequests.markPlayed() }
             .launchIn(viewModelScope)
     }
 
@@ -153,7 +158,24 @@ class MainViewModel @Inject constructor(
     // region Playback: delegated to the process-wide PlaybackController
 
     fun playMyVibe() = playbackController.playMyVibe()
-    fun playWaveFrom(trackId: String) = playbackController.playWaveFrom(trackId)
+    fun playWaveFrom(trackId: String) {
+        playRequests.userStarted()
+        playbackController.playWaveFrom(trackId)
+    }
+
+    /**
+     * The big knob on the wave page. It starts the wave, or plays the session restored at launch: both count
+     * as switching music on (the full player may open). A play after the user's own pause is a resume and
+     * opens nothing; so are the mini-player's buttons.
+     */
+    fun waveKnob(waveActive: Boolean) {
+        val press = WaveKnob.press(waveActive, playbackController.isPlaying.value, playRequests.hasPlayed)
+        if (press.opensPlayer) playRequests.userStarted()
+        when (press.action) {
+            WaveKnob.Action.START_WAVE -> playbackController.playMyVibe()
+            WaveKnob.Action.TOGGLE -> playbackController.togglePlayPause()
+        }
+    }
 
     fun loadMoreQueue() = playbackController.loadMoreQueue()
 
@@ -181,7 +203,7 @@ class MainViewModel @Inject constructor(
         playbackController.playHits(libraryRepository.weeklyHits.value, shuffle)
     }
 
-    /** @param byUser a track tapped in a list; false for the wave's own shelf, which belongs to the wave page. */
+    /** @param byUser the user chose this track (a list, a card); false when the app moves on by itself. */
     fun playTrack(trackId: String, playlist: List<TrackDetailsDto>, source: PlaylistSource? = null, byUser: Boolean = true) {
         if (byUser) playRequests.userStarted()
         playbackController.playTrack(trackId, playlist, source)
@@ -194,7 +216,10 @@ class MainViewModel @Inject constructor(
     val trackWaveStarted: Flow<TrackDetailsDto> = playbackController.trackWaveStarted
 
     fun setWaveTuning(tuning: WaveTuning) = playbackController.setWaveTuning(tuning)
-    fun startTrackWave(track: TrackDetailsDto) = playbackController.startTrackWave(track)
+    fun startTrackWave(track: TrackDetailsDto) {
+        playRequests.userStarted()
+        playbackController.startTrackWave(track)
+    }
     fun returnToMyWave() = playbackController.returnToMyWave()
     fun undoTrackWave() = playbackController.undoTrackWave()
 
