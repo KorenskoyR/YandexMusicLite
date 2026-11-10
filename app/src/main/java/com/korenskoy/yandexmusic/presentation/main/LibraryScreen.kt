@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import android.content.res.Configuration
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.ui.text.font.FontWeight
@@ -173,8 +176,8 @@ fun LibraryScreen(
     val section = sectionName?.let { LibrarySection.valueOf(it) }
     val back = rememberPredictiveBack(enabled = section != null && openedPlaylist == null) { sectionName = null }
 
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = LocalConfiguration.current.orientation ==
+        Configuration.ORIENTATION_LANDSCAPE
     val contentStart = 20.dp
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
@@ -409,7 +412,7 @@ private fun KeptRow(
 ) {
     Column {
         HiFiSectionHeader(stringResource(R.string.offline_on_device), Modifier.padding(start = 12.dp, top = 6.dp, bottom = 12.dp))
-        androidx.compose.foundation.lazy.LazyRow(
+        LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -425,7 +428,7 @@ private fun KeptRow(
 
 @Composable
 private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean, isAlbum: Boolean = false, onClick: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val shape = RoundedCornerShape(18.dp)
     Column(
         Modifier
@@ -451,10 +454,10 @@ private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean
                     modifier = Modifier.align(Alignment.Center).size(40.dp)
                 )
             } else {
-                coil3.compose.AsyncImage(
-                    model = coil3.request.ImageRequest.Builder(context).cover(cover, CoverSize.Medium).build(),
+                AsyncImage(
+                    model = ImageRequest.Builder(context).cover(cover, CoverSize.Medium).build(),
                     contentDescription = null,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             }

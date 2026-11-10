@@ -1,5 +1,14 @@
 package com.korenskoy.yandexmusic.data.download
 
+import android.database.Cursor
+import android.os.Build
+import android.os.Environment
+import android.os.StatFs
+import android.os.storage.StorageManager
+import android.os.storage.StorageVolume
+import androidx.core.content.IntentCompat
+import java.io.File
+import kotlinx.coroutines.CancellationException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -70,14 +79,14 @@ class UsbStorage(
      * may have a card too). Null on Android 9 and older, or with nothing plugged in: the window opens as usual.
      */
     fun pickerStart(): Uri? {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return null
-        val storage = context.getSystemService(android.os.storage.StorageManager::class.java) ?: return null
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        val storage = context.getSystemService(StorageManager::class.java) ?: return null
         return runCatching {
             storage.storageVolumes
-                .filter { it.isRemovable && it.state == android.os.Environment.MEDIA_MOUNTED }
+                .filter { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }
                 .sortedByDescending { it.getDescription(context).contains("USB", ignoreCase = true) }
                 .firstNotNullOfOrNull {
-                    androidx.core.content.IntentCompat.getParcelableExtra(it.createOpenDocumentTreeIntent(), DocumentsContract.EXTRA_INITIAL_URI, Uri::class.java)
+                    IntentCompat.getParcelableExtra(it.createOpenDocumentTreeIntent(), DocumentsContract.EXTRA_INITIAL_URI, Uri::class.java)
                 }
         }.getOrNull()
     }
@@ -97,22 +106,22 @@ class UsbStorage(
 
     fun freeBytes(): Long {
         val dir = volumeDirectory()
-        if (dir != null) runCatching { return android.os.StatFs(dir.path).availableBytes }
+        if (dir != null) runCatching { return StatFs(dir.path).availableBytes }
         return (rootRow(Root.COLUMN_AVAILABLE_BYTES) as? Long) ?: 0L
     }
 
     /** The drive the folder is on: a tree id starts with the volume's id ("6266-080C:YandexMusicLite"). */
-    private fun volume(): android.os.storage.StorageVolume? {
+    private fun volume(): StorageVolume? {
         val tree = folder.value ?: return null
         val uuid = runCatching { DocumentsContract.getTreeDocumentId(tree).substringBefore(':') }.getOrNull() ?: return null
-        return context.getSystemService(android.os.storage.StorageManager::class.java)?.storageVolumes
+        return context.getSystemService(StorageManager::class.java)?.storageVolumes
             ?.firstOrNull { it.uuid.equals(uuid, ignoreCase = true) }
     }
 
-    private fun volumeDirectory(): java.io.File? {
+    private fun volumeDirectory(): File? {
         val vol = volume() ?: return null
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) vol.directory
-        else vol.uuid?.let { java.io.File("/storage/$it") }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) vol.directory
+        else vol.uuid?.let { File("/storage/$it") }
     }
 
     /** The files in the folder by name; unfinished ones ("*.part") are cleaned away. */
@@ -155,7 +164,7 @@ class UsbStorage(
             requireNotNull(resolver.openOutputStream(part, "w")).use(write)
             DocumentsContract.renameDocument(resolver, part, name) ?: error("Not renamed")
             true
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             part?.let(::delete)
             throw e
         } catch (e: Exception) {
@@ -185,8 +194,8 @@ class UsbStorage(
                     val rootDoc = c.getString(docColumn) ?: continue
                     if (treeId.startsWith(rootDoc.trimEnd('/'))) {
                         return@use when (c.getType(wanted)) {
-                            android.database.Cursor.FIELD_TYPE_INTEGER -> c.getLong(wanted)
-                            android.database.Cursor.FIELD_TYPE_STRING -> c.getString(wanted)
+                            Cursor.FIELD_TYPE_INTEGER -> c.getLong(wanted)
+                            Cursor.FIELD_TYPE_STRING -> c.getString(wanted)
                             else -> null
                         }
                     }

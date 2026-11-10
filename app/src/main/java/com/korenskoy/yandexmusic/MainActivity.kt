@@ -1,5 +1,17 @@
 package com.korenskoy.yandexmusic
 
+import android.app.SearchManager
+import android.graphics.Color
+import android.provider.MediaStore
+import androidx.activity.SystemBarStyle
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalResources
+import com.korenskoy.yandexmusic.data.download.DownloadStorage
+import com.korenskoy.yandexmusic.data.player.AppPresence
+import com.korenskoy.yandexmusic.data.player.MediaLibraryTree
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
+import com.korenskoy.yandexmusic.presentation.splash.SplashScreen
+import javax.inject.Inject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import androidx.lifecycle.lifecycleScope
@@ -49,14 +61,14 @@ class MainActivity : ComponentActivity() {
     // to a foreground service by itself once playback starts.
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
-    @javax.inject.Inject
-    lateinit var libraryTree: com.korenskoy.yandexmusic.data.player.MediaLibraryTree
+    @Inject
+    lateinit var libraryTree: MediaLibraryTree
 
-    @javax.inject.Inject
+    @Inject
     lateinit var settingsRepository: SettingsRepository
 
-    @javax.inject.Inject
-    lateinit var downloadStorage: com.korenskoy.yandexmusic.data.download.DownloadStorage
+    @Inject
+    lateinit var downloadStorage: DownloadStorage
 
     /** Incremented on each "open the player" request (notification tap); MainScreen reacts to changes. */
     private var openPlayerSignal by mutableIntStateOf(0)
@@ -83,15 +95,15 @@ class MainActivity : ComponentActivity() {
         // The app is always dark: dark system bars whatever the system's own theme. "Auto" followed the system,
         // so a light head unit got a light navigation bar (painted turquoise by the vendor) and dark status icons
         enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
         setContent {
             // Scale the whole UI for screens whose reported density is wrong (dense car head units):
             // the app cannot change the system density, so it overrides its own instead.
             val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
             val uiScaleManual by settingsRepository.uiScaleManual.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE)
-            val resources = androidx.compose.ui.platform.LocalResources.current
+            val resources = LocalResources.current
             val baseDensity = LocalDensity.current
             val uiScale = remember(uiScaleAuto, uiScaleManual, resources) {
                 val info = DisplayScale.analyze(resources.displayMetrics)
@@ -103,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 YandexMusicTheme {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        color = com.korenskoy.yandexmusic.presentation.hifi.HiFi.Ground
+                        color = HiFi.Ground
                     ) {
                         // Skip the splash when the app is re-entered with a session already on screen
                         AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal)
@@ -121,8 +133,8 @@ class MainActivity : ComponentActivity() {
 
     /** Assistant request "play <query> on Yandex Music Lite": same matching as voice search in the car. */
     private fun playFromSearch(intent: Intent) {
-        if (intent.action != android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
-        val query = intent.getStringExtra(android.app.SearchManager.QUERY)
+        if (intent.action != MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+        val query = intent.getStringExtra(SearchManager.QUERY)
         lifecycleScope.launch {
             libraryTree.startAction(mediaId = "", searchQuery = query)?.invoke()
             openPlayerSignal++
@@ -131,14 +143,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        com.korenskoy.yandexmusic.data.player.AppPresence.visibleActivities++
+        AppPresence.visibleActivities++
         downloadStorage.refresh()
         val token = SessionToken(this, ComponentName(this, MusicService::class.java))
         controllerFuture = MediaController.Builder(this, token).buildAsync()
     }
 
     override fun onStop() {
-        com.korenskoy.yandexmusic.data.player.AppPresence.visibleActivities--
+        AppPresence.visibleActivities--
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
         super.onStop()
@@ -160,7 +172,7 @@ fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
         if (isAuthorized && (skipSplash || hasSession)) "main" else "splash"
     }
 
-    androidx.compose.runtime.LaunchedEffect(isAuthorized) {
+    LaunchedEffect(isAuthorized) {
         val currentRoute = navController.currentBackStackEntry?.destination?.route
         if (!isAuthorized && currentRoute != "splash" && currentRoute != "auth") {
             navController.navigate("auth") {
@@ -174,7 +186,7 @@ fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
         startDestination = startDestination
     ) {
         composable("splash") {
-            com.korenskoy.yandexmusic.presentation.splash.SplashScreen(
+            SplashScreen(
                 onSplashFinished = {
                     val destination = if (isAuthorized) "main" else "auth"
                     navController.navigate(destination) {

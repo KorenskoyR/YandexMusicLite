@@ -1,5 +1,14 @@
 package com.korenskoy.yandexmusic.data.download
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
 import android.net.Uri
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
@@ -48,7 +57,7 @@ data class StorageStatus(
 /** Where the downloads live: the internal storage or, encrypted, the removable SD card or a flash drive. */
 @Singleton
 class DownloadStorage @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
+    @ApplicationContext context: Context,
     private val card: CardStorage,
     private val usb: UsbStorage,
     private val downloads: TrackDownloadManager,
@@ -62,21 +71,21 @@ class DownloadStorage @Inject constructor(
     init {
         scope.launch { combine(card.wanted, usb.wanted, usb.folder) { _, _, _ -> }.collectLatest { refresh() } }
         // A card or a flash drive put in or taken out while the app is open (a head unit never closes it)
-        val volumes = android.content.IntentFilter().apply {
-            addAction(android.content.Intent.ACTION_MEDIA_MOUNTED)
-            addAction(android.content.Intent.ACTION_MEDIA_UNMOUNTED)
-            addAction(android.content.Intent.ACTION_MEDIA_EJECT)
-            addAction(android.content.Intent.ACTION_MEDIA_REMOVED)
+        val volumes = IntentFilter().apply {
+            addAction(Intent.ACTION_MEDIA_MOUNTED)
+            addAction(Intent.ACTION_MEDIA_UNMOUNTED)
+            addAction(Intent.ACTION_MEDIA_EJECT)
+            addAction(Intent.ACTION_MEDIA_REMOVED)
             addDataScheme("file")
         }
         runCatching {
-            androidx.core.content.ContextCompat.registerReceiver(
+            ContextCompat.registerReceiver(
                 context,
-                object : android.content.BroadcastReceiver() {
-                    override fun onReceive(context: android.content.Context, intent: android.content.Intent) = refresh()
+                object : BroadcastReceiver() {
+                    override fun onReceive(context: Context, intent: Intent) = refresh()
                 },
                 volumes,
-                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+                ContextCompat.RECEIVER_NOT_EXPORTED
             )
         }
     }
@@ -147,8 +156,8 @@ class DownloadStorage @Inject constructor(
 }
 
 /** The storage singletons from outside the graph (the on-device check of a flash drive picked in the system window). */
-@dagger.hilt.EntryPoint
-@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+@EntryPoint
+@InstallIn(SingletonComponent::class)
 interface StorageAccess {
     fun storage(): DownloadStorage
     fun downloads(): TrackDownloadManager

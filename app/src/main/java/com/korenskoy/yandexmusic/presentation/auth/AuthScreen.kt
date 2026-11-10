@@ -135,7 +135,7 @@ fun AuthScreen(
 
                     override fun onReceivedError(
                         view: WebView?,
-                        request: android.webkit.WebResourceRequest?,
+                        request: WebResourceRequest?,
                         error: android.webkit.WebResourceError?
                     ) {
                         super.onReceivedError(view, request, error)

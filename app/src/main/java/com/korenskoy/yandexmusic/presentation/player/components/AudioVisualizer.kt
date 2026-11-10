@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -77,7 +78,7 @@ fun AudioVisualizer(
                         }
                     }
                     .clip(RoundedCornerShape(50))
-                    .background(androidx.compose.ui.graphics.Color.White)
+                    .background(Color.White)
             )
         }
     }

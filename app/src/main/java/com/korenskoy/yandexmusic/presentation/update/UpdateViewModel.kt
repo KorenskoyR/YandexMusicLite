@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import android.content.Context
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import com.korenskoy.yandexmusic.R
 import androidx.lifecycle.ViewModel
@@ -20,8 +25,8 @@ import javax.inject.Inject
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     private val updateManager: GitHubUpdateManager,
-    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository,
-    @param:dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
+    private val settingsRepository: SettingsRepository,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _checkResult = MutableStateFlow<UpdateCheckResult?>(null)
@@ -37,7 +42,7 @@ class UpdateViewModel @Inject constructor(
     private val _isSignatureMismatch = MutableStateFlow(false)
     val isSignatureMismatch: StateFlow<Boolean> = _isSignatureMismatch.asStateFlow()
 
-    private var downloadedApkFile: java.io.File? = null
+    private var downloadedApkFile: File? = null
 
     init {
         // Silent check on launch, after a delay for network readiness
@@ -69,7 +74,7 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    private var downloadJob: kotlinx.coroutines.Job? = null
+    private var downloadJob: Job? = null
 
     fun startDownload(apkUrl: String) {
         downloadJob?.cancel()

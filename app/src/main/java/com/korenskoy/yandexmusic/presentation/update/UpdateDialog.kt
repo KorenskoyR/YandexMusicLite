@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.geometry.Offset
+import java.util.Locale
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.Role
@@ -70,7 +73,7 @@ fun UpdateDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        androidx.compose.foundation.layout.BoxWithConstraints {
+        BoxWithConstraints {
         // The window never hides its buttons: the header stays on top, the buttons at the bottom, and what lies
         // between (the description, the size, the warnings) gives up its height and scrolls. Only on a screen too
         // short even for the header and the buttons does the whole window scroll.
@@ -199,7 +202,7 @@ fun UpdateDialog(
 
                 if (updateInfo.apkSizeBytes > 0) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    val sizeMb = String.format(java.util.Locale.US, "%.2f", updateInfo.apkSizeBytes / (1024f * 1024f))
+                    val sizeMb = String.format(Locale.US, "%.2f", updateInfo.apkSizeBytes / (1024f * 1024f))
                     Text(
                         text = stringResource(R.string.update_file_size, sizeMb.toString()),
                         color = Color.White.copy(alpha = 0.45f),
@@ -364,7 +367,7 @@ fun UpdateDialog(
                             .background(Brush.verticalGradient(HiFi.MetalEdge))
                             .padding(1.5.dp)
                             .clip(CircleShape)
-                            .background(Brush.radialGradient(HiFi.KnobFace, center = androidx.compose.ui.geometry.Offset.Zero, radius = 900f))
+                            .background(Brush.radialGradient(HiFi.KnobFace, center = Offset.Zero, radius = 900f))
                             .clickable(enabled = !isDownloading) {
                                 if (isReadyToInstall) {
                                     if (!hasInstallPermission) {

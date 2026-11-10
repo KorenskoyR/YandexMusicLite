@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material.icons.rounded.GraphicEq
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import androidx.compose.material3.TextButton
@@ -100,7 +102,7 @@ internal fun ColumnScope.SettingsGroup(title: String?, content: @Composable Colu
 
 @Composable
 internal fun SettingsRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     onClick: (() -> Unit)?,
     subtitle: String? = null,
@@ -241,7 +243,7 @@ internal fun SoundQualityRow(compatible: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
-internal fun SegmentedRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, control: @Composable () -> Unit) {
+internal fun SegmentedRow(icon: ImageVector, title: String, control: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(icon, size = 32.dp)
@@ -326,7 +328,7 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
 /** UI scale for screens whose reported density is wrong (dense car head units); applied in MainActivity. */
 @Composable
 internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualScale: Float, onManualChange: (Float) -> Unit) {
-    val resources = androidx.compose.ui.platform.LocalResources.current
+    val resources = LocalResources.current
     val info = remember(resources) { DisplayScale.analyze(resources.displayMetrics) }
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

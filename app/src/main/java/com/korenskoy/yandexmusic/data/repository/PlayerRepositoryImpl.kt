@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import androidx.media3.common.PlaybackException
+import com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
 import androidx.core.net.toUri
 import android.os.SystemClock
 import android.util.Log
@@ -43,7 +45,7 @@ class PlayerRepositoryImpl(
     private val playerB: ExoPlayer,
     private val downloadManager: TrackDownloadManager,
     private val preloadManager: TrackPreloadManager,
-    private val wakeLockHelper: com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
+    private val wakeLockHelper: PlaybackWakeLockHelper
 ) : PlayerRepository {
 
     private val _currentTrackId = MutableStateFlow<String?>(null)
@@ -179,7 +181,7 @@ class PlayerRepositoryImpl(
 
     private fun setupPlayerListener(player: ExoPlayer, playerIdx: Int) {
         player.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // A new track brings its own normalization
                 applyVolume(player)
             }
@@ -208,7 +210,7 @@ class PlayerRepositoryImpl(
                 }
             }
 
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "ExoPlayer error on player[$playerIdx]: ${error.errorCodeName}", error)
                 player.currentMediaItem?.mediaId?.let { preloadManager.evictUrl(it) }
                 when {

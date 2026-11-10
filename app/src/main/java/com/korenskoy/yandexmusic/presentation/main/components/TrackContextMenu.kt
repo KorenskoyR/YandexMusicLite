@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import com.korenskoy.yandexmusic.presentation.hifi.AppScale
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults
 import androidx.compose.material.icons.rounded.Waves
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
@@ -120,14 +124,14 @@ fun TrackContextMenu(
     val scope = rememberCoroutineScope()
     // A tap outside or a swipe down closes the menu; Back goes one step back (handled below, because the
     // sheet's own Back would hide it first)
-    val appDensity = androidx.compose.ui.platform.LocalDensity.current
+    val appDensity = LocalDensity.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults.Container,
+        containerColor = HiFiDialogDefaults.Container,
         properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
     ) {
-        com.korenskoy.yandexmusic.presentation.hifi.AppScale(appDensity) {
+        AppScale(appDensity) {
         BackHandler {
             if (pickerStepsBack) picking = false
             else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -218,7 +222,7 @@ fun TrackContextMenu(
                 ContextMenuItem(
                     if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     stringResource(if (isLiked) R.string.track_menu_unlike else R.string.track_menu_like),
-                    iconTint = if (isLiked) com.korenskoy.yandexmusic.presentation.hifi.HiFi.Love else Color.White.copy(alpha = 0.75f)
+                    iconTint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.75f)
                 ) {
                     onToggleLike()
                     onDismiss()
@@ -267,7 +271,7 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
 
 @Composable
 private fun ContextMenuItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     text: String,
     iconTint: Color = Color.White.copy(alpha = 0.75f),
     onClick: () -> Unit

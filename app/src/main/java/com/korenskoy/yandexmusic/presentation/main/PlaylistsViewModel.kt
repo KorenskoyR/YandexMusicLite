@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.data.download.OfflineDownloads
+import com.korenskoy.yandexmusic.data.player.PlayRequests
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.flow.Flow
 import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.data.download.OfflineCollection
@@ -38,8 +44,8 @@ class PlaylistsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: UserPlaylistsRepository,
     private val playbackController: PlaybackController,
-    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests,
-    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
+    private val playRequests: PlayRequests,
+    private val offline: OfflineDownloads
 ) : ViewModel() {
 
     val playlists: StateFlow<List<UserPlaylistDto>> = repository.playlists
@@ -225,9 +231,9 @@ internal fun failureReason(e: Throwable): String = when (e) {
             ?.let { Regex(""""name"\s*:\s*"([^"]+)"""").find(it)?.groupValues?.get(1) }
         "HTTP ${e.code()}" + name?.let { " $it" }.orEmpty()
     }
-    is java.net.SocketTimeoutException -> "TIMEOUT"
-    is java.net.UnknownHostException -> "NO_DNS"
-    is java.io.IOException -> "NETWORK"
-    is kotlinx.serialization.SerializationException -> "BAD_RESPONSE"
+    is SocketTimeoutException -> "TIMEOUT"
+    is UnknownHostException -> "NO_DNS"
+    is IOException -> "NETWORK"
+    is SerializationException -> "BAD_RESPONSE"
     else -> e::class.java.simpleName
 }

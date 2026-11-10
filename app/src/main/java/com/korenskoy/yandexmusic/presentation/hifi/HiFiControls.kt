@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint
+import android.os.Build
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.graphicsLayer
@@ -95,18 +103,18 @@ fun Modifier.hifiSoftShadow(
     color: Color = Color.Black.copy(alpha = 0.55f),
     enabled: Boolean = true
 ): Modifier {
-    if (!enabled || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) return this
+    if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return this
     return this
         .drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
-            val body = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
-            val shadow = androidx.compose.ui.graphics.Path().apply { addPath(body, Offset(0f, elevation.toPx() / 3f)) }
-            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            val body = Path().apply { addOutline(outline) }
+            val shadow = Path().apply { addPath(body, Offset(0f, elevation.toPx() / 3f)) }
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = color.toArgb()
-                maskFilter = android.graphics.BlurMaskFilter(elevation.toPx().coerceAtLeast(1f), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                maskFilter = BlurMaskFilter(elevation.toPx().coerceAtLeast(1f), BlurMaskFilter.Blur.NORMAL)
             }
             onDrawBehind {
-                clipPath(body, androidx.compose.ui.graphics.ClipOp.Difference) {
+                clipPath(body, ClipOp.Difference) {
                     drawIntoCanvas { it.nativeCanvas.drawPath(shadow.asAndroidPath(), paint) }
                 }
             }
@@ -123,10 +131,10 @@ fun Modifier.hifiRecessed(cornerRadius: Dp): Modifier = this.drawWithCache {
     onDrawBehind {
         drawRoundRect(fill, cornerRadius = r)
         drawRoundRect(innerShadow, cornerRadius = r)
-        drawRoundRect(color = Color.White.copy(alpha = 0.06f), cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+        drawRoundRect(color = Color.White.copy(alpha = 0.06f), cornerRadius = r, style = Stroke(1f))
         // The light lip follows the rounded bottom edge (a straight line used to poke out past the corners)
         clipRect(top = size.height - r.y) {
-            drawRoundRect(color = Color.White.copy(alpha = 0.10f), cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(lip))
+            drawRoundRect(color = Color.White.copy(alpha = 0.10f), cornerRadius = r, style = Stroke(lip))
         }
     }
 }
@@ -248,18 +256,18 @@ fun GlassPillButton(
  */
 @Composable
 private fun PillLabel(text: String, icon: ImageVector?) {
-    androidx.compose.foundation.layout.BoxWithConstraints(contentAlignment = Alignment.Center) {
+    BoxWithConstraints(contentAlignment = Alignment.Center) {
         val withIcon = icon != null && maxWidth >= 132.dp
         Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             if (withIcon && icon != null) {
                 Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(8.dp))
             }
-            androidx.compose.foundation.text.BasicText(
+            BasicText(
                 text,
-                style = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold),
                 maxLines = 1,
-                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp, stepSize = 0.5.sp)
+                autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp, stepSize = 0.5.sp)
             )
         }
     }

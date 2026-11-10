@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.dto
 
+import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -35,12 +37,12 @@ data class AccountStatusResponseDto(
 
     val uidLong: Long?
         get() = account?.uidLong ?: when (directUid) {
-            is kotlinx.serialization.json.JsonPrimitive -> directUid.content.toLongOrNull()
+            is JsonPrimitive -> directUid.content.toLongOrNull()
             else -> null
         }
     val uidString: String
         get() = account?.uidString?.takeIf { it.isNotEmpty() } ?: when (directUid) {
-            is kotlinx.serialization.json.JsonPrimitive -> directUid.content
+            is JsonPrimitive -> directUid.content
             null -> ""
             else -> directUid.toString()
         }
@@ -67,12 +69,12 @@ data class AccountDto(
 ) {
     val uidLong: Long?
         get() = when (uid) {
-            is kotlinx.serialization.json.JsonPrimitive -> uid.content.toLongOrNull()
+            is JsonPrimitive -> uid.content.toLongOrNull()
             else -> null
         }
     val uidString: String
         get() = when (uid) {
-            is kotlinx.serialization.json.JsonPrimitive -> uid.content
+            is JsonPrimitive -> uid.content
             null -> ""
             else -> uid.toString()
         }
@@ -119,7 +121,7 @@ data class TrackDetailsDto(
     @SerialName("artists") val artists: List<ArtistDto> = emptyList(),
     @SerialName("coverUri") val coverUri: String? = null,
     @SerialName("durationMs") val durationMs: Long? = null,
-    @kotlinx.serialization.Transient val isRadio: Boolean = false,
+    @Transient val isRadio: Boolean = false,
     @SerialName("albums") val albums: List<TrackAlbumDto> = emptyList(),
     @SerialName("r128") val r128: R128Dto? = null,
     @SerialName("contentWarning") val contentWarning: String? = null
@@ -129,11 +131,11 @@ data class TrackDetailsDto(
         get() = contentWarning.equals("explicit", ignoreCase = true)
 
     val idString: String
-        get() = if (id is kotlinx.serialization.json.JsonPrimitive) id.content else id.toString()
+        get() = if (id is JsonPrimitive) id.content else id.toString()
 
     /** Playlist edits address a track by the id + album pair. */
     val albumId: String?
-        get() = (albums.firstOrNull()?.id as? kotlinx.serialization.json.JsonPrimitive)?.content
+        get() = (albums.firstOrNull()?.id as? JsonPrimitive)?.content
 }
 
 /** Loudness measured by the service (EBU R128): integrated loudness in LUFS and true peak in dBTP. */
@@ -166,11 +168,11 @@ data class UserPlaylistDto(
         get() = visibility == "public"
 
     val kindString: String
-        get() = (kind as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+        get() = (kind as? JsonPrimitive)?.content.orEmpty()
 
     /** Whose playlist this is, as the server said; null for lists cached before 1.11. */
     val ownerUid: String?
-        get() = (uid as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "0" }
+        get() = (uid as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "0" }
 
     /** Cover template ("avatars.yandex.net/...%%"): the custom/first-track cover, else the mosaic's first tile. */
     val coverUri: String?
@@ -190,10 +192,10 @@ data class PlaylistTrackDto(
     @SerialName("track") val track: TrackDetailsDto? = null
 ) {
     val trackId: String?
-        get() = track?.idString ?: (id as? kotlinx.serialization.json.JsonPrimitive)?.content
+        get() = track?.idString ?: (id as? JsonPrimitive)?.content
 
     val albumIdString: String?
-        get() = (albumId as? kotlinx.serialization.json.JsonPrimitive)?.content ?: track?.albumId
+        get() = (albumId as? JsonPrimitive)?.content ?: track?.albumId
 }
 
 @Serializable
@@ -204,7 +206,7 @@ data class ArtistDto(
     @SerialName("ogImage") val ogImage: String? = null
 ) {
     val idString: String?
-        get() = (id as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "0" }
+        get() = (id as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "0" }
 
     val coverUri: String?
         get() = cover?.uri ?: ogImage
@@ -222,7 +224,7 @@ data class AlbumDto(
     @SerialName("volumes") val volumes: List<List<TrackDetailsDto>> = emptyList()
 ) {
     val idString: String?
-        get() = (id as? kotlinx.serialization.json.JsonPrimitive)?.content
+        get() = (id as? JsonPrimitive)?.content
 
     val tracks: List<TrackDetailsDto>
         get() = volumes.flatten()
@@ -267,7 +269,7 @@ data class LibraryTrackDto(
             if (track != null) return track.idString
             val element = id ?: trackId
             return when (element) {
-                is kotlinx.serialization.json.JsonPrimitive -> element.content
+                is JsonPrimitive -> element.content
                 null -> ""
                 else -> element.toString().trim('"')
             }

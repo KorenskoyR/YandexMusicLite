@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.data.download.OfflineDownloads
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import android.util.Log
@@ -35,7 +36,7 @@ class TrackReactions @Inject constructor(
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
     private val settingsRepository: SettingsRepository,
-    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
+    private val offline: OfflineDownloads
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 

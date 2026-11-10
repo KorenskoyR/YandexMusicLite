@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import android.os.SystemClock
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import com.korenskoy.yandexmusic.presentation.hifi.AppScale
 import androidx.compose.material.icons.rounded.Waves
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLinkBadge
 import com.korenskoy.yandexmusic.utils.cover
@@ -135,7 +140,7 @@ internal fun PlayerHeader(
     onSleepAtEndOfTrack: () -> Unit,
     onCancelSleepTimer: () -> Unit
 ) {
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
     // On a narrow phone (360 dp) the balancing space would leave the caption too little room for both words
     val balanced = maxWidth >= 350.dp
     Row(
@@ -206,15 +211,15 @@ private fun SleepTimerButton(
                 modifier = Modifier.size(20.dp)
             )
         }
-        val appDensity = androidx.compose.ui.platform.LocalDensity.current
+        val appDensity = LocalDensity.current
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             shape = RoundedCornerShape(18.dp),
             containerColor = HiFiDialogDefaults.Container,
-            border = androidx.compose.foundation.BorderStroke(1.dp, HiFiDialogDefaults.Rim)
+            border = BorderStroke(1.dp, HiFiDialogDefaults.Rim)
         ) {
-        com.korenskoy.yandexmusic.presentation.hifi.AppScale(appDensity) {
+        AppScale(appDensity) {
             val colors = MenuDefaults.itemColors(textColor = Color.White)
             for (minutes in listOf(15, 30, 45, 60)) {
                 DropdownMenuItem(
@@ -244,10 +249,10 @@ private fun SleepTimerButton(
 @Composable
 internal fun SleepTimerCaption(state: SleepTimerState?) {
     if (state == null) return
-    var now by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(state) {
         while (true) {
-            now = android.os.SystemClock.elapsedRealtime()
+            now = SystemClock.elapsedRealtime()
             kotlinx.coroutines.delay(15_000L)
         }
     }
@@ -481,8 +486,8 @@ private fun TimeReadout(progress: () -> Long, durationMs: Long, scrub: Float?) {
         label = "time_color"
     )
     Row(Modifier.fillMaxWidth().offset(y = (-4).dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(elapsed, color = color, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
-        Text(remaining, color = color, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+        Text(elapsed, color = color, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, style = TextStyle(fontFeatureSettings = "tnum"))
+        Text(remaining, color = color, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, style = TextStyle(fontFeatureSettings = "tnum"))
     }
 }
 

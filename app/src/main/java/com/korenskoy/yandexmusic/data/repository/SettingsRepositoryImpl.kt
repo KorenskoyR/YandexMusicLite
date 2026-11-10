@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
@@ -150,9 +151,9 @@ class SettingsRepositoryImpl @Inject constructor(
     override val carClock = carClockPref.first
     override suspend fun setCarClock(enabled: Boolean) = carClockPref.second(enabled)
 
-    private val carUnderCoverPref = choice("car_under_cover", com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE)
+    private val carUnderCoverPref = choice("car_under_cover", CarUnderCover.QUEUE)
     override val carUnderCover = carUnderCoverPref.first
-    override suspend fun setCarUnderCover(value: com.korenskoy.yandexmusic.domain.model.CarUnderCover) = carUnderCoverPref.second(value)
+    override suspend fun setCarUnderCover(value: CarUnderCover) = carUnderCoverPref.second(value)
 
     private val animationPref = choice("animation_mode", AnimationMode.AUTO)
     override val animationMode = animationPref.first

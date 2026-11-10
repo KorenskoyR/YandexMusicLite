@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.domain.repository
 
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -18,7 +20,7 @@ interface PlayerRepository {
     val skipNextEvent: Flow<Unit>
     val skipPrevEvent: Flow<Unit>
     val playbackErrorEvent: Flow<PlaybackFailure>
-    val activePlayerState: StateFlow<androidx.media3.exoplayer.ExoPlayer>
+    val activePlayerState: StateFlow<ExoPlayer>
 
     /**
      * Starts [trackId]. With [crossfade] the currently audible track keeps playing until the new one
@@ -52,5 +54,5 @@ interface PlayerRepository {
     fun triggerSkipPrev()
     fun stop()
     fun release()
-    fun getPlayer(): androidx.media3.common.Player
+    fun getPlayer(): Player
 }

@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import android.net.Uri
+import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.data.download.StorageStatus
 import androidx.compose.runtime.Immutable
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
@@ -35,7 +38,7 @@ data class SettingsUiState(
     val swipeToCloseMiniPlayer: Boolean = true,
     val steeringWheelOnLeft: Boolean = true,
     val carClock: Boolean = true,
-    val carUnderCover: com.korenskoy.yandexmusic.domain.model.CarUnderCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE,
+    val carUnderCover: CarUnderCover = CarUnderCover.QUEUE,
     val uiScaleAuto: Boolean = true,
     val uiScaleManual: Float = 1f,
     val animationMode: AnimationMode = AnimationMode.AUTO
@@ -67,9 +70,9 @@ data class SettingsActions(
     val onSwipeToCloseChange: (Boolean) -> Unit = {},
     val onSteeringWheelChange: (Boolean) -> Unit = {},
     val onCarClockChange: (Boolean) -> Unit = {},
-    val onCarUnderCoverChange: (com.korenskoy.yandexmusic.domain.model.CarUnderCover) -> Unit = {},
-    val onStoragePlaceChange: (com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place) -> Unit = {},
-    val onUsbFolderChosen: (android.net.Uri) -> Unit = {},
+    val onCarUnderCoverChange: (CarUnderCover) -> Unit = {},
+    val onStoragePlaceChange: (TrackDownloadManager.Place) -> Unit = {},
+    val onUsbFolderChosen: (Uri) -> Unit = {},
     val onUiScaleAutoChange: (Boolean) -> Unit = {},
     val onUiScaleManualChange: (Float) -> Unit = {},
     val onAnimationModeChange: (AnimationMode) -> Unit = {}

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
@@ -122,8 +124,8 @@ fun SearchScreen(
     onSubmit: () -> Unit = {},
     initiallyShowHistory: Boolean = false
 ) {
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = LocalConfiguration.current.orientation ==
+        Configuration.ORIENTATION_LANDSCAPE
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
     val contentStart = 20.dp

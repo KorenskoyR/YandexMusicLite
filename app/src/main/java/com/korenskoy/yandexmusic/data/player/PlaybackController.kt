@@ -1,5 +1,14 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.os.SystemClock
+import com.korenskoy.yandexmusic.data.network.NetworkMonitor
+import com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.withContext
 import com.korenskoy.yandexmusic.domain.model.WaveTuning
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -70,8 +79,8 @@ class PlaybackController @Inject constructor(
     private val cacheManager: PlaylistCacheManager,
     private val radioRepository: RadioRepository,
     private val stateStore: PlaybackStateStore,
-    private val settingsRepository: com.korenskoy.yandexmusic.domain.repository.SettingsRepository,
-    private val networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor,
+    private val settingsRepository: SettingsRepository,
+    private val networkMonitor: NetworkMonitor,
     private val reserve: RoadReserve
 ) {
     private val scope = CoroutineScope(
@@ -137,9 +146,9 @@ class PlaybackController @Inject constructor(
     /** The current station's character, mood and language. */
     val waveTuning: StateFlow<WaveTuning> = _waveTuning.asStateFlow()
 
-    private val _trackWaveStarted = kotlinx.coroutines.flow.MutableSharedFlow<TrackDetailsDto>(extraBufferCapacity = 1)
+    private val _trackWaveStarted = MutableSharedFlow<TrackDetailsDto>(extraBufferCapacity = 1)
     /** A wave by a track has just started: the screen offers to undo it. */
-    val trackWaveStarted: kotlinx.coroutines.flow.SharedFlow<TrackDetailsDto> = _trackWaveStarted
+    val trackWaveStarted: SharedFlow<TrackDetailsDto> = _trackWaveStarted
 
     private data class BeforeTrackWave(
         val source: PlaylistSource,
@@ -181,7 +190,7 @@ class PlaybackController @Inject constructor(
     val wavePreview: StateFlow<List<TrackDetailsDto>> get() = wave.preview
     private var libraryTracks: List<TrackDetailsDto> = emptyList()
 
-    private val link = LinkTracker(android.os.SystemClock::elapsedRealtime)
+    private val link = LinkTracker(SystemClock::elapsedRealtime)
     private val _linkState = MutableStateFlow(LinkState.GOOD)
     /** How the music gets through right now: the "Слабая связь" and "Нет связи" labels. */
     val linkState: StateFlow<LinkState> = _linkState.asStateFlow()
@@ -225,7 +234,7 @@ class PlaybackController @Inject constructor(
     private var retriedTrackId: String? = null
     private var consecutiveFailedTracks = 0
     /** Completes once the saved session (if any) has been loaded from disk. */
-    private val sessionRestored = kotlinx.coroutines.CompletableDeferred<Unit>()
+    private val sessionRestored = CompletableDeferred<Unit>()
 
     private val activeUserFolder: String
         get() = authRepository.getActiveAccount()?.folderName ?: "default"
@@ -629,10 +638,10 @@ class PlaybackController @Inject constructor(
                     api.setStationSettings(
                         station,
                         kotlinx.serialization.json.buildJsonObject {
-                            put("diversity", kotlinx.serialization.json.JsonPrimitive(tuning.diversity.wire))
-                            put("moodEnergy", kotlinx.serialization.json.JsonPrimitive(tuning.mood.wire))
-                            put("language", kotlinx.serialization.json.JsonPrimitive(tuning.language.wire))
-                            put("type", kotlinx.serialization.json.JsonPrimitive("rotor"))
+                            put("diversity", JsonPrimitive(tuning.diversity.wire))
+                            put("moodEnergy", JsonPrimitive(tuning.mood.wire))
+                            put("language", JsonPrimitive(tuning.language.wire))
+                            put("type", JsonPrimitive("rotor"))
                         }
                     )
                 }.onFailure { Log.w(TAG, "Wave settings not saved", it) }.isSuccess
@@ -748,7 +757,7 @@ class PlaybackController @Inject constructor(
 
     private fun onTrackEnded() {
         // With crossfade the end is announced a few seconds early: the timer fades out over that tail
-        if (sleep.takeEndOfTrack(com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl.CROSSFADE_DURATION_MS)) return
+        if (sleep.takeEndOfTrack(PlayerRepositoryImpl.CROSSFADE_DURATION_MS)) return
         playNext(isAuto = true)
     }
 
@@ -1183,7 +1192,7 @@ class PlaybackController @Inject constructor(
         scope.launch(Dispatchers.IO) {
             try {
                 api.sendStationFeedback(station, type, trackId, from = WaveQueue.feedbackFrom(station), totalPlayedSeconds = playedSeconds)
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Error sending rotor feedback $type", e)
@@ -1203,9 +1212,9 @@ class PlaybackController @Inject constructor(
         radioRepository.getBuiltinStations().firstOrNull { "radio_${it.id}" == trackId }
 
     private fun radioTrackFor(station: RadioStation) = TrackDetailsDto(
-        id = kotlinx.serialization.json.JsonPrimitive("radio_${station.id}"),
+        id = JsonPrimitive("radio_${station.id}"),
         title = station.name,
-        artists = listOf(ArtistDto(id = kotlinx.serialization.json.JsonPrimitive("0"), name = context.getString(R.string.radio_live_frequency, station.frequency))),
+        artists = listOf(ArtistDto(id = JsonPrimitive("0"), name = context.getString(R.string.radio_live_frequency, station.frequency))),
         coverUri = station.iconRes?.let { "android.resource://${BuildConfig.APPLICATION_ID}/$it" } ?: station.logoUrl.ifEmpty { null },
         durationMs = 0,
         isRadio = true
@@ -1263,12 +1272,12 @@ class PlaybackController @Inject constructor(
     }
 
     private fun coverUrlFor(track: TrackDetailsDto): String? = track.coverUri?.let { uri ->
-        if (uri.startsWith("android.resource")) uri else uri.toCoverUrl(com.korenskoy.yandexmusic.utils.CoverSize.Medium)
+        if (uri.startsWith("android.resource")) uri else uri.toCoverUrl(CoverSize.Medium)
     }
 
     /** User-facing playback errors; the visible UI shows them as a Snackbar. */
-    private val _messages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val messages: kotlinx.coroutines.flow.SharedFlow<String> = _messages
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val messages: SharedFlow<String> = _messages
 
     private fun showMessage(text: String) {
         // No screen is collecting (app in background): fall back to a system toast

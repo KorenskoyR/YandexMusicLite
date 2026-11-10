@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.foundation.layout.PaddingValues
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
@@ -248,7 +249,7 @@ private fun QueueSheetContent(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            contentPadding = PaddingValues(
                 bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
             )
         ) {

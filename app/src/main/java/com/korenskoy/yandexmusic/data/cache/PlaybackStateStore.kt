@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.data.cache
 
+import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import android.content.Context
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +27,7 @@ data class PlaybackSnapshot(
 
 @Singleton
 class PlaybackStateStore @Inject constructor(
-    @param:dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val json: Json
 ) {
     private val file: File
@@ -39,20 +42,20 @@ class PlaybackStateStore @Inject constructor(
                 tmp.copyTo(file, overwrite = true)
                 tmp.delete()
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            android.util.Log.w("PlaybackStateStore", "Could not save the session", e)
+            Log.w("PlaybackStateStore", "Could not save the session", e)
         }
     }
 
     suspend fun load(): PlaybackSnapshot? = withContext(Dispatchers.IO) {
         try {
             if (file.exists()) json.decodeFromString(PlaybackSnapshot.serializer(), file.readText()) else null
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            android.util.Log.w("PlaybackStateStore", "Could not read the saved session", e)
+            Log.w("PlaybackStateStore", "Could not read the saved session", e)
             null
         }
     }

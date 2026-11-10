@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import androidx.compose.ui.text.TextStyle
+import java.util.Locale
 import androidx.compose.foundation.layout.fillMaxHeight
 import android.os.SystemClock
 import androidx.compose.foundation.Canvas
@@ -361,7 +363,7 @@ private fun SignInStatus(state: PhoneSignInState, m: SignInMetrics) {
         PhoneSignInState.GettingCode -> stringResource(R.string.auth_phone_getting_code)
         is PhoneSignInState.Waiting -> if (state.offline) stringResource(R.string.auth_phone_no_network) else {
             val left = ((state.expiresAt - now) / 1000L).coerceAtLeast(0L)
-            stringResource(R.string.auth_phone_waiting, "%d:%02d".format(java.util.Locale.US, left / 60, left % 60))
+            stringResource(R.string.auth_phone_waiting, "%d:%02d".format(Locale.US, left / 60, left % 60))
         }
         PhoneSignInState.Expired -> stringResource(R.string.auth_phone_expired)
         PhoneSignInState.Denied -> stringResource(R.string.auth_phone_denied)
@@ -383,7 +385,7 @@ private fun SignInStatus(state: PhoneSignInState, m: SignInMetrics) {
             fontSize = if (m.big) 18.sp else 15.sp,
             lineHeight = if (m.big) 24.sp else 20.sp,
             fontWeight = if (busy) FontWeight.Normal else FontWeight.SemiBold,
-            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+            style = TextStyle(fontFeatureSettings = "tnum"),
             maxLines = 3,
             overflow = TextOverflow.Ellipsis
         )

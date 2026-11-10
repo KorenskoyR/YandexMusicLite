@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.asPaddingValues
@@ -50,7 +51,7 @@ import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiMotion
 
-enum class MainTab(@param:androidx.annotation.StringRes val title: Int, val icon: ImageVector, val route: String) {
+enum class MainTab(@param:StringRes val title: Int, val icon: ImageVector, val route: String) {
     HOME(R.string.tab_wave, Icons.Rounded.Waves, "home"),
     SEARCH(R.string.tab_search, Icons.Rounded.Search, "search"),
     LIBRARY(R.string.tab_music, Icons.Rounded.LibraryMusic, "library"),

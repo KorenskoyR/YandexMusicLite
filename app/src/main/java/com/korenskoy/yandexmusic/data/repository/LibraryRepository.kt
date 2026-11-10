@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import android.util.Log
 import com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
@@ -69,8 +76,8 @@ class LibraryRepository @Inject constructor(
     private var loadedFolder: String? = null
     private var hitsPage = 1
     private var trendsPage = 1
-    private val loadingMoreHits = java.util.concurrent.atomic.AtomicBoolean(false)
-    private val loadingMoreTrends = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val loadingMoreHits = AtomicBoolean(false)
+    private val loadingMoreTrends = AtomicBoolean(false)
 
     private val activeFolder: String
         get() = authRepository.getActiveAccount()?.folderName ?: "default"
@@ -110,7 +117,7 @@ class LibraryRepository @Inject constructor(
             val uid = resolveUid()
             val response = try {
                 api.getLikedTracks(uid, richTracks = false)
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (uid != "me") api.getLikedTracks("me", richTracks = false) else throw e
@@ -146,7 +153,7 @@ class LibraryRepository @Inject constructor(
             // Keep the server's order (most recent like first)
             val tracks = ids.map { id ->
                 cachedById[id] ?: embedded[id] ?: fetched[id] ?: previousById[id]
-                    ?: TrackDetailsDto(id = kotlinx.serialization.json.JsonPrimitive(id))
+                    ?: TrackDetailsDto(id = JsonPrimitive(id))
             }
             if (activeFolder != folder) return false // account switched while syncing
             _likedTracks.value = tracks
@@ -155,7 +162,7 @@ class LibraryRepository @Inject constructor(
             revision?.let { cacheManager.saveLikesRevision(folder, it) }
             if (!metaCurrent && fetched.size >= missing.size / 2) cacheManager.markLikesMetaCurrent(folder)
             return true
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Likes sync failed", e)
@@ -217,7 +224,7 @@ class LibraryRepository @Inject constructor(
                 if (liked) api.likeTrack(uid, id) else api.unlikeTrack(uid, id)
             }.onFailure { Log.e(TAG, "Like change failed for $id", it) }
             // No connection: the like stands and is sent later. The server refusing it is another matter
-            if (outcome.exceptionOrNull() is java.io.IOException) {
+            if (outcome.exceptionOrNull() is IOException) {
                 addPendingReaction(folder, PendingReaction(id, if (liked) PendingReaction.Kind.LIKE else PendingReaction.Kind.UNLIKE))
                 onDone(true)
                 return@launch
@@ -246,7 +253,7 @@ class LibraryRepository @Inject constructor(
                 api.dislikeTrack(uid, id)
             }.onFailure {
                 Log.e(TAG, "Dislike failed for $id", it)
-                if (it is java.io.IOException) addPendingReaction(folder, PendingReaction(id, PendingReaction.Kind.DISLIKE))
+                if (it is IOException) addPendingReaction(folder, PendingReaction(id, PendingReaction.Kind.DISLIKE))
             }
         }
     }
@@ -276,10 +283,10 @@ class LibraryRepository @Inject constructor(
                             api.dislikeTrack(uid, reaction.trackId)
                         }
                     }
-                } catch (e: java.io.IOException) {
+                } catch (e: IOException) {
                     Log.w(TAG, "Still no connection for the saved reactions", e)
                     break
-                } catch (e: kotlinx.coroutines.CancellationException) {
+                } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     // The server refused this one: sending it again will not help
@@ -335,7 +342,7 @@ class LibraryRepository @Inject constructor(
     }
 
     private fun loadMore(
-        gate: java.util.concurrent.atomic.AtomicBoolean,
+        gate: AtomicBoolean,
         queries: List<String>,
         nextPage: () -> Int,
         append: (List<TrackDetailsDto>) -> Unit
@@ -362,18 +369,18 @@ class LibraryRepository @Inject constructor(
         _likedIds.value = emptySet()
     }
 
-    private fun extractTrackIds(element: kotlinx.serialization.json.JsonElement?): List<String> {
+    private fun extractTrackIds(element: JsonElement?): List<String> {
         if (element == null) return emptyList()
         val ids = mutableListOf<String>()
-        fun search(el: kotlinx.serialization.json.JsonElement) {
+        fun search(el: JsonElement) {
             when (el) {
-                is kotlinx.serialization.json.JsonObject -> {
+                is JsonObject -> {
                     val trackObj = el["track"]
-                    if (trackObj is kotlinx.serialization.json.JsonObject) {
-                        (trackObj["id"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotEmpty() }?.let { ids += it }
+                    if (trackObj is JsonObject) {
+                        (trackObj["id"] as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() }?.let { ids += it }
                     }
                     val directId = el["id"] ?: el["trackId"]
-                    if (directId is kotlinx.serialization.json.JsonPrimitive && directId.content.length > 2 &&
+                    if (directId is JsonPrimitive && directId.content.length > 2 &&
                         directId.content.all { it.isDigit() || it == ':' || it == '-' } &&
                         (el.containsKey("albumId") || el.containsKey("timestamp"))
                     ) {
@@ -381,7 +388,7 @@ class LibraryRepository @Inject constructor(
                     }
                     el.values.forEach { search(it) }
                 }
-                is kotlinx.serialization.json.JsonArray -> el.forEach { search(it) }
+                is JsonArray -> el.forEach { search(it) }
                 else -> Unit
             }
         }

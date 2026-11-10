@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.cache
 
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
@@ -23,7 +25,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class PlaylistCacheManager @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val json: Json
 ) {
     private val database by lazy { CacheDatabase.get(context) }
@@ -187,7 +189,7 @@ class PlaylistCacheManager @Inject constructor(
         try {
             importLegacyFiles()
             block()
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Cache operation failed", e)

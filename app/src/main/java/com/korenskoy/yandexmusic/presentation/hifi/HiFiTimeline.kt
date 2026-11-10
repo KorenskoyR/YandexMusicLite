@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import java.util.Locale
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -82,8 +83,8 @@ object TimelineMath {
         val hours = total / 3600
         val minutes = (total % 3600) / 60
         val seconds = total % 60
-        return if (hours > 0) String.format(java.util.Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
-        else String.format(java.util.Locale.ROOT, "%d:%02d", minutes, seconds)
+        return if (hours > 0) String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
+        else String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
     }
 
     /** The two labels under the player timeline: elapsed and "−remaining". */

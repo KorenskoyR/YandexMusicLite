@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.download
 
+import com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
 import android.content.Context
@@ -131,7 +133,7 @@ class OfflineDownloads @Inject constructor(
 class OfflineSync @Inject constructor(
     private val offline: OfflineDownloads,
     private val collections: OfflineCollections,
-    private val playlists: com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
+    private val playlists: UserPlaylistsRepository
 ) {
     suspend fun refreshAll() {
         for (kept in collections.all.value) {
@@ -141,7 +143,7 @@ class OfflineSync @Inject constructor(
                     if (playlist != null) offline.sync(kept.key, playlist.title.orEmpty(), playlist.coverUri, playlists.tracks(playlist))
                 }
                 offline.resume(kept.key)
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("OfflineSync", "Kept ${kept.key} not refreshed", e)

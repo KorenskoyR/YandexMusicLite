@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import com.korenskoy.yandexmusic.data.download.OfflineDownloads
+import com.korenskoy.yandexmusic.data.player.PlayRequests
 import kotlinx.coroutines.flow.Flow
 import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.data.download.OfflineCollection
@@ -46,8 +48,8 @@ data class CatalogPageState(
 class CatalogViewModel @Inject constructor(
     private val repository: CatalogRepository,
     private val playbackController: PlaybackController,
-    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests,
-    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
+    private val playRequests: PlayRequests,
+    private val offline: OfflineDownloads
 ) : ViewModel() {
 
     private val _stack = MutableStateFlow<List<CatalogPageState>>(emptyList())

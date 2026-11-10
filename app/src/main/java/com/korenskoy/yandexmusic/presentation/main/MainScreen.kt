@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import com.korenskoy.yandexmusic.data.download.OfflineState
+import com.korenskoy.yandexmusic.presentation.catalog.CatalogPage
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.systemBars
 import kotlinx.coroutines.launch
@@ -239,10 +246,10 @@ fun MainScreen(
                             modifier = if (isLandscape && tab != MainTab.CAR) Modifier.windowInsetsPadding(sideInsets) else Modifier
                         ) { (_, catalogTop) ->
                         if (catalogTop != null) {
-                            val albumId = (catalogTop.page as? com.korenskoy.yandexmusic.presentation.catalog.CatalogPage.Album)?.id
+                            val albumId = (catalogTop.page as? CatalogPage.Album)?.id
                             val albumOffline by remember(albumId) {
-                                albumId?.let(catalogVm::offlineState) ?: kotlinx.coroutines.flow.flowOf(com.korenskoy.yandexmusic.data.download.OfflineState.None)
-                            }.collectAsStateWithLifecycle(com.korenskoy.yandexmusic.data.download.OfflineState.None)
+                                albumId?.let(catalogVm::offlineState) ?: kotlinx.coroutines.flow.flowOf(OfflineState.None)
+                            }.collectAsStateWithLifecycle(OfflineState.None)
                             val downloadedIds by viewModel.downloadedTrackIds.collectAsStateWithLifecycle()
                             CatalogPageScreen(
                                 state = catalogTop,
@@ -366,7 +373,7 @@ fun MainScreen(
                     }
                 }
                 // A wave by a track has started: say so, and offer to undo it
-                val resources = androidx.compose.ui.platform.LocalResources.current
+                val resources = LocalResources.current
                 val undoLabel = stringResource(com.korenskoy.yandexmusic.R.string.action_undo)
                 LaunchedEffect(lifecycleOwner) {
                     lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -384,7 +391,7 @@ fun MainScreen(
                 }
                 // In the car the message sits right above the big source dock, never over it
                 val bars = WindowInsets.systemBars.asPaddingValues()
-                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
                 val snackBottom = when {
                     currentTab == MainTab.CAR -> com.korenskoy.yandexmusic.presentation.car.carDockClearance(
                         maxWidth, maxHeight, maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(), isLandscape
@@ -400,7 +407,7 @@ fun MainScreen(
                         .navigationBarsPadding()
                         .padding(bottom = snackBottom)
                 ) { data ->
-                    com.korenskoy.yandexmusic.presentation.hifi.HiFiSnackbar(
+                    HiFiSnackbar(
                         message = data.visuals.message,
                         actionLabel = data.visuals.actionLabel,
                         onAction = { data.performAction() }
@@ -432,7 +439,7 @@ fun MainScreen(
 }
 
 /** A catalog page slides a fifth of the way in from the right and fades in; Back mirrors it. */
-private fun catalogTransition(forward: Boolean, lite: Boolean): androidx.compose.animation.ContentTransform =
+private fun catalogTransition(forward: Boolean, lite: Boolean): ContentTransform =
     if (lite) {
         fadeIn(HiFiMotion.quick()) togetherWith fadeOut(HiFiMotion.quick())
     } else {
@@ -509,7 +516,7 @@ private fun Modifier.sharedCover(scope: SharedTransitionScope, visibility: Anima
  */
 @Composable
 private fun PrefetchCovers(viewModel: MainViewModel, track: TrackDetailsDto?) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val wavePreview by viewModel.wavePreview.collectAsStateWithLifecycle()
     val ahead = remember(queue, track?.idString) { listOfNotNull(track) + upcomingOf(queue, track?.idString, limit = 2) }

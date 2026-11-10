@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import android.util.Log
+import androidx.security.crypto.MasterKey
+import java.io.File
 import androidx.core.content.edit
 import android.content.Context
 import android.content.SharedPreferences
@@ -30,7 +33,7 @@ class AuthRepositoryImpl @Inject constructor(
         val secure = try {
             KeystoreStringPreferences(context, SECURE_PREFS_FILE, KEYSTORE_ALIAS)
         } catch (e: Exception) {
-            android.util.Log.e("AuthRepository", "Unexpected error", e)
+            Log.e("AuthRepository", "Unexpected error", e)
             null
         }
         // Fallback to plain SharedPreferences if Keystore is broken on this device
@@ -47,11 +50,11 @@ class AuthRepositoryImpl @Inject constructor(
     @Suppress("DEPRECATION")
     private fun migrateLegacyStorage(context: Context, target: SharedPreferences) {
         if (MIGRATED_KEYS.any { target.contains(it) }) return
-        val legacyFile = java.io.File(context.applicationInfo.dataDir, "shared_prefs/$LEGACY_PREFS_FILE.xml")
+        val legacyFile = File(context.applicationInfo.dataDir, "shared_prefs/$LEGACY_PREFS_FILE.xml")
         val legacyEncrypted = if (legacyFile.exists()) {
             try {
-                val masterKey = androidx.security.crypto.MasterKey.Builder(context)
-                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
                 androidx.security.crypto.EncryptedSharedPreferences.create(
                     context,
@@ -61,7 +64,7 @@ class AuthRepositoryImpl @Inject constructor(
                     androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e: Exception) {
-                android.util.Log.e("AuthRepository", "Unexpected error", e)
+                Log.e("AuthRepository", "Unexpected error", e)
                 null
             }
         } else {
@@ -105,7 +108,7 @@ class AuthRepositoryImpl @Inject constructor(
             try {
                 json.decodeFromString<List<UserAccount>>(accountsRaw)
             } catch (e: Exception) {
-                android.util.Log.e("AuthRepository", "Unexpected error", e)
+                Log.e("AuthRepository", "Unexpected error", e)
                 emptyList()
             }
         } else {
@@ -146,7 +149,7 @@ class AuthRepositoryImpl @Inject constructor(
             val raw = json.encodeToString(accounts)
             sharedPreferences.edit { putString(KEY_ACCOUNTS_JSON, raw) }
         } catch (e: Exception) {
-            android.util.Log.e("AuthRepository", "Unexpected error", e)
+            Log.e("AuthRepository", "Unexpected error", e)
         }
     }
 

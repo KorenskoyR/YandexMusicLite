@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.di
 
+import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import android.content.Context
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.korenskoy.yandexmusic.BuildConfig
@@ -85,7 +86,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideYandexMusicApi(retrofit: Retrofit): com.korenskoy.yandexmusic.data.network.YandexMusicApi {
-        return retrofit.create(com.korenskoy.yandexmusic.data.network.YandexMusicApi::class.java)
+    fun provideYandexMusicApi(retrofit: Retrofit): YandexMusicApi {
+        return retrofit.create(YandexMusicApi::class.java)
     }
 }

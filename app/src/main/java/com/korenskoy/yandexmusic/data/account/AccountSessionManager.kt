@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.data.account
 
+import com.korenskoy.yandexmusic.data.download.OfflineDownloads
+import com.korenskoy.yandexmusic.data.download.OfflineSync
+import kotlinx.coroutines.CancellationException
 import android.util.Log
 import com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager
 import com.korenskoy.yandexmusic.data.download.DownloadScheduler
@@ -36,8 +39,8 @@ class AccountSessionManager @Inject constructor(
     private val cacheManager: PlaylistCacheManager,
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
-    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads,
-    private val offlineSync: com.korenskoy.yandexmusic.data.download.OfflineSync,
+    private val offline: OfflineDownloads,
+    private val offlineSync: OfflineSync,
     private val httpClient: dagger.Lazy<okhttp3.OkHttpClient>
 ) {
     /** Syncs outlive any screen. */
@@ -95,7 +98,7 @@ class AccountSessionManager @Inject constructor(
                 )
             )
             Log.i(TAG, "Account status refreshed: hasPlus=${status.hasPlus}")
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.d(TAG, "Account status refresh: ${e.message}")

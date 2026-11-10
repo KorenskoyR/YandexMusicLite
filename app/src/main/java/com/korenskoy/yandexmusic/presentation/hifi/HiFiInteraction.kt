@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import android.os.SystemClock
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import kotlinx.coroutines.CancellationException
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -85,7 +91,7 @@ class Appearance internal constructor(private val createdAt: Long) {
 
     /** True only the first time [key] is shown, and only right after the list was created. */
     internal fun shouldAnimate(key: Any): Boolean =
-        seen.add(key) && android.os.SystemClock.uptimeMillis() - createdAt < WINDOW_MS
+        seen.add(key) && SystemClock.uptimeMillis() - createdAt < WINDOW_MS
 
     private companion object {
         const val WINDOW_MS = 600L
@@ -93,7 +99,7 @@ class Appearance internal constructor(private val createdAt: Long) {
 }
 
 @Composable
-fun rememberAppearance(vararg keys: Any?): Appearance = remember(*keys) { Appearance(android.os.SystemClock.uptimeMillis()) }
+fun rememberAppearance(vararg keys: Any?): Appearance = remember(*keys) { Appearance(SystemClock.uptimeMillis()) }
 
 /** Fade-and-rise for row [index] of a list, once per [key]; nothing at all in lite mode. */
 fun Modifier.appearOnce(appearance: Appearance, key: Any, index: Int): Modifier = composed {
@@ -182,7 +188,7 @@ fun Modifier.reorderHandle(
     val move by rememberUpdatedState(onMove)
     val allowed by rememberUpdatedState(canMoveTo)
     pointerInput(key, afterLongPress) {
-        val onStart = { _: androidx.compose.ui.geometry.Offset ->
+        val onStart = { _: Offset ->
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             state.start(key)
         }
@@ -207,16 +213,16 @@ fun Modifier.reorderHandle(
  * On older Android a plain Back simply calls [onBack]. Read the returned progress with [predictiveBack].
  */
 @Composable
-fun rememberPredictiveBack(enabled: Boolean, onBack: () -> Unit): Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
+fun rememberPredictiveBack(enabled: Boolean, onBack: () -> Unit): Animatable<Float, AnimationVector1D> {
     val progress = remember { Animatable(0f) }
     val back by rememberUpdatedState(onBack)
     // A page opened again starts flat; the one that just left keeps its shape while it fades out
     LaunchedEffect(enabled) { if (enabled) progress.snapTo(0f) }
-    androidx.activity.compose.PredictiveBackHandler(enabled = enabled) { events ->
+    PredictiveBackHandler(enabled = enabled) { events ->
         try {
             events.collect { progress.snapTo(it.progress) }
             back()
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             progress.animateTo(0f, HiFiMotion.spring())
             throw e
         }
@@ -231,7 +237,7 @@ fun Modifier.predictiveBack(progress: Animatable<Float, *>): Modifier = graphics
         val s = 1f - 0.08f * p
         scaleX = s
         scaleY = s
-        shape = androidx.compose.foundation.shape.RoundedCornerShape((28f * p * density))
+        shape = RoundedCornerShape((28f * p * density))
         clip = true
     }
 }

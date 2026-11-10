@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.domain.repository
 
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
@@ -60,8 +61,8 @@ interface SettingsRepository {
     suspend fun setCarClock(enabled: Boolean)
 
     /** «В авто»: under the cover the "Очередь" button (the biggest cover) or the "Далее" row. */
-    val carUnderCover: Flow<com.korenskoy.yandexmusic.domain.model.CarUnderCover>
-    suspend fun setCarUnderCover(value: com.korenskoy.yandexmusic.domain.model.CarUnderCover)
+    val carUnderCover: Flow<CarUnderCover>
+    suspend fun setCarUnderCover(value: CarUnderCover)
 
     val animationMode: Flow<AnimationMode>
     suspend fun setAnimationMode(value: AnimationMode)

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic
 
+import com.korenskoy.yandexmusic.data.crash.CrashLog
+import com.korenskoy.yandexmusic.data.player.BluetoothAutoplay
 import coil3.request.allowHardware
 import okio.Path.Companion.toOkioPath
 import coil3.request.crossfade
@@ -28,7 +30,7 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
     lateinit var widgetUpdater: NowPlayingWidgetUpdater
 
     @Inject
-    lateinit var bluetoothAutoplay: com.korenskoy.yandexmusic.data.player.BluetoothAutoplay
+    lateinit var bluetoothAutoplay: BluetoothAutoplay
 
     /**
      * Covers: a quarter of the app's memory for decoded images and 300 MB on disk, so covers seen once come
@@ -53,7 +55,7 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
 
     override fun onCreate() {
         // Before anything else, so a crash during start-up is recorded too
-        com.korenskoy.yandexmusic.data.crash.CrashLog.install(this)
+        CrashLog.install(this)
         super.onCreate()
         widgetUpdater.start()
         bluetoothAutoplay.start()

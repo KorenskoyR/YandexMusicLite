@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.os.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,7 +26,7 @@ internal class SleepTimer(
     fun start(minutes: Int) {
         job?.cancel()
         val durationMs = minutes * 60_000L
-        _state.value = SleepTimerState(android.os.SystemClock.elapsedRealtime() + durationMs, atEndOfTrack = false)
+        _state.value = SleepTimerState(SystemClock.elapsedRealtime() + durationMs, atEndOfTrack = false)
         job = scope.launch {
             delay((durationMs - FADE_MS).coerceAtLeast(0L))
             fadeOutAndPause(FADE_MS)

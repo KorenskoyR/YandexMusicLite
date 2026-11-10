@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.ui.theme
 
+import android.content.ContextWrapper
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -33,7 +34,7 @@ fun YandexMusicTheme(
         SideEffect {
             var context = view.context
             var activity: Activity? = null
-            while (context is android.content.ContextWrapper) {
+            while (context is ContextWrapper) {
                 if (context is Activity) {
                     activity = context
                     break

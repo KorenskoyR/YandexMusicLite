@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.widget
 
+import android.content.BroadcastReceiver
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.ComponentName
 import android.content.Context
@@ -153,7 +156,7 @@ private fun ControlButton(icon: Int, description: String, intent: Intent) {
 }
 
 // MediaButtonReceiver is marked unstable in media3; it is the documented receiver for media buttons
-@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+@OptIn(markerClass = [UnstableApi::class])
 internal fun mediaButtonIntent(context: Context, keyCode: Int): Intent =
     Intent(Intent.ACTION_MEDIA_BUTTON)
         .setComponent(ComponentName(context, MediaButtonReceiver::class.java))
@@ -169,7 +172,7 @@ private fun openPlayerIntent(context: Context): Intent =
         .putExtra(MainActivity.EXTRA_OPEN_PLAYER, true)
 
 /** "Next" / "previous" from the widget: skips within the current session (nothing to skip without one). */
-class WidgetSkipReceiver : android.content.BroadcastReceiver() {
+class WidgetSkipReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val controller = EntryPointAccessors.fromApplication(context.applicationContext, NowPlayingWidget.Dependencies::class.java)
             .playbackController()

@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.runtime.LaunchedEffect
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
+import com.korenskoy.yandexmusic.presentation.main.components.WaveTuneSheet
 import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.data.download.OfflineCollection
 import com.korenskoy.yandexmusic.presentation.car.CAR_QUEUE_LIMIT
@@ -70,7 +74,7 @@ internal fun HomeTab(
     val seed by viewModel.waveSeed.collectAsStateWithLifecycle()
     var tuneOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     if (tuneOpen) {
-        com.korenskoy.yandexmusic.presentation.main.components.WaveTuneSheet(tuning, onChange = viewModel::setWaveTuning, onDismiss = { tuneOpen = false })
+        WaveTuneSheet(tuning, onChange = viewModel::setWaveTuning, onDismiss = { tuneOpen = false })
     }
     HomeScreen(
         waveTrack = if (waveActive) now.track else null,
@@ -177,7 +181,7 @@ internal fun LibraryTab(
         openedPlaylist?.playlist?.let(playlistsVm::offlineState) ?: kotlinx.coroutines.flow.flowOf(OfflineState.None)
     }.collectAsStateWithLifecycle(OfflineState.None)
 
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         if (viewModel.tracks.value.isEmpty()) viewModel.loadLikedTracks()
     }
 
@@ -274,7 +278,7 @@ internal fun CarTab(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val (settings, settingsActions) = settingsHost(viewModel, accountVm, updateVm, crashVm, onOpenAccounts, onOpenCrashLog, onAddAccount, settingsVm)
     if (showSettings) {
-        com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet(
+        SettingsSheet(
             state = settings,
             actions = settingsActions,
             onDismiss = { showSettings = false }
@@ -344,7 +348,7 @@ internal fun settingsHost(
     onOpenCrashLog: () -> Unit,
     onAddAccount: () -> Unit,
     settingsVm: SettingsViewModel
-): Pair<com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState, SettingsActions> {
+): Pair<SettingsUiState, SettingsActions> {
     val settingsState by settingsVm.state.collectAsStateWithLifecycle()
     val activeAccount by accountVm.activeAccount.collectAsStateWithLifecycle()
     val accountName by accountVm.accountName.collectAsStateWithLifecycle()

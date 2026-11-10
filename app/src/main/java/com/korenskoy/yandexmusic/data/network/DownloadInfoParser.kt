@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.network
 
+import android.util.Log
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
@@ -49,7 +50,7 @@ object DownloadInfoParser {
                 return DownloadInfoXml(host, path, ts, s)
             }
         } catch (e: Exception) {
-            android.util.Log.e("DownloadInfoParser", "Unexpected error", e)
+            Log.e("DownloadInfoParser", "Unexpected error", e)
         }
         return null
     }

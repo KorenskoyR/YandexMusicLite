@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -21,7 +22,7 @@ private val Context.radioDataStore: DataStore<Preferences> by preferencesDataSto
 
 @Singleton
 class RadioRepository @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     private val FAVORITES_KEY = stringSetPreferencesKey("favorite_station_ids")
 

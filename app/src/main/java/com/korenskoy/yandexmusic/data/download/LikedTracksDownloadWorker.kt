@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.download
 
+import com.korenskoy.yandexmusic.data.player.SoundMode
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -38,7 +39,7 @@ class LikedTracksDownloadWorker(
         fun libraryRepository(): LibraryRepository
         fun downloadManager(): TrackDownloadManager
         fun preloadManager(): TrackPreloadManager
-        fun soundMode(): com.korenskoy.yandexmusic.data.player.SoundMode
+        fun soundMode(): SoundMode
     }
 
     private val deps = EntryPointAccessors.fromApplication(context.applicationContext, Dependencies::class.java)

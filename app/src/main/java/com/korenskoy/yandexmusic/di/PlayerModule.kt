@@ -1,5 +1,17 @@
 package com.korenskoy.yandexmusic.di
 
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.korenskoy.yandexmusic.data.download.CardAwareDataSourceFactory
+import com.korenskoy.yandexmusic.data.download.CardStorage
+import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
+import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
+import com.korenskoy.yandexmusic.data.player.EncrawDataSourceFactory
+import com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
+import com.korenskoy.yandexmusic.data.player.SystemEqualizer
+import com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl
+import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -13,15 +25,15 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@OptIn(UnstableApi::class)
 @Module
 @InstallIn(SingletonComponent::class)
 object PlayerModule {
 
-    private fun createConfiguredExoPlayer(context: Context, audioSessionId: Int, card: com.korenskoy.yandexmusic.data.download.CardStorage): ExoPlayer =
+    private fun createConfiguredExoPlayer(context: Context, audioSessionId: Int, card: CardStorage): ExoPlayer =
         createConfiguredExoPlayer(context, card).apply { if (audioSessionId > 0) setAudioSessionId(audioSessionId) }
 
-    private fun createConfiguredExoPlayer(context: Context, card: com.korenskoy.yandexmusic.data.download.CardStorage): ExoPlayer {
+    private fun createConfiguredExoPlayer(context: Context, card: CardStorage): ExoPlayer {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -45,10 +57,10 @@ object PlayerModule {
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
 
-        val encrawDataSourceFactory = com.korenskoy.yandexmusic.data.player.EncrawDataSourceFactory(context)
+        val encrawDataSourceFactory = EncrawDataSourceFactory(context)
         // Encrypted tracks on the SD card are read through their own source; everything else as before
-        val cardAware = com.korenskoy.yandexmusic.data.download.CardAwareDataSourceFactory(encrawDataSourceFactory, card)
-        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(cardAware)
+        val cardAware = CardAwareDataSourceFactory(encrawDataSourceFactory, card)
+        val mediaSourceFactory = DefaultMediaSourceFactory(cardAware)
 
         return try {
             ExoPlayer.Builder(context, renderersFactory)
@@ -70,16 +82,16 @@ object PlayerModule {
     @Singleton
     fun providePlayerRepository(
         @ApplicationContext context: Context,
-        downloadManager: com.korenskoy.yandexmusic.data.network.TrackDownloadManager,
-        preloadManager: com.korenskoy.yandexmusic.data.network.TrackPreloadManager,
-        wakeLockHelper: com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper,
-        equalizer: com.korenskoy.yandexmusic.data.player.SystemEqualizer,
-        card: com.korenskoy.yandexmusic.data.download.CardStorage
-    ): com.korenskoy.yandexmusic.domain.repository.PlayerRepository {
+        downloadManager: TrackDownloadManager,
+        preloadManager: TrackPreloadManager,
+        wakeLockHelper: PlaybackWakeLockHelper,
+        equalizer: SystemEqualizer,
+        card: CardStorage
+    ): PlayerRepository {
         val playerA = createConfiguredExoPlayer(context, equalizer.audioSessionId, card)
         val playerB = createConfiguredExoPlayer(context, equalizer.audioSessionId, card)
         equalizer.announce()
-        return com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl(
+        return PlayerRepositoryImpl(
             playerA, playerB, downloadManager, preloadManager, wakeLockHelper
         )
     }

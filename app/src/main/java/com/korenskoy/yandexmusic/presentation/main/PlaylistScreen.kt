@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
+import com.korenskoy.yandexmusic.presentation.hifi.AppScale
 import com.korenskoy.yandexmusic.presentation.main.components.RemoveOfflineDialog
 import com.korenskoy.yandexmusic.presentation.main.components.OfflineCaption
 import com.korenskoy.yandexmusic.presentation.main.components.OfflineButton
@@ -130,11 +136,11 @@ fun PlaylistScreen(
     isPlaying: Boolean,
     likedTrackIds: Set<String>,
     downloadedTrackIds: Set<String>,
-    contentBottom: androidx.compose.ui.unit.Dp,
+    contentBottom: Dp,
     onBack: () -> Unit,
     onPlay: (shuffle: Boolean) -> Unit,
     onTrackClick: (String) -> Unit,
-    onToggleLike: (com.korenskoy.yandexmusic.data.dto.TrackDetailsDto) -> Unit,
+    onToggleLike: (TrackDetailsDto) -> Unit,
     onRetry: () -> Unit,
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
@@ -146,7 +152,7 @@ fun PlaylistScreen(
 ) {
     val playlist = opened.playlist
     // Track order being edited (null — normal view); saved as one change with "Done"
-    var editedOrder by remember(opened.tracks) { mutableStateOf<List<com.korenskoy.yandexmusic.data.dto.TrackDetailsDto>?>(null) }
+    var editedOrder by remember(opened.tracks) { mutableStateOf<List<TrackDetailsDto>?>(null) }
     // Back leaves the playlist (the page shrinks under the gesture); while reordering it only cancels that
     val back = rememberPredictiveBack(enabled = true, onBack = onBack)
     BackHandler(enabled = editedOrder != null) { editedOrder = null }
@@ -184,8 +190,8 @@ fun PlaylistScreen(
             onDismiss = { deleting = false }
         )
     }
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = LocalConfiguration.current.orientation ==
+        Configuration.ORIENTATION_LANDSCAPE
     val backButton: @Composable () -> Unit = {
         Box(
             modifier = Modifier
@@ -235,9 +241,9 @@ fun PlaylistScreen(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                val appDensity = androidx.compose.ui.platform.LocalDensity.current
+                val appDensity = LocalDensity.current
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-        com.korenskoy.yandexmusic.presentation.hifi.AppScale(appDensity) {
+        AppScale(appDensity) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.playlist_rename)) },
                         leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
@@ -413,8 +419,8 @@ fun PlaylistScreen(
  */
 @Composable
 private fun ReorderList(
-    tracks: List<com.korenskoy.yandexmusic.data.dto.TrackDetailsDto>,
-    contentBottom: androidx.compose.ui.unit.Dp,
+    tracks: List<TrackDetailsDto>,
+    contentBottom: Dp,
     onMove: (from: Int, to: Int) -> Unit
 ) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()

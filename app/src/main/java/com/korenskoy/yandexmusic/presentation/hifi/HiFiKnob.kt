@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.ui.geometry.Size
 import kotlin.math.floor
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.Crossfade
@@ -115,7 +116,7 @@ fun HiFiKnob(
                         color = Color.White.copy(alpha = 0.16f),
                         startAngle = 200f, sweepAngle = 140f, useCenter = false,
                         topLeft = c - Offset(faceR - 1f, faceR - 1f),
-                        size = androidx.compose.ui.geometry.Size((faceR - 1f) * 2, (faceR - 1f) * 2),
+                        size = Size((faceR - 1f) * 2, (faceR - 1f) * 2),
                         style = Stroke(width = 1.2.dp.toPx())
                     )
                 }

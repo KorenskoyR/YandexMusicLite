@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.utils
 
+import coil3.network.NetworkHeaders
 import android.content.Context
 import coil3.SingletonImageLoader
 import coil3.network.httpHeaders
@@ -76,7 +77,7 @@ fun prefetchCovers(context: Context, tracks: List<TrackDetailsDto>, sizes: List<
     }
 }
 
-private val BROWSER_USER_AGENT_HEADERS = coil3.network.NetworkHeaders.Builder()
+private val BROWSER_USER_AGENT_HEADERS = NetworkHeaders.Builder()
     .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     .build()
 

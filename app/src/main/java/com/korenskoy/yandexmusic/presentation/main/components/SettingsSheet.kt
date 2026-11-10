@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import android.content.ActivityNotFoundException
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.data.download.StorageStatus
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -566,10 +570,10 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
         SegmentedRow(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.settings_car_under)) {
             HiFiSegmented(
                 options = listOf(stringResource(R.string.settings_car_under_queue), stringResource(R.string.settings_car_under_next)),
-                selectedIndex = if (state.carUnderCover == com.korenskoy.yandexmusic.domain.model.CarUnderCover.NEXT) 1 else 0,
+                selectedIndex = if (state.carUnderCover == CarUnderCover.NEXT) 1 else 0,
                 onSelect = {
                     actions.onCarUnderCoverChange(
-                        if (it == 1) com.korenskoy.yandexmusic.domain.model.CarUnderCover.NEXT else com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE
+                        if (it == 1) CarUnderCover.NEXT else CarUnderCover.QUEUE
                     )
                 },
                 fontSize = 13.sp
@@ -698,13 +702,13 @@ private fun SettingsNote(text: String) {
 private fun StoragePlaceRow(storage: StorageStatus, actions: SettingsActions) {
     var noPicker by remember { mutableStateOf(false) }
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+        ActivityResultContracts.OpenDocumentTree()
     ) { tree -> tree?.let(actions.onUsbFolderChosen) }
     val pickFolder = {
         try {
             picker.launch(storage.usbPickerStart)
-        } catch (e: android.content.ActivityNotFoundException) {
-            android.util.Log.w("Settings", "No folder picker", e)
+        } catch (e: ActivityNotFoundException) {
+            Log.w("Settings", "No folder picker", e)
             noPicker = true
         }
     }

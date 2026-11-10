@@ -1,5 +1,15 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Density
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiWellButton
 import androidx.compose.material.icons.rounded.Settings
 import com.korenskoy.yandexmusic.utils.russianQuantityString
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -188,10 +198,10 @@ fun CarScreen(
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
-    androidx.activity.compose.BackHandler(enabled = tuneOpen) { tuneOpen = false }
-    androidx.activity.compose.BackHandler(enabled = queueOpen) { queueOpen = false }
-    androidx.activity.compose.BackHandler(onBack = onExit)
-    val view = androidx.compose.ui.platform.LocalView.current
+    BackHandler(enabled = tuneOpen) { tuneOpen = false }
+    BackHandler(enabled = queueOpen) { queueOpen = false }
+    BackHandler(onBack = onExit)
+    val view = LocalView.current
     DisposableEffect(Unit) {
         view.keepScreenOn = true
         onDispose { view.keepScreenOn = false }
@@ -290,13 +300,13 @@ fun CarScreen(
         // lines follow the (scaled) font instead
         // The car's type is already sized for a glance from the driver's seat and the whole layout is fitted to
         // the screen: Android's "font size" does not grow it, or labels get cut and the dock leaves the screen
-        val systemDensity = androidx.compose.ui.platform.LocalDensity.current
+        val systemDensity = LocalDensity.current
         val carDensity = remember(systemDensity) {
-            androidx.compose.ui.unit.Density(systemDensity.density, systemDensity.fontScale.coerceAtMost(CAR_MAX_FONT_SCALE))
+            Density(systemDensity.density, systemDensity.fontScale.coerceAtMost(CAR_MAX_FONT_SCALE))
         }
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.ui.platform.LocalDensity provides carDensity,
-            androidx.compose.material3.LocalTextStyle provides androidx.compose.material3.LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified)
+        CompositionLocalProvider(
+            LocalDensity provides carDensity,
+            LocalTextStyle provides LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified)
         ) {
         // "Настроить волну": big enough to hit without aiming. Lying down it opens over the cover column,
         // standing it takes the cover's place — the controls and the sources are never covered
@@ -438,7 +448,7 @@ fun CarScreen(
                     // As on the phone's wave page: cover, track, controls, then "next" right above the sources.
                     // "Настроить волну" takes the place of the cover and the "next" row (more room than it needs),
                     // so the controls and the sources stay reachable
-                    androidx.compose.animation.Crossfade(
+                    Crossfade(
                         targetState = when {
                             tuneOpen -> 1
                             queueOpen -> 2
@@ -482,7 +492,7 @@ fun CarScreen(
                     .fillMaxSize()
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { queueOpen = false }
             )
-            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
                 queuePanel(
                     Modifier
@@ -500,7 +510,7 @@ fun CarScreen(
                     .fillMaxSize()
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { tuneOpen = false }
             )
-            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
             // Over the cover column only: never wider than what the driver's panel leaves (it is u(652) wide
             // with u(48) + u(40) + u(40) around it), so the controls and the sources stay uncovered
             val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
@@ -568,7 +578,7 @@ private fun CarHeader(
         // The same settings button as on "Моя музыка", as big as "back" so it is hit without aiming
         if (onOpenSettings != null) {
             Spacer(Modifier.width(u(16f)))
-            com.korenskoy.yandexmusic.presentation.hifi.HiFiWellButton(
+            HiFiWellButton(
                 onClick = onOpenSettings,
                 contentDescription = stringResource(R.string.library_settings),
                 size = u(56f)
@@ -620,7 +630,7 @@ private fun CarClock(u: Scale) {
 }
 
 /** Tabular digits: the clock and the readout don't jump as numbers change. */
-private val Tabular = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
+private val Tabular = TextStyle(fontFeatureSettings = "tnum")
 
 @Composable
 private fun DriverPanel(
@@ -906,7 +916,7 @@ private fun CarQueuePanel(
                 Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
             }
         }
-        androidx.compose.foundation.lazy.LazyColumn(
+        LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(u(4f))
         ) {
@@ -1002,7 +1012,7 @@ private fun NextRow(
 ) {
     if (tracks.isEmpty() && !loading) return
     val limit = maxWidth
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val n = CAR_NEXT_COUNT
         val card = ((androidx.compose.ui.unit.min(this.maxWidth, limit) - gap * (n - 1)) / n).coerceAtMost(maxCard)
         Column(Modifier.width(card * n + gap * (n - 1))) {

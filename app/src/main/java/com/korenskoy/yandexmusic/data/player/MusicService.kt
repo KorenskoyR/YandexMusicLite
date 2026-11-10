@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.os.Bundle
+import android.util.Log
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.SessionCommands
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import androidx.media3.session.SessionResult
@@ -35,7 +43,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@OptIn(UnstableApi::class)
 @AndroidEntryPoint
 class MusicService : MediaLibraryService() {
 
@@ -57,7 +65,7 @@ class MusicService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: AudioManager? = null
-    private var focusRequest: android.media.AudioFocusRequest? = null
+    private var focusRequest: AudioFocusRequest? = null
     private var hasAudioFocus = false
     private var wasPlayingBeforeTransientLoss = false
 
@@ -155,11 +163,11 @@ class MusicService : MediaLibraryService() {
     /** Returns true when playback may proceed (focus granted now or delayed). */
     private fun requestSystemAudioFocus(): Boolean {
         val result = try {
-            val playbackAttributes = android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+            val playbackAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build()
-            val request = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(playbackAttributes)
                 .setAcceptsDelayedFocusGain(true)
                 // Ducking is handled by us (both players must duck together)
@@ -169,7 +177,7 @@ class MusicService : MediaLibraryService() {
             focusRequest = request
             audioManager?.requestAudioFocus(request)
         } catch (e: Exception) {
-            android.util.Log.e("MusicService", "Unexpected error", e)
+            Log.e("MusicService", "Unexpected error", e)
             null
         }
         return when (result) {
@@ -192,7 +200,7 @@ class MusicService : MediaLibraryService() {
         try {
             focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
         } catch (e: Exception) {
-            android.util.Log.e("MusicService", "Unexpected error", e)
+            Log.e("MusicService", "Unexpected error", e)
         }
     }
 
@@ -241,7 +249,7 @@ class MusicService : MediaLibraryService() {
                     .build()
                 return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                     .setAvailablePlayerCommands(transportOnly)
-                    .setAvailableSessionCommands(androidx.media3.session.SessionCommands.EMPTY)
+                    .setAvailableSessionCommands(SessionCommands.EMPTY)
                     .build()
             }
 
@@ -304,7 +312,7 @@ class MusicService : MediaLibraryService() {
                 session: MediaSession,
                 controller: MediaSession.ControllerInfo,
                 customCommand: SessionCommand,
-                args: android.os.Bundle
+                args: Bundle
             ): ListenableFuture<SessionResult> {
                 val track = playbackController.currentTrack.value
                     ?: return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
@@ -364,10 +372,10 @@ class MusicService : MediaLibraryService() {
             future.set(
                 try {
                     block()
-                } catch (e: kotlinx.coroutines.CancellationException) {
+                } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    android.util.Log.e("MusicService", "Browse request failed", e)
+                    Log.e("MusicService", "Browse request failed", e)
                     LibraryResult.ofError(SessionError.ERROR_UNKNOWN)
                 }
             )

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.network
 
+import android.util.Log
+import java.io.IOException
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -30,7 +32,7 @@ class NetworkMonitor @Inject constructor(
             val caps = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         } catch (e: Exception) {
-            android.util.Log.e("NetworkMonitor", "Unexpected error", e)
+            Log.e("NetworkMonitor", "Unexpected error", e)
             false
         }
     }
@@ -63,7 +65,7 @@ class NetworkMonitor @Inject constructor(
                 trySend(false)
             }
         } catch (e: Exception) {
-            android.util.Log.e("NetworkMonitor", "Unexpected error", e)
+            Log.e("NetworkMonitor", "Unexpected error", e)
             trySend(true) // Fallback to true if we can't check
         }
 
@@ -71,7 +73,7 @@ class NetworkMonitor @Inject constructor(
             try {
                 connectivityManager.unregisterNetworkCallback(callback)
             } catch (e: Exception) {
-                android.util.Log.e("NetworkMonitor", "Unexpected error", e)
+                Log.e("NetworkMonitor", "Unexpected error", e)
             }
         }
     }.distinctUntilChanged()
@@ -82,7 +84,7 @@ class NetworkMonitor @Inject constructor(
                 socket.connect(InetSocketAddress("oauth.yandex.ru", 443), timeoutMs)
             }
             true
-        } catch (e: java.io.IOException) {
+        } catch (e: IOException) {
             // Unreachable, timed out or refused: all the same here
             false
         }

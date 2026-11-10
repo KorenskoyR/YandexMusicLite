@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.crash
 
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -29,7 +30,7 @@ fun CrashLogDialog(
     onDismiss: () -> Unit,
     title: String = stringResource(R.string.crash_log_title)
 ) {
-    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val locale = LocalConfiguration.current.locales[0]
     val format = androidx.compose.runtime.remember(locale) { SimpleDateFormat("dd.MM.yyyy HH:mm", locale) }
     HiFiAlertDialog(
         onDismissRequest = onDismiss,

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.player.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
 import com.korenskoy.yandexmusic.R
@@ -77,7 +78,7 @@ fun RadioCoverCard(
 
         // "В ЭФИРЕ" in the top-left corner; the dot blinks only while effects are on
         if (showLiveBadge) {
-            val lite = com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite.current
+            val lite = LocalHiFiLite.current
             val blink = if (!lite) {
                 rememberInfiniteTransition(label = "live_pulse").animateFloat(
                     initialValue = 1f,
@@ -102,7 +103,7 @@ fun RadioCoverCard(
                         .size(8.dp)
                         .graphicsLayer { alpha = blink?.value ?: 1f }
                         .clip(CircleShape)
-                        .background(com.korenskoy.yandexmusic.presentation.hifi.HiFi.Live)
+                        .background(HiFi.Live)
                 )
                 Spacer(modifier = Modifier.width(7.dp))
                 Text(

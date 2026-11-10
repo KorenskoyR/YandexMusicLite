@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.domain.model
 
+import androidx.annotation.DrawableRes
+
 data class RadioStation(
     val id: String,
     val name: String,
@@ -9,7 +11,7 @@ data class RadioStation(
     val category: RadioCategory,
     val bitRate: Int = 192,
     val isFavorite: Boolean = false,
-    @androidx.annotation.DrawableRes val iconRes: Int? = null,
+    @DrawableRes val iconRes: Int? = null,
     val brandColorStart: Long = 0xFF33333C,
     val brandColorEnd: Long = 0xFF1E1E24
 )

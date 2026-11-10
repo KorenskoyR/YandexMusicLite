@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.util.Log
+import com.korenskoy.yandexmusic.data.download.OfflineCollections
+import com.korenskoy.yandexmusic.data.download.OfflineRules
+import com.korenskoy.yandexmusic.data.repository.SearchRepository
+import kotlinx.coroutines.CancellationException
 import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.Context
 import android.net.Uri
@@ -31,9 +36,9 @@ class MediaLibraryTree @Inject constructor(
     private val radioRepository: RadioRepository,
     private val downloadManager: TrackDownloadManager,
     private val playbackController: PlaybackController,
-    private val searchRepository: com.korenskoy.yandexmusic.data.repository.SearchRepository,
+    private val searchRepository: SearchRepository,
     private val playlistsRepository: UserPlaylistsRepository,
-    private val offlineCollections: com.korenskoy.yandexmusic.data.download.OfflineCollections
+    private val offlineCollections: OfflineCollections
 ) {
     fun root(): MediaItem = folder(ROOT_ID, context.getString(R.string.app_name), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         .withExtras(Bundle().apply {
@@ -125,10 +130,10 @@ class MediaLibraryTree @Inject constructor(
         }
         val found = try {
             searchRepository.searchTracks(query)
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            android.util.Log.w("MediaLibraryTree", "Voice search failed", e)
+            Log.w("MediaLibraryTree", "Voice search failed", e)
             emptyList()
         }
         val first = found.firstOrNull() ?: return { playbackController.playMyVibe() }
@@ -149,16 +154,16 @@ class MediaLibraryTree @Inject constructor(
         val playlist = playlistsRepository.playlists.value.firstOrNull { it.kindString == kind } ?: return null
         return try {
             playlistsRepository.tracks(playlist)
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            android.util.Log.w("MediaLibraryTree", "Playlist $kind failed to load", e)
+            Log.w("MediaLibraryTree", "Playlist $kind failed to load", e)
             null
         }
     }
 
     /** Everything on the device, as "Скачанные" in the app: liked tracks, then the kept playlists' and albums'. */
-    private fun downloaded(): List<TrackDetailsDto> = com.korenskoy.yandexmusic.data.download.OfflineRules.downloadedTracks(
+    private fun downloaded(): List<TrackDetailsDto> = OfflineRules.downloadedTracks(
         libraryRepository.likedTracks.value, offlineCollections.all.value, downloadManager.downloadedTrackIds.value
     )
 

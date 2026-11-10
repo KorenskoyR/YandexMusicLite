@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import android.graphics.Bitmap
 import com.korenskoy.yandexmusic.utils.CoverSize
 import android.os.Build
 import androidx.compose.foundation.background
@@ -38,7 +39,7 @@ private object GrainTexture {
             val v = if (random.nextBoolean()) 0xFF else 0x00
             (alpha shl 24) or (v shl 16) or (v shl 8) or v
         }
-        android.graphics.Bitmap.createBitmap(pixels, SIZE, SIZE, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+        Bitmap.createBitmap(pixels, SIZE, SIZE, Bitmap.Config.ARGB_8888).asImageBitmap()
     }
 }
 

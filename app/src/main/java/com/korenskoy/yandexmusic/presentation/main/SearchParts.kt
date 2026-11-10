@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.rounded.SearchOff
@@ -334,7 +335,7 @@ internal fun BestResultCard(title: String, subtitle: String, coverUri: String?, 
             .height(104.dp)
             .hifiSoftShadow(shape, 16.dp)
             .clip(shape)
-            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(tint.primary.copy(alpha = 0.55f), tint.secondary.copy(alpha = 0.55f), HiFi.Ground)))
+            .background(Brush.linearGradient(listOf(tint.primary.copy(alpha = 0.55f), tint.secondary.copy(alpha = 0.55f), HiFi.Ground)))
             .hifiGlass(shape, fill = Color.Black.copy(alpha = 0.18f), border = Color.White.copy(alpha = 0.12f))
             .hifiPress(onClick)
             .padding(horizontal = 14.dp),

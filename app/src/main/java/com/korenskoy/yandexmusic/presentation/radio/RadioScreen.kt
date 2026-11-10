@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.animation.fadeOut
@@ -145,8 +147,8 @@ fun RadioScreen(
     modifier: Modifier = Modifier,
     hasActiveTrack: Boolean = false
 ) {
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = LocalConfiguration.current.orientation ==
+        Configuration.ORIENTATION_LANDSCAPE
     val contentStart = 16.dp
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)

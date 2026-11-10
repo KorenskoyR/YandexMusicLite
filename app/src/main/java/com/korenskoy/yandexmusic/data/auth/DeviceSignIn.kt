@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.auth
 
+import java.net.URI
 import android.os.Build
 import com.korenskoy.yandexmusic.BuildConfig
 import com.korenskoy.yandexmusic.di.UpdateClient
@@ -137,7 +138,7 @@ class DeviceSignIn @Inject constructor(
         }
 
         internal fun isYandexHttps(url: String): Boolean {
-            val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+            val uri = runCatching { URI(url) }.getOrNull() ?: return false
             if (uri.scheme != "https") return false
             val host = uri.host?.lowercase() ?: return false
             return listOf("ya.ru", "yandex.ru", "yandex.com").any { host == it || host.endsWith(".$it") }

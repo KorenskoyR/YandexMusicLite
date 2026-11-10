@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.data.download.OfflineCollection
+import com.korenskoy.yandexmusic.data.download.OfflineDownloads
+import com.korenskoy.yandexmusic.data.download.OfflineRules
+import com.korenskoy.yandexmusic.data.network.NetworkMonitor
+import com.korenskoy.yandexmusic.data.player.TrackReactions
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.WaveTuning
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.first
@@ -49,10 +55,10 @@ class MainViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
-    networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor,
-    private val reactions: com.korenskoy.yandexmusic.data.player.TrackReactions,
+    networkMonitor: NetworkMonitor,
+    private val reactions: TrackReactions,
     private val playRequests: PlayRequests,
-    offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
+    offline: OfflineDownloads
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -86,12 +92,12 @@ class MainViewModel @Inject constructor(
     val downloadProgress = downloadManager.downloadProgress
 
     /** Playlists and albums kept on the device. */
-    val offlineCollections: StateFlow<List<com.korenskoy.yandexmusic.data.download.OfflineCollection>> = offline.all
+    val offlineCollections: StateFlow<List<OfflineCollection>> = offline.all
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** "Скачанные": liked tracks on the device, then the kept playlists' and albums'. */
     val downloadedTracks: StateFlow<List<TrackDetailsDto>> = combine(libraryRepository.likedTracks, offline.all, downloadManager.downloadedTrackIds) { liked, kept, ids ->
-        com.korenskoy.yandexmusic.data.download.OfflineRules.downloadedTracks(liked, kept, ids)
+        OfflineRules.downloadedTracks(liked, kept, ids)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val steeringWheelOnLeft: StateFlow<Boolean> = settingsRepository.steeringWheelOnLeft
@@ -112,7 +118,7 @@ class MainViewModel @Inject constructor(
     val isBuffering: StateFlow<Boolean> = playbackController.isBuffering
     val progress: StateFlow<Long> = playbackController.progress
     val isFetchingMoreQueue: StateFlow<Boolean> = playbackController.isFetchingMoreQueue
-    val wavePreview: StateFlow<List<com.korenskoy.yandexmusic.data.dto.TrackDetailsDto>> = playbackController.wavePreview
+    val wavePreview: StateFlow<List<TrackDetailsDto>> = playbackController.wavePreview
     val streamQuality: StateFlow<String?> = playbackController.streamQuality
     val sleepTimer: StateFlow<SleepTimerState?> = playbackController.sleepTimer
     val playbackMessages: SharedFlow<String> = playbackController.messages
@@ -249,8 +255,8 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val carClock: StateFlow<Boolean> = settingsRepository.carClock
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val carUnderCover: StateFlow<com.korenskoy.yandexmusic.domain.model.CarUnderCover> = settingsRepository.carUnderCover
-        .stateIn(viewModelScope, SharingStarted.Eagerly, com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE)
+    val carUnderCover: StateFlow<CarUnderCover> = settingsRepository.carUnderCover
+        .stateIn(viewModelScope, SharingStarted.Eagerly, CarUnderCover.QUEUE)
     val animationMode: StateFlow<AnimationMode?> = settingsRepository.animationMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 

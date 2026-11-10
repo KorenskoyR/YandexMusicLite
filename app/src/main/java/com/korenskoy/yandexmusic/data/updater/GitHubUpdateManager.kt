@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.data.updater
 
+import java.net.URI
+import java.net.URISyntaxException
+import java.security.NoSuchAlgorithmException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
@@ -107,7 +111,7 @@ class GitHubUpdateManager @Inject constructor(
             } else {
                 UpdateCheckResult.UpToDate(BuildConfig.VERSION_NAME)
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for updates", e)
@@ -355,7 +359,7 @@ class GitHubUpdateManager @Inject constructor(
                 val md = MessageDigest.getInstance("SHA-256")
                 val digest = md.digest(sig.toByteArray())
                 digest.joinToString(":") { "%02X".format(it) }
-            } catch (e: java.security.NoSuchAlgorithmException) {
+            } catch (e: NoSuchAlgorithmException) {
                 Log.w(TAG, "SHA-256 unavailable", e)
                 null
             }
@@ -475,7 +479,7 @@ class GitHubUpdateManager @Inject constructor(
          */
         /** Release assets are served from github.com and redirected to GitHub's object storage. */
         fun isTrustedDownloadUrl(url: String): Boolean {
-            val uri = try { java.net.URI(url) } catch (e: java.net.URISyntaxException) { return false }
+            val uri = try { URI(url) } catch (e: URISyntaxException) { return false }
             val host = uri.host?.lowercase() ?: return false
             return uri.scheme == "https" && (host == "github.com" || host.endsWith(".githubusercontent.com"))
         }

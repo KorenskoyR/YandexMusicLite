@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.security
 
+import android.util.Log
+import java.security.InvalidKeyException
 import android.content.Context
 import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
@@ -45,7 +47,7 @@ class KeystoreStringPreferences(
         val cipher = Cipher.getInstance(TRANSFORMATION)
         try {
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-        } catch (e: java.security.InvalidKeyException) {
+        } catch (e: InvalidKeyException) {
             // The Keystore entry was removed or invalidated (restore, keystore reset): start over with a new
             // key. Values sealed with the old one were unreadable already.
             KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }.deleteEntry(keyAlias)
@@ -63,7 +65,7 @@ class KeystoreStringPreferences(
         String(cipher.doFinal(sealed, IV_BYTES, sealed.size - IV_BYTES), Charsets.UTF_8)
     } catch (e: Exception) {
         // Tampered value or a key lost after restore: behave as if the value is absent
-        android.util.Log.w("KeystoreStringPreferences", "Stored value cannot be decrypted", e)
+        Log.w("KeystoreStringPreferences", "Stored value cannot be decrypted", e)
         null
     }
 

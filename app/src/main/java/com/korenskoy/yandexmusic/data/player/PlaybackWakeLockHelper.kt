@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.os.Build
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.PowerManager
@@ -34,7 +35,7 @@ class PlaybackWakeLockHelper @Inject constructor(
     private val wifiLock: WifiManager.WifiLock? = try {
         wifiManager?.createWifiLock(
             // FULL_HIGH_PERF is deprecated since Android 10 and ignored from Android 14; LOW_LATENCY is its successor
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 WifiManager.WIFI_MODE_FULL_LOW_LATENCY
             } else {
                 @Suppress("DEPRECATION")

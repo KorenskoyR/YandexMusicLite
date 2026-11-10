@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import android.net.Uri
+import com.korenskoy.yandexmusic.data.download.DownloadStorage
+import com.korenskoy.yandexmusic.data.player.SystemEqualizer
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.download.DownloadScheduler
@@ -33,12 +37,12 @@ class SettingsViewModel @Inject constructor(
     private val roadReserve: RoadReserve,
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
-    private val storage: com.korenskoy.yandexmusic.data.download.DownloadStorage,
-    private val equalizer: com.korenskoy.yandexmusic.data.player.SystemEqualizer
+    private val storage: DownloadStorage,
+    private val equalizer: SystemEqualizer
 ) : ViewModel() {
 
     private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean)
-    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: com.korenskoy.yandexmusic.domain.model.CarUnderCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE)
+    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(val reserveMb: Int, val reserveUsed: Long, val autoDownload: Boolean, val cacheBytes: Long)
 
@@ -118,14 +122,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setDownloadsOnCard(onCard: Boolean) = storage.moveTo(onCard)
-    fun setStoragePlace(place: com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place) = storage.moveTo(place)
-    fun useUsbFolder(tree: android.net.Uri) = storage.useUsbFolder(tree)
+    fun setStoragePlace(place: TrackDownloadManager.Place) = storage.moveTo(place)
+    fun useUsbFolder(tree: Uri) = storage.useUsbFolder(tree)
     fun setStartPage(value: StartPage) = save { setStartPage(value) }
     fun setExpandPlayer(enabled: Boolean) = save { setExpandPlayerOnPlay(enabled) }
     fun setSwipeToClose(enabled: Boolean) = save { setSwipeToCloseMiniPlayer(enabled) }
     fun setSteeringWheelOnLeft(onLeft: Boolean) = save { setSteeringWheelOnLeft(onLeft) }
     fun setCarClock(enabled: Boolean) = save { setCarClock(enabled) }
-    fun setCarUnderCover(value: com.korenskoy.yandexmusic.domain.model.CarUnderCover) = save { setCarUnderCover(value) }
+    fun setCarUnderCover(value: CarUnderCover) = save { setCarUnderCover(value) }
     fun setUiScaleAuto(enabled: Boolean) = save { setUiScaleAuto(enabled) }
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }

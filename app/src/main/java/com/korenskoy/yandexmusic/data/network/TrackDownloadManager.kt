@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.data.network
 
+import android.net.Uri
+import android.util.Log
+import com.korenskoy.yandexmusic.data.download.UsbStorage
+import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import com.korenskoy.yandexmusic.data.download.CardStorage
@@ -31,7 +37,7 @@ class TrackDownloadManager @Inject constructor(
     /** Null in tests that do not need the card. */
     private val card: CardStorage? = null,
     /** Null in tests that do not need a flash drive. */
-    private val usb: com.korenskoy.yandexmusic.data.download.UsbStorage? = null
+    private val usb: UsbStorage? = null
 ) {
     /** Where a downloaded track lives. */
     enum class Place { INTERNAL, CARD, USB }
@@ -54,7 +60,7 @@ class TrackDownloadManager @Inject constructor(
 
     /** Tracks on the flash drive by id, as last listed ("<id>.enc"). */
     @Volatile
-    private var usbFiles: Map<String, com.korenskoy.yandexmusic.data.download.UsbStorage.Entry> = emptyMap()
+    private var usbFiles: Map<String, UsbStorage.Entry> = emptyMap()
 
     private fun usbName(trackId: String) = "$trackId.${CardStorage.EXTENSION}"
 
@@ -123,7 +129,7 @@ class TrackDownloadManager @Inject constructor(
      * drive is in. Disk and system access: call off the main thread.
      */
     fun localTrackUri(trackId: String): String? {
-        getLocalTrackFile(trackId)?.let { return android.net.Uri.fromFile(it).toString() }
+        getLocalTrackFile(trackId)?.let { return Uri.fromFile(it).toString() }
         val onUsb = usbFiles[trackId]?.takeIf { usb?.present == true }
         if (onUsb != null) return onUsb.uri.toString()
         // Listed as downloaded, but not there: the card or the drive went without the system saying so.
@@ -156,7 +162,7 @@ class TrackDownloadManager @Inject constructor(
         return trackLocks.getOrPut(trackId) { Mutex() }.withLock { downloadNow(trackId, url, quality, replace) }
     }
 
-    private val trackLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+    private val trackLocks = ConcurrentHashMap<String, Mutex>()
 
     private suspend fun downloadNow(
         trackId: String,
@@ -230,11 +236,11 @@ class TrackDownloadManager @Inject constructor(
             usbFiles[trackId]?.let { usb?.delete(it.uri) }
             updateCacheStats()
             return@withContext true
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             tempFile.delete()
             throw e
         } catch (e: Exception) {
-            android.util.Log.w("TrackDownloadManager", "Download failed", e)
+            Log.w("TrackDownloadManager", "Download failed", e)
             tempFile.delete()
             return@withContext false
         }
@@ -290,7 +296,7 @@ class TrackDownloadManager @Inject constructor(
             val temp = File(if (target == Place.CARD) cardTracks!! else tracksDir, "$id.tmp")
             try {
                 // The plain sound, wherever it is now
-                val plain: () -> java.io.InputStream = when (from) {
+                val plain: () -> InputStream = when (from) {
                     Place.INTERNAL -> { -> internalFile(id).inputStream() }
                     Place.CARD -> { -> CardStorage.decryptingStream(key!!, cardFile(cardTracks!!, id)) }
                     Place.USB -> { -> CardStorage.decryptingStream(key!!, card!!.openSeekable(usbFiles.getValue(id).uri)) }
@@ -327,11 +333,11 @@ class TrackDownloadManager @Inject constructor(
                     Place.CARD -> cardFile(cardTracks!!, id).delete()
                     Place.USB -> usb?.delete(usbFiles.getValue(id).uri)
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 temp.delete()
                 throw e
             } catch (e: Exception) {
-                android.util.Log.w("TrackDownloadManager", "Move of $id failed", e)
+                Log.w("TrackDownloadManager", "Move of $id failed", e)
                 temp.delete()
                 updateCacheStats()
                 return@withContext false

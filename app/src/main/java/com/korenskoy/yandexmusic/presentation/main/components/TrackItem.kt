@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.animation.core.LinearEasing
@@ -145,7 +146,7 @@ fun TrackItem(
             Spacer(modifier = Modifier.width(10.dp))
         } else if (isDownloading) {
             val downloading = stringResource(R.string.cd_skachivaetsya)
-            com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator(
+            HiFiActivityIndicator(
                 size = 16.dp,
                 color = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.semantics { contentDescription = downloading }

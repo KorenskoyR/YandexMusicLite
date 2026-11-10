@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.data.download
 
+import androidx.media3.common.PlaybackException
+import androidx.media3.datasource.TransferListener
+import kotlinx.coroutines.flow.Flow
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
@@ -51,7 +54,7 @@ import javax.inject.Singleton
 @Singleton
 class CardStorage(
     private val context: Context,
-    wantsCard: kotlinx.coroutines.flow.Flow<Boolean>,
+    wantsCard: Flow<Boolean>,
     private val keyProvider: () -> ByteArray?,
     private val cardRootOverride: (() -> File?)? = null
 ) {
@@ -225,9 +228,9 @@ class CardAwareDataSourceFactory(private val upstream: DataSource.Factory, priva
         }
 
         private var active: DataSource? = null
-        private val listeners = mutableListOf<androidx.media3.datasource.TransferListener>()
+        private val listeners = mutableListOf<TransferListener>()
 
-        override fun addTransferListener(transferListener: androidx.media3.datasource.TransferListener) {
+        override fun addTransferListener(transferListener: TransferListener) {
             listeners += transferListener
             other.addTransferListener(transferListener)
         }
@@ -264,17 +267,17 @@ internal class EncryptedFileDataSource(private val card: CardStorage) : BaseData
     override fun open(dataSpec: DataSpec): Long {
         uri = dataSpec.uri
         transferInitializing(dataSpec)
-        val key = card.key() ?: throw DataSourceException(androidx.media3.common.PlaybackException.ERROR_CODE_IO_NO_PERMISSION)
+        val key = card.key() ?: throw DataSourceException(PlaybackException.ERROR_CODE_IO_NO_PERMISSION)
         val raf = try {
             card.openSeekable(dataSpec.uri)
         } catch (e: Exception) {
             // The card or the flash drive was taken out
-            throw DataSourceException(e, androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND)
+            throw DataSourceException(e, PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND)
         }
         val length = CardStorage.plainLength(raf.length)
         if (dataSpec.position > length) {
             raf.close()
-            throw DataSourceException(androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
+            throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
         }
         file = raf
         reader = CardStorage.decrypting(key, raf, dataSpec.position)

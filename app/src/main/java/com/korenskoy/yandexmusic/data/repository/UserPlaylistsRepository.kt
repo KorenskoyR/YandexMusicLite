@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import kotlinx.coroutines.CancellationException
 import android.util.Log
 import com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
@@ -55,7 +56,7 @@ class UserPlaylistsRepository @Inject constructor(
             loadedFolder = folder
             cacheManager.saveUserPlaylists(folder, list)
             true
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Playlists refresh failed", e)
@@ -77,7 +78,7 @@ class UserPlaylistsRepository @Inject constructor(
             val tracks = resolveTracks(folder, full)
             if (tracks.isNotEmpty()) cacheManager.savePlaylistTracks(folder, kind, full.revision, tracks)
             tracks
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             val last = cacheManager.loadLastPlaylistTracks(folder, kind)

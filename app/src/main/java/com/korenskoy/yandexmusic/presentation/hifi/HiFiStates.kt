@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
@@ -147,7 +155,7 @@ fun HiFiActivityIndicator(modifier: Modifier = Modifier, size: Dp = 22.dp, color
     val turn = rememberInfiniteTransition(label = "activity").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(900, easing = androidx.compose.animation.core.LinearEasing)),
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
         label = "activity_turn"
     )
     val loading = stringResource(R.string.state_loading)
@@ -157,16 +165,16 @@ fun HiFiActivityIndicator(modifier: Modifier = Modifier, size: Dp = 22.dp, color
             .semantics { contentDescription = loading }
             .drawBehind {
                 val stroke = (size.toPx() / 11f).coerceAtLeast(1.5f)
-                drawCircle(color.copy(alpha = 0.18f), radius = this.size.minDimension / 2f - stroke / 2f, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                drawCircle(color.copy(alpha = 0.18f), radius = this.size.minDimension / 2f - stroke / 2f, style = Stroke(stroke))
                 rotate(turn.value) {
                     drawArc(
                         color = color,
                         startAngle = 0f,
                         sweepAngle = 100f,
                         useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, stroke / 2f),
-                        size = androidx.compose.ui.geometry.Size(this.size.width - stroke, this.size.height - stroke),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        topLeft = Offset(stroke / 2f, stroke / 2f),
+                        size = Size(this.size.width - stroke, this.size.height - stroke),
+                        style = Stroke(stroke, cap = StrokeCap.Round)
                     )
                 }
             }
@@ -181,8 +189,8 @@ fun HiFiSnackbar(message: String, modifier: Modifier = Modifier, actionLabel: St
             .padding(horizontal = 16.dp)
             .widthIn(max = 560.dp)
             .fillMaxWidth()
-            .hifiSoftShadow(androidx.compose.foundation.shape.RoundedCornerShape(18.dp), 20.dp)
-            .hifiGlass(androidx.compose.foundation.shape.RoundedCornerShape(18.dp), fill = Color(0xF21A1D26), border = HiFi.GlassBorder)
+            .hifiSoftShadow(RoundedCornerShape(18.dp), 20.dp)
+            .hifiGlass(RoundedCornerShape(18.dp), fill = Color(0xF21A1D26), border = HiFi.GlassBorder)
             .padding(start = 18.dp, end = if (actionLabel != null) 6.dp else 18.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -193,10 +201,10 @@ fun HiFiSnackbar(message: String, modifier: Modifier = Modifier, actionLabel: St
                 actionLabel,
                 color = Color(0xFF8FB6FF),
                 fontSize = 15.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onAction)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(role = Role.Button, onClick = onAction)
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             )
         }
@@ -213,7 +221,7 @@ fun HiFiProgressBar(progress: (() -> Float)?, modifier: Modifier = Modifier, hei
         rememberInfiniteTransition(label = "progress_sweep").animateFloat(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(1300, easing = androidx.compose.animation.core.LinearEasing)),
+            animationSpec = infiniteRepeatable(tween(1300, easing = LinearEasing)),
             label = "progress_sweep_phase"
         )
     } else null
@@ -224,18 +232,18 @@ fun HiFiProgressBar(progress: (() -> Float)?, modifier: Modifier = Modifier, hei
             .drawBehind {
                 val r = CornerRadius(this.size.height / 2f)
                 drawRoundRect(Color.Black.copy(alpha = 0.45f), cornerRadius = r)
-                drawRoundRect(Color.White.copy(alpha = 0.08f), cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+                drawRoundRect(Color.White.copy(alpha = 0.08f), cornerRadius = r, style = Stroke(1f))
                 if (progress != null) {
                     val w = this.size.width * progress().coerceIn(0f, 1f)
-                    if (w > 0f) drawRoundRect(Color.White, size = androidx.compose.ui.geometry.Size(w.coerceAtLeast(this.size.height), this.size.height), cornerRadius = r)
+                    if (w > 0f) drawRoundRect(Color.White, size = Size(w.coerceAtLeast(this.size.height), this.size.height), cornerRadius = r)
                 } else {
                     val segment = this.size.width * 0.28f
                     val x = -segment + (sweep?.value ?: 0.5f) * (this.size.width + segment)
                     clipRect {
                         drawRoundRect(
                             Color.White,
-                            topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
-                            size = androidx.compose.ui.geometry.Size(segment, this.size.height),
+                            topLeft = Offset(x, 0f),
+                            size = Size(segment, this.size.height),
                             cornerRadius = r
                         )
                     }
