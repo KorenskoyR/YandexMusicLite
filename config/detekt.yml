@@ -1,0 +1,34 @@
+# Static analysis for CI: bug-prone patterns and dead code. Style rules that fight Compose (function names,
+# long parameter lists, magic numbers of layouts) are off; lint already covers Android specifics.
+# What existed when detekt was introduced is listed in detekt-baseline.xml, so only new findings fail the build.
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  WildcardImport:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  NewLineAtEndOfFile:
+    active: false
+naming:
+  FunctionNaming:
+    active: false
+  MatchingDeclarationName:
+    active: false
+  VariableNaming:
+    active: false
+  TopLevelPropertyNaming:
+    active: false
+complexity:
+  LongParameterList:
+    active: false
+  TooManyFunctions:
+    active: false
+  LongMethod:
+    active: false
+  CyclomaticComplexMethod:
+    active: false

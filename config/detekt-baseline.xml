@@ -1,0 +1,61 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:DownloadInfoParser.kt$DownloadInfoParser$host.isNotEmpty() &amp;&amp; path.isNotEmpty() &amp;&amp; ts.isNotEmpty() &amp;&amp; s.isNotEmpty()</ID>
+    <ID>ComplexCondition:LibraryRepository.kt$LibraryRepository$directId is JsonPrimitive &amp;&amp; directId.content.length &gt; 2 &amp;&amp; directId.content.all { it.isDigit() || it == ':' || it == '-' } &amp;&amp; (el.containsKey("albumId") || el.containsKey("timestamp"))</ID>
+    <ID>ComplexCondition:LibraryRepository.kt$LibraryRepository$metaCurrent &amp;&amp; revision != null &amp;&amp; revision == cacheManager.loadLikesRevision(folder) &amp;&amp; ids.toSet() == _likedIds.value &amp;&amp; _likedTracks.value.size == ids.size</ID>
+    <ID>ComplexCondition:Loudness.kt$Loudness$integratedLufs == null || integratedLufs.isNaN() || integratedLufs &gt; 0.0 || integratedLufs &lt; -70.0</ID>
+    <ID>ComplexCondition:PlaybackController.kt$PlaybackController$isBuffering.value &amp;&amp; track != null &amp;&amp; track.idString == trackId &amp;&amp; !track.isRadio</ID>
+    <ID>ComplexCondition:RadioScreen.kt$near != null &amp;&amp; near != lastTick &amp;&amp; nearFraction != null &amp;&amp; abs(nearFraction - next) &lt; 0.012f</ID>
+    <ID>LargeClass:PlaybackController.kt$PlaybackController</ID>
+    <ID>NestedBlockDepth:AuthScreen.kt$internal fun extractTokenFromUrl(url: String): String?</ID>
+    <ID>NestedBlockDepth:DownloadInfoParser.kt$DownloadInfoParser$fun parseXml(xml: String): DownloadInfoXml?</ID>
+    <ID>NestedBlockDepth:OfflineDownloads.kt$OfflineSync$suspend fun refreshAll()</ID>
+    <ID>NestedBlockDepth:ReserveKeeper.kt$ReserveKeeper$private suspend fun fill(limitBytes: Long)</ID>
+    <ID>NestedBlockDepth:TrackPreloadManager.kt$TrackPreloadManager$private suspend fun tryResolveHq(trackId: String): ResolvedStream?</ID>
+    <ID>NestedBlockDepth:TrackPreloadManager.kt$TrackPreloadManager$private suspend fun tryResolveLossless(trackId: String): ResolvedStream?</ID>
+    <ID>SwallowedException:AuthScreen.kt$e: java.net.URISyntaxException</ID>
+    <ID>SwallowedException:GitHubUpdateManager.kt$GitHubUpdateManager.Companion$e: URISyntaxException</ID>
+    <ID>SwallowedException:KeystoreStringPreferences.kt$KeystoreStringPreferences$e: InvalidKeyException</ID>
+    <ID>SwallowedException:NetworkMonitor.kt$NetworkMonitor$e: IOException</ID>
+    <ID>SwallowedException:PlayerModule.kt$PlayerModule$e: Exception</ID>
+    <ID>SwallowedException:PlaylistsViewModel.kt$PlaylistsViewModel$e: UserPlaylistsRepository.PlaylistChangedException</ID>
+    <ID>SwallowedException:TrackPreloadManager.kt$TrackPreloadManager$e: Exception</ID>
+    <ID>ThrowsCount:LibraryRepository.kt$LibraryRepository$private suspend fun doSyncLikes(): Boolean</ID>
+    <ID>TooGenericExceptionCaught:AccountSessionManager.kt$AccountSessionManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AuthRepositoryImpl.kt$AuthRepositoryImpl$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AuthScreen.kt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CardStorage.kt$CardStorage.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CardStorage.kt$EncryptedFileDataSource$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CatalogViewModel.kt$CatalogViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DownloadInfoParser.kt$DownloadInfoParser$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:GitHubUpdateManager.kt$GitHubUpdateManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:KeystoreStringPreferences.kt$KeystoreStringPreferences$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LibraryRepository.kt$LibraryRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MediaLibraryTree.kt$MediaLibraryTree$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MusicService.kt$MusicService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NetworkMonitor.kt$NetworkMonitor$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:OfflineDownloads.kt$OfflineSync$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlaybackController.kt$PlaybackController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlaybackStateStore.kt$PlaybackStateStore$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlaybackWakeLockHelper.kt$PlaybackWakeLockHelper$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlayerModule.kt$PlayerModule$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlaylistCacheManager.kt$PlaylistCacheManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PlaylistsViewModel.kt$PlaylistsViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RoadReserve.kt$RoadReserve$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SearchViewModel.kt$SearchViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TrackDownloadManager.kt$TrackDownloadManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TrackPreloadManager.kt$TrackPreloadManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TrackReactions.kt$TrackReactions$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:UsbStorage.kt$UsbStorage$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:UserPlaylistsRepository.kt$UserPlaylistsRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WaveQueue.kt$WaveQueue$e: Exception</ID>
+    <ID>UnusedParameter:FullScreenPlayer.kt$onCloseAndClear: () -&gt; Unit</ID>
+    <ID>UnusedParameter:MainScreen.kt$radioVm: RadioViewModel</ID>
+    <ID>UnusedParameter:SearchParts.kt$onClose: () -&gt; Unit</ID>
+    <ID>UnusedParameter:Theme.kt$darkTheme: Boolean = true</ID>
+    <ID>UnusedParameter:WaveTune.kt$label: String</ID>
+    <ID>UnusedPrivateProperty:PlayerRepositoryImpl.kt$PlayerRepositoryImpl$private val downloadManager: TrackDownloadManager</ID>
+  </CurrentIssues>
+</SmellBaseline>

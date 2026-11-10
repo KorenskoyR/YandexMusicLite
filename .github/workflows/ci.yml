@@ -40,3 +40,20 @@ jobs:
           name: screenshot-diffs
           path: app/build/outputs/roborazzi/
           if-no-files-found: ignore
+
+  detekt:
+    name: Static analysis (detekt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      # The command-line build, pinned by checksum: no extra Gradle plugin in the app's own build
+      - name: Download detekt
+        run: |
+          curl -sSL -o detekt.jar https://github.com/detekt/detekt/releases/download/v1.23.8/detekt-cli-1.23.8-all.jar
+          echo "2ce2ff952e150baf28a29cda70a363b0340b3e81a55f43e51ec5edffc3d066c1  detekt.jar" | sha256sum -c -
+      # New findings fail the build; what existed before is in the baseline
+      - run: java -jar detekt.jar --input app/src/main/java --build-upon-default-config --config config/detekt.yml --baseline config/detekt-baseline.xml

@@ -34,6 +34,11 @@ val deviceSecret = (localProperties.getProperty("YANDEX_DEVICE_SECRET") ?: Syste
 
 composeCompiler {
     stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("app/compose-stability.conf"))
+    // `-PcomposeReports` writes the compiler's stability and skippability reports to build/compose_reports
+    if (project.hasProperty("composeReports")) {
+        reportsDestination.set(layout.buildDirectory.dir("compose_reports"))
+        metricsDestination.set(layout.buildDirectory.dir("compose_reports"))
+    }
 }
 
 android {
