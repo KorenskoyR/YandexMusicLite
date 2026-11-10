@@ -259,7 +259,7 @@ private fun PillLabel(text: String, icon: ImageVector?) {
                 text,
                 style = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold),
                 maxLines = 1,
-                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 13.sp, maxFontSize = 16.sp, stepSize = 0.5.sp)
+                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp, stepSize = 0.5.sp)
             )
         }
     }

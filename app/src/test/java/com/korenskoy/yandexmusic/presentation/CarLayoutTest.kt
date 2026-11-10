@@ -49,4 +49,10 @@ class CarLayoutTest {
         assertEquals("too short to be a swipe", 0, carSwipeStep(-120f, 189f))
         assertEquals("back and forth comes to nothing", 0, carSwipeStep(-200f + 180f, 189f))
     }
+
+    @Test
+    fun theSystemFontSizeDoesNotGrowTheCarScreen() {
+        // At 130% the dock's labels were cut and, on a small phone, the dock left the screen
+        assertEquals(1f, com.korenskoy.yandexmusic.presentation.car.CAR_MAX_FONT_SCALE, 0f)
+    }
 }

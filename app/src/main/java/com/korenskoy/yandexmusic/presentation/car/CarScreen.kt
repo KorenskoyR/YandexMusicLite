@@ -288,7 +288,14 @@ fun CarScreen(
 
         // The theme's fixed 24sp line height would not follow the head-unit scale and clip small text:
         // lines follow the (scaled) font instead
+        // The car's type is already sized for a glance from the driver's seat and the whole layout is fitted to
+        // the screen: Android's "font size" does not grow it, or labels get cut and the dock leaves the screen
+        val systemDensity = androidx.compose.ui.platform.LocalDensity.current
+        val carDensity = remember(systemDensity) {
+            androidx.compose.ui.unit.Density(systemDensity.density, systemDensity.fontScale.coerceAtMost(CAR_MAX_FONT_SCALE))
+        }
         androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalDensity provides carDensity,
             androidx.compose.material3.LocalTextStyle provides androidx.compose.material3.LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified)
         ) {
         // "Настроить волну": big enough to hit without aiming. Lying down it opens over the cover column,
@@ -824,6 +831,9 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
         )
     }
 }
+
+/** How far Android's "font size" may grow the car screen's own, already large, type: not at all. */
+internal const val CAR_MAX_FONT_SCALE = 1f
 
 /** How many tracks the "Далее" row shows. */
 const val CAR_NEXT_COUNT = 4
