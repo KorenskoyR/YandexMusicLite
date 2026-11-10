@@ -156,13 +156,14 @@ fun HiFiWellButton(
     onClick: () -> Unit,
     contentDescription: String,
     modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier
-            .size(44.dp)
+            .size(size)
             .hifiSoftShadow(CircleShape, 20.dp)
-            .hifiMachined(22.dp)
+            .hifiMachined(size / 2)
             .clip(CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {

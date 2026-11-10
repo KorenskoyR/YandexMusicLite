@@ -45,7 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.korenskoy.yandexmusic.presentation.hifi.AppDialog
 import androidx.compose.ui.window.DialogProperties
 import com.korenskoy.yandexmusic.data.updater.UpdateCheckResult
 
@@ -66,10 +66,16 @@ fun UpdateDialog(
     /** "Пропустить эту версию"; offered until a download starts. */
     onSkip: (() -> Unit)? = null
 ) {
-    Dialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        androidx.compose.foundation.layout.BoxWithConstraints {
+        // The window never hides its buttons: the header stays on top, the buttons at the bottom, and what lies
+        // between (the description, the size, the warnings) gives up its height and scrolls. Only on a screen too
+        // short even for the header and the buttons does the whole window scroll.
+        val roomy = maxHeight >= UpdateWindowMinHeight
+        val showSkipHint = maxHeight >= UpdateWindowRoomForHint
         Box(
             modifier = Modifier
                 .padding(24.dp)
@@ -87,7 +93,7 @@ fun UpdateDialog(
                 )
                 .padding(22.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().then(if (roomy) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
                 // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -160,6 +166,7 @@ fun UpdateDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
+                Column(if (roomy) Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()) else Modifier) {
                 // Changelog Card
                 Text(
                     text = stringResource(R.string.update_chto_novogo_v_etoy),
@@ -298,6 +305,8 @@ fun UpdateDialog(
                             )
                         }
                     }
+                }
+
                 }
 
                 Spacer(modifier = Modifier.height(22.dp))
@@ -444,14 +453,23 @@ fun UpdateDialog(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.update_skip_version), color = Color.White.copy(alpha = 0.78f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    Text(
-                        stringResource(R.string.update_skip_hint),
-                        style = HiFiType.Caption.copy(fontSize = 12.sp, lineHeight = 17.sp),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-                    )
+                    if (showSkipHint) {
+                        Text(
+                            stringResource(R.string.update_skip_hint),
+                            style = HiFiType.Caption.copy(fontSize = 12.sp, lineHeight = 17.sp),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                        )
+                    }
                 }
             }
         }
+        }
     }
 }
+
+/** Below this the update window scrolls as a whole; above it only the part between the header and the buttons does. */
+private val UpdateWindowMinHeight = 280.dp
+
+/** The note under "Пропустить эту версию" only where the screen has room for it. */
+private val UpdateWindowRoomForHint = 560.dp

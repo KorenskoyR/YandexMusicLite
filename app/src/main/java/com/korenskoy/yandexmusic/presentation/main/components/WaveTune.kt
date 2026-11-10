@@ -62,7 +62,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.korenskoy.yandexmusic.presentation.hifi.AppDialog
 import androidx.compose.ui.window.DialogProperties
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.domain.model.WaveDiversity
@@ -300,7 +300,7 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
         if (!visible.targetState && visible.isIdle) onDismiss()
     }
     val close = { visible.targetState = false }
-    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    AppDialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize()) {
             AnimatedVisibility(visibleState = visible, enter = fadeIn(HiFiMotion.standard()), exit = fadeOut(HiFiMotion.standard())) {
                 Box(

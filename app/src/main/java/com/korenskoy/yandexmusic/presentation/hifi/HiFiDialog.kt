@@ -1,5 +1,19 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.Density
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -8,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
@@ -46,8 +59,32 @@ object HiFiDialogDefaults {
 enum class HiFiDialogActionKind { Primary, Danger, Quiet }
 
 /**
+ * A window over the app that keeps the app's own scale. A dialog is a separate window: Compose gives it the
+ * system's density, so "Масштаб интерфейса" (the app's density) did not reach it — on a head unit that
+ * reports a wrong density the update window, Settings and the questions were drawn at the system's size
+ * (and cut off where the screen is short). The density the dialog is opened from is handed inside.
+ */
+@Composable
+fun AppDialog(
+    onDismissRequest: () -> Unit,
+    properties: DialogProperties = DialogProperties(),
+    content: @Composable () -> Unit
+) {
+    val appDensity = LocalDensity.current
+    Dialog(onDismissRequest = onDismissRequest, properties = properties) {
+        CompositionLocalProvider(LocalDensity provides appDensity, content = content)
+    }
+}
+
+/** Popups and sheets (menus, the track's sheet) are windows too: their content gets the app's scale back. */
+@Composable
+fun AppScale(density: Density, content: @Composable () -> Unit) =
+    CompositionLocalProvider(LocalDensity provides density, content = content)
+
+/**
  * A dialog in the Hi-Fi language. [confirm] and [dismiss] are usually [HiFiDialogAction]s: the main
  * action is a metal capsule (a red glass one when it destroys something), the way out a quiet text.
+ * Drawn at the app's scale; a long text scrolls, so the actions are never pushed out of the screen.
  */
 @Composable
 fun HiFiAlertDialog(
@@ -57,17 +94,35 @@ fun HiFiAlertDialog(
     dismiss: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
 ) {
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        modifier = Modifier.border(1.dp, HiFiDialogDefaults.Rim, HiFiDialogDefaults.Shape),
-        shape = HiFiDialogDefaults.Shape,
-        containerColor = HiFiDialogDefaults.Container,
-        tonalElevation = 0.dp,
-        title = { Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp) },
-        text = content,
-        confirmButton = confirm,
-        dismissButton = dismiss
-    )
+    AppDialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .padding(horizontal = 24.dp, vertical = 24.dp)
+                .widthIn(min = 280.dp, max = 560.dp)
+                .clip(HiFiDialogDefaults.Shape)
+                .background(HiFiDialogDefaults.Container)
+                .border(1.dp, HiFiDialogDefaults.Rim, HiFiDialogDefaults.Shape)
+                .padding(24.dp)
+        ) {
+            Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+            if (content != null) {
+                Spacer(Modifier.height(16.dp))
+                Box(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    CompositionLocalProvider(LocalContentColor provides HiFi.TextSecondary) { content() }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            FlowRow(
+                Modifier.align(Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically
+            ) {
+                dismiss?.invoke()
+                confirm()
+            }
+        }
+    }
 }
 
 @Composable

@@ -103,7 +103,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.korenskoy.yandexmusic.presentation.hifi.AppDialog
 import androidx.compose.ui.window.DialogProperties
 import com.korenskoy.yandexmusic.BuildConfig
 import com.korenskoy.yandexmusic.R
@@ -155,7 +155,7 @@ fun SettingsSheet(
 
     val pageActions = actions.copyWith(onLogout = { confirmLogout = true }, onClearDownloads = { confirmClear = true }, close = close)
 
-    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    AppDialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // Inside the dialog's window: Back there first steps out of a page to the root list, then closes
         BackHandler(enabled = !isLandscape && page != null) { pageName = null }
         Box(Modifier.fillMaxSize()) {

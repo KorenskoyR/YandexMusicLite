@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.material.icons.rounded.Settings
 import com.korenskoy.yandexmusic.utils.russianQuantityString
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
@@ -181,7 +182,9 @@ fun CarScreen(
     onTrackWave: (TrackDetailsDto) -> Unit = {},
     onBackToMyWave: () -> Unit = {},
     initialTuneOpen: Boolean = false,
-    initialQueueOpen: Boolean = false
+    initialQueueOpen: Boolean = false,
+    /** Opens the same settings as on "Моя музыка"; null — no button. */
+    onOpenSettings: (() -> Unit)? = null
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
@@ -347,7 +350,11 @@ fun CarScreen(
             }
         }
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
-            CarHeader(u, onExit, showClock, pills = if (isLandscape) wavePills else null)
+            // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
+            CarHeader(
+                u, onExit, showClock, pills = if (isLandscape) wavePills else null,
+                onOpenSettings = onOpenSettings, showCaption = isLandscape || onOpenSettings == null
+            )
             if (!isLandscape) {
                 Row(
                     Modifier.fillMaxWidth().padding(start = u(28f), end = u(28f), bottom = u(14f)),
@@ -528,7 +535,14 @@ internal class Scale(val factor: Float) {
 private data class DockItem(val source: CarSource, val icon: ImageVector, val label: String, val onClick: () -> Unit)
 
 @Composable
-private fun CarHeader(u: Scale, onExit: () -> Unit, showClock: Boolean, pills: (@Composable () -> Unit)? = null) {
+private fun CarHeader(
+    u: Scale,
+    onExit: () -> Unit,
+    showClock: Boolean,
+    pills: (@Composable () -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
+    showCaption: Boolean = true
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -544,9 +558,22 @@ private fun CarHeader(u: Scale, onExit: () -> Unit, showClock: Boolean, pills: (
         ) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = Color.White, modifier = Modifier.size(u(26f)))
         }
+        // The same settings button as on "Моя музыка", as big as "back" so it is hit without aiming
+        if (onOpenSettings != null) {
+            Spacer(Modifier.width(u(16f)))
+            com.korenskoy.yandexmusic.presentation.hifi.HiFiWellButton(
+                onClick = onOpenSettings,
+                contentDescription = stringResource(R.string.library_settings),
+                size = u(56f)
+            ) {
+                Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
+            }
+        }
         Spacer(Modifier.width(u(16f)))
-        Text(stringResource(R.string.car_label), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
-        Spacer(Modifier.width(u(14f)))
+        if (showCaption) {
+            Text(stringResource(R.string.car_label), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
+            Spacer(Modifier.width(u(14f)))
+        }
         HiFiLinkBadge(height = u(32f), fontSize = u.sp(14f))
         if (pills != null) {
             Spacer(Modifier.width(u(24f)))

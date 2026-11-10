@@ -206,6 +206,7 @@ private fun SleepTimerButton(
                 modifier = Modifier.size(20.dp)
             )
         }
+        val appDensity = androidx.compose.ui.platform.LocalDensity.current
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -213,6 +214,7 @@ private fun SleepTimerButton(
             containerColor = HiFiDialogDefaults.Container,
             border = androidx.compose.foundation.BorderStroke(1.dp, HiFiDialogDefaults.Rim)
         ) {
+        com.korenskoy.yandexmusic.presentation.hifi.AppScale(appDensity) {
             val colors = MenuDefaults.itemColors(textColor = Color.White)
             for (minutes in listOf(15, 30, 45, 60)) {
                 DropdownMenuItem(
@@ -234,6 +236,7 @@ private fun SleepTimerButton(
                 )
             }
         }
+}
     }
 }
 

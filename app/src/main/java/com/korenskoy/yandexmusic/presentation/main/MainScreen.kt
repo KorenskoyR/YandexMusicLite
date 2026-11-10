@@ -268,7 +268,13 @@ fun MainScreen(
                                 onOpenAlbum = { id, title -> catalogVm.openAlbum(id, title) }
                             )
                             MainTab.RADIO -> RadioTab(viewModel, radioVm, now)
-                            MainTab.CAR -> CarTab(viewModel, radioVm, now, progress, isLandscape, onExit = { chosenTab = MainTab.HOME })
+                            MainTab.CAR -> CarTab(
+                                viewModel, radioVm, now, progress, isLandscape, onExit = { chosenTab = MainTab.HOME },
+                                accountVm = accountVm, updateVm = updateVm, crashVm = crashVm,
+                                onOpenAccounts = { showAccountDialog = true },
+                                onOpenCrashLog = { showCrashLog = true },
+                                onAddAccount = onNavigateToAuth
+                            )
                         }
                         }
                     }

@@ -235,7 +235,9 @@ fun PlaylistScreen(
                         modifier = Modifier.size(22.dp)
                     )
                 }
+                val appDensity = androidx.compose.ui.platform.LocalDensity.current
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+        com.korenskoy.yandexmusic.presentation.hifi.AppScale(appDensity) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.playlist_rename)) },
                         leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
@@ -259,6 +261,7 @@ fun PlaylistScreen(
                         onClick = { showMenu = false; deleting = true }
                     )
                 }
+}
             }
     }
     // While it loads or after a failure the list says nothing, and the playlist itself knows its size

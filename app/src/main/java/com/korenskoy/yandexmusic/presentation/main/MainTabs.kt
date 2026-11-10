@@ -170,13 +170,6 @@ internal fun LibraryTab(
     val downloadState by viewModel.downloadAllState.collectAsStateWithLifecycle()
     val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val settingsState by settingsVm.state.collectAsStateWithLifecycle()
-    val activeAccount by accountVm.activeAccount.collectAsStateWithLifecycle()
-    val accountName by accountVm.accountName.collectAsStateWithLifecycle()
-    val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsStateWithLifecycle()
-    val defaultAccountName by accountVm.defaultAccountName.collectAsStateWithLifecycle()
-    val updateStatusMessage by updateVm.statusMessage.collectAsStateWithLifecycle()
-    val crashReports by crashVm.reports.collectAsStateWithLifecycle()
     val userPlaylists by playlistsVm.playlists.collectAsStateWithLifecycle()
     val openedPlaylist by playlistsVm.opened.collectAsStateWithLifecycle()
     val openedKey = openedPlaylist?.playlist?.let(OfflineCollection::keyOf)
@@ -188,48 +181,7 @@ internal fun LibraryTab(
         if (viewModel.tracks.value.isEmpty()) viewModel.loadLikedTracks()
     }
 
-    val settings = settingsState.copy(
-        accountName = accountName,
-        avatarUrl = accountAvatarUrl,
-        hasPlus = activeAccount?.hasPlus == true,
-        defaultAccountName = defaultAccountName,
-        updateStatus = updateStatusMessage,
-        crashReports = crashReports.size
-    )
-    val settingsActions = remember(settingsVm, accountVm, updateVm, viewModel) {
-        SettingsActions(
-            onAccountManagement = onOpenAccounts,
-            onAddAccount = onAddAccount,
-            onLogout = { accountVm.logoutCurrentAccount() },
-            onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
-            onOpenCrashLog = onOpenCrashLog,
-            onCompatibleSoundChange = settingsVm::setCompatibleSound,
-            onCrossfadeChange = settingsVm::setCrossfade,
-            onNormalizeVolumeChange = settingsVm::setNormalizeVolume,
-            onOpenEqualizer = settingsVm::openEqualizer,
-            onStartMusicChange = settingsVm::setStartMusic,
-            onBluetoothAutoplayChange = settingsVm::setBluetoothAutoplay,
-            onSkipExplicitChange = settingsVm::setSkipExplicit,
-            onReserveChange = settingsVm::setReserveMb,
-            onClearReserve = settingsVm::clearReserve,
-            onAutoDownloadChange = settingsVm::setAutoDownload,
-            onDownloadAll = { viewModel.downloadAllLikedTracks() },
-            onUpgradeDownloads = settingsVm::upgradeDownloads,
-            onDownloadsOnCardChange = settingsVm::setDownloadsOnCard,
-            onClearDownloads = { viewModel.clearMusicCache() },
-            onStartPageChange = settingsVm::setStartPage,
-            onExpandPlayerChange = settingsVm::setExpandPlayer,
-            onSwipeToCloseChange = settingsVm::setSwipeToClose,
-            onSteeringWheelChange = settingsVm::setSteeringWheelOnLeft,
-            onCarClockChange = settingsVm::setCarClock,
-            onCarUnderCoverChange = settingsVm::setCarUnderCover,
-            onStoragePlaceChange = settingsVm::setStoragePlace,
-            onUsbFolderChosen = settingsVm::useUsbFolder,
-            onUiScaleAutoChange = settingsVm::setUiScaleAuto,
-            onUiScaleManualChange = settingsVm::setUiScaleManual,
-            onAnimationModeChange = settingsVm::setAnimationMode
-        )
-    }
+    val (settings, settingsActions) = settingsHost(viewModel, accountVm, updateVm, crashVm, onOpenAccounts, onOpenCrashLog, onAddAccount, settingsVm)
 
     LibraryScreen(
         tracks = tracks,
@@ -309,8 +261,25 @@ internal fun CarTab(
     now: NowPlaying,
     progress: () -> Long,
     isLandscape: Boolean,
-    onExit: () -> Unit
+    onExit: () -> Unit,
+    accountVm: AccountViewModel,
+    updateVm: UpdateViewModel,
+    crashVm: CrashLogViewModel,
+    onOpenAccounts: () -> Unit,
+    onOpenCrashLog: () -> Unit,
+    onAddAccount: () -> Unit,
+    settingsVm: SettingsViewModel = hiltViewModel()
 ) {
+    // The same settings as on "Моя музыка"; closing them returns here, the music goes on
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    val (settings, settingsActions) = settingsHost(viewModel, accountVm, updateVm, crashVm, onOpenAccounts, onOpenCrashLog, onAddAccount, settingsVm)
+    if (showSettings) {
+        com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet(
+            state = settings,
+            actions = settingsActions,
+            onDismiss = { showSettings = false }
+        )
+    }
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
     val showClock by viewModel.carClock.collectAsStateWithLifecycle()
@@ -356,6 +325,74 @@ internal fun CarTab(
         trackWaveSeed = waveSeed,
         onWaveTuningChange = viewModel::setWaveTuning,
         onTrackWave = viewModel::startTrackWave,
-        onBackToMyWave = viewModel::returnToMyWave
+        onBackToMyWave = viewModel::returnToMyWave,
+        onOpenSettings = { showSettings = true }
     )
+}
+
+/**
+ * What the settings show and do, the same wherever they open: on "Моя музыка" behind the gear in the header,
+ * and in the car behind the gear next to "back".
+ */
+@Composable
+internal fun settingsHost(
+    viewModel: MainViewModel,
+    accountVm: AccountViewModel,
+    updateVm: UpdateViewModel,
+    crashVm: CrashLogViewModel,
+    onOpenAccounts: () -> Unit,
+    onOpenCrashLog: () -> Unit,
+    onAddAccount: () -> Unit,
+    settingsVm: SettingsViewModel
+): Pair<com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState, SettingsActions> {
+    val settingsState by settingsVm.state.collectAsStateWithLifecycle()
+    val activeAccount by accountVm.activeAccount.collectAsStateWithLifecycle()
+    val accountName by accountVm.accountName.collectAsStateWithLifecycle()
+    val accountAvatarUrl by accountVm.accountAvatarUrl.collectAsStateWithLifecycle()
+    val defaultAccountName by accountVm.defaultAccountName.collectAsStateWithLifecycle()
+    val updateStatusMessage by updateVm.statusMessage.collectAsStateWithLifecycle()
+    val crashReports by crashVm.reports.collectAsStateWithLifecycle()
+    val settings = settingsState.copy(
+        accountName = accountName,
+        avatarUrl = accountAvatarUrl,
+        hasPlus = activeAccount?.hasPlus == true,
+        defaultAccountName = defaultAccountName,
+        updateStatus = updateStatusMessage,
+        crashReports = crashReports.size
+    )
+    val settingsActions = remember(settingsVm, accountVm, updateVm, viewModel) {
+        SettingsActions(
+            onAccountManagement = onOpenAccounts,
+            onAddAccount = onAddAccount,
+            onLogout = { accountVm.logoutCurrentAccount() },
+            onCheckForUpdates = { updateVm.checkForUpdates(silent = false) },
+            onOpenCrashLog = onOpenCrashLog,
+            onCompatibleSoundChange = settingsVm::setCompatibleSound,
+            onCrossfadeChange = settingsVm::setCrossfade,
+            onNormalizeVolumeChange = settingsVm::setNormalizeVolume,
+            onOpenEqualizer = settingsVm::openEqualizer,
+            onStartMusicChange = settingsVm::setStartMusic,
+            onBluetoothAutoplayChange = settingsVm::setBluetoothAutoplay,
+            onSkipExplicitChange = settingsVm::setSkipExplicit,
+            onReserveChange = settingsVm::setReserveMb,
+            onClearReserve = settingsVm::clearReserve,
+            onAutoDownloadChange = settingsVm::setAutoDownload,
+            onDownloadAll = { viewModel.downloadAllLikedTracks() },
+            onUpgradeDownloads = settingsVm::upgradeDownloads,
+            onDownloadsOnCardChange = settingsVm::setDownloadsOnCard,
+            onClearDownloads = { viewModel.clearMusicCache() },
+            onStartPageChange = settingsVm::setStartPage,
+            onExpandPlayerChange = settingsVm::setExpandPlayer,
+            onSwipeToCloseChange = settingsVm::setSwipeToClose,
+            onSteeringWheelChange = settingsVm::setSteeringWheelOnLeft,
+            onCarClockChange = settingsVm::setCarClock,
+            onCarUnderCoverChange = settingsVm::setCarUnderCover,
+            onStoragePlaceChange = settingsVm::setStoragePlace,
+            onUsbFolderChosen = settingsVm::useUsbFolder,
+            onUiScaleAutoChange = settingsVm::setUiScaleAuto,
+            onUiScaleManualChange = settingsVm::setUiScaleManual,
+            onAnimationModeChange = settingsVm::setAnimationMode
+        )
+    }
+    return settings to settingsActions
 }

@@ -120,12 +120,14 @@ fun TrackContextMenu(
     val scope = rememberCoroutineScope()
     // A tap outside or a swipe down closes the menu; Back goes one step back (handled below, because the
     // sheet's own Back would hide it first)
+    val appDensity = androidx.compose.ui.platform.LocalDensity.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogDefaults.Container,
         properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
     ) {
+        com.korenskoy.yandexmusic.presentation.hifi.AppScale(appDensity) {
         BackHandler {
             if (pickerStepsBack) picking = false
             else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -224,6 +226,7 @@ fun TrackContextMenu(
             }
         }
     }
+}
 }
 
 @Composable
