@@ -10,5 +10,7 @@
     <exclude domain="sharedpref" path="auth_prefs_fallback.xml" />
     <exclude domain="sharedpref" path="__androidx_security_crypto_encrypted_prefs__.xml" />
     <exclude domain="file" path="tracks/" />
+    <exclude domain="sharedpref" path="card_storage.xml" />
+    <exclude domain="file" path="offline_collections.json" />
     <exclude domain="file" path="playback_state.json" />
 </full-backup-content>

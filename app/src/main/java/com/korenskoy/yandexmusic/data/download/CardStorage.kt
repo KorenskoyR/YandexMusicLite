@@ -165,6 +165,11 @@ private class KeystoreKey(private val context: Context) {
 
     @Synchronized
     fun key(): ByteArray? {
+        // The Keystore key never leaves the device. Without it (the app's data came from a backup or another
+        // phone) the saved key cannot be opened, now or ever: it is dropped and a new one made. Files written
+        // with the old one could not be read anyway.
+        val orphaned = prefs.contains(KEY) && !hasWrapper()
+        if (orphaned) prefs.edit(commit = true) { remove(KEY) }
         val wrapper = wrapper() ?: return null
         val saved = prefs.getString(KEY, null)
         if (saved != null) {
@@ -181,6 +186,10 @@ private class KeystoreKey(private val context: Context) {
         prefs.edit(commit = true) { putString(KEY, Base64.encodeToString(wrapped, Base64.NO_WRAP)) }
         return fresh
     }
+
+    private fun hasWrapper(): Boolean = runCatching {
+        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.containsAlias(ALIAS)
+    }.getOrDefault(true) // unsure: keep the saved key
 
     private fun wrapper(): SecretKey? {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

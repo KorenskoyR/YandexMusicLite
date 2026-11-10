@@ -542,6 +542,9 @@ class LayoutSafetyTest {
         for (rules in listOf("backup_rules.xml", "data_extraction_rules.xml")) {
             val xml = File("src/main/res/xml/$rules").readText()
             assertTrue("$rules must exclude encrypted auth tokens", xml.contains("path=\"auth_prefs.xml\""))
+            // Useless on another device (the Keystore key stays behind), and the tracks themselves are not copied
+            assertTrue("$rules must exclude the card key", xml.contains("path=\"card_storage.xml\""))
+            assertTrue("$rules must exclude the list of kept playlists", xml.contains("path=\"offline_collections.json\""))
         }
 
         val network = File(sourceDir, "di/NetworkModule.kt").readText()
