@@ -18,11 +18,22 @@ class AuthInterceptor @Inject constructor(
             requestBuilder.header("X-Yandex-Music-Client", "YandexMusicAndroid/2024.01.0")
         }
 
-        val token = authRepository.getToken()
+        // The token is for Yandex alone: whatever address a request of this client gets, another host never sees it
+        val token = if (isYandexHost(originalRequest.url.host)) authRepository.getToken() else null
         if (!token.isNullOrEmpty()) {
             requestBuilder.header("Authorization", "OAuth $token")
         }
 
         return chain.proceed(requestBuilder.build())
+    }
+
+    companion object {
+        private val YANDEX_DOMAINS = listOf("yandex.net", "yandex.ru", "yandex.com", "ya.ru")
+
+        /** "api.music.yandex.net", "storage.mds.yandex.net"… but not "yandex.net.example.com". */
+        fun isYandexHost(host: String): Boolean {
+            val h = host.lowercase()
+            return YANDEX_DOMAINS.any { h == it || h.endsWith(".$it") }
+        }
     }
 }

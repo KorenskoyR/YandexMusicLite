@@ -53,6 +53,19 @@ class UpdateRequestsTest {
         .build()
 
     @Test
+    fun theTokenGoesToYandexHostsOnly() {
+        for (url in listOf("https://example.com/file.mp3", "https://yandex.net.example.com/x", "https://notyandex.ru/x")) {
+            shared.answering("x").newCall(Request.Builder().url(url).build()).execute().close()
+        }
+        assertEquals(listOf(null, null, null), sent.map { it.header("Authorization") })
+        sent.clear()
+        for (url in listOf("https://storage.mds.yandex.net/get-mp3/1", "https://login.yandex.ru/info")) {
+            shared.answering("x").newCall(Request.Builder().url(url).build()).execute().close()
+        }
+        assertEquals(listOf("OAuth $TOKEN", "OAuth $TOKEN"), sent.map { it.header("Authorization") })
+    }
+
+    @Test
     fun yandexRequestsStillCarryTheToken() {
         val request = Request.Builder().url("https://api.music.yandex.net/account/status").build()
 
