@@ -364,6 +364,8 @@ class MusicService : MediaLibraryService() {
             future.set(
                 try {
                     block()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     android.util.Log.e("MusicService", "Browse request failed", e)
                     LibraryResult.ofError(SessionError.ERROR_UNKNOWN)

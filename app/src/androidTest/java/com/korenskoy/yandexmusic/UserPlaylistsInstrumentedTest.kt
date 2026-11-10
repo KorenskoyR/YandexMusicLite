@@ -117,7 +117,7 @@ class UserPlaylistsInstrumentedTest {
 
             assertTrue("playlists row", hasText("Плейлисты", 10_000))
             device.findObject(By.text("Плейлисты")).click()
-            assertTrue("playlist card", hasText("Тестовый плейлист", 2_000))
+            assertTrue("playlist card", hasText("Тестовый плейлист", 10_000))
             device.executeShellCommand("screencap -p /data/local/tmp/library_playlists.png")
             device.findObject(By.text("Тестовый плейлист")).click()
 

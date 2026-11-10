@@ -107,6 +107,8 @@ class GitHubUpdateManager @Inject constructor(
             } else {
                 UpdateCheckResult.UpToDate(BuildConfig.VERSION_NAME)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for updates", e)
             UpdateCheckResult.Error(e.localizedMessage ?: context.getString(R.string.update_err_network))

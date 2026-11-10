@@ -95,6 +95,8 @@ class AccountSessionManager @Inject constructor(
                 )
             )
             Log.i(TAG, "Account status refreshed: hasPlus=${status.hasPlus}")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.d(TAG, "Account status refresh: ${e.message}")
         }

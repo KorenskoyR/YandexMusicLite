@@ -1183,6 +1183,8 @@ class PlaybackController @Inject constructor(
         scope.launch(Dispatchers.IO) {
             try {
                 api.sendStationFeedback(station, type, trackId, from = WaveQueue.feedbackFrom(station), totalPlayedSeconds = playedSeconds)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Error sending rotor feedback $type", e)
             }

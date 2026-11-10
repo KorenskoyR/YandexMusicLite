@@ -39,6 +39,8 @@ class PlaybackStateStore @Inject constructor(
                 tmp.copyTo(file, overwrite = true)
                 tmp.delete()
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             android.util.Log.w("PlaybackStateStore", "Could not save the session", e)
         }
@@ -47,6 +49,8 @@ class PlaybackStateStore @Inject constructor(
     suspend fun load(): PlaybackSnapshot? = withContext(Dispatchers.IO) {
         try {
             if (file.exists()) json.decodeFromString(PlaybackSnapshot.serializer(), file.readText()) else null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             android.util.Log.w("PlaybackStateStore", "Could not read the saved session", e)
             null

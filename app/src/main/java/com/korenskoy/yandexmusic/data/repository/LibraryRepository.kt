@@ -110,6 +110,8 @@ class LibraryRepository @Inject constructor(
             val uid = resolveUid()
             val response = try {
                 api.getLikedTracks(uid, richTracks = false)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 if (uid != "me") api.getLikedTracks("me", richTracks = false) else throw e
             }
