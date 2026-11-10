@@ -59,9 +59,9 @@ interface SettingsRepository {
     val carClock: Flow<Boolean>
     suspend fun setCarClock(enabled: Boolean)
 
-    /** «В авто»: the row of what comes next under the cover; off, the cover takes the whole column. */
-    val carShowNext: Flow<Boolean>
-    suspend fun setCarShowNext(enabled: Boolean)
+    /** «В авто»: under the cover the "Очередь" button (the biggest cover) or the "Далее" row. */
+    val carUnderCover: Flow<com.korenskoy.yandexmusic.domain.model.CarUnderCover>
+    suspend fun setCarUnderCover(value: com.korenskoy.yandexmusic.domain.model.CarUnderCover)
 
     val animationMode: Flow<AnimationMode>
     suspend fun setAnimationMode(value: AnimationMode)

@@ -38,7 +38,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean)
-    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val next: Boolean = true)
+    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: com.korenskoy.yandexmusic.domain.model.CarUnderCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(val reserveMb: Int, val reserveUsed: Long, val autoDownload: Boolean, val cacheBytes: Long)
 
@@ -49,8 +49,8 @@ class SettingsViewModel @Inject constructor(
 
     private val look: Flow<Look> = combine(
         combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
-        settings.carShowNext
-    ) { look, next -> look.copy(next = next) }
+        settings.carUnderCover
+    ) { look, under -> look.copy(under = under) }
 
     private val scale: Flow<Scale> = combine(settings.uiScaleAuto, settings.uiScaleManual, settings.animationMode, ::Scale)
 
@@ -77,7 +77,7 @@ class SettingsViewModel @Inject constructor(
             swipeToCloseMiniPlayer = l.swipe,
             steeringWheelOnLeft = l.left,
             carClock = l.clock,
-            carShowNext = l.next,
+            carUnderCover = l.under,
             uiScaleAuto = sc.auto,
             uiScaleManual = sc.manual,
             animationMode = sc.animations
@@ -125,7 +125,7 @@ class SettingsViewModel @Inject constructor(
     fun setSwipeToClose(enabled: Boolean) = save { setSwipeToCloseMiniPlayer(enabled) }
     fun setSteeringWheelOnLeft(onLeft: Boolean) = save { setSteeringWheelOnLeft(onLeft) }
     fun setCarClock(enabled: Boolean) = save { setCarClock(enabled) }
-    fun setCarShowNext(enabled: Boolean) = save { setCarShowNext(enabled) }
+    fun setCarUnderCover(value: com.korenskoy.yandexmusic.domain.model.CarUnderCover) = save { setCarUnderCover(value) }
     fun setUiScaleAuto(enabled: Boolean) = save { setUiScaleAuto(enabled) }
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }

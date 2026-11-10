@@ -150,9 +150,9 @@ class SettingsRepositoryImpl @Inject constructor(
     override val carClock = carClockPref.first
     override suspend fun setCarClock(enabled: Boolean) = carClockPref.second(enabled)
 
-    private val carShowNextPref = bool("car_show_next", true)
-    override val carShowNext = carShowNextPref.first
-    override suspend fun setCarShowNext(enabled: Boolean) = carShowNextPref.second(enabled)
+    private val carUnderCoverPref = choice("car_under_cover", com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE)
+    override val carUnderCover = carUnderCoverPref.first
+    override suspend fun setCarUnderCover(value: com.korenskoy.yandexmusic.domain.model.CarUnderCover) = carUnderCoverPref.second(value)
 
     private val animationPref = choice("animation_mode", AnimationMode.AUTO)
     override val animationMode = animationPref.first

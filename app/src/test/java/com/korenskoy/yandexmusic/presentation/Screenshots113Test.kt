@@ -30,6 +30,7 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import com.korenskoy.yandexmusic.data.player.LinkState
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.WaveDiversity
 import com.korenskoy.yandexmusic.domain.model.WaveLanguage
 import com.korenskoy.yandexmusic.domain.model.WaveMood
@@ -133,7 +134,7 @@ class Screenshots113Test {
     @OptIn(ExperimentalRoborazziApi::class)
     private fun snapScreen(name: String) = captureScreenRoboImage("src/test/screenshots/$name.png", options)
 
-    // --- В авто: a bigger cover, "Далее" as small covers ---
+    // --- В авто: the biggest cover with the "Очередь" button (default), or the "Далее" row ---
 
     @Composable
     private fun Car(
@@ -142,43 +143,65 @@ class Screenshots113Test {
         seedTrack: TrackDetailsDto? = null,
         next: List<TrackDetailsDto> = listOf(tracks[2], tracks[1], tracks[0], seed),
         loading: Boolean = false,
-        showNext: Boolean = true
+        under: CarUnderCover = CarUnderCover.QUEUE,
+        queueOpen: Boolean = false
     ) = CompositionLocalProvider(LocalCarClock provides { FIXED_TIME }, LocalLinkState provides LinkState.GOOD) {
         CarScreen(
             currentTrack = tracks[0], isPlaying = true, likedTrackIds = setOf("1"), onPlayPauseClick = {}, onNextClick = {},
             onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
             onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = isLandscape, steeringWheelOnLeft = wheelOnLeft,
             progress = { 82_000L }, durationMs = 286_000, upcoming = next, upcomingLoading = loading, source = PlaylistSource.VIBE,
-            showNext = showNext, waveTuning = tuned, trackWaveSeed = seedTrack
+            underCover = under, waveTuning = tuned, trackWaveSeed = seedTrack, initialQueueOpen = queueOpen
         )
     }
 
     @Test
     @Config(qualifiers = "+land")
-    fun carBigCover() {
+    fun carQueueButton() {
         show { Car(isLandscape = true) }
         snap("v113_car")
     }
 
     @Test
     @Config(qualifiers = "+land")
-    fun carBigCoverRightWheel() {
-        show { Car(isLandscape = true, wheelOnLeft = false, seedTrack = longSeed) }
-        snap("v113_car_right")
+    fun carQueueOpen() {
+        show { Car(isLandscape = true, queueOpen = true) }
+        snap("v113_car_queue")
     }
 
     @Test
     @Config(qualifiers = "+land")
-    fun carWithoutNext() {
-        show { Car(isLandscape = true, showNext = false) }
-        snap("v113_car_no_next")
+    fun carQueueOpenRightWheel() {
+        show { Car(isLandscape = true, wheelOnLeft = false, seedTrack = longSeed, queueOpen = true) }
+        snap("v113_car_queue_right")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carQueueWhileTheWaveLoads() {
+        show { Car(isLandscape = true, next = emptyList(), loading = true, queueOpen = true) }
+        snap("v113_car_queue_loading")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carNextRow() {
+        show { Car(isLandscape = true, under = CarUnderCover.NEXT) }
+        snap("v113_car_next")
+    }
+
+    @Test
+    @Config(qualifiers = "+land")
+    fun carNextRowRightWheel() {
+        show { Car(isLandscape = true, wheelOnLeft = false, seedTrack = longSeed, under = CarUnderCover.NEXT) }
+        snap("v113_car_next_right")
     }
 
     @Test
     @Config(qualifiers = "+land")
     fun carNextLoading() {
-        show { Car(isLandscape = true, next = emptyList(), loading = true) }
-        snap("v113_car_loading")
+        show { Car(isLandscape = true, next = emptyList(), loading = true, under = CarUnderCover.NEXT) }
+        snap("v113_car_next_loading")
     }
 
     @Test
@@ -196,6 +219,20 @@ class Screenshots113Test {
     }
 
     @Test
+    @Config(qualifiers = OLD_HEAD_UNIT)
+    fun oldHeadUnitCarQueueOpen() {
+        show { Car(isLandscape = true, queueOpen = true) }
+        snap("v113_head_old_car_queue")
+    }
+
+    @Test
+    @Config(qualifiers = OLD_HEAD_UNIT)
+    fun oldHeadUnitCarNext() {
+        show { Car(isLandscape = true, under = CarUnderCover.NEXT) }
+        snap("v113_head_old_car_next")
+    }
+
+    @Test
     @Config(qualifiers = WIDE_HEAD_UNIT)
     fun wideHeadUnitCar() {
         show { Car(isLandscape = true) }
@@ -210,6 +247,13 @@ class Screenshots113Test {
     }
 
     @Test
+    @Config(qualifiers = PHONE_ON_SIDE)
+    fun phoneOnItsSideCarQueueOpen() {
+        show { Car(isLandscape = true, queueOpen = true) }
+        snap("v113_phone_side_car_queue")
+    }
+
+    @Test
     @Config(qualifiers = GEELY)
     fun geelyCar() {
         show { Car(isLandscape = false) }
@@ -218,16 +262,23 @@ class Screenshots113Test {
 
     @Test
     @Config(qualifiers = GEELY)
-    fun geelyCarWithoutNext() {
-        show { Car(isLandscape = false, showNext = false) }
-        snap("v113_geely_car_no_next")
+    fun geelyCarQueueOpen() {
+        show { Car(isLandscape = false, queueOpen = true) }
+        snap("v113_geely_car_queue")
     }
 
     @Test
     @Config(qualifiers = GEELY)
-    fun geelyCarLoading() {
-        show { Car(isLandscape = false, next = emptyList(), loading = true) }
-        snap("v113_geely_car_loading")
+    fun geelyCarNext() {
+        show { Car(isLandscape = false, under = CarUnderCover.NEXT) }
+        snap("v113_geely_car_next")
+    }
+
+    @Test
+    @Config(qualifiers = GEELY)
+    fun geelyCarNextLoading() {
+        show { Car(isLandscape = false, next = emptyList(), loading = true, under = CarUnderCover.NEXT) }
+        snap("v113_geely_car_next_loading")
     }
 
     @Test
@@ -241,6 +292,13 @@ class Screenshots113Test {
     fun smallPhoneCarPortrait() {
         show { Car(isLandscape = false) }
         snap("v113_small_car_portrait")
+    }
+
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun smallPhoneCarNext() {
+        show { Car(isLandscape = false, under = CarUnderCover.NEXT) }
+        snap("v113_small_car_next")
     }
 
     // --- A playlist or an album on the device ---

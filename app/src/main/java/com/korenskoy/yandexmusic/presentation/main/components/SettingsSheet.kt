@@ -563,7 +563,20 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
             )
         }
         SwitchRow(Icons.Rounded.Schedule, stringResource(R.string.settings_car_clock), stringResource(R.string.settings_car_clock_hint), state.carClock, actions.onCarClockChange)
-        SwitchRow(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.settings_car_next), stringResource(R.string.settings_car_next_hint), state.carShowNext, actions.onCarShowNextChange)
+        SegmentedRow(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.settings_car_under)) {
+            HiFiSegmented(
+                options = listOf(stringResource(R.string.settings_car_under_queue), stringResource(R.string.settings_car_under_next)),
+                selectedIndex = if (state.carUnderCover == com.korenskoy.yandexmusic.domain.model.CarUnderCover.NEXT) 1 else 0,
+                onSelect = {
+                    actions.onCarUnderCoverChange(
+                        if (it == 1) com.korenskoy.yandexmusic.domain.model.CarUnderCover.NEXT else com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE
+                    )
+                },
+                fontSize = 13.sp
+            )
+            Spacer(Modifier.heightIn(min = 10.dp))
+            SettingsHint(stringResource(R.string.settings_car_under_hint))
+        }
     }
     SettingsGroup(stringResource(R.string.settings_g_look)) {
         UiScaleRow(state.uiScaleAuto, actions.onUiScaleAutoChange, state.uiScaleManual, actions.onUiScaleManualChange)

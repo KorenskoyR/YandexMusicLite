@@ -3,6 +3,7 @@ package com.korenskoy.yandexmusic.presentation
 import androidx.compose.ui.unit.dp
 import com.korenskoy.yandexmusic.presentation.car.carDockClearance
 import com.korenskoy.yandexmusic.presentation.car.carScaleOf
+import com.korenskoy.yandexmusic.presentation.car.carSwipeStep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,5 +38,15 @@ class CarLayoutTest {
         // dislike + previous + ring + next + like, standing; the panel is 544 wide at most of the design
         val controls = 60 + 80 + 196 + 80 + 60
         assertTrue(controls <= 544 - 4 * 16)
+    }
+
+    @Test
+    fun oneSwipeSwitchesOneTrack() {
+        // A quick swipe arrives as several moves; only their sum, once the finger lifts, counts
+        val moves = listOf(-60f, -80f, -70f)
+        assertEquals(-1, carSwipeStep(moves.sum(), 72f * 2.625f))
+        assertEquals(1, carSwipeStep(190f, 189f))
+        assertEquals("too short to be a swipe", 0, carSwipeStep(-120f, 189f))
+        assertEquals("back and forth comes to nothing", 0, carSwipeStep(-200f + 180f, 189f))
     }
 }

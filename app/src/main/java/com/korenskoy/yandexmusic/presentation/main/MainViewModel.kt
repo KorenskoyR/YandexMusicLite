@@ -249,8 +249,8 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val carClock: StateFlow<Boolean> = settingsRepository.carClock
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val carShowNext: StateFlow<Boolean> = settingsRepository.carShowNext
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val carUnderCover: StateFlow<com.korenskoy.yandexmusic.domain.model.CarUnderCover> = settingsRepository.carUnderCover
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE)
     val animationMode: StateFlow<AnimationMode?> = settingsRepository.animationMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 

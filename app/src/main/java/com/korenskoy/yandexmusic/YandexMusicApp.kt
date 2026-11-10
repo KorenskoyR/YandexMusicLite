@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic
 
+import coil3.request.allowHardware
 import okio.Path.Companion.toOkioPath
 import coil3.request.crossfade
 import coil3.memory.MemoryCache
@@ -44,6 +45,10 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
                     .build()
             }
             .crossfade(COVER_CROSSFADE_MS)
+            // Plain bitmaps, never "hardware" ones: head units that draw their window without the GPU (Android 9
+            // on Allwinner with a Mali-400) crash on a hardware bitmap ("Software rendering doesn't support
+            // hardware bitmaps"). On Android 8+ the pixels sit in native memory either way.
+            .allowHardware(false)
             .build()
 
     override fun onCreate() {

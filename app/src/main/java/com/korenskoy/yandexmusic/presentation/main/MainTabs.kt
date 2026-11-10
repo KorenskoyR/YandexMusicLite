@@ -2,7 +2,7 @@ package com.korenskoy.yandexmusic.presentation.main
 
 import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.data.download.OfflineCollection
-import com.korenskoy.yandexmusic.presentation.car.CAR_NEXT_COUNT
+import com.korenskoy.yandexmusic.presentation.car.CAR_QUEUE_LIMIT
 import com.korenskoy.yandexmusic.data.player.PlaybackQueue
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -222,7 +222,7 @@ internal fun LibraryTab(
             onSwipeToCloseChange = settingsVm::setSwipeToClose,
             onSteeringWheelChange = settingsVm::setSteeringWheelOnLeft,
             onCarClockChange = settingsVm::setCarClock,
-            onCarShowNextChange = settingsVm::setCarShowNext,
+            onCarUnderCoverChange = settingsVm::setCarUnderCover,
             onStoragePlaceChange = settingsVm::setStoragePlace,
             onUsbFolderChosen = settingsVm::useUsbFolder,
             onUiScaleAutoChange = settingsVm::setUiScaleAuto,
@@ -314,7 +314,7 @@ internal fun CarTab(
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
     val showClock by viewModel.carClock.collectAsStateWithLifecycle()
-    val showNext by viewModel.carShowNext.collectAsStateWithLifecycle()
+    val underCover by viewModel.carUnderCover.collectAsStateWithLifecycle()
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
@@ -322,7 +322,7 @@ internal fun CarTab(
     // What will really play next, by the player's own rule (explicit passed over, a playlist goes on from its start)
     val upcoming = remember(queue, now.trackId, now.source, skipExplicit, track?.isRadio) {
         if (track == null || track.isRadio) emptyList()
-        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, CAR_NEXT_COUNT) { skipExplicit && it.isExplicit }
+        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, CAR_QUEUE_LIMIT) { skipExplicit && it.isExplicit }
     }
     CarScreen(
         currentTrack = track,
@@ -351,7 +351,7 @@ internal fun CarTab(
         source = now.source,
         isBuffering = now.isBuffering,
         showClock = showClock,
-        showNext = showNext,
+        underCover = underCover,
         waveTuning = waveTuning,
         trackWaveSeed = waveSeed,
         onWaveTuningChange = viewModel::setWaveTuning,

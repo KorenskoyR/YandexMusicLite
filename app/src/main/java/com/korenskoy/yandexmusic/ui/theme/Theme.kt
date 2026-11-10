@@ -42,7 +42,11 @@ fun YandexMusicTheme(
             }
             val window = activity?.window
             if (window != null) {
-                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+                // Always dark bars: a light navigation bar on a head unit is painted light by the vendor
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = false
+                    isAppearanceLightNavigationBars = false
+                }
             }
         }
     }

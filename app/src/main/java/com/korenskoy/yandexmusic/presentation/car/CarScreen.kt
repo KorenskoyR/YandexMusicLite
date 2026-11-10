@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.utils.russianQuantityString
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.systemBars
@@ -171,16 +174,19 @@ fun CarScreen(
     isLiked: Boolean = currentTrack?.let { likedTrackIds.contains(it.idString) } == true,
     isBuffering: Boolean = false,
     showClock: Boolean = true,
-    showNext: Boolean = true,
+    underCover: CarUnderCover = CarUnderCover.QUEUE,
     waveTuning: WaveTuning = WaveTuning(),
     trackWaveSeed: TrackDetailsDto? = null,
     onWaveTuningChange: (WaveTuning) -> Unit = {},
     onTrackWave: (TrackDetailsDto) -> Unit = {},
     onBackToMyWave: () -> Unit = {},
-    initialTuneOpen: Boolean = false
+    initialTuneOpen: Boolean = false,
+    initialQueueOpen: Boolean = false
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
+    var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
     androidx.activity.compose.BackHandler(enabled = tuneOpen) { tuneOpen = false }
+    androidx.activity.compose.BackHandler(enabled = queueOpen) { queueOpen = false }
     androidx.activity.compose.BackHandler(onBack = onExit)
     val view = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(Unit) {
@@ -193,6 +199,10 @@ fun CarScreen(
 
     val playPause = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() }
     val isRadio = currentTrack?.isRadio == true
+    val withQueue = underCover == CarUnderCover.QUEUE
+    // A station has no queue: the panel never stays open over one
+    LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
+    val openQueue = { tuneOpen = false; queueOpen = true }
     val active = carSourceOf(source, isRadio)
     val nextCaption = when {
         source == PlaylistSource.VIBE && trackWaveSeed != null -> stringResource(R.string.car_next_track_wave)
@@ -225,14 +235,27 @@ fun CarScreen(
         DockItem(CarSource.DOWNLOADED, Icons.Rounded.DownloadDone, stringResource(R.string.car_source_downloaded), onPlayDownloaded)
     )
 
+    val latestPrev by androidx.compose.runtime.rememberUpdatedState(onPrevClick)
+    val latestNext by androidx.compose.runtime.rememberUpdatedState(onNextClick)
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(HiFi.Ground)
             .pointerInput(Unit) {
-                detectHorizontalDragGestures { _, dragAmount ->
-                    if (dragAmount > 50) onPrevClick() else if (dragAmount < -50) onNextClick()
-                }
+                // One track per swipe: the distance adds up over the whole gesture and counts once the finger
+                // lifts (a quick swipe arrives as several moves, each of which used to switch a track)
+                var travelled = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { travelled = 0f },
+                    onDragEnd = {
+                        when (carSwipeStep(travelled, CarSwipeThreshold.toPx())) {
+                            1 -> latestPrev()
+                            -1 -> latestNext()
+                        }
+                        travelled = 0f
+                    },
+                    onDragCancel = { travelled = 0f }
+                ) { _, dragAmount -> travelled += dragAmount }
             }
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { playPause() }) }
     ) {
@@ -293,6 +316,16 @@ fun CarScreen(
                 WaveTuneChoices(waveTuning, onWaveTuningChange, segments = segments, optionHeight = u(56f), fontSize = u.sp(15f), captionSize = u.sp(14f), gap = u(12f))
             }
         }
+        // "Очередь": what plays now and what follows, in rows big enough to hit while parked; a tap plays it
+        val queueCaption = listOf(sourceLabel, stringResource(R.string.car_queue_more, russianQuantityString(upcoming.size, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many)))
+            .filter { it.isNotBlank() }.joinToString(" · ")
+        val queuePanel: @Composable (Modifier) -> Unit = { panelModifier ->
+            CarQueuePanel(
+                u = u, modifier = panelModifier, caption = queueCaption, current = currentTrack, upcoming = upcoming, loading = upcomingLoading,
+                onClick = { queueOpen = false; onUpcomingClick(it) }, onClose = { queueOpen = false }
+            )
+        }
+        val queueCount = russianQuantityString(upcoming.size, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many)
         // The wave's buttons: in the header on a wide screen, in a row under it on a tall one
         val onWave = active == CarSource.WAVE
         val wavePills: @Composable () -> Unit = {
@@ -301,7 +334,7 @@ fun CarScreen(
             if (trackWaveSeed != null && onWave) {
                 WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
                 WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !waveTuning.isDefault, height = pillHeight, fontSize = pillFont,
-                    onClick = { tuneOpen = true }, description = stringResource(R.string.wave_tune_title))
+                    onClick = { queueOpen = false; tuneOpen = true }, description = stringResource(R.string.wave_tune_title))
             } else {
                 currentTrack?.takeIf { !it.isRadio }?.let { track ->
                     WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_by_track), active = false, height = pillHeight, fontSize = pillFont, onClick = { onTrackWave(track) })
@@ -309,7 +342,7 @@ fun CarScreen(
                 if (onWave) {
                     val summary = waveTuningSummary(waveTuning)
                     WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), active = summary != null, height = pillHeight, fontSize = pillFont,
-                        onClick = { tuneOpen = true }, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
+                        onClick = { queueOpen = false; tuneOpen = true }, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
                 }
             }
         }
@@ -341,10 +374,26 @@ fun CarScreen(
                     // The cover alone, and under it the covers of what comes next: nothing lies on the cover
                     val far: @Composable () -> Unit = {
                         // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
-                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen || queueOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
                         Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
-                            if (isRadio || !showNext) {
+                            if (isRadio) {
                                 CarCover(u, currentTrack, Modifier.size(u(500f)))
+                            } else if (withQueue) {
+                                Column(
+                                    Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(u(18f), Alignment.CenterVertically)
+                                ) {
+                                    // As big as the column allows (500), less only when the button would not fit
+                                    CarCover(
+                                        u, currentTrack,
+                                        Modifier
+                                            .weight(1f, fill = false)
+                                            .sizeIn(maxWidth = u(500f), maxHeight = u(500f))
+                                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                                    )
+                                    QueuePill(u, queueCount, onClick = openQueue)
+                                }
                             } else {
                                 Column(
                                     Modifier.fillMaxSize(),
@@ -360,7 +409,7 @@ fun CarScreen(
                                             .aspectRatio(1f, matchHeightConstraintsFirst = true)
                                     )
                                     // Four small covers exactly as wide as the cover at its full size
-                                    NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(88f), gap = u(16f), maxWidth = u(400f), onClick = onUpcomingClick)
+                                    NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(88f), gap = u(16f), maxWidth = u(400f), onClick = onUpcomingClick, onCaptionClick = openQueue)
                                 }
                             }
                         }
@@ -376,13 +425,20 @@ fun CarScreen(
                     // "Настроить волну" takes the place of the cover and the "next" row (more room than it needs),
                     // so the controls and the sources stay reachable
                     androidx.compose.animation.Crossfade(
-                        targetState = tuneOpen,
+                        targetState = when {
+                            tuneOpen -> 1
+                            queueOpen -> 2
+                            else -> 0
+                        },
                         modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth(),
                         label = "car_tune"
                     ) { open ->
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                            if (open) tunePanel(Modifier.fillMaxWidth(), true)
-                            else CarCover(u, currentTrack, Modifier.size(u(if (isRadio || !showNext) 400f else 310f)))
+                            when (open) {
+                                1 -> tunePanel(Modifier.fillMaxWidth(), true)
+                                2 -> queuePanel(Modifier.fillMaxWidth().height(u(400f)))
+                                else -> CarCover(u, currentTrack, Modifier.size(u(if (isRadio || withQueue) 400f else 310f)))
+                            }
                         }
                     }
                     Spacer(Modifier.height(u(24f)))
@@ -396,11 +452,31 @@ fun CarScreen(
                         // stay together instead of spreading to the edges
                         modifier = Modifier.widthIn(max = u(560f)).fillMaxWidth().weight(1f),
                         compactDock = true,
-                        beforeDock = if (isRadio || tuneOpen || !showNext) null else {
-                            { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick) }
+                        beforeDock = when {
+                            isRadio || tuneOpen -> null
+                            withQueue -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { QueuePill(u, queueCount, onClick = openQueue) } } }
+                            else -> { { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick, onCaptionClick = openQueue) } }
                         }
                     )
                 }
+            }
+        }
+        // "Очередь" lying down: over the cover column too, the whole height of it
+        if (queueOpen && isLandscape) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { queueOpen = false }
+            )
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                queuePanel(
+                    Modifier
+                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                        .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
+                        .width(panelWidth)
+                        .fillMaxHeight()
+                )
             }
         }
         // "Настроить волну" lying down: over the cover column, so the controls and the sources stay free
@@ -725,6 +801,151 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
 /** How many tracks the "Далее" row shows. */
 const val CAR_NEXT_COUNT = 4
 
+/** How far ahead the car's queue looks: the row shows the first [CAR_NEXT_COUNT], the panel all of them. */
+const val CAR_QUEUE_LIMIT = 50
+
+/** How far a finger travels across the car screen to switch a track. */
+internal val CarSwipeThreshold = 72.dp
+
+/** A swipe's result: 1 — back a track (to the right), -1 — on to the next (to the left), 0 — too short. */
+internal fun carSwipeStep(travelledPx: Float, thresholdPx: Float): Int = when {
+    travelledPx >= thresholdPx -> 1
+    travelledPx <= -thresholdPx -> -1
+    else -> 0
+}
+
+/** "Очередь · 24 трека": the glass button under the biggest cover. */
+@Composable
+private fun QueuePill(u: Scale, count: String, onClick: () -> Unit) {
+    val description = stringResource(R.string.car_queue_cd, count)
+    Row(
+        Modifier
+            .height(u(64f))
+            .hifiGlass(CircleShape)
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .padding(horizontal = u(28f)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(u(24f)))
+        Spacer(Modifier.width(u(12f)))
+        Text(stringResource(R.string.car_queue), color = Color.White, fontSize = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(" · $count", color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(20f), fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+/** The queue over the cover's place: what plays now, then what follows; a tap plays that track. */
+@Composable
+private fun CarQueuePanel(
+    u: Scale,
+    modifier: Modifier,
+    caption: String,
+    current: TrackDetailsDto?,
+    upcoming: List<TrackDetailsDto>,
+    loading: Boolean,
+    onClick: (TrackDetailsDto) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(u(30f)))
+            .background(HiFi.SheetFill.copy(alpha = 0.97f))
+            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+            .padding(start = u(16f), end = u(16f), top = u(18f), bottom = u(8f))
+    ) {
+        Row(Modifier.padding(start = u(8f), end = u(2f), bottom = u(8f)), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.car_queue), color = Color.White, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                Text(caption, color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Box(
+                Modifier
+                    .size(u(56f))
+                    .hifiGlass(CircleShape)
+                    .clickable(role = Role.Button, onClick = onClose),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+            }
+        }
+        androidx.compose.foundation.lazy.LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(u(4f))
+        ) {
+            current?.let { track -> item(key = "now") { QueueRow(u, track, isCurrent = true, onClick = null) } }
+            items(upcoming.size, key = { "q" + it + upcoming[it].idString }) { index ->
+                val track = upcoming[index]
+                QueueRow(u, track, isCurrent = false) { onClick(track) }
+            }
+            if (loading && upcoming.isEmpty()) items(3, key = { "wait$it" }) { QueueRowPlaceholder(u) }
+            if (!loading && upcoming.isEmpty()) item(key = "empty") {
+                Text(
+                    stringResource(R.string.car_queue_empty),
+                    color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(17f),
+                    modifier = Modifier.padding(horizontal = u(10f), vertical = u(16f))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onClick: (() -> Unit)?) {
+    val context = LocalContext.current
+    val title = track.title ?: stringResource(R.string.bez_nazvaniya)
+    val shape = RoundedCornerShape(u(18f))
+    val description = if (onClick != null) stringResource(R.string.car_next_play_cd, title) else title
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = u(84f))
+            .clip(shape)
+            .then(if (isCurrent) Modifier.background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.10f), shape) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = description, onClick = onClick) else Modifier)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .padding(horizontal = u(10f), vertical = u(8f)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(u(68f)).clip(RoundedCornerShape(u(14f))).background(HiFi.Placeholder), contentAlignment = Alignment.Center) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Small).crossfade(true).build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            if (isCurrent) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+        }
+        Spacer(Modifier.width(u(16f)))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isCurrent) {
+                    Text(stringResource(R.string.car_queue_now) + " · ", color = Color.White.copy(alpha = 0.86f), fontSize = u.sp(13f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em, maxLines = 1)
+                }
+                Text(
+                    track.artists.joinToString { it.name ?: "" },
+                    color = Color.White.copy(alpha = 0.64f), fontSize = u.sp(17f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueRowPlaceholder(u: Scale) {
+    val fill = Color.White.copy(alpha = 0.06f)
+    Row(Modifier.fillMaxWidth().height(u(84f)).padding(horizontal = u(10f), vertical = u(8f)), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(u(68f)).clip(RoundedCornerShape(u(14f))).background(fill))
+        Spacer(Modifier.width(u(16f)))
+        Column {
+            Box(Modifier.width(u(200f)).height(u(16f)).clip(RoundedCornerShape(u(6f))).background(fill))
+            Spacer(Modifier.height(u(10f)))
+            Box(Modifier.width(u(120f)).height(u(12f)).clip(RoundedCornerShape(u(5f))).background(fill))
+        }
+    }
+}
+
 /**
  * What comes next: up to four small covers with title and artist, so the current cover stays the big one.
  * Fixed, not a carousel: a swipe on the car screen switches tracks, and nothing slides under the driver's
@@ -739,7 +960,8 @@ private fun NextRow(
     maxCard: Dp,
     gap: Dp,
     maxWidth: Dp = Dp.Infinity,
-    onClick: (TrackDetailsDto) -> Unit
+    onClick: (TrackDetailsDto) -> Unit,
+    onCaptionClick: (() -> Unit)? = null
 ) {
     if (tracks.isEmpty() && !loading) return
     val limit = maxWidth
@@ -748,13 +970,19 @@ private fun NextRow(
         val card = ((androidx.compose.ui.unit.min(this.maxWidth, limit) - gap * (n - 1)) / n).coerceAtMost(maxCard)
         Column(Modifier.width(card * n + gap * (n - 1))) {
             Text(
-                caption.uppercase(),
+                caption.uppercase() + if (onCaptionClick != null) " ›" else "",
                 color = Color.White.copy(alpha = 0.66f),
                 fontSize = u.sp(13f),
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.16.em,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (onCaptionClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(u(8f)))
+                        .clickable(role = Role.Button, onClick = onCaptionClick)
+                        .padding(vertical = u(4f))
+                } else Modifier
             )
             Spacer(Modifier.height(u(10f)))
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {

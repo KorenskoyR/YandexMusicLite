@@ -80,7 +80,12 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
         if (savedInstanceState == null) intent?.let { playFromSearch(it) }
 
-        enableEdgeToEdge()
+        // The app is always dark: dark system bars whatever the system's own theme. "Auto" followed the system,
+        // so a light head unit got a light navigation bar (painted turquoise by the vendor) and dark status icons
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
         setContent {
             // Scale the whole UI for screens whose reported density is wrong (dense car head units):
             // the app cannot change the system density, so it overrides its own instead.
