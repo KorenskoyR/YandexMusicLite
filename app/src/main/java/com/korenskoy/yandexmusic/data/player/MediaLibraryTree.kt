@@ -32,7 +32,8 @@ class MediaLibraryTree @Inject constructor(
     private val downloadManager: TrackDownloadManager,
     private val playbackController: PlaybackController,
     private val searchRepository: com.korenskoy.yandexmusic.data.repository.SearchRepository,
-    private val playlistsRepository: UserPlaylistsRepository
+    private val playlistsRepository: UserPlaylistsRepository,
+    private val offlineCollections: com.korenskoy.yandexmusic.data.download.OfflineCollections
 ) {
     fun root(): MediaItem = folder(ROOT_ID, context.getString(R.string.app_name), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         .withExtras(Bundle().apply {
@@ -156,8 +157,10 @@ class MediaLibraryTree @Inject constructor(
         }
     }
 
-    private fun downloaded(): List<TrackDetailsDto> =
-        libraryRepository.likedTracks.value.filter { downloadManager.isKnownDownloaded(it.idString) }
+    /** Everything on the device, as "Скачанные" in the app: liked tracks, then the kept playlists' and albums'. */
+    private fun downloaded(): List<TrackDetailsDto> = com.korenskoy.yandexmusic.data.download.OfflineRules.downloadedTracks(
+        libraryRepository.likedTracks.value, offlineCollections.all.value, downloadManager.downloadedTrackIds.value
+    )
 
     private fun trackItem(prefix: String, track: TrackDetailsDto): MediaItem = playable(
         prefix + track.idString,

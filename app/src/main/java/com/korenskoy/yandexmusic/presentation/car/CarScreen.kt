@@ -171,6 +171,7 @@ fun CarScreen(
     isLiked: Boolean = currentTrack?.let { likedTrackIds.contains(it.idString) } == true,
     isBuffering: Boolean = false,
     showClock: Boolean = true,
+    showNext: Boolean = true,
     waveTuning: WaveTuning = WaveTuning(),
     trackWaveSeed: TrackDetailsDto? = null,
     onWaveTuningChange: (WaveTuning) -> Unit = {},
@@ -342,23 +343,24 @@ fun CarScreen(
                         // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
                         val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
                         Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
-                            if (isRadio) {
+                            if (isRadio || !showNext) {
                                 CarCover(u, currentTrack, Modifier.size(u(500f)))
                             } else {
                                 Column(
                                     Modifier.fillMaxSize(),
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(u(22f), Alignment.CenterVertically)
+                                    verticalArrangement = Arrangement.spacedBy(u(18f), Alignment.CenterVertically)
                                 ) {
-                                    // Gets what the row leaves, never more than 300: the row is measured first
+                                    // Gets what the row leaves, never more than 400: the row is measured first
                                     CarCover(
                                         u, currentTrack,
                                         Modifier
                                             .weight(1f, fill = false)
-                                            .sizeIn(maxWidth = u(300f), maxHeight = u(300f))
+                                            .sizeIn(maxWidth = u(400f), maxHeight = u(400f))
                                             .aspectRatio(1f, matchHeightConstraintsFirst = true)
                                     )
-                                    NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(152f), gap = u(22f), onClick = onUpcomingClick)
+                                    // Four small covers exactly as wide as the cover at its full size
+                                    NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(88f), gap = u(16f), maxWidth = u(400f), onClick = onUpcomingClick)
                                 }
                             }
                         }
@@ -380,7 +382,7 @@ fun CarScreen(
                     ) { open ->
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                             if (open) tunePanel(Modifier.fillMaxWidth(), true)
-                            else CarCover(u, currentTrack, Modifier.size(u(if (isRadio) 400f else 220f)))
+                            else CarCover(u, currentTrack, Modifier.size(u(if (isRadio || !showNext) 400f else 310f)))
                         }
                     }
                     Spacer(Modifier.height(u(24f)))
@@ -394,8 +396,8 @@ fun CarScreen(
                         // stay together instead of spreading to the edges
                         modifier = Modifier.widthIn(max = u(560f)).fillMaxWidth().weight(1f),
                         compactDock = true,
-                        beforeDock = if (isRadio || tuneOpen) null else {
-                            { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(168f), gap = u(20f), onClick = onUpcomingClick) }
+                        beforeDock = if (isRadio || tuneOpen || !showNext) null else {
+                            { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick) }
                         }
                     )
                 }
@@ -720,10 +722,13 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
     }
 }
 
+/** How many tracks the "Далее" row shows. */
+const val CAR_NEXT_COUNT = 4
+
 /**
- * What comes next: up to three covers with title and artist, like the wave page on a phone. Fixed, not a
- * carousel: a swipe on the car screen switches tracks, and nothing slides under the driver's finger. While
- * the wave is still fetching, placeholders of the same size keep the place.
+ * What comes next: up to four small covers with title and artist, so the current cover stays the big one.
+ * Fixed, not a carousel: a swipe on the car screen switches tracks, and nothing slides under the driver's
+ * finger. While the wave is still fetching, placeholders of the same size keep the place.
  */
 @Composable
 private fun NextRow(
@@ -733,12 +738,15 @@ private fun NextRow(
     loading: Boolean,
     maxCard: Dp,
     gap: Dp,
+    maxWidth: Dp = Dp.Infinity,
     onClick: (TrackDetailsDto) -> Unit
 ) {
     if (tracks.isEmpty() && !loading) return
+    val limit = maxWidth
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        val card = ((maxWidth - gap * 2) / 3).coerceAtMost(maxCard)
-        Column(Modifier.width(card * 3 + gap * 2)) {
+        val n = CAR_NEXT_COUNT
+        val card = ((androidx.compose.ui.unit.min(this.maxWidth, limit) - gap * (n - 1)) / n).coerceAtMost(maxCard)
+        Column(Modifier.width(card * n + gap * (n - 1))) {
             Text(
                 caption.uppercase(),
                 color = Color.White.copy(alpha = 0.66f),
@@ -748,9 +756,9 @@ private fun NextRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(u(12f)))
+            Spacer(Modifier.height(u(10f)))
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                repeat(3) { slot ->
+                repeat(n) { slot ->
                     AnimatedContent(
                         targetState = tracks.getOrNull(slot),
                         contentKey = { it?.idString },
@@ -772,13 +780,13 @@ private fun NextRow(
 @Composable
 private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(u(18f))
+    val shape = RoundedCornerShape(u(14f))
     val title = track.title ?: stringResource(R.string.bez_nazvaniya)
     val description = stringResource(R.string.car_next_play_cd, title)
     Column(
         Modifier
             .width(size)
-            .clip(RoundedCornerShape(u(18f)))
+            .clip(RoundedCornerShape(u(14f)))
             .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = description }
     ) {
@@ -788,33 +796,33 @@ private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> 
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(size)
-                .hifiSoftShadow(shape, u(16f))
+                .hifiSoftShadow(shape, u(12f))
                 .clip(shape)
                 .background(HiFi.Placeholder)
         )
-        Spacer(Modifier.height(u(10f)))
-        Text(title, color = Color.White, fontSize = u.sp(17f), lineHeight = u.sp(22f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(u(8f)))
+        Text(title, color = Color.White, fontSize = u.sp(15f), lineHeight = u.sp(19f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             track.artists.joinToString { it.name ?: "" },
             color = Color.White.copy(alpha = 0.66f),
-            fontSize = u.sp(15f),
-            lineHeight = u.sp(20f),
+            fontSize = u.sp(13f),
+            lineHeight = u.sp(17f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-/** Exactly a card's height (cover, 10, two lines), so the row does not jump when the tracks arrive. */
+/** Exactly a card's height (cover, 8, lines of 19 and 17), so the row does not jump when the tracks arrive. */
 @Composable
 private fun NextCardPlaceholder(u: Scale, size: Dp) {
     val fill = Color.White.copy(alpha = 0.06f)
     Column(Modifier.width(size)) {
-        Box(Modifier.size(size).clip(RoundedCornerShape(u(18f))).background(fill))
-        Spacer(Modifier.height(u(15f)))
-        Box(Modifier.width(size * 0.72f).height(u(12f)).clip(RoundedCornerShape(u(6f))).background(fill))
-        Spacer(Modifier.height(u(10f)))
-        Box(Modifier.width(size * 0.48f).height(u(10f)).clip(RoundedCornerShape(u(5f))).background(fill))
-        Spacer(Modifier.height(u(5f)))
+        Box(Modifier.size(size).clip(RoundedCornerShape(u(14f))).background(fill))
+        Spacer(Modifier.height(u(13f)))
+        Box(Modifier.width(size * 0.72f).height(u(11f)).clip(RoundedCornerShape(u(5f))).background(fill))
+        Spacer(Modifier.height(u(8f)))
+        Box(Modifier.width(size * 0.48f).height(u(9f)).clip(RoundedCornerShape(u(4f))).background(fill))
+        Spacer(Modifier.height(u(3f)))
     }
 }

@@ -51,7 +51,8 @@ class MainViewModel @Inject constructor(
     private val downloadScheduler: DownloadScheduler,
     networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor,
     private val reactions: com.korenskoy.yandexmusic.data.player.TrackReactions,
-    private val playRequests: PlayRequests
+    private val playRequests: PlayRequests,
+    offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -83,6 +84,15 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, DownloadQueueState.IDLE)
     val downloadedTrackIds: StateFlow<Set<String>> = downloadManager.downloadedTrackIds
     val downloadProgress = downloadManager.downloadProgress
+
+    /** Playlists and albums kept on the device. */
+    val offlineCollections: StateFlow<List<com.korenskoy.yandexmusic.data.download.OfflineCollection>> = offline.all
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** "Скачанные": liked tracks on the device, then the kept playlists' and albums'. */
+    val downloadedTracks: StateFlow<List<TrackDetailsDto>> = combine(libraryRepository.likedTracks, offline.all, downloadManager.downloadedTrackIds) { liked, kept, ids ->
+        com.korenskoy.yandexmusic.data.download.OfflineRules.downloadedTracks(liked, kept, ids)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val steeringWheelOnLeft: StateFlow<Boolean> = settingsRepository.steeringWheelOnLeft
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT)
@@ -184,9 +194,9 @@ class MainViewModel @Inject constructor(
         playbackController.playAllLikedTracks()
     }
 
-    /** The liked tracks that are on the device, in the library's order. */
+    /** Everything on the device: liked tracks in the library's order, then kept playlists and albums. */
     fun playDownloaded() {
-        val downloaded = tracks.value.filter { it.idString in downloadedTrackIds.value }
+        val downloaded = downloadedTracks.value
         downloaded.firstOrNull()?.let {
             playRequests.userStarted()
             playbackController.playTrack(it.idString, downloaded, PlaylistSource.LIBRARY)
@@ -238,6 +248,8 @@ class MainViewModel @Inject constructor(
     val swipeToCloseMiniPlayer: StateFlow<Boolean> = settingsRepository.swipeToCloseMiniPlayer
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val carClock: StateFlow<Boolean> = settingsRepository.carClock
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val carShowNext: StateFlow<Boolean> = settingsRepository.carShowNext
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val animationMode: StateFlow<AnimationMode?> = settingsRepository.animationMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)

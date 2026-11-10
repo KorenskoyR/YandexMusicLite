@@ -27,8 +27,13 @@ class TrackDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient,
     /** Null in tests that do not need the card. */
-    private val card: CardStorage? = null
+    private val card: CardStorage? = null,
+    /** Null in tests that do not need a flash drive. */
+    private val usb: com.korenskoy.yandexmusic.data.download.UsbStorage? = null
 ) {
+    /** Where a downloaded track lives. */
+    enum class Place { INTERNAL, CARD, USB }
+
     private val tracksDir = File(context.filesDir, "tracks").apply {
         if (!exists()) mkdirs()
     }
@@ -40,7 +45,16 @@ class TrackDownloadManager @Inject constructor(
     private fun cardFile(dir: File, trackId: String) = File(dir, "$trackId.${CardStorage.EXTENSION}")
 
     /** True when new downloads go to the card: chosen in the settings, and the card is in and usable. */
-    private fun downloadsToCard(): Boolean = card?.wanted?.value == true && card.cardUsable
+    private fun downloadsToCard(): Boolean = usb?.wanted?.value != true && card?.wanted?.value == true && card.cardUsable
+
+    /** True when new downloads go to the flash drive: chosen, the drive is in, and the key is there. */
+    private fun downloadsToUsb(): Boolean = usb?.wanted?.value == true && card?.key() != null && usb.present
+
+    /** Tracks on the flash drive by id, as last listed ("<id>.enc"). */
+    @Volatile
+    private var usbFiles: Map<String, com.korenskoy.yandexmusic.data.download.UsbStorage.Entry> = emptyMap()
+
+    private fun usbName(trackId: String) = "$trackId.${CardStorage.EXTENSION}"
 
     private val _downloadedTrackIds = MutableStateFlow<Set<String>>(emptySet())
     val downloadedTrackIds = _downloadedTrackIds.asStateFlow()
@@ -70,14 +84,17 @@ class TrackDownloadManager @Inject constructor(
         val all = internal + onCard
         val files = internal.filter { it.extension == "mp3" && it.length() > 0 } +
             onCard.filter { it.extension == CardStorage.EXTENSION && it.length() > 0 }
+        usbFiles = usb?.files().orEmpty()
+            .filter { (name, entry) -> name.endsWith(".${CardStorage.EXTENSION}") && entry.size > 0 }
+            .mapKeys { (name, _) -> name.removeSuffix(".${CardStorage.EXTENSION}") }
         savedQualities = all.filter { it.extension == "quality" }.mapNotNull { file ->
             runCatching {
                 val (codec, kbps) = file.readText().split(':')
                 file.nameWithoutExtension to TrackPreloadManager.StreamQuality(codec, kbps.trim().toInt())
             }.getOrNull()
         }.toMap()
-        _downloadedTrackIds.value = files.map { it.nameWithoutExtension }.toSet()
-        _cacheSizeBytes.value = files.sumOf { it.length() }
+        _downloadedTrackIds.value = files.map { it.nameWithoutExtension }.toSet() + usbFiles.keys
+        _cacheSizeBytes.value = files.sumOf { it.length() } + usbFiles.values.sumOf { it.size }
     }
 
     fun setDownloadProgress(progress: DownloadProgressInfo?) {
@@ -92,8 +109,21 @@ class TrackDownloadManager @Inject constructor(
         return if (onCard.exists() && onCard.length() > 0) onCard else null
     }
 
+    /** How much the files of [trackIds] take on the device (disk access: call off the main thread). */
+    fun sizeOf(trackIds: Collection<String>): Long = trackIds.distinct().sumOf { getLocalTrackFile(it)?.length() ?: usbFiles[it]?.size ?: 0L }
+
     fun isTrackDownloaded(trackId: String): Boolean {
-        return getLocalTrackFile(trackId) != null
+        return getLocalTrackFile(trackId) != null || trackId in usbFiles
+    }
+
+    /**
+     * What the player opens for a downloaded track: the file, or the document on the flash drive while the
+     * drive is in. Disk and system access: call off the main thread.
+     */
+    fun localTrackUri(trackId: String): String? {
+        getLocalTrackFile(trackId)?.let { return android.net.Uri.fromFile(it).toString() }
+        val onUsb = usbFiles[trackId] ?: return null
+        return onUsb.uri.toString().takeIf { usb?.present == true }
     }
 
     /** Main-thread friendly check against the in-memory index (no disk access). */
@@ -115,11 +145,12 @@ class TrackDownloadManager @Inject constructor(
     ): Boolean = withContext(Dispatchers.IO) {
         if (!replace && isTrackDownloaded(trackId)) return@withContext true
 
-        val toCard = downloadsToCard()
-        val key = if (toCard) card?.key() else null
+        val toUsb = downloadsToUsb()
+        val toCard = !toUsb && downloadsToCard()
+        val key = if (toCard || toUsb) card?.key() else null
         val dir = if (toCard && key != null) cardDir() ?: tracksDir else tracksDir
-        val encrypted = dir != tracksDir
-        val file = if (encrypted) cardFile(dir, trackId) else internalFile(trackId)
+        val encrypted = dir != tracksDir || (toUsb && key != null)
+        val file = if (dir != tracksDir) cardFile(dir, trackId) else internalFile(trackId)
         val tempFile = File(dir, "$trackId.tmp")
 
         val encrawKey = if (url.contains("#encraw_key=")) {
@@ -150,6 +181,20 @@ class TrackDownloadManager @Inject constructor(
                 return@withContext false
             }
 
+            if (toUsb && key != null) {
+                // Across to the flash drive; the encrypted temp file goes either way
+                val written = usb?.put(usbName(trackId)) { out -> tempFile.inputStream().use { it.copyTo(out) } } == true
+                tempFile.delete()
+                if (!written) return@withContext false
+                // Its quality is noted in the app's own folder; the copies elsewhere go
+                val qualityFile = File(tracksDir, "$trackId.quality")
+                if (quality != null) qualityFile.writeText("${quality.codec}:${quality.bitrateKbps}") else qualityFile.delete()
+                internalFile(trackId).delete()
+                cardDir()?.let { cardFile(it, trackId).delete(); File(it, "$trackId.quality").delete() }
+                updateCacheStats()
+                return@withContext true
+            }
+
             // Rename after successful download
             if (file.exists()) file.delete()
             val renamed = tempFile.renameTo(file)
@@ -161,6 +206,7 @@ class TrackDownloadManager @Inject constructor(
             if (quality != null) qualityFile.writeText("${quality.codec}:${quality.bitrateKbps}") else qualityFile.delete()
             // A replaced copy in the other place goes, so a track is never kept twice
             removeOtherCopy(trackId, keep = file)
+            usbFiles[trackId]?.let { usb?.delete(it.uri) }
             updateCacheStats()
             return@withContext true
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -174,7 +220,7 @@ class TrackDownloadManager @Inject constructor(
     }
 
     suspend fun removeTrack(trackId: String) = withContext(Dispatchers.IO) {
-        var removed = false
+        var removed = usbFiles[trackId]?.let { usb?.delete(it.uri) } == true
         for (dir in listOfNotNull(tracksDir, cardDir())) {
             File(dir, "$trackId.quality").delete()
             for (file in listOf(internalFile(trackId).takeIf { dir == tracksDir }, cardFile(dir, trackId).takeIf { dir != tracksDir })) {
@@ -187,6 +233,7 @@ class TrackDownloadManager @Inject constructor(
     suspend fun clearMusicCache() = withContext(Dispatchers.IO) {
         tracksDir.listFiles()?.forEach { it.delete() }
         cardDir()?.listFiles()?.forEach { it.delete() }
+        usbFiles.values.forEach { usb?.delete(it.uri) }
         updateCacheStats()
     }
 
@@ -199,39 +246,66 @@ class TrackDownloadManager @Inject constructor(
     }
 
     /**
-     * Moves every downloaded track to the card (encrypting) or back to the internal storage (decrypting),
-     * one at a time: each track is complete in its new place before the old copy goes, so stopping half-way
-     * loses nothing. [onProgress] gets (moved, total). Returns false when it could not finish.
+     * Moves every downloaded track to [target]: the internal storage (plain), the card or the flash drive
+     * (encrypted). One track at a time, each complete in its new place before the old copy goes, so stopping
+     * half-way loses nothing. [onProgress] gets (moved, total). Returns false when it could not finish.
      */
-    suspend fun moveAll(toCard: Boolean, onProgress: (Int, Int) -> Unit): Boolean = withContext(Dispatchers.IO) {
-        val cardTracks = cardDir() ?: return@withContext false
-        val key = card?.key() ?: return@withContext false
-        val sources = if (toCard) {
-            tracksDir.listFiles { f -> f.extension == "mp3" && f.length() > 0 }.orEmpty()
-        } else {
-            cardTracks.listFiles { f -> f.extension == CardStorage.EXTENSION && f.length() > 0 }.orEmpty()
+    suspend fun moveAll(target: Place, onProgress: (Int, Int) -> Unit): Boolean = withContext(Dispatchers.IO) {
+        val key = card?.key()
+        if (target != Place.INTERNAL && key == null) return@withContext false
+        val cardTracks = cardDir()
+        if (target == Place.CARD && cardTracks == null) return@withContext false
+        if (target == Place.USB && usb?.present != true) return@withContext false
+        updateCacheStats()
+        // Every copy that is not in the target place yet
+        val sources = buildList {
+            if (target != Place.INTERNAL) tracksDir.listFiles { f -> f.extension == "mp3" && f.length() > 0 }.orEmpty().forEach { add(it.nameWithoutExtension to Place.INTERNAL) }
+            if (target != Place.CARD && cardTracks != null) cardTracks.listFiles { f -> f.extension == CardStorage.EXTENSION && f.length() > 0 }.orEmpty().forEach { add(it.nameWithoutExtension to Place.CARD) }
+            if (target != Place.USB && usb?.present == true) usbFiles.keys.forEach { add(it to Place.USB) }
         }
         var moved = 0
         onProgress(0, sources.size)
-        for (source in sources) {
-            val id = source.nameWithoutExtension
-            val targetDir = if (toCard) cardTracks else tracksDir
-            val target = if (toCard) cardFile(cardTracks, id) else internalFile(id)
-            val temp = File(targetDir, "$id.tmp")
+        for ((id, from) in sources) {
+            val temp = File(if (target == Place.CARD) cardTracks!! else tracksDir, "$id.tmp")
             try {
-                if (toCard) {
-                    source.inputStream().use { input -> FileOutputStream(temp).use { fos -> CardStorage.encrypting(key, fos).use { input.copyTo(it) } } }
-                } else {
-                    CardStorage.decryptingStream(key, source).use { input -> FileOutputStream(temp).use { input.copyTo(it) } }
+                // The plain sound, wherever it is now
+                val plain: () -> java.io.InputStream = when (from) {
+                    Place.INTERNAL -> { -> internalFile(id).inputStream() }
+                    Place.CARD -> { -> CardStorage.decryptingStream(key!!, cardFile(cardTracks!!, id)) }
+                    Place.USB -> { -> CardStorage.decryptingStream(key!!, card!!.openSeekable(usbFiles.getValue(id).uri)) }
                 }
-                if (target.exists()) target.delete()
-                if (!temp.renameTo(target)) {
-                    temp.copyTo(target, overwrite = true)
-                    temp.delete()
+                plain().use { input ->
+                    FileOutputStream(temp).use { fos ->
+                        if (target == Place.INTERNAL) input.copyTo(fos) else CardStorage.encrypting(key!!, fos).use { input.copyTo(it) }
+                    }
                 }
-                val quality = File(source.parentFile, "$id.quality")
-                if (quality.exists()) quality.copyTo(File(targetDir, "$id.quality"), overwrite = true).also { quality.delete() }
-                source.delete()
+                when (target) {
+                    Place.INTERNAL, Place.CARD -> {
+                        val dest = if (target == Place.INTERNAL) internalFile(id) else cardFile(cardTracks!!, id)
+                        if (dest.exists()) dest.delete()
+                        if (!temp.renameTo(dest)) {
+                            temp.copyTo(dest, overwrite = true)
+                            temp.delete()
+                        }
+                    }
+                    Place.USB -> {
+                        val written = usb!!.put(usbName(id)) { out -> temp.inputStream().use { it.copyTo(out) } }
+                        temp.delete()
+                        if (!written) error("The flash drive refused $id")
+                    }
+                }
+                // The quality note: on the card beside a card copy, otherwise in the app's own folder
+                val qualityDir = if (target == Place.CARD) cardTracks!! else tracksDir
+                val oldQualityDir = if (from == Place.CARD) cardTracks!! else tracksDir
+                if (qualityDir != oldQualityDir) {
+                    val quality = File(oldQualityDir, "$id.quality")
+                    if (quality.exists()) quality.copyTo(File(qualityDir, "$id.quality"), overwrite = true).also { quality.delete() }
+                }
+                when (from) {
+                    Place.INTERNAL -> internalFile(id).delete()
+                    Place.CARD -> cardFile(cardTracks!!, id).delete()
+                    Place.USB -> usb?.delete(usbFiles.getValue(id).uri)
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 temp.delete()
                 throw e
@@ -248,5 +322,10 @@ class TrackDownloadManager @Inject constructor(
         updateCacheStats()
         true
     }
+
+    /** The two-place move of before: to the card or back to the internal storage. */
+    suspend fun moveAll(toCard: Boolean, onProgress: (Int, Int) -> Unit): Boolean =
+        moveAll(if (toCard) Place.CARD else Place.INTERNAL, onProgress)
+
 }
 

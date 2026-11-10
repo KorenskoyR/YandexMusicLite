@@ -119,6 +119,10 @@ class TrackPreloadManager @Inject constructor(
     fun playableCopy(trackId: String): java.io.File? =
         downloadManager.getLocalTrackFile(trackId)?.takeUnless { isSilentCopy(trackId) }
 
+    /** The downloaded copy to play, as the player opens it: a file, or a document on a flash drive. */
+    fun playableUri(trackId: String): String? =
+        downloadManager.localTrackUri(trackId)?.takeUnless { isSilentCopy(trackId) }
+
     /** Main-thread friendly [playableCopy]: answers from memory. */
     fun hasPlayableCopy(trackId: String): Boolean = downloadManager.isKnownDownloaded(trackId) && !isSilentCopy(trackId)
 
@@ -361,7 +365,7 @@ class TrackPreloadManager @Inject constructor(
 
     private suspend fun fetchOrAwait(trackId: String): String? {
         if (trackId.startsWith("radio_")) return null
-        if (playableCopy(trackId) != null) return null
+        if (playableUri(trackId) != null) return null
         // Reuse a cached link unless its quality was neither lossless nor 320k — then re-resolve to try for better.
         resolvedUrls[trackId]?.takeIf {
             qualities[trackId]?.isLossless == true || (qualities[trackId]?.bitrateKbps ?: 0) >= 320

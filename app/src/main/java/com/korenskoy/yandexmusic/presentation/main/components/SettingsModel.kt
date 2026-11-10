@@ -35,6 +35,7 @@ data class SettingsUiState(
     val swipeToCloseMiniPlayer: Boolean = true,
     val steeringWheelOnLeft: Boolean = true,
     val carClock: Boolean = true,
+    val carShowNext: Boolean = true,
     val uiScaleAuto: Boolean = true,
     val uiScaleManual: Float = 1f,
     val animationMode: AnimationMode = AnimationMode.AUTO
@@ -66,6 +67,9 @@ data class SettingsActions(
     val onSwipeToCloseChange: (Boolean) -> Unit = {},
     val onSteeringWheelChange: (Boolean) -> Unit = {},
     val onCarClockChange: (Boolean) -> Unit = {},
+    val onCarShowNextChange: (Boolean) -> Unit = {},
+    val onStoragePlaceChange: (com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place) -> Unit = {},
+    val onUsbFolderChosen: (android.net.Uri) -> Unit = {},
     val onUiScaleAutoChange: (Boolean) -> Unit = {},
     val onUiScaleManualChange: (Float) -> Unit = {},
     val onAnimationModeChange: (AnimationMode) -> Unit = {}

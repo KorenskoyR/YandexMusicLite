@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import com.korenskoy.yandexmusic.presentation.main.components.RemoveOfflineDialog
+import com.korenskoy.yandexmusic.presentation.main.components.OfflineCaption
+import com.korenskoy.yandexmusic.presentation.main.components.OfflineButton
+import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiWideHeader
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
@@ -79,7 +87,9 @@ class CatalogActions(
     val onOpenArtist: (id: String, name: String) -> Unit,
     val onOpenAlbum: (id: String, title: String) -> Unit,
     val onPlay: (tracks: List<TrackDetailsDto>, trackId: String?, shuffle: Boolean) -> Unit,
-    val onToggleLike: (TrackDetailsDto) -> Unit
+    val onToggleLike: (TrackDetailsDto) -> Unit,
+    val onDownloadAlbum: (AlbumDto) -> Unit = {},
+    val onRemoveAlbum: (albumId: String) -> Unit = {}
 )
 
 /** The page on top of the catalog stack: an artist or an album. Back returns to the previous page. */
@@ -90,12 +100,34 @@ fun CatalogPageScreen(
     isPlaying: Boolean,
     likedTrackIds: Set<String>,
     contentBottom: Dp,
-    actions: CatalogActions
+    actions: CatalogActions,
+    downloadedTrackIds: Set<String> = emptySet(),
+    offline: OfflineState = OfflineState.None
 ) {
     val back = rememberPredictiveBack(enabled = true, onBack = actions.onBack)
     val isArtist = state.page is CatalogPage.Artist
     val tracks = state.artist?.popularTracks ?: state.album?.tracks.orEmpty()
     val appearance = rememberAppearance(state.page)
+    val album = state.album
+    var askRemoveDownload by remember { mutableStateOf(false) }
+    if (askRemoveDownload && album != null) {
+        RemoveOfflineDialog(
+            title = album.title.orEmpty(),
+            onConfirm = { album.idString?.let(actions.onRemoveAlbum); askRemoveDownload = false },
+            onDismiss = { askRemoveDownload = false }
+        )
+    }
+    // An album is kept on the device like a playlist; an artist's page has nothing to keep
+    val offlineButton: @Composable () -> Unit = {
+        if (album != null && tracks.isNotEmpty()) {
+            OfflineButton(
+                offline,
+                onDownload = { actions.onDownloadAlbum(album) },
+                onStop = { album.idString?.let(actions.onRemoveAlbum) },
+                onAskRemove = { askRemoveDownload = true }
+            )
+        }
+    }
     val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
@@ -126,7 +158,7 @@ fun CatalogPageScreen(
                             size = size
                         )
                     },
-                    details = { state.album?.let { album -> AlbumSubtitle(album, actions) } },
+                    details = { state.album?.let { album -> AlbumSubtitle(album, actions); OfflineCaption(offline) } },
                     actions = {
                         if (tracks.isNotEmpty()) {
                             PlayButton(Icons.Default.PlayArrow, stringResource(R.string.cd_slushat), primary = true, Modifier.weight(1f)) {
@@ -135,6 +167,7 @@ fun CatalogPageScreen(
                             PlayButton(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, Modifier.weight(1f)) {
                                 actions.onPlay(tracks, null, true)
                             }
+                            offlineButton()
                         }
                     }
                 )
@@ -163,7 +196,7 @@ fun CatalogPageScreen(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
-                        state.album?.let { album -> AlbumSubtitle(album, actions) }
+                        state.album?.let { album -> AlbumSubtitle(album, actions); OfflineCaption(offline) }
                     }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -175,6 +208,7 @@ fun CatalogPageScreen(
                         PlayButton(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, Modifier.weight(1f)) {
                             actions.onPlay(tracks, null, true)
                         }
+                        offlineButton()
                     }
                 }
             }
@@ -195,6 +229,8 @@ fun CatalogPageScreen(
                             track = track,
                             isPlaying = isPlaying && track.idString == currentTrackId,
                             isLiked = track.idString in likedTrackIds,
+                            isDownloaded = track.idString in downloadedTrackIds,
+                            isDownloading = (offline as? OfflineState.Downloading)?.currentTrackId == track.idString,
                             onToggleLike = { actions.onToggleLike(track) },
                             onClick = { actions.onPlay(tracks, track.idString, false) }
                         )

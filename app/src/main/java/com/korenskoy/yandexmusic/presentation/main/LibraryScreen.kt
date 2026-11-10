@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
+import com.korenskoy.yandexmusic.data.download.OfflineCollection
+import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
@@ -148,11 +155,21 @@ fun LibraryScreen(
     onRenamePlaylist: (UserPlaylistDto, String) -> Unit = { _, _ -> },
     onDeletePlaylist: (UserPlaylistDto) -> Unit = {},
     onReorderPlaylist: (UserPlaylistDto, List<String>, List<String>) -> Unit = { _, _, _ -> },
-    onSetPlaylistPublic: (UserPlaylistDto, Boolean) -> Unit = { _, _ -> }
+    onSetPlaylistPublic: (UserPlaylistDto, Boolean) -> Unit = { _, _ -> },
+    openedOffline: OfflineState = OfflineState.None,
+    onDownloadPlaylist: () -> Unit = {},
+    onRemovePlaylistDownload: () -> Unit = {},
+    /** Everything on the device; null: the liked tracks that are downloaded. */
+    downloadedTracks: List<TrackDetailsDto>? = null,
+    offlineCollections: List<OfflineCollection> = emptyList(),
+    onDownloadedTrackClick: (String) -> Unit = onTrackClick,
+    onOpenCollection: (OfflineCollection) -> Unit = {},
+    /** A section open from the start (screenshots): LIKED, DOWNLOADED or PLAYLISTS. */
+    initialSection: String? = null
 ) {
     var showSettings by remember { mutableStateOf(false) }
     var showProgressModal by remember { mutableStateOf(false) }
-    var sectionName by rememberSaveable { mutableStateOf<String?>(null) }
+    var sectionName by rememberSaveable { mutableStateOf(initialSection) }
     val section = sectionName?.let { LibrarySection.valueOf(it) }
     val back = rememberPredictiveBack(enabled = section != null && openedPlaylist == null) { sectionName = null }
 
@@ -162,7 +179,7 @@ fun LibraryScreen(
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
     val columns = if (isLandscape) landscapeColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp) else 2
-    val downloaded = remember(tracks, downloadedTrackIds) { tracks.filter { downloadedTrackIds.contains(it.idString) } }
+    val downloaded = downloadedTracks ?: remember(tracks, downloadedTrackIds) { tracks.filter { downloadedTrackIds.contains(it.idString) } }
 
     if (openedPlaylist != null) {
         PlaylistScreen(
@@ -181,7 +198,10 @@ fun LibraryScreen(
             onRename = { onRenamePlaylist(openedPlaylist.playlist, it) },
             onDelete = { onDeletePlaylist(openedPlaylist.playlist) },
             onReorder = { shown, new -> onReorderPlaylist(openedPlaylist.playlist, shown, new) },
-            onSetPublic = { onSetPlaylistPublic(openedPlaylist.playlist, it) }
+            onSetPublic = { onSetPlaylistPublic(openedPlaylist.playlist, it) },
+            offline = openedOffline,
+            onDownload = onDownloadPlaylist,
+            onRemoveDownload = onRemovePlaylistDownload
         )
         return
     }
@@ -271,6 +291,21 @@ fun LibraryScreen(
                             onBack = { sectionName = null }
                         )
                     }
+                    if (shown == LibrarySection.DOWNLOADED && offlineCollections.isNotEmpty()) {
+                        item(key = "kept") {
+                            KeptRow(
+                                liked = tracks.filter { it.idString in downloadedTrackIds },
+                                kept = offlineCollections,
+                                downloadedTrackIds = downloadedTrackIds,
+                                onOpenLiked = { sectionName = LibrarySection.LIKED.name },
+                                onOpen = onOpenCollection
+                            )
+                        }
+                        item(key = "all_title") {
+                            HiFiSectionHeader(stringResource(R.string.offline_all_downloaded), Modifier.padding(start = 12.dp, top = 22.dp, bottom = 6.dp))
+                        }
+                    }
+                    val onRowClick: (String) -> Unit = if (shown == LibrarySection.DOWNLOADED) onDownloadedTrackClick else onTrackClick
                     if (shown == LibrarySection.LIKED && list.isNotEmpty()) {
                         item(key = "buttons") {
                             Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -290,7 +325,7 @@ fun LibraryScreen(
                         items(list.chunked(2), key = { row -> row.joinToString("|") { it.idString } }, contentType = { "track_row" }) { rowItems ->
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 rowItems.forEach { track ->
-                                    Box(Modifier.weight(1f)) { LibraryTrack(track, currentTrackId, isPlaying, likedTrackIds, downloadedTrackIds, onToggleLike, onTrackClick) }
+                                    Box(Modifier.weight(1f)) { LibraryTrack(track, currentTrackId, isPlaying, likedTrackIds, downloadedTrackIds, onToggleLike, onRowClick) }
                                 }
                                 if (rowItems.size == 1) Spacer(Modifier.weight(1f))
                             }
@@ -298,7 +333,7 @@ fun LibraryScreen(
                     } else {
                         itemsIndexed(list, key = { _, t -> t.idString }, contentType = { _, _ -> "track" }) { index, track ->
                             Box(Modifier.appearOnce(appearance, track.idString, index)) {
-                                LibraryTrack(track, currentTrackId, isPlaying, likedTrackIds, downloadedTrackIds, onToggleLike, onTrackClick)
+                                LibraryTrack(track, currentTrackId, isPlaying, likedTrackIds, downloadedTrackIds, onToggleLike, onRowClick)
                             }
                         }
                     }
@@ -358,6 +393,89 @@ private fun LibraryTrack(
         onToggleLike = { onToggleLike(track) },
         onClick = { onTrackClick(track.idString) }
     )
+}
+
+/**
+ * "Плейлисты на устройстве": «Мне нравится» and the kept playlists and albums as covers, each with the
+ * "downloaded" mark the track rows use.
+ */
+@Composable
+private fun KeptRow(
+    liked: List<TrackDetailsDto>,
+    kept: List<OfflineCollection>,
+    downloadedTrackIds: Set<String>,
+    onOpenLiked: () -> Unit,
+    onOpen: (OfflineCollection) -> Unit
+) {
+    Column {
+        HiFiSectionHeader(stringResource(R.string.offline_on_device), Modifier.padding(start = 12.dp, top = 6.dp, bottom = 12.dp))
+        androidx.compose.foundation.lazy.LazyRow(
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            if (liked.isNotEmpty()) item(key = "liked") {
+                KeptCard(stringResource(R.string.library_liked), liked.size, cover = null, isLiked = true, onClick = onOpenLiked)
+            }
+            items(kept, key = { it.key }) { collection ->
+                KeptCard(collection.title, collection.trackIds.count { it in downloadedTrackIds }, collection.coverUri, isLiked = false, isAlbum = collection.isAlbum) { onOpen(collection) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean, isAlbum: Boolean = false, onClick: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        Modifier
+            .width(132.dp)
+            .clip(shape)
+            .hifiPress(onClick)
+    ) {
+        Box(
+            Modifier
+                .size(132.dp)
+                .clip(shape)
+                .background(if (isLiked) Brush.linearGradient(listOf(Color(0xFF7A2E3A), HiFi.Love)) else Brush.linearGradient(listOf(HiFi.Placeholder, HiFi.Placeholder)))
+        ) {
+            if (isLiked || cover == null) {
+                Icon(
+                    when {
+                        isLiked -> Icons.Rounded.Favorite
+                        isAlbum -> Icons.Rounded.Album
+                        else -> Icons.AutoMirrored.Rounded.QueueMusic
+                    },
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = if (isLiked) 1f else 0.6f),
+                    modifier = Modifier.align(Alignment.Center).size(40.dp)
+                )
+            } else {
+                coil3.compose.AsyncImage(
+                    model = coil3.request.ImageRequest.Builder(context).cover(cover, CoverSize.Medium).build(),
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x9E0A0B0F)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.DownloadDone, contentDescription = stringResource(R.string.cd_skachan), tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+        Text(title, style = HiFiType.Body.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 9.dp))
+        Text(
+            russianQuantityString(count, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
+            style = HiFiType.Caption, maxLines = 1
+        )
+    }
 }
 
 /** One library section row: metal plaque, title, count, chevron, hairline below. */

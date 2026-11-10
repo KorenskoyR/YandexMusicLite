@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import kotlinx.coroutines.flow.Flow
+import com.korenskoy.yandexmusic.data.download.OfflineState
+import com.korenskoy.yandexmusic.data.download.OfflineCollection
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -43,7 +46,8 @@ data class CatalogPageState(
 class CatalogViewModel @Inject constructor(
     private val repository: CatalogRepository,
     private val playbackController: PlaybackController,
-    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests
+    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests,
+    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
 ) : ViewModel() {
 
     private val _stack = MutableStateFlow<List<CatalogPageState>>(emptyList())
@@ -66,6 +70,21 @@ class CatalogViewModel @Inject constructor(
     }
 
     fun back() = _stack.update { it.dropLast(1) }
+
+    /** An album's download button. */
+    fun offlineState(albumId: String): Flow<OfflineState> = offline.state(OfflineCollection.albumKey(albumId))
+
+    /** Keeps the album on the device. */
+    fun downloadAlbum(album: AlbumDto) {
+        val id = album.idString ?: return
+        if (album.tracks.isEmpty()) return
+        viewModelScope.launch { offline.download(OfflineCollection(OfflineCollection.albumKey(id), album.title.orEmpty(), album.coverUri, album.tracks)) }
+    }
+
+    /** Stops the album's download or takes it off the device. */
+    fun removeAlbumFromDevice(albumId: String) {
+        viewModelScope.launch { offline.remove(OfflineCollection.albumKey(albumId)) }
+    }
 
     fun closeAll() {
         _stack.value = emptyList()
@@ -90,6 +109,7 @@ class CatalogViewModel @Inject constructor(
                     is CatalogPage.Album -> {
                         val album = repository.album(page.id)
                         replace(page) { it.copy(album = album, isLoading = false) }
+                        offline.sync(OfflineCollection.albumKey(page.id), album.title.orEmpty(), album.coverUri, album.tracks)
                     }
                 }
             } catch (e: CancellationException) {

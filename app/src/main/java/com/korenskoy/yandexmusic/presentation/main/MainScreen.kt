@@ -166,7 +166,9 @@ fun MainScreen(
             onOpenArtist = { id, name -> catalogVm.openArtist(id, name) },
             onOpenAlbum = { id, title -> catalogVm.openAlbum(id, title) },
             onPlay = { tracks, trackId, shuffle -> catalogVm.play(tracks, trackId, shuffle) },
-            onToggleLike = { viewModel.toggleLike(it) }
+            onToggleLike = { viewModel.toggleLike(it) },
+            onDownloadAlbum = { catalogVm.downloadAlbum(it) },
+            onRemoveAlbum = { catalogVm.removeAlbumFromDevice(it) }
         )
     }
     // Another tab: the catalog pages belong to where they were opened
@@ -237,13 +239,20 @@ fun MainScreen(
                             modifier = if (isLandscape && tab != MainTab.CAR) Modifier.windowInsetsPadding(sideInsets) else Modifier
                         ) { (_, catalogTop) ->
                         if (catalogTop != null) {
+                            val albumId = (catalogTop.page as? com.korenskoy.yandexmusic.presentation.catalog.CatalogPage.Album)?.id
+                            val albumOffline by remember(albumId) {
+                                albumId?.let(catalogVm::offlineState) ?: kotlinx.coroutines.flow.flowOf(com.korenskoy.yandexmusic.data.download.OfflineState.None)
+                            }.collectAsStateWithLifecycle(com.korenskoy.yandexmusic.data.download.OfflineState.None)
+                            val downloadedIds by viewModel.downloadedTrackIds.collectAsStateWithLifecycle()
                             CatalogPageScreen(
                                 state = catalogTop,
                                 currentTrackId = now.trackId,
                                 isPlaying = isPlaying,
                                 likedTrackIds = likedTrackIds,
                                 contentBottom = contentBottom,
-                                actions = catalogActions
+                                actions = catalogActions,
+                                downloadedTrackIds = downloadedIds,
+                                offline = albumOffline
                             )
                         } else when (tab) {
                             MainTab.HOME -> HomeTab(
@@ -255,7 +264,8 @@ fun MainScreen(
                                 viewModel, accountVm, playlistsVm, updateVm, crashVm, now,
                                 onOpenAccounts = { showAccountDialog = true },
                                 onOpenCrashLog = { showCrashLog = true },
-                                onAddAccount = onNavigateToAuth
+                                onAddAccount = onNavigateToAuth,
+                                onOpenAlbum = { id, title -> catalogVm.openAlbum(id, title) }
                             )
                             MainTab.RADIO -> RadioTab(viewModel, radioVm, now)
                             MainTab.CAR -> CarTab(viewModel, radioVm, now, progress, isLandscape, onExit = { chosenTab = MainTab.HOME })

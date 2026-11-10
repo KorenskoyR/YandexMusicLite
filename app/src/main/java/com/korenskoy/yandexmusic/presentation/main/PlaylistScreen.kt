@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.RemoveOfflineDialog
+import com.korenskoy.yandexmusic.presentation.main.components.OfflineCaption
+import com.korenskoy.yandexmusic.presentation.main.components.OfflineButton
+import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiWideHeader
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.ImageRequest
@@ -135,7 +139,10 @@ fun PlaylistScreen(
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
     onReorder: (shownOrder: List<String>, newOrder: List<String>) -> Unit = { _, _ -> },
-    onSetPublic: (Boolean) -> Unit = {}
+    onSetPublic: (Boolean) -> Unit = {},
+    offline: OfflineState = OfflineState.None,
+    onDownload: () -> Unit = {},
+    onRemoveDownload: () -> Unit = {}
 ) {
     val playlist = opened.playlist
     // Track order being edited (null — normal view); saved as one change with "Done"
@@ -154,6 +161,21 @@ fun PlaylistScreen(
             onConfirm = { onRename(it); renaming = false },
             onDismiss = { renaming = false }
         )
+    }
+    var askRemoveDownload by remember { mutableStateOf(false) }
+    if (askRemoveDownload) {
+        RemoveOfflineDialog(
+            title = playlist.title.orEmpty(),
+            onConfirm = { onRemoveDownload(); askRemoveDownload = false },
+            onDismiss = { askRemoveDownload = false }
+        )
+    }
+    // Downloading needs the list itself: not while it loads, failed or is empty
+    val canDownload = !opened.isLoading && !opened.failed && opened.tracks.isNotEmpty()
+    val offlineButton: @Composable () -> Unit = {
+        if (canDownload || offline != OfflineState.None) {
+            OfflineButton(offline, onDownload = onDownload, onStop = onRemoveDownload, onAskRemove = { askRemoveDownload = true })
+        }
     }
     if (deleting) {
         DeletePlaylistDialog(
@@ -247,6 +269,7 @@ fun PlaylistScreen(
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 14.sp
         )
+        OfflineCaption(offline)
         if (playlist.isPublic) {
             Text(
                 text = stringResource(R.string.playlist_public_badge).uppercase(),
@@ -278,6 +301,7 @@ fun PlaylistScreen(
                             modifier = Modifier.weight(1f)) { onPlay(false) }
                         PlaylistAction(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, enabled = enabled,
                             modifier = Modifier.weight(1f)) { onPlay(true) }
+                        offlineButton()
                     }
                 },
                 trailing = {
@@ -328,6 +352,7 @@ fun PlaylistScreen(
                     modifier = Modifier.weight(1f)) { onPlay(false) }
                 PlaylistAction(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, enabled = enabled,
                     modifier = Modifier.weight(1f)) { onPlay(true) }
+                offlineButton()
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -367,6 +392,7 @@ fun PlaylistScreen(
                             isPlaying = isPlaying && track.idString == currentTrackId,
                             isLiked = likedTrackIds.contains(track.idString),
                             isDownloaded = downloadedTrackIds.contains(track.idString),
+                            isDownloading = (offline as? OfflineState.Downloading)?.currentTrackId == track.idString,
                             onToggleLike = { onToggleLike(track) },
                             onClick = { onTrackClick(track.idString) }
                         )

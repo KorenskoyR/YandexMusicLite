@@ -368,7 +368,6 @@
     <string name="settings_explicit_hint">Пропускать треки 18+ в волне и при переходе к следующему</string>
     <string name="settings_wave_tuning_note">Характер, настроение и язык «Моей волны» — на экране волны.</string>
     <string name="settings_storage_place">Где хранить</string>
-    <string name="settings_storage_internal">Память устройства</string>
     <string name="settings_storage_card">SD-карта</string>
     <string name="settings_storage_card_note">На карте свободно %1$s. Треки на ней зашифрованы и играют только в этом приложении.</string>
     <string name="settings_storage_card_missing">Карта не найдена. Треки с неё вернутся, как только её вставят.</string>
@@ -452,4 +451,28 @@
     <string name="car_next_wave">Далее в волне</string>
     <string name="car_next_track_wave">Далее · волна по треку</string>
     <string name="car_next_play_cd">Включить «%1$s»</string>
+    <string name="settings_car_next">Показывать «Далее»</string>
+    <string name="settings_car_next_hint">Ряд следующих треков под обложкой. Выключите — обложка станет крупнее</string>
+    <string name="offline_notification_title">Скачиваем «%1$s»</string>
+    <string name="offline_download_cd">Скачать на устройство</string>
+    <string name="offline_stop_cd">Скачивается, %1$d из %2$d. Остановить</string>
+    <string name="offline_done_cd">Скачан. Удалить с устройства</string>
+    <string name="offline_downloading">Скачиваем: %1$d из %2$d</string>
+    <string name="offline_downloading_hint">Можно закрыть приложение</string>
+    <string name="offline_done">Скачан · %1$s</string>
+    <string name="offline_partly">Скачано %1$d из %2$d · %3$s</string>
+    <string name="offline_done_hint">Новые треки скачаются сами</string>
+    <string name="offline_remove_title">Удалить «%1$s» с устройства?</string>
+    <string name="offline_remove_text">Он останется в «Моей музыке» и будет играть из сети. Треки из «Мне нравится» и других скачанных плейлистов останутся на устройстве.</string>
+    <string name="offline_remove">Удалить</string>
+    <string name="offline_on_device">Плейлисты на устройстве</string>
+    <string name="offline_all_downloaded">Все скачанные треки</string>
+    <string name="cd_skachivaetsya">Скачивается</string>
+    <string name="settings_storage_internal_short">Память</string>
+    <string name="settings_storage_usb">Флешка</string>
+    <string name="settings_storage_usb_note">%1$s · свободно %2$s. Треки там зашифрованы и играют только в этом приложении.</string>
+    <string name="settings_storage_usb_missing">Флешка с выбранной папкой не вставлена. Треки с неё вернутся, как только её вставят; пока есть связь, они играют из сети. Новое скачивается в память устройства.</string>
+    <string name="settings_storage_usb_no_picker">На этом устройстве нет системного окна выбора папки, поэтому флешку выбрать нельзя.</string>
+    <string name="settings_storage_usb_hint">На флешке: папку выбираете один раз в окне Android.</string>
+    <string name="settings_storage_usb_other">Другая папка</string>
 </resources>

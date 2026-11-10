@@ -69,6 +69,7 @@ fun TrackItem(
     isPlaying: Boolean,
     isLiked: Boolean = false,
     isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
     onClick: () -> Unit,
     onToggleLike: () -> Unit = {},
     onLongClick: () -> Unit = {}
@@ -142,6 +143,14 @@ fun TrackItem(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
+        } else if (isDownloading) {
+            val downloading = stringResource(R.string.cd_skachivaetsya)
+            com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator(
+                size = 16.dp,
+                color = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.semantics { contentDescription = downloading }
+            )
+            Spacer(modifier = Modifier.width(12.dp))
         }
 
         // A 44 dp touch area around the 34 dp glass circle

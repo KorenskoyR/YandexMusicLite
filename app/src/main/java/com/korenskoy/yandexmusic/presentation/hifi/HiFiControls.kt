@@ -242,14 +242,26 @@ fun GlassPillButton(
     }
 }
 
+/**
+ * The capsule's icon and word. Where three buttons share a row (a playlist with its download button, a
+ * small phone) the word shrinks a little instead of being cut, and a very narrow capsule drops the icon.
+ */
 @Composable
 private fun PillLabel(text: String, icon: ImageVector?) {
-    Row(Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
-            Spacer(Modifier.width(8.dp))
+    androidx.compose.foundation.layout.BoxWithConstraints(contentAlignment = Alignment.Center) {
+        val withIcon = icon != null && maxWidth >= 132.dp
+        Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            if (withIcon && icon != null) {
+                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(8.dp))
+            }
+            androidx.compose.foundation.text.BasicText(
+                text,
+                style = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 13.sp, maxFontSize = 16.sp, stepSize = 0.5.sp)
+            )
         }
-        Text(text, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

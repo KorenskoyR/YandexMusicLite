@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.data.download.StorageStatus
+import com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -516,25 +519,7 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
             subtitle = stringResource(R.string.settings_upgrade_downloads_hint),
             onClick = actions.onUpgradeDownloads
         )
-        if (state.storage.cardAvailable || state.storage.onCard) {
-            SegmentedRow(Icons.Rounded.SdCard, stringResource(R.string.settings_storage_place)) {
-                HiFiSegmented(
-                    options = listOf(stringResource(R.string.settings_storage_internal), stringResource(R.string.settings_storage_card)),
-                    selectedIndex = if (state.storage.onCard) 1 else 0,
-                    onSelect = { if (state.storage.moving == null) actions.onDownloadsOnCardChange(it == 1) },
-                    fontSize = 13.sp
-                )
-                Spacer(Modifier.heightIn(min = 10.dp))
-                val moving = state.storage.moving
-                SettingsHint(
-                    when {
-                        moving != null -> stringResource(R.string.settings_storage_moving, moving.first, moving.second)
-                        !state.storage.cardAvailable -> stringResource(R.string.settings_storage_card_missing)
-                        else -> stringResource(R.string.settings_storage_card_note, formatSize(state.storage.cardFreeBytes))
-                    }
-                )
-            }
-        }
+        StoragePlaceRow(state.storage, actions)
         SettingsRow(
             icon = Icons.Rounded.Storage,
             title = stringResource(R.string.settings_storage),
@@ -578,6 +563,7 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
             )
         }
         SwitchRow(Icons.Rounded.Schedule, stringResource(R.string.settings_car_clock), stringResource(R.string.settings_car_clock_hint), state.carClock, actions.onCarClockChange)
+        SwitchRow(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.settings_car_next), stringResource(R.string.settings_car_next_hint), state.carShowNext, actions.onCarShowNextChange)
     }
     SettingsGroup(stringResource(R.string.settings_g_look)) {
         UiScaleRow(state.uiScaleAuto, actions.onUiScaleAutoChange, state.uiScaleManual, actions.onUiScaleManualChange)
@@ -689,4 +675,66 @@ private fun SettingsHint(text: String) {
 @Composable
 private fun SettingsNote(text: String) {
     Text(text, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp))
+}
+
+/**
+ * "Где хранить": the phone's memory, the SD card (when there is one) or a flash drive. A flash drive needs a
+ * folder picked once in the system window; without that window (some head units) it says so.
+ */
+@Composable
+private fun StoragePlaceRow(storage: StorageStatus, actions: SettingsActions) {
+    var noPicker by remember { mutableStateOf(false) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+    ) { tree -> tree?.let(actions.onUsbFolderChosen) }
+    val pickFolder = {
+        try {
+            picker.launch(storage.usbPickerStart)
+        } catch (e: android.content.ActivityNotFoundException) {
+            android.util.Log.w("Settings", "No folder picker", e)
+            noPicker = true
+        }
+    }
+    val withCard = storage.cardAvailable || storage.onCard
+    val places = listOfNotNull(Place.INTERNAL, Place.CARD.takeIf { withCard }, Place.USB)
+    SegmentedRow(Icons.Rounded.SdCard, stringResource(R.string.settings_storage_place)) {
+        HiFiSegmented(
+            options = places.map {
+                stringResource(
+                    when (it) {
+                        Place.INTERNAL -> R.string.settings_storage_internal_short
+                        Place.CARD -> R.string.settings_storage_card
+                        Place.USB -> R.string.settings_storage_usb
+                    }
+                )
+            },
+            selectedIndex = places.indexOf(storage.place).coerceAtLeast(0),
+            onSelect = { index ->
+                val place = places[index]
+                if (storage.moving == null) {
+                    // A drive not there yet (or never picked): the system window asks for the folder first
+                    if (place == Place.USB && !storage.usbAvailable) pickFolder() else actions.onStoragePlaceChange(place)
+                }
+            },
+            fontSize = 13.sp
+        )
+        Spacer(Modifier.heightIn(min = 10.dp))
+        val moving = storage.moving
+        SettingsHint(
+            when {
+                moving != null -> stringResource(R.string.settings_storage_moving, moving.first, moving.second)
+                noPicker -> stringResource(R.string.settings_storage_usb_no_picker)
+                storage.place == Place.USB && !storage.usbAvailable -> stringResource(R.string.settings_storage_usb_missing)
+                storage.place == Place.USB -> stringResource(R.string.settings_storage_usb_note, storage.usbLabel ?: stringResource(R.string.settings_storage_usb), formatSize(storage.usbFreeBytes))
+                storage.place == Place.CARD && !storage.cardAvailable -> stringResource(R.string.settings_storage_card_missing)
+                withCard -> stringResource(R.string.settings_storage_card_note, formatSize(storage.cardFreeBytes))
+                else -> stringResource(R.string.settings_storage_usb_hint)
+            }
+        )
+        if (storage.place == Place.USB && moving == null) {
+            TextButton(onClick = { pickFolder() }) {
+                Text(stringResource(R.string.settings_storage_usb_other), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
 }

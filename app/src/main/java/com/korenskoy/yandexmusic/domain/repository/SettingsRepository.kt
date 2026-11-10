@@ -59,6 +59,10 @@ interface SettingsRepository {
     val carClock: Flow<Boolean>
     suspend fun setCarClock(enabled: Boolean)
 
+    /** «В авто»: the row of what comes next under the cover; off, the cover takes the whole column. */
+    val carShowNext: Flow<Boolean>
+    suspend fun setCarShowNext(enabled: Boolean)
+
     val animationMode: Flow<AnimationMode>
     suspend fun setAnimationMode(value: AnimationMode)
 
@@ -77,6 +81,14 @@ interface SettingsRepository {
     /** Downloads on the removable SD card (encrypted) instead of the internal storage. */
     val downloadsOnSdCard: Flow<Boolean>
     suspend fun setDownloadsOnSdCard(enabled: Boolean)
+
+    /** New downloads go to the folder picked on a USB flash drive (wins over the SD card). */
+    val downloadsOnUsb: Flow<Boolean>
+    suspend fun setDownloadsOnUsb(enabled: Boolean)
+
+    /** The folder on the flash drive picked in the system window (a tree uri); null until one was. */
+    val usbFolder: Flow<String?>
+    suspend fun setUsbFolder(uri: String?)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3

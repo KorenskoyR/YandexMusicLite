@@ -150,6 +150,10 @@ class SettingsRepositoryImpl @Inject constructor(
     override val carClock = carClockPref.first
     override suspend fun setCarClock(enabled: Boolean) = carClockPref.second(enabled)
 
+    private val carShowNextPref = bool("car_show_next", true)
+    override val carShowNext = carShowNextPref.first
+    override suspend fun setCarShowNext(enabled: Boolean) = carShowNextPref.second(enabled)
+
     private val animationPref = choice("animation_mode", AnimationMode.AUTO)
     override val animationMode = animationPref.first
     override suspend fun setAnimationMode(value: AnimationMode) = animationPref.second(value)
@@ -169,4 +173,14 @@ class SettingsRepositoryImpl @Inject constructor(
     private val sdCardPref = bool("downloads_on_sd_card", false)
     override val downloadsOnSdCard = sdCardPref.first
     override suspend fun setDownloadsOnSdCard(enabled: Boolean) = sdCardPref.second(enabled)
+
+    private val usbPref = bool("downloads_on_usb", false)
+    override val downloadsOnUsb = usbPref.first
+    override suspend fun setDownloadsOnUsb(enabled: Boolean) = usbPref.second(enabled)
+
+    private val USB_FOLDER_KEY = stringPreferencesKey("usb_folder")
+    override val usbFolder: Flow<String?> = context.dataStore.data.map { it[USB_FOLDER_KEY] }
+    override suspend fun setUsbFolder(uri: String?) {
+        context.dataStore.edit { if (uri == null) it.remove(USB_FOLDER_KEY) else it[USB_FOLDER_KEY] = uri }
+    }
 }

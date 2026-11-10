@@ -51,6 +51,9 @@ class MusicService : MediaLibraryService() {
     @Inject
     lateinit var reactions: TrackReactions
 
+    @Inject
+    lateinit var equalizer: SystemEqualizer
+
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: AudioManager? = null
@@ -81,6 +84,8 @@ class MusicService : MediaLibraryService() {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 hasAudioFocus = true
                 playerRepository.setDucked(false)
+                // The alert or the call is over: an equalizer that lost the session gets it back now
+                equalizer.announce()
                 if (wasPlayingBeforeTransientLoss) {
                     wasPlayingBeforeTransientLoss = false
                     playbackController.play()
@@ -130,6 +135,9 @@ class MusicService : MediaLibraryService() {
                 }
             }
         }
+
+        // Equalizer apps hear about the session again whenever the sound comes back
+        equalizer.keepAnnounced(serviceScope, playerRepository.isPlaying, playerRepository.currentTrackId, playerRepository.activePlayerState)
 
         // Dynamically update MediaLibrarySession when active player swaps
         serviceScope.launch {
@@ -454,6 +462,7 @@ class MusicService : MediaLibraryService() {
         AppPresence.playerServiceRunning = false
         serviceScope.cancel()
         abandonSystemAudioFocus()
+        equalizer.close()
         mediaLibrarySession?.run {
             removeSession(this)
             release()

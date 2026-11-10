@@ -34,7 +34,8 @@ class TrackReactions @Inject constructor(
     private val playbackController: PlaybackController,
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -64,7 +65,8 @@ class TrackReactions @Inject constructor(
         libraryRepository.setLiked(track, like) { ok ->
             if (!ok) return@setLiked
             scope.launch {
-                if (!like) downloadManager.removeTrack(trackId)
+                // A track of a kept playlist stays on the device without the like
+                if (!like) { if (!offline.keepsFile(trackId)) downloadManager.removeTrack(trackId) }
                 else if (settingsRepository.autoDownloadLikedTracks.first()) downloadScheduler.downloadTrack(trackId)
             }
         }
@@ -78,7 +80,7 @@ class TrackReactions @Inject constructor(
         }
         libraryRepository.dislike(track)
         playbackController.onTrackDisliked(track.idString)
-        scope.launch { downloadManager.removeTrack(track.idString) }
+        scope.launch { if (!offline.keepsFile(track.idString)) downloadManager.removeTrack(track.idString) }
     }
 
     private suspend fun flushPendingReactions() {

@@ -84,6 +84,12 @@ class CardStorage(
     val cardUsable: Boolean
         get() = cardTracksDir() != null && key() != null
 
+    /** An encrypted track to read: a file on the card, or a document on a flash drive. */
+    fun openSeekable(uri: Uri): SeekableBytes = when (uri.scheme) {
+        "content" -> SeekableBytes.of(requireNotNull(context.contentResolver.openFileDescriptor(uri, "r")) { "No document $uri" })
+        else -> SeekableBytes.of(RandomAccessFile(File(requireNotNull(uri.path)), "r"))
+    }
+
     companion object {
         const val TAG = "CardStorage"
         const val EXTENSION = "enc"
@@ -98,7 +104,10 @@ class CardStorage(
         }
 
         /** Reads an encrypted file from [position] (of the plain content) on. */
-        fun decrypting(key: ByteArray, file: RandomAccessFile, position: Long): CipherReader {
+        fun decrypting(key: ByteArray, file: RandomAccessFile, position: Long): CipherReader = decrypting(key, SeekableBytes.of(file), position)
+
+        /** The same for any seekable source: a file, or a document on a flash drive. */
+        fun decrypting(key: ByteArray, file: SeekableBytes, position: Long): CipherReader {
             val iv = ByteArray(IV_BYTES)
             file.seek(0)
             file.readFully(iv)
@@ -114,10 +123,19 @@ class CardStorage(
 
         fun plainLength(file: File): Long = (file.length() - IV_BYTES).coerceAtLeast(0L)
 
+        fun plainLength(encryptedBytes: Long): Long = (encryptedBytes - IV_BYTES).coerceAtLeast(0L)
+
         /** The whole plain content, for moving a track back to the internal storage. */
-        fun decryptingStream(key: ByteArray, file: File): InputStream {
-            val raf = RandomAccessFile(file, "r")
-            val reader = decrypting(key, raf, 0)
+        fun decryptingStream(key: ByteArray, file: File): InputStream = decryptingStream(key, SeekableBytes.of(RandomAccessFile(file, "r")))
+
+        /** The same from any seekable source; closing the stream closes [source]. */
+        fun decryptingStream(key: ByteArray, source: SeekableBytes): InputStream {
+            val reader = try {
+                decrypting(key, source, 0)
+            } catch (e: Exception) {
+                source.close()
+                throw e
+            }
             return object : InputStream() {
                 override fun read(): Int {
                     val one = ByteArray(1)
@@ -125,12 +143,12 @@ class CardStorage(
                 }
 
                 override fun read(b: ByteArray, off: Int, len: Int): Int = reader.read(b, off, len)
-                override fun close() = raf.close()
+                override fun close() = source.close()
             }
         }
     }
 
-    class CipherReader(private val file: RandomAccessFile, private val cipher: Cipher) {
+    class CipherReader(private val file: SeekableBytes, private val cipher: Cipher) {
         private val buffer = ByteArray(16 * 1024)
 
         fun read(target: ByteArray, offset: Int, length: Int): Int {
@@ -190,6 +208,13 @@ class CardAwareDataSourceFactory(private val upstream: DataSource.Factory, priva
     override fun createDataSource(): DataSource = Router(upstream.createDataSource(), card)
 
     private class Router(private val other: DataSource, private val card: CardStorage) : DataSource {
+        /** "<id>.enc": a file on the card, or a document on a flash drive (its id ends with the name). */
+        private fun isEncrypted(uri: Uri): Boolean = when (uri.scheme) {
+            "file" -> uri.path?.endsWith(".${CardStorage.EXTENSION}") == true
+            "content" -> uri.lastPathSegment?.endsWith(".${CardStorage.EXTENSION}") == true
+            else -> false
+        }
+
         private var active: DataSource? = null
         private val listeners = mutableListOf<androidx.media3.datasource.TransferListener>()
 
@@ -199,8 +224,7 @@ class CardAwareDataSourceFactory(private val upstream: DataSource.Factory, priva
         }
 
         override fun open(dataSpec: DataSpec): Long {
-            val path = dataSpec.uri.takeIf { it.scheme == "file" }?.path
-            val source = if (path != null && path.endsWith(".${CardStorage.EXTENSION}")) {
+            val source = if (isEncrypted(dataSpec.uri)) {
                 EncryptedFileDataSource(card).also { encrypted -> listeners.forEach(encrypted::addTransferListener) }
             } else other
             active = source
@@ -222,7 +246,7 @@ class CardAwareDataSourceFactory(private val upstream: DataSource.Factory, priva
 
 @OptIn(UnstableApi::class)
 internal class EncryptedFileDataSource(private val card: CardStorage) : BaseDataSource(false) {
-    private var file: RandomAccessFile? = null
+    private var file: SeekableBytes? = null
     private var reader: CardStorage.CipherReader? = null
     private var uri: Uri? = null
     private var remaining = 0L
@@ -232,13 +256,16 @@ internal class EncryptedFileDataSource(private val card: CardStorage) : BaseData
         uri = dataSpec.uri
         transferInitializing(dataSpec)
         val key = card.key() ?: throw DataSourceException(androidx.media3.common.PlaybackException.ERROR_CODE_IO_NO_PERMISSION)
-        val f = File(requireNotNull(dataSpec.uri.path))
-        val length = CardStorage.plainLength(f)
-        if (dataSpec.position > length) throw DataSourceException(androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
         val raf = try {
-            RandomAccessFile(f, "r")
-        } catch (e: java.io.IOException) {
+            card.openSeekable(dataSpec.uri)
+        } catch (e: Exception) {
+            // The card or the flash drive was taken out
             throw DataSourceException(e, androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND)
+        }
+        val length = CardStorage.plainLength(raf.length)
+        if (dataSpec.position > length) {
+            raf.close()
+            throw DataSourceException(androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
         }
         file = raf
         reader = CardStorage.decrypting(key, raf, dataSpec.position)

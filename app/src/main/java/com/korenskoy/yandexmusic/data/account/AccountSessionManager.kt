@@ -35,7 +35,9 @@ class AccountSessionManager @Inject constructor(
     private val playlistsRepository: UserPlaylistsRepository,
     private val cacheManager: PlaylistCacheManager,
     private val downloadManager: TrackDownloadManager,
-    private val downloadScheduler: DownloadScheduler
+    private val downloadScheduler: DownloadScheduler,
+    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads,
+    private val offlineSync: com.korenskoy.yandexmusic.data.download.OfflineSync
 ) {
     /** Syncs outlive any screen. */
     private val scope = CoroutineScope(
@@ -61,6 +63,8 @@ class AccountSessionManager @Inject constructor(
         scope.launch {
             playlistsRepository.loadCached()
             playlistsRepository.refresh()
+            // Kept playlists follow what changed on the server
+            offlineSync.refreshAll()
         }
         playbackController.primeWave()
     }
@@ -134,7 +138,10 @@ class AccountSessionManager @Inject constructor(
         if (authRepository.getActiveAccount()?.uid == uid) logoutCurrent() else authRepository.removeAccount(uid)
     }
 
-    /** Drops the active user's cached lists and downloaded tracks no other saved account has liked, then reloads. */
+    /**
+     * Drops the active user's cached lists and downloaded tracks (kept playlists included) no other saved
+     * account has liked, then reloads.
+     */
     suspend fun clearMusicCache() {
         withContext(Dispatchers.IO) {
             val activeUid = authRepository.getActiveAccount()?.uid
@@ -142,7 +149,10 @@ class AccountSessionManager @Inject constructor(
             val protectedTrackIds = authRepository.getAllAccounts()
                 .filter { it.uid != activeUid }
                 .flatMapTo(mutableSetOf()) { other -> cacheManager.loadLikedTracks(other.folderName).map { it.idString } }
-            libraryRepository.likedTracks.value.map { it.idString }
+            val kept = offline.keptTrackIds()
+            offline.forgetAll()
+            (libraryRepository.likedTracks.value.map { it.idString } + kept)
+                .distinct()
                 .filterNot { it in protectedTrackIds }
                 .forEach { downloadManager.removeTrack(it) }
         }

@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.data.download.OfflineState
+import com.korenskoy.yandexmusic.data.download.OfflineCollection
+import com.korenskoy.yandexmusic.presentation.car.CAR_NEXT_COUNT
 import com.korenskoy.yandexmusic.data.player.PlaybackQueue
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -156,9 +159,12 @@ internal fun LibraryTab(
     onOpenAccounts: () -> Unit,
     onOpenCrashLog: () -> Unit,
     onAddAccount: () -> Unit,
+    onOpenAlbum: (id: String, title: String) -> Unit = { _, _ -> },
     settingsVm: SettingsViewModel = hiltViewModel()
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val downloadedTracks by viewModel.downloadedTracks.collectAsStateWithLifecycle()
+    val offlineCollections by viewModel.offlineCollections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val loadFailed by viewModel.libraryLoadFailed.collectAsStateWithLifecycle()
     val downloadState by viewModel.downloadAllState.collectAsStateWithLifecycle()
@@ -173,6 +179,10 @@ internal fun LibraryTab(
     val crashReports by crashVm.reports.collectAsStateWithLifecycle()
     val userPlaylists by playlistsVm.playlists.collectAsStateWithLifecycle()
     val openedPlaylist by playlistsVm.opened.collectAsStateWithLifecycle()
+    val openedKey = openedPlaylist?.playlist?.let(OfflineCollection::keyOf)
+    val openedOffline by remember(openedKey) {
+        openedPlaylist?.playlist?.let(playlistsVm::offlineState) ?: kotlinx.coroutines.flow.flowOf(OfflineState.None)
+    }.collectAsStateWithLifecycle(OfflineState.None)
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (viewModel.tracks.value.isEmpty()) viewModel.loadLikedTracks()
@@ -212,6 +222,9 @@ internal fun LibraryTab(
             onSwipeToCloseChange = settingsVm::setSwipeToClose,
             onSteeringWheelChange = settingsVm::setSteeringWheelOnLeft,
             onCarClockChange = settingsVm::setCarClock,
+            onCarShowNextChange = settingsVm::setCarShowNext,
+            onStoragePlaceChange = settingsVm::setStoragePlace,
+            onUsbFolderChosen = settingsVm::useUsbFolder,
             onUiScaleAutoChange = settingsVm::setUiScaleAuto,
             onUiScaleManualChange = settingsVm::setUiScaleManual,
             onAnimationModeChange = settingsVm::setAnimationMode
@@ -248,7 +261,17 @@ internal fun LibraryTab(
         onRenamePlaylist = { playlist, title -> playlistsVm.rename(playlist, title) },
         onDeletePlaylist = { playlistsVm.delete(it) },
         onReorderPlaylist = { playlist, shown, new -> playlistsVm.reorder(playlist, shown, new) },
-        onSetPlaylistPublic = { playlist, public -> playlistsVm.setPublic(playlist, public) }
+        onSetPlaylistPublic = { playlist, public -> playlistsVm.setPublic(playlist, public) },
+        openedOffline = openedOffline,
+        onDownloadPlaylist = { playlistsVm.downloadOpened() },
+        onRemovePlaylistDownload = { playlistsVm.removeOpenedFromDevice() },
+        downloadedTracks = downloadedTracks,
+        offlineCollections = offlineCollections,
+        onDownloadedTrackClick = { id -> viewModel.playTrack(id, downloadedTracks, PlaylistSource.LIBRARY) },
+        onOpenCollection = { kept ->
+            if (kept.isAlbum) onOpenAlbum(kept.itemId, kept.title)
+            else userPlaylists.firstOrNull { OfflineCollection.keyOf(it) == kept.key }?.let { playlistsVm.open(it) }
+        }
     )
 }
 
@@ -291,6 +314,7 @@ internal fun CarTab(
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
     val showClock by viewModel.carClock.collectAsStateWithLifecycle()
+    val showNext by viewModel.carShowNext.collectAsStateWithLifecycle()
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
@@ -298,7 +322,7 @@ internal fun CarTab(
     // What will really play next, by the player's own rule (explicit passed over, a playlist goes on from its start)
     val upcoming = remember(queue, now.trackId, now.source, skipExplicit, track?.isRadio) {
         if (track == null || track.isRadio) emptyList()
-        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, 3) { skipExplicit && it.isExplicit }
+        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, CAR_NEXT_COUNT) { skipExplicit && it.isExplicit }
     }
     CarScreen(
         currentTrack = track,
@@ -327,6 +351,7 @@ internal fun CarTab(
         source = now.source,
         isBuffering = now.isBuffering,
         showClock = showClock,
+        showNext = showNext,
         waveTuning = waveTuning,
         trackWaveSeed = waveSeed,
         onWaveTuningChange = viewModel::setWaveTuning,

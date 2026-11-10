@@ -38,7 +38,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean)
-    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean)
+    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val next: Boolean = true)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(val reserveMb: Int, val reserveUsed: Long, val autoDownload: Boolean, val cacheBytes: Long)
 
@@ -48,8 +48,9 @@ class SettingsViewModel @Inject constructor(
     ) { (compatible, crossfade, normalize), (start, bluetooth, explicit) -> Sound(compatible, crossfade, normalize, start, bluetooth, explicit) }
 
     private val look: Flow<Look> = combine(
-        settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look
-    )
+        combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
+        settings.carShowNext
+    ) { look, next -> look.copy(next = next) }
 
     private val scale: Flow<Scale> = combine(settings.uiScaleAuto, settings.uiScaleManual, settings.animationMode, ::Scale)
 
@@ -76,6 +77,7 @@ class SettingsViewModel @Inject constructor(
             swipeToCloseMiniPlayer = l.swipe,
             steeringWheelOnLeft = l.left,
             carClock = l.clock,
+            carShowNext = l.next,
             uiScaleAuto = sc.auto,
             uiScaleManual = sc.manual,
             animationMode = sc.animations
@@ -116,11 +118,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setDownloadsOnCard(onCard: Boolean) = storage.moveTo(onCard)
+    fun setStoragePlace(place: com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place) = storage.moveTo(place)
+    fun useUsbFolder(tree: android.net.Uri) = storage.useUsbFolder(tree)
     fun setStartPage(value: StartPage) = save { setStartPage(value) }
     fun setExpandPlayer(enabled: Boolean) = save { setExpandPlayerOnPlay(enabled) }
     fun setSwipeToClose(enabled: Boolean) = save { setSwipeToCloseMiniPlayer(enabled) }
     fun setSteeringWheelOnLeft(onLeft: Boolean) = save { setSteeringWheelOnLeft(onLeft) }
     fun setCarClock(enabled: Boolean) = save { setCarClock(enabled) }
+    fun setCarShowNext(enabled: Boolean) = save { setCarShowNext(enabled) }
     fun setUiScaleAuto(enabled: Boolean) = save { setUiScaleAuto(enabled) }
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }

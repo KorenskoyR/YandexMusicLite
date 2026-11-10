@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.flow.Flow
+import com.korenskoy.yandexmusic.data.download.OfflineState
+import com.korenskoy.yandexmusic.data.download.OfflineCollection
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -35,7 +38,8 @@ class PlaylistsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: UserPlaylistsRepository,
     private val playbackController: PlaybackController,
-    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests
+    private val playRequests: com.korenskoy.yandexmusic.data.player.PlayRequests,
+    private val offline: com.korenskoy.yandexmusic.data.download.OfflineDownloads
 ) : ViewModel() {
 
     val playlists: StateFlow<List<UserPlaylistDto>> = repository.playlists
@@ -77,8 +81,30 @@ class PlaylistsViewModel @Inject constructor(
                 OpenedPlaylist(playlist, isLoading = false, failed = true, failReason = failureReason(e))
             }
             if (_opened.value?.playlist?.kindString == playlist.kindString) _opened.value = loaded
+            if (!loaded.failed) offline.sync(OfflineCollection.keyOf(playlist), playlist.title.orEmpty(), playlist.coverUri, loaded.tracks)
         }
     }
+
+    // region On the device
+
+    /** The opened playlist's download button. */
+    fun offlineState(playlist: UserPlaylistDto): Flow<OfflineState> = offline.state(OfflineCollection.keyOf(playlist))
+
+    /** Keeps the opened playlist on the device: its tracks are downloaded, and new ones follow. */
+    fun downloadOpened() {
+        val opened = _opened.value?.takeIf { !it.isLoading && !it.failed && it.tracks.isNotEmpty() } ?: return
+        viewModelScope.launch {
+            offline.download(OfflineCollection(OfflineCollection.keyOf(opened.playlist), opened.playlist.title.orEmpty(), opened.playlist.coverUri, opened.tracks))
+        }
+    }
+
+    /** Stops the download, or takes the playlist off the device (it stays in the library). */
+    fun removeOpenedFromDevice() {
+        val playlist = _opened.value?.playlist ?: return
+        viewModelScope.launch { offline.remove(OfflineCollection.keyOf(playlist)) }
+    }
+
+    // endregion
 
     fun close() {
         openJob?.cancel()
