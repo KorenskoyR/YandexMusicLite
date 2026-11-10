@@ -70,4 +70,14 @@ class DownloadOncePerTrackTest {
         assertEquals(3, requests.get())
         assertTrue("tracks do not wait for each other", mostAtOnce.get() > 1)
     }
+
+    @Test
+    fun aFileGoneBehindTheAppsBackStopsCountingAsDownloaded() = runBlocking {
+        val downloads = TrackDownloadManager(context, OkHttpClient.Builder().addInterceptor(server).build())
+        assertTrue(downloads.downloadTrack("7", "https://example.com/7"))
+        File(context.filesDir, "tracks/7.mp3").delete()
+        assertTrue(downloads.isKnownDownloaded("7"))
+        assertEquals(null, downloads.localTrackUri("7"))
+        assertTrue(!downloads.isKnownDownloaded("7"))
+    }
 }

@@ -173,6 +173,18 @@ class UsbStorageTest {
     }
 
     @Test
+    fun aDriveGoneWithoutAWordIsNoticedWhenItsTrackIsAskedFor() = runBlocking {
+        val downloads = TrackDownloadManager(context, client, card(), usb())
+        assertTrue(downloads.downloadTrack("11", "https://example.com/11"))
+        // Taken out, and nobody told the app
+        FakeDrive.root.resolve("YandexMusicLite").renameTo(File(FakeDrive.root, "elsewhere"))
+        assertTrue("still listed", downloads.isKnownDownloaded("11"))
+
+        assertNull(downloads.localTrackUri("11"))
+        assertFalse("the list was read again: the track plays from the network now", downloads.isKnownDownloaded("11"))
+    }
+
+    @Test
     fun removingATrackDeletesItFromTheDrive() = runBlocking {
         val downloads = TrackDownloadManager(context, client, card(), usb())
         downloads.downloadTrack("4", "https://example.com/4")

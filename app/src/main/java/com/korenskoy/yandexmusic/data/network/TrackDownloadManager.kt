@@ -124,8 +124,12 @@ class TrackDownloadManager @Inject constructor(
      */
     fun localTrackUri(trackId: String): String? {
         getLocalTrackFile(trackId)?.let { return android.net.Uri.fromFile(it).toString() }
-        val onUsb = usbFiles[trackId] ?: return null
-        return onUsb.uri.toString().takeIf { usb?.present == true }
+        val onUsb = usbFiles[trackId]?.takeIf { usb?.present == true }
+        if (onUsb != null) return onUsb.uri.toString()
+        // Listed as downloaded, but not there: the card or the drive went without the system saying so.
+        // The list is read again, so the track counts as not downloaded and plays from the network.
+        if (trackId in _downloadedTrackIds.value) updateCacheStats()
+        return null
     }
 
     /** Main-thread friendly check against the in-memory index (no disk access). */
