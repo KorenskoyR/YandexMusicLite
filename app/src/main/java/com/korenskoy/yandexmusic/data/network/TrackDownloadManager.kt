@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.network
 
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 import com.korenskoy.yandexmusic.data.download.CardStorage
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -142,6 +144,21 @@ class TrackDownloadManager @Inject constructor(
         url: String,
         quality: TrackPreloadManager.StreamQuality? = null,
         replace: Boolean = false
+    ): Boolean {
+        // One download per track: several jobs may want it at once (all liked, the like just given, a playlist,
+        // the quality upgrade), and they would write the same temporary file together. The others wait and
+        // find the finished file.
+        // The locks stay in the map: dropping one while a job is about to take it would let two in again
+        return trackLocks.getOrPut(trackId) { Mutex() }.withLock { downloadNow(trackId, url, quality, replace) }
+    }
+
+    private val trackLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+
+    private suspend fun downloadNow(
+        trackId: String,
+        url: String,
+        quality: TrackPreloadManager.StreamQuality?,
+        replace: Boolean
     ): Boolean = withContext(Dispatchers.IO) {
         if (!replace && isTrackDownloaded(trackId)) return@withContext true
 
