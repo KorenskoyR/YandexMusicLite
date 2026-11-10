@@ -83,12 +83,15 @@ class UsbFolderInstrumentedTest {
         }
         compose.onNodeWithText("Флешка").performScrollTo().performClick()
 
-        // The system window, opened on the drive: the folder, "use this folder", "allow"
-        assertNotNull("The folder picker did not open on the drive", device.wait(Until.findObject(By.text("YandexMusicLite")), 15_000))
-        device.findObject(By.text("YandexMusicLite")).click()
-        device.wait(Until.findObject(By.textContains("USE THIS FOLDER").clickable(true)), 10_000)?.click()
-            ?: device.wait(Until.findObject(By.textContains("Use this folder")), 5_000)!!.click()
-        (device.wait(Until.findObject(By.text("ALLOW")), 10_000) ?: device.wait(Until.findObject(By.text("Allow")), 5_000))!!.click()
+        // The system window, opened on the drive: the folder, "use this folder", "allow". A folder kept from an
+        // earlier run is used as it is, without the window: the app asks only once
+        if (!storage.state.value.usbChosen || !storage.state.value.usbAvailable) {
+            assertNotNull("The folder picker did not open on the drive", device.wait(Until.findObject(By.text("YandexMusicLite")), 15_000))
+            device.findObject(By.text("YandexMusicLite")).click()
+            device.wait(Until.findObject(By.textContains("USE THIS FOLDER").clickable(true)), 10_000)?.click()
+                ?: device.wait(Until.findObject(By.textContains("Use this folder")), 5_000)!!.click()
+            (device.wait(Until.findObject(By.text("ALLOW")), 10_000) ?: device.wait(Until.findObject(By.text("Allow")), 5_000))!!.click()
+        }
 
         // Kept, moved, encrypted
         waitFor(30_000) { storage.state.value.onUsb && storage.state.value.moving == null && !File(context.filesDir, "tracks/$id.mp3").exists() }
