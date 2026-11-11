@@ -171,6 +171,10 @@ class SettingsRepositoryImpl @Inject constructor(
     override val skipExplicit = explicitPref.first
     override suspend fun setSkipExplicit(enabled: Boolean) = explicitPref.second(enabled)
 
+    private val aiPref = bool("skip_ai", false)
+    override val skipAi = aiPref.first
+    override suspend fun setSkipAi(enabled: Boolean) = aiPref.second(enabled)
+
     private val smoothPref = bool("smooth_playback", true)
     override val smoothPlayback = smoothPref.first
     override suspend fun setSmoothPlayback(enabled: Boolean) = smoothPref.second(enabled)

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
+import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Download
@@ -422,14 +424,19 @@ internal fun TitleRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = track.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { stringResource(if (track.isRadio) R.string.car_source_radio else R.string.player_unknown_artist) },
-                color = Color.White.copy(alpha = 0.70f),
-                fontSize = if (compact) 15.sp else 17.sp,
-                lineHeight = 22.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            val aiMark = rememberAiMark(track)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { stringResource(if (track.isRadio) R.string.car_source_radio else R.string.player_unknown_artist) },
+                    color = Color.White.copy(alpha = 0.70f),
+                    fontSize = if (compact) 15.sp else 17.sp,
+                    lineHeight = 22.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (aiMark != null) AiChip(Modifier.padding(start = 8.dp), fontSize = 11.sp, height = 20.dp, horizontal = 7.dp)
+            }
         }
         }
         // A station, or the user's own file: nothing to keep, add or start a wave from

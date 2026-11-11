@@ -598,4 +598,10 @@
     <string name="voice_device_phone">«%1$s» — играет музыка с телефона</string>
     <string name="voice_device_sd">«%1$s» — играет музыка с карты</string>
     <string name="voice_device_flash">«%1$s» — играет музыка с флешки</string>
+    <!-- Music made with AI -->
+    <string name="ai_mark">ИИ</string>
+    <string name="ai_mark_cd">Создан с использованием ИИ</string>
+    <string name="ai_menu_source">По данным Яндекс Музыки</string>
+    <string name="settings_skip_ai">Пропускать музыку, созданную ИИ</string>
+    <string name="settings_skip_ai_hint">Треки, которые Яндекс отметил как созданные с использованием ИИ, не включаются сами</string>
 </resources>

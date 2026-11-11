@@ -79,6 +79,10 @@ interface SettingsRepository {
     val skipExplicit: Flow<Boolean>
     suspend fun setSkipExplicit(enabled: Boolean)
 
+    /** Tracks Yandex marks as made (wholly or partly) with AI do not play by themselves. Off by default. */
+    val skipAi: Flow<Boolean>
+    suspend fun setSkipAi(enabled: Boolean)
+
     /** "Не прерывать музыку": on an uneven link, copies from the cache and a light stream instead of stops. */
     val smoothPlayback: Flow<Boolean>
     suspend fun setSmoothPlayback(enabled: Boolean)

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
+import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -248,8 +250,10 @@ private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onCli
                 }
                 Text(
                     track.artists.joinToString { it.name ?: "" },
-                    color = Color.White.copy(alpha = 0.64f), fontSize = u.sp(17f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis
+                    color = Color.White.copy(alpha = 0.64f), fontSize = u.sp(17f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                if (rememberAiMark(track) != null) AiChip(Modifier.padding(start = u(10f)), fontSize = u.sp(12f), height = u(22f), horizontal = u(8f))
             }
         }
     }

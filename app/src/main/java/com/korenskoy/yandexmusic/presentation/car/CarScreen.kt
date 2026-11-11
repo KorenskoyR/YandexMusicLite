@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
+import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.material.icons.rounded.Mic
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
@@ -782,14 +784,19 @@ private fun DriverPanel(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = u(6f))
                 )
-                Text(
-                    if (shown?.isRadio == true) stringResource(R.string.mini_player_live) else shown?.artists?.joinToString { it.name ?: "" }.orEmpty(),
-                    color = Color.White.copy(alpha = 0.72f),
-                    fontSize = u.sp(26f),
-                    lineHeight = u.sp(32f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val aiMark = rememberAiMark(shown)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (shown?.isRadio == true) stringResource(R.string.mini_player_live) else shown?.artists?.joinToString { it.name ?: "" }.orEmpty(),
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = u.sp(26f),
+                        lineHeight = u.sp(32f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (aiMark != null) AiChip(Modifier.padding(start = u(12f)), fontSize = u.sp(15f), height = u(28f), horizontal = u(10f))
+                }
             }
         }
 

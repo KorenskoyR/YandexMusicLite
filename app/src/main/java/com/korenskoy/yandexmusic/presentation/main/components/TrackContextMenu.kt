@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
+import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.Download
 import com.korenskoy.yandexmusic.data.download.TrackOfflineState
@@ -181,6 +183,26 @@ fun TrackContextMenu(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)
             )
+            // What Yandex says about AI in this track, word for word
+            val aiMark = rememberAiMark(track)
+            if (aiMark != null && !picking) {
+                Row(
+                    Modifier
+                        .padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AiChip(fontSize = 11.sp, height = 22.dp, horizontal = 7.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(aiMark, color = Color.White.copy(alpha = 0.86f), fontSize = 14.sp, lineHeight = 19.sp)
+                        Text(stringResource(R.string.ai_menu_source), color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, lineHeight = 16.sp)
+                    }
+                }
+            }
 
             if (picking) {
                 LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {

@@ -144,6 +144,18 @@ data class TrackDetailsDto(
         get() = (albums.firstOrNull()?.id as? JsonPrimitive)?.content
 }
 
+/** A track's credits: lines like "Исполнитель — Кино", "Использование ИИ — Трек полностью создан с использованием ИИ". */
+@Serializable
+data class TrackCreditsDto(
+    @SerialName("credits") val credits: List<CreditDto> = emptyList()
+)
+
+@Serializable
+data class CreditDto(
+    @SerialName("title") val title: String? = null,
+    @SerialName("value") val value: String? = null
+)
+
 /** Loudness measured by the service (EBU R128): integrated loudness in LUFS and true peak in dBTP. */
 @Serializable
 data class R128Dto(

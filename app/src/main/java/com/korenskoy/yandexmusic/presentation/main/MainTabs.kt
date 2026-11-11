@@ -52,10 +52,10 @@ data class NowPlaying(
     val waveActive: Boolean get() = source == PlaylistSource.VIBE && track != null
 }
 
-/** The tracks after the current one (at most [limit]). Pure; unit-tested. */
-fun upcomingOf(queue: List<TrackDetailsDto>, currentId: String?, limit: Int = 10): List<TrackDetailsDto> {
+/** The tracks after the current one (at most [limit]), without those [passOver] rejects. Pure; unit-tested. */
+fun upcomingOf(queue: List<TrackDetailsDto>, currentId: String?, limit: Int = 10, passOver: (TrackDetailsDto) -> Boolean = { false }): List<TrackDetailsDto> {
     val index = queue.indexOfFirst { it.idString == currentId }
-    return if (index < 0) emptyList() else queue.drop(index + 1).take(limit)
+    return if (index < 0) emptyList() else queue.drop(index + 1).filterNot(passOver).take(limit)
 }
 
 @Composable
@@ -70,8 +70,11 @@ internal fun HomeTab(
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val wavePreview by viewModel.wavePreview.collectAsStateWithLifecycle()
     val isFetchingWave by viewModel.isFetchingMoreQueue.collectAsStateWithLifecycle()
-    val upcoming = remember(queue, now.trackId) { upcomingOf(queue, now.trackId) }
-    val shelf = remember(now.waveActive, upcoming, wavePreview) { waveShelfOf(now.waveActive, upcoming, wavePreview) }
+    val skipAi by viewModel.skipAi.collectAsStateWithLifecycle()
+    val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
+    val upcoming = remember(queue, now.trackId, skipAi, aiMarks) { upcomingOf(queue, now.trackId, passOver = { skipAi && it.idString in aiMarks }) }
+    val preview = remember(wavePreview, skipAi, aiMarks) { if (skipAi) wavePreview.filterNot { it.idString in aiMarks } else wavePreview }
+    val shelf = remember(now.waveActive, upcoming, preview) { waveShelfOf(now.waveActive, upcoming, preview) }
     val waveActive = now.waveActive
     val tuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val seed by viewModel.waveSeed.collectAsStateWithLifecycle()
@@ -324,14 +327,18 @@ internal fun CarTab(
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
+    val skipAi by viewModel.skipAi.collectAsStateWithLifecycle()
+    val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
     val deviceMusic by viewModel.carDeviceMusic.collectAsStateWithLifecycle()
     // Said in the car, played at once: no list to pick from while driving
     val voice = rememberVoiceInput { phrase -> viewModel.playByVoice(phrase) }
     val track = now.track
     // What will really play next, by the player's own rule (explicit passed over, a playlist goes on from its start)
-    val upcoming = remember(queue, now.trackId, now.source, skipExplicit, track?.isRadio) {
+    val upcoming = remember(queue, now.trackId, now.source, skipExplicit, skipAi, aiMarks, track?.isRadio) {
         if (track == null || track.isRadio) emptyList()
-        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, CAR_QUEUE_LIMIT) { skipExplicit && it.isExplicit }
+        else PlaybackQueue.upcoming(queue, queue.indexOfFirst { it.idString == now.trackId }, now.source, CAR_QUEUE_LIMIT) {
+            (skipExplicit && it.isExplicit) || (skipAi && it.idString in aiMarks)
+        }
     }
     CarScreen(
         currentTrack = track,
@@ -421,6 +428,7 @@ internal fun settingsHost(
             onStartMusicChange = settingsVm::setStartMusic,
             onBluetoothAutoplayChange = settingsVm::setBluetoothAutoplay,
             onSkipExplicitChange = settingsVm::setSkipExplicit,
+            onSkipAiChange = settingsVm::setSkipAi,
             onReserveChange = settingsVm::setReserveMb,
             onClearReserve = settingsVm::clearReserve,
             onAutoDownloadChange = settingsVm::setAutoDownload,

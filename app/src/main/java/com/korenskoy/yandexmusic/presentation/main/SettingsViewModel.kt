@@ -50,7 +50,7 @@ class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean, val equalizer: Boolean)
+    private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean, val equalizer: Boolean, val ai: Boolean = false)
 
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
     private val equalizerFound = MutableStateFlow(false)
@@ -68,8 +68,9 @@ class SettingsViewModel @Inject constructor(
     private val sound: Flow<Sound> = combine(
         combine(soundMode.compatible, settings.crossfadeSeconds, settings.normalizeVolume, ::Triple),
         combine(settings.startMusic, settings.bluetoothAutoplay, settings.skipExplicit, ::Triple),
-        equalizerFound
-    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq -> Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq) }
+        equalizerFound,
+        settings.skipAi
+    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq, ai -> Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq, ai) }
 
     private val look: Flow<Look> = combine(
         combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
@@ -95,6 +96,7 @@ class SettingsViewModel @Inject constructor(
             startMusic = s.startMusic,
             bluetoothAutoplay = s.bluetooth,
             skipExplicit = s.explicit,
+            skipAi = s.ai,
             reserveMb = lib.reserveMb,
             reserveUsedBytes = lib.reserveUsed,
             autoDownload = lib.autoDownload,
@@ -151,6 +153,7 @@ class SettingsViewModel @Inject constructor(
     fun setStartMusic(value: StartMusic) = save { setStartMusic(value) }
     fun setBluetoothAutoplay(enabled: Boolean) = save { setBluetoothAutoplay(enabled) }
     fun setSkipExplicit(enabled: Boolean) = save { setSkipExplicit(enabled) }
+    fun setSkipAi(enabled: Boolean) = save { setSkipAi(enabled) }
     fun setReserveMb(megabytes: Int) = save { setRoadReserveMb(megabytes) }
     fun clearReserve() {
         viewModelScope.launch { roadReserve.clear() }

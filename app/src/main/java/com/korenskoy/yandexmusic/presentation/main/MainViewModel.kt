@@ -6,6 +6,7 @@ import retrofit2.HttpException
 import java.io.IOException
 import android.util.Log
 import com.korenskoy.yandexmusic.data.player.VoiceSearch
+import com.korenskoy.yandexmusic.data.ai.AiMarks
 import com.korenskoy.yandexmusic.data.player.VoicePhrase
 import com.korenskoy.yandexmusic.data.local.LocalMusicRepository
 import com.korenskoy.yandexmusic.data.local.LocalRules
@@ -89,7 +90,8 @@ class MainViewModel @Inject constructor(
     private val offline: OfflineDownloads,
     private val voiceSearch: VoiceSearch,
     albums: LikedAlbumsRepository,
-    private val localMusic: LocalMusicRepository
+    private val localMusic: LocalMusicRepository,
+    private val ai: AiMarks
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -482,6 +484,13 @@ class MainViewModel @Inject constructor(
     /** Opens the full player when the user starts music, if the setting asks for it. */
     val openPlayerRequests: Flow<Unit> = playRequests.userStarted
         .filter { settingsRepository.expandPlayerOnPlay.first() }
+
+    /** Tracks Yandex marks as made with AI: id → its words. Shown always; passed over when [skipAi] is on. */
+    val aiMarks: StateFlow<Map<String, String>> = ai.marks
+    val skipAi: StateFlow<Boolean> = settingsRepository.skipAi
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun wantAiMark(trackId: String) = ai.want(trackId)
+    fun unwantAiMark(trackId: String) = ai.unwant(trackId)
 
     /** "Без ненормативной лексики": what is shown as coming next leaves out what will be passed over. */
     val skipExplicit: StateFlow<Boolean> = settingsRepository.skipExplicit

@@ -50,6 +50,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import com.korenskoy.yandexmusic.presentation.hifi.LocalAiMarks
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -219,11 +220,14 @@ fun MainScreen(
     val showMini = currentTrack != null && currentTab != MainTab.CAR && !(currentTab == MainTab.HOME && now.waveActive)
     val snackbar = remember { SnackbarHostState() }
     val openPlayer = { isPlayerExpanded = true }
+    val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
+    val aiMarksUi = remember(aiMarks) { com.korenskoy.yandexmusic.presentation.hifi.AiMarksUi(aiMarks, viewModel::wantAiMark, viewModel::unwantAiMark) }
 
     CompositionLocalProvider(
         LocalStreamQuality provides streamQuality,
         LocalLinkState provides linkState,
         LocalTrackMenu provides trackMenuLauncher,
+        LocalAiMarks provides aiMarksUi,
         LocalHiFiLite provides lite,
         LocalArtworkTint provides appTint
     ) {

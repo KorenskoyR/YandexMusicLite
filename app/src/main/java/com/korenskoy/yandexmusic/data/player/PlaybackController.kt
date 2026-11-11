@@ -14,6 +14,7 @@ import com.korenskoy.yandexmusic.domain.model.WaveTuning
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.korenskoy.yandexmusic.utils.prefetchCovers
 import com.korenskoy.yandexmusic.utils.CoverSize
+import com.korenskoy.yandexmusic.data.ai.AiMarks
 import com.korenskoy.yandexmusic.data.local.LocalArtProvider
 import com.korenskoy.yandexmusic.data.local.LocalMusicRepository
 import com.korenskoy.yandexmusic.data.reserve.RoadReserve
@@ -85,7 +86,8 @@ class PlaybackController @Inject constructor(
     private val networkMonitor: NetworkMonitor,
     private val reserve: RoadReserve,
     private val journal: PlaybackJournal,
-    private val localMusic: LocalMusicRepository
+    private val localMusic: LocalMusicRepository,
+    private val aiMarks: AiMarks
 ) {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
@@ -141,6 +143,11 @@ class PlaybackController @Inject constructor(
 
     // Declared before the wave and the init blocks below: both may read them at once
     private val skipExplicit = settingsRepository.skipExplicit.stateIn(scope, SharingStarted.Eagerly, false)
+    private val skipAi = settingsRepository.skipAi.stateIn(scope, SharingStarted.Eagerly, false)
+    /** The current track was picked by the user, not reached by the queue: a mark never takes it away. */
+    private var currentChosen = true
+    /** A track already left because its mark came after it started: never left twice. */
+    private var leftForMark: String? = null
     private val smoothOn = settingsRepository.smoothPlayback.stateIn(scope, SharingStarted.Eagerly, true)
 
     /** Whether the link is uneven: the music waited for data mid-track. */
@@ -189,7 +196,7 @@ class PlaybackController @Inject constructor(
         recent = recentPlayedTrackIds,
         isOffline = ::isOffline,
         userFolder = { activeUserFolder },
-        keep = { !(skipExplicit.value && it.isExplicit) },
+        keep = { !(skipExplicit.value && it.isExplicit) && !(skipAi.value && aiMarks.isAi(it.idString)) },
         // Appended to the queue as it is now: tracks the user removed or moved stay that way
         onFresh = { fresh ->
             if (_currentSource.value == PlaylistSource.VIBE) {
@@ -311,6 +318,7 @@ class PlaybackController @Inject constructor(
             .launchIn(scope)
 
         watchTheSteadiness()
+        watchAiMarks()
         keepWaveShelfFilled()
         watchTheLink()
         reserveKeeper.start()
@@ -343,9 +351,21 @@ class PlaybackController @Inject constructor(
         playlist: List<TrackDetailsDto>,
         source: PlaylistSource? = null,
         crossfade: Boolean = true,
-        startPositionMs: Long = 0L
+        startPositionMs: Long = 0L,
+        /** Picked by the user (a row, a search, the voice); false when the queue moves on by itself. */
+        chosen: Boolean = true
     ) {
         val track = playlist.find { it.idString == trackId } ?: return
+        if (!chosen && skippedOnTheWay(track)) {
+            // Reached by the queue though it is to be passed over (its mark came late): the next that is not
+            val index = playlist.indexOf(track)
+            val next = PlaybackQueue.nextMatching(playlist, index) { !skippedOnTheWay(it) }
+            if (next != null && playlist[next].idString != trackId) {
+                playTrack(playlist[next].idString, playlist, source, crossfade, 0L, chosen = false)
+                return
+            }
+        }
+        currentChosen = chosen
         startRequestId++
         waitingForConnection = false
         // A context chosen on purpose: there is nothing to go back to any more
@@ -403,7 +423,7 @@ class PlaybackController @Inject constructor(
         val waveList = wave.tracks.value
         val unplayed = wave.firstUnplayed()
         if (unplayed != null) {
-            playTrack(unplayed.idString, waveList, PlaylistSource.VIBE)
+            playTrack(unplayed.idString, waveList, PlaylistSource.VIBE, chosen = false)
             if (waveList.size < 30) wave.fetchMore()
             return
         }
@@ -415,7 +435,7 @@ class PlaybackController @Inject constructor(
             if (request != startRequestId) return@fetchMore
             val list = wave.tracks.value
             if (list.isNotEmpty()) {
-                playTrack(list.first().idString, list, PlaylistSource.VIBE)
+                playTrack(list.first().idString, list, PlaylistSource.VIBE, chosen = false)
             } else {
                 _isStarting.value = false
                 showMessage(context.getString(R.string.msg_wave_load_failed))
@@ -483,7 +503,7 @@ class PlaybackController @Inject constructor(
         }
     }
 
-    fun playNext(isAuto: Boolean = false) {
+    fun playNext(isAuto: Boolean = false, sendFeedback: Boolean = true) {
         val current = _currentTrack.value
         if (current == null) {
             val playlist = _currentPlaylist.value
@@ -497,7 +517,7 @@ class PlaybackController @Inject constructor(
         if (returnFromOfflineMix()) return
 
         val currentId = current.idString
-        if (_currentSource.value == PlaylistSource.VIBE) {
+        if (_currentSource.value == PlaylistSource.VIBE && sendFeedback) {
             val playedSeconds = progress.value / 1000.0
             sendRotorFeedback(if (isAuto) "trackFinished" else "skip", currentId, playedSeconds)
         }
@@ -505,7 +525,7 @@ class PlaybackController @Inject constructor(
         val playlist = _currentPlaylist.value
         val currentIndex = playlist.indexOfFirst { it.idString == currentId }
         when (val action = PlaybackQueue.nextAction(playlist, currentIndex, _currentSource.value, ::skippedOnTheWay)) {
-            is NextAction.PlayIndex -> playTrack(playlist[action.index].idString, playlist)
+            is NextAction.PlayIndex -> playTrack(playlist[action.index].idString, playlist, chosen = false)
             NextAction.FetchMoreWave -> {
                 if (isOffline()) {
                     skipToNextOnDevice(current)
@@ -520,8 +540,8 @@ class PlaybackController @Inject constructor(
                     val following = PlaybackQueue.nextMatching(updated, newIndex) { !skippedOnTheWay(it) }
                         ?: (newIndex + 1).takeIf { newIndex != -1 && it < updated.size }
                     when {
-                        following != null -> playTrack(updated[following].idString, updated)
-                        updated.isNotEmpty() -> playTrack(updated.first().idString, updated)
+                        following != null -> playTrack(updated[following].idString, updated, chosen = false)
+                        updated.isNotEmpty() -> playTrack(updated.first().idString, updated, chosen = false)
                         else -> playAllLikedTracks()
                     }
                 }
@@ -781,7 +801,29 @@ class PlaybackController @Inject constructor(
     fun cancelSleepTimer() = sleep.cancel()
 
     /** "Without explicit lyrics": such tracks are passed over on the way; a track the user picks still plays. */
-    private fun skippedOnTheWay(track: TrackDetailsDto): Boolean = skipExplicit.value && track.isExplicit
+    private fun skippedOnTheWay(track: TrackDetailsDto): Boolean =
+        (skipExplicit.value && track.isExplicit) || (skipAi.value && aiMarks.isAi(track.idString))
+
+    /**
+     * Marks are asked for what plays and what comes next, and for what the wave will play; when a mark arrives for
+     * a track that has started by itself, it is left at once (the queue's own next, no "skip" sent to the wave).
+     */
+    private fun watchAiMarks() {
+        combine(_currentTrack, _currentPlaylist, wave.preview) { track, queue, preview ->
+            val index = queue.indexOfFirst { it.idString == track?.idString }
+            val upcoming = if (index < 0) emptyList() else queue.drop(index + 1).take(AI_LOOK_AHEAD)
+            // The last wish is asked first: the playing track, then the next ones, then the wave's preview
+            (preview.take(AI_LOOK_AHEAD) + upcoming.reversed() + listOfNotNull(track)).filterNot { it.isLocal || it.isRadio }.map { it.idString }
+        }.distinctUntilChanged().onEach { aiMarks.want(it) }.launchIn(scope)
+        combine(aiMarks.marks, skipAi, _currentTrack) { marks, on, track -> Triple(marks, on, track) }
+            .onEach { (marks, on, track) ->
+                // Only a track the queue reached by itself, marked while it has just begun, and never twice
+                val marked = track?.takeIf { on && marks.containsKey(it.idString) } ?: return@onEach
+                if (currentChosen || leftForMark == marked.idString || progress.value > AI_LATE_LEAVE_MS) return@onEach
+                leftForMark = marked.idString
+                playNext(sendFeedback = false)
+            }.launchIn(scope)
+    }
 
     private fun onTrackEnded() {
         // With crossfade the end is announced a few seconds early: the timer fades out over that tail
@@ -909,7 +951,7 @@ class PlaybackController @Inject constructor(
             }
             if (request != startRequestId) return@launch
             if (next != null) {
-                playTrack(next.idString, queue)
+                playTrack(next.idString, queue, chosen = false)
             } else {
                 _isStarting.value = false
                 playerRepository.stop()
@@ -1159,7 +1201,7 @@ class PlaybackController @Inject constructor(
         }
         val index = point.queue.indexOfFirst { it.idString == point.leftTrackId }
         val next = point.queue.getOrNull(index + 1) ?: point.queue.firstOrNull() ?: return false
-        playTrack(next.idString, point.queue, point.source)
+        playTrack(next.idString, point.queue, point.source, chosen = false)
         return true
     }
 
@@ -1313,7 +1355,7 @@ class PlaybackController @Inject constructor(
         }
         // Coming from a mix already, the place to go back to stays what it was
         val point = returnPoint ?: leaving
-        playTrack(mix.first().idString, mix, PlaylistSource.LIBRARY)
+        playTrack(mix.first().idString, mix, PlaylistSource.LIBRARY, chosen = false)
         returnPoint = point
     }
 
@@ -1328,7 +1370,7 @@ class PlaybackController @Inject constructor(
         val queue = _currentPlaylist.value
         val start = queue.indexOfFirst { it.idString == from.idString }
         val next = PlaybackQueue.nextMatching(queue, start) { isOnDevice(it) }
-        if (next != null) playTrack(queue[next].idString, queue) else playOfflineMix(ReturnPoint(_currentSource.value, queue, from.idString))
+        if (next != null) playTrack(queue[next].idString, queue, chosen = false) else playOfflineMix(ReturnPoint(_currentSource.value, queue, from.idString))
     }
 
     private fun prepareNextTrackInQueue() {
@@ -1530,6 +1572,10 @@ class PlaybackController @Inject constructor(
         private const val LINK_STALL_MS = 6_000L
         /** The cache fills only while the playing track has this much in hand. */
         const val RESERVE_HEADROOM_MS = 20_000L
+        /** How many tracks ahead the AI marks are asked for. */
+        private const val AI_LOOK_AHEAD = 5
+        /** A mark that comes later than this into a track no longer takes it away: it has been heard. */
+        private const val AI_LATE_LEAVE_MS = 20_000L
         private const val STEADY_CHECK_MS = 30_000L
         private const val LIGHT_URL_TTL_MS = 30 * 60_000L
         private const val SERVER_CHECK_INTERVAL_MS = 30_000L

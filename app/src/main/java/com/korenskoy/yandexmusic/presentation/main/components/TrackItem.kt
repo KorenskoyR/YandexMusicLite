@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
+import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
@@ -128,12 +130,17 @@ fun TrackItem(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = track.artists.joinToString { it.name ?: "" }.ifEmpty { stringResource(R.string.player_unknown_artist) },
-                style = HiFiType.Caption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            val aiMark = rememberAiMark(track)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.artists.joinToString { it.name ?: "" }.ifEmpty { stringResource(R.string.player_unknown_artist) },
+                    style = HiFiType.Caption,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (aiMark != null) AiChip(Modifier.padding(start = 7.dp))
+            }
         }
 
         if (isDownloaded) {
