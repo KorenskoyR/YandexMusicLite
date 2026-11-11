@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import com.korenskoy.yandexmusic.data.repository.LikedAlbumsRepository
+import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.download.OfflineDownloads
 import com.korenskoy.yandexmusic.data.player.PlayRequests
 import kotlinx.coroutines.flow.Flow
@@ -49,8 +56,38 @@ class CatalogViewModel @Inject constructor(
     private val repository: CatalogRepository,
     private val playbackController: PlaybackController,
     private val playRequests: PlayRequests,
-    private val offline: OfflineDownloads
+    private val offline: OfflineDownloads,
+    private val likedAlbums: LikedAlbumsRepository
 ) : ViewModel() {
+
+    /** Albums in the collection, for the heart on an album page. */
+    val likedAlbumIds: StateFlow<Set<String>> = likedAlbums.albums
+        .map { list -> list.mapNotNullTo(mutableSetOf()) { it.idString } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    private val _messages = MutableSharedFlow<Int>(extraBufferCapacity = 2)
+
+    /** String resources to show in the snackbar. */
+    val messages: SharedFlow<Int> = _messages
+
+    /**
+     * The heart on an album page: into the collection or out of it, at once on the screen and then on the
+     * server, so the official app shows the same. A refusal puts the heart back and says so.
+     */
+    fun toggleAlbumLike(album: AlbumDto) {
+        val id = album.idString ?: return
+        val liked = id !in likedAlbums.albums.value.mapNotNull { it.idString }
+        viewModelScope.launch {
+            try {
+                likedAlbums.setLiked(album, liked)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("CatalogViewModel", "Album $id not ${if (liked) "added" else "removed"}", e)
+                _messages.tryEmit(R.string.album_like_failed)
+            }
+        }
+    }
 
     private val _stack = MutableStateFlow<List<CatalogPageState>>(emptyList())
     val stack: StateFlow<List<CatalogPageState>> = _stack.asStateFlow()

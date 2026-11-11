@@ -15,12 +15,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '21' # Robolectric screenshot tests for SDK 35 need Java 21
           distribution: 'temurin'
@@ -42,7 +42,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Scan for leaked secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -74,22 +74,16 @@ jobs:
           cp app/build/outputs/apk/release/*.apk release_artifacts/YandexMusicLite.apk
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release_artifacts/YandexMusicLite.apk
           generate_release_notes: false
           name: Yandex Music Lite ${{ github.ref_name }}
           body: |
-            ### Yandex Music Lite ${{ github.ref_name }}
-
-            Что нового:
-            Версия по итогам полной проверки приложения: новых функций нет, исправлены редкие ошибки.
-            • ⬇️ Один трек больше не скачивается двумя задачами сразу (общая загрузка, автозагрузка после лайка, плейлист) — файл не может получиться битым.
-            • 💾 Карту или флешку вынули, а система об этом не сообщила — трек играет из сети, а не выдаёт ошибку.
-            • 🔁 После переноса на новое устройство или восстановления из резервной копии хранение на карте и флешке снова работает, а скачанные плейлисты не начинают качаться заново сами.
-            • 🔠 Крупный шрифт в настройках Android больше не обрезает подписи в «В авто» и кнопки в плейлисте.
-            • ⬆️ Закрыли окно обновления — загрузка файла останавливается.
-            • 🔒 Сетевой кэш очищается при смене аккаунта; токен отправляется только на серверы Яндекса.
+            • 💿 Альбомы и сохранённые плейлисты
+            • 🔄 Библиотека обновляется без перезапуска
+            • 🎛 Нет запинки с эквалайзером, настройки волны заметнее
+            • 🛠 Исправления по итогам полной проверки
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

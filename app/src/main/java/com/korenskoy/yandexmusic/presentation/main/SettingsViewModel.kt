@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import android.net.Uri
 import com.korenskoy.yandexmusic.data.download.DownloadStorage
 import com.korenskoy.yandexmusic.data.player.SystemEqualizer
@@ -41,15 +43,19 @@ class SettingsViewModel @Inject constructor(
     private val equalizer: SystemEqualizer
 ) : ViewModel() {
 
-    private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean)
+    private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean, val equalizer: Boolean)
+
+    /** Whether an equalizer is on the device; asked again each time the sound settings open. */
+    private val equalizerFound = MutableStateFlow(false)
     private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(val reserveMb: Int, val reserveUsed: Long, val autoDownload: Boolean, val cacheBytes: Long)
 
     private val sound: Flow<Sound> = combine(
         combine(soundMode.compatible, settings.crossfadeSeconds, settings.normalizeVolume, ::Triple),
-        combine(settings.startMusic, settings.bluetoothAutoplay, settings.skipExplicit, ::Triple)
-    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit) -> Sound(compatible, crossfade, normalize, start, bluetooth, explicit) }
+        combine(settings.startMusic, settings.bluetoothAutoplay, settings.skipExplicit, ::Triple),
+        equalizerFound
+    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq -> Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq) }
 
     private val look: Flow<Look> = combine(
         combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
@@ -67,7 +73,7 @@ class SettingsViewModel @Inject constructor(
             compatibleSound = s.compatible,
             crossfadeSeconds = s.crossfade,
             normalizeVolume = s.normalize,
-            equalizerAvailable = equalizer.available,
+            equalizerAvailable = s.equalizer,
             startMusic = s.startMusic,
             bluetoothAutoplay = s.bluetooth,
             skipExplicit = s.explicit,
@@ -102,6 +108,14 @@ class SettingsViewModel @Inject constructor(
     fun setCrossfade(seconds: Int) = save { setCrossfadeSeconds(seconds) }
     fun setNormalizeVolume(enabled: Boolean) = save { setNormalizeVolume(enabled) }
     fun openEqualizer() = equalizer.open()
+
+    fun refreshEqualizer() {
+        viewModelScope.launch(Dispatchers.Default) { equalizerFound.value = equalizer.isAvailable() }
+    }
+
+    init {
+        refreshEqualizer()
+    }
     fun setStartMusic(value: StartMusic) = save { setStartMusic(value) }
     fun setBluetoothAutoplay(enabled: Boolean) = save { setBluetoothAutoplay(enabled) }
     fun setSkipExplicit(enabled: Boolean) = save { setSkipExplicit(enabled) }

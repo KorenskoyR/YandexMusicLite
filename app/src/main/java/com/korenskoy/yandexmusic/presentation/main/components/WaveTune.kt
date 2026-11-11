@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Waves
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -238,14 +240,14 @@ private fun TuneChip(text: String, selected: Boolean, height: Dp, fontSize: Text
             .heightIn(min = height)
             .clip(shape)
             .then(
-                if (selected) Modifier.background(Brush.radialGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))).border(1.dp, Color(0x8CC9CED8), shape)
+                if (selected) Modifier.background(PickedFill).border(1.dp, HiFi.OnMetal, shape)
                 else Modifier.background(Color.White.copy(alpha = 0.06f)).border(1.dp, Color.White.copy(alpha = 0.14f), shape)
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = height * 0.38f),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (selected) Color.White else Color.White.copy(alpha = 0.82f), fontSize = fontSize, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
+        TuneLabel(text, selected, fontSize, Color.White.copy(alpha = 0.82f))
     }
 }
 
@@ -268,23 +270,43 @@ private fun TuneStrip(options: List<String>, selected: Int, onSelect: (Int) -> U
             val shape = RoundedCornerShape(inner / 2)
             Box(
                 Modifier
-                    .weight(option.length + 3f)
+                    // Room for the tick, so a picked word is not cut
+                    .weight(option.length + 4.5f)
                     .fillMaxHeight()
                     .clip(shape)
-                    .then(if (on) Modifier.background(Brush.radialGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))).border(1.dp, Color(0x8CC9CED8), shape) else Modifier)
+                    .then(if (on) Modifier.background(PickedFill).border(1.dp, HiFi.OnMetal, shape) else Modifier)
                     .selectable(selected = on, role = Role.RadioButton) { onSelect(index) },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    option,
-                    color = if (on) Color.White else Color.White.copy(alpha = 0.74f),
-                    fontSize = fontSize,
-                    fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                TuneLabel(option, on, fontSize, Color.White.copy(alpha = 0.74f))
             }
         }
+    }
+}
+
+/**
+ * A picked option is filled with light metal, its word dark and ticked: an outline alone melts into the dark
+ * sheet at a glance from a moving car.
+ */
+private val PickedFill = Brush.verticalGradient(listOf(HiFi.OnMetal, HiFi.SteelEdge))
+private val PickedText = Color(0xFF0B0D12)
+
+@Composable
+private fun TuneLabel(text: String, picked: Boolean, fontSize: TextUnit, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (picked) {
+            val tick = with(LocalDensity.current) { fontSize.toDp() }
+            Icon(Icons.Rounded.Check, contentDescription = null, tint = PickedText, modifier = Modifier.size(tick + 2.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(
+            text,
+            color = if (picked) PickedText else color,
+            fontSize = fontSize,
+            fontWeight = if (picked) FontWeight.ExtraBold else FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

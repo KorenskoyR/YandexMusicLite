@@ -56,6 +56,33 @@ interface YandexMusicApi {
         @Path("userId") userId: String
     ): ResponseWrapper<List<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>>
 
+    /** Albums in the collection, newest first; with [rich] each one comes whole, without it only ids. */
+    @GET("users/{userId}/likes/albums")
+    suspend fun getLikedAlbums(
+        @Path("userId") userId: String,
+        @retrofit2.http.Query("rich") rich: Boolean
+    ): ResponseWrapper<List<com.korenskoy.yandexmusic.data.dto.LikedAlbumDto>>
+
+    /** Other people's playlists saved to the collection. */
+    @GET("users/{userId}/likes/playlists")
+    suspend fun getLikedPlaylists(
+        @Path("userId") userId: String
+    ): ResponseWrapper<List<com.korenskoy.yandexmusic.data.dto.LikedPlaylistDto>>
+
+    @retrofit2.http.POST("users/{userId}/likes/albums/add-multiple")
+    @retrofit2.http.FormUrlEncoded
+    suspend fun likeAlbum(
+        @Path("userId") userId: String,
+        @retrofit2.http.Field("album-ids") albumIds: String
+    ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
+
+    @retrofit2.http.POST("users/{userId}/likes/albums/remove")
+    @retrofit2.http.FormUrlEncoded
+    suspend fun unlikeAlbum(
+        @Path("userId") userId: String,
+        @retrofit2.http.Field("album-ids") albumIds: String
+    ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
+
     @GET("users/{userId}/playlists/{kind}")
     suspend fun getUserPlaylist(
         @Path("userId") userId: String,

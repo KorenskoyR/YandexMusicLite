@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
+import com.korenskoy.yandexmusic.data.dto.AlbumDto
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,24 @@ class PlaylistCacheManager @Inject constructor(
     suspend fun loadUserPlaylists(userFolder: String): List<UserPlaylistDto> =
         getValue(sanitizeUserFolder(userFolder), USER_PLAYLISTS)
             ?.let { runCatching { json.decodeFromString<List<UserPlaylistDto>>(it) }.getOrNull() }
+            .orEmpty()
+
+    /** Other people's playlists saved to the collection. */
+    suspend fun saveSavedPlaylists(userFolder: String, playlists: List<UserPlaylistDto>) =
+        putValue(sanitizeUserFolder(userFolder), SAVED_PLAYLISTS, json.encodeToString(playlists))
+
+    suspend fun loadSavedPlaylists(userFolder: String): List<UserPlaylistDto> =
+        getValue(sanitizeUserFolder(userFolder), SAVED_PLAYLISTS)
+            ?.let { runCatching { json.decodeFromString<List<UserPlaylistDto>>(it) }.getOrNull() }
+            .orEmpty()
+
+    /** Albums in the collection, without their tracks. */
+    suspend fun saveLikedAlbums(userFolder: String, albums: List<AlbumDto>) =
+        putValue(sanitizeUserFolder(userFolder), LIKED_ALBUMS, json.encodeToString(albums))
+
+    suspend fun loadLikedAlbums(userFolder: String): List<AlbumDto> =
+        getValue(sanitizeUserFolder(userFolder), LIKED_ALBUMS)
+            ?.let { runCatching { json.decodeFromString<List<AlbumDto>>(it) }.getOrNull() }
             .orEmpty()
 
     /** Tracks of one playlist, stored with the revision they belong to; an older revision is replaced. */
@@ -252,6 +271,8 @@ class PlaylistCacheManager @Inject constructor(
         const val POPULAR = "popular"
         const val LIKES_REVISION = "likes_revision"
         const val USER_PLAYLISTS = "user_playlists"
+        const val SAVED_PLAYLISTS = "saved_playlists"
+        const val LIKED_ALBUMS = "liked_albums"
         val LEGACY_PLAYLIST = Regex("""playlist_(.+)_(\d+)\.json""")
 
         fun playlistList(kind: String) = "playlist:$kind"

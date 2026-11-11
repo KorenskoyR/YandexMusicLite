@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.flow.map
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.compose.animation.ContentTransform
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalContext
@@ -130,11 +132,18 @@ fun MainScreen(
     val streamQuality by viewModel.streamQuality.collectAsStateWithLifecycle()
     val linkState by viewModel.linkState.collectAsStateWithLifecycle()
     val catalogStack by catalogVm.stack.collectAsStateWithLifecycle()
+    val likedAlbumIds by catalogVm.likedAlbumIds.collectAsStateWithLifecycle()
     val radioStations by radioVm.stations.collectAsStateWithLifecycle()
     // Progress ticks 10× a second: the State is handed out as `{ progressState.value }` and read only where
     // it is drawn, so nothing here recomposes on a tick
     val progressState = viewModel.progress.collectAsStateWithLifecycle()
     val progress = remember(progressState) { { progressState.value } }
+
+    // The library keeps up with the official app while the app is on the screen
+    LifecycleStartEffect(viewModel) {
+        viewModel.onAppShown()
+        onStopOrDispose { viewModel.onAppHidden() }
+    }
 
     val now = NowPlaying(currentTrack, isPlaying, isBuffering, currentSource, likedTrackIds)
 
@@ -175,7 +184,8 @@ fun MainScreen(
             onPlay = { tracks, trackId, shuffle -> catalogVm.play(tracks, trackId, shuffle) },
             onToggleLike = { viewModel.toggleLike(it) },
             onDownloadAlbum = { catalogVm.downloadAlbum(it) },
-            onRemoveAlbum = { catalogVm.removeAlbumFromDevice(it) }
+            onRemoveAlbum = { catalogVm.removeAlbumFromDevice(it) },
+            onToggleAlbumLike = { catalogVm.toggleAlbumLike(it) }
         )
     }
     // Another tab: the catalog pages belong to where they were opened
@@ -259,7 +269,8 @@ fun MainScreen(
                                 contentBottom = contentBottom,
                                 actions = catalogActions,
                                 downloadedTrackIds = downloadedIds,
-                                offline = albumOffline
+                                offline = albumOffline,
+                                albumLiked = catalogTop.album?.idString?.let { it in likedAlbumIds } == true
                             )
                         } else when (tab) {
                             MainTab.HOME -> HomeTab(
@@ -366,14 +377,14 @@ fun MainScreen(
 
                 // Playback and playlist errors ("no connection", "station unavailable"), above the mini-player
                 val lifecycleOwner = LocalLifecycleOwner.current
+                val resources = LocalResources.current
                 LaunchedEffect(lifecycleOwner) {
                     // Collected only while visible, so a message raised in the background falls back to a toast
                     lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                        merge(viewModel.playbackMessages, playlistsVm.messages).collect { snackbar.showSnackbar(it) }
+                        merge(viewModel.playbackMessages, playlistsVm.messages, catalogVm.messages.map { resources.getString(it) }).collect { snackbar.showSnackbar(it) }
                     }
                 }
                 // A wave by a track has started: say so, and offer to undo it
-                val resources = LocalResources.current
                 val undoLabel = stringResource(com.korenskoy.yandexmusic.R.string.action_undo)
                 LaunchedEffect(lifecycleOwner) {
                     lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {

@@ -55,6 +55,8 @@ data class SettingsActions(
     val onCrossfadeChange: (Int) -> Unit = {},
     val onNormalizeVolumeChange: (Boolean) -> Unit = {},
     val onOpenEqualizer: () -> Unit = {},
+    /** The sound settings opened: look for an equalizer again. */
+    val onRefreshEqualizer: () -> Unit = {},
     val onStartMusicChange: (StartMusic) -> Unit = {},
     val onBluetoothAutoplayChange: (Boolean) -> Unit = {},
     val onSkipExplicitChange: (Boolean) -> Unit = {},

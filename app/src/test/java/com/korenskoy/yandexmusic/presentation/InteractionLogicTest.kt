@@ -3,6 +3,7 @@ package com.korenskoy.yandexmusic.presentation
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.player.PlaybackQueue
 import com.korenskoy.yandexmusic.data.player.SessionButtons
+import com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager
 import com.korenskoy.yandexmusic.presentation.update.UpdatePolicy
 import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.utils.toCoverUrl
@@ -128,6 +129,30 @@ class InteractionLogicTest {
         assertTrue("a newer one", UpdatePolicy.offerOnLaunch("1.9.4", skipped = "1.9.3", silent = true))
         assertTrue("asked for in Settings", UpdatePolicy.offerOnLaunch("1.9.3", skipped = "1.9.3", silent = false))
         assertTrue("nothing skipped", UpdatePolicy.offerOnLaunch("1.9.3", skipped = null, silent = true))
+    }
+
+    @Test
+    fun releaseNotesShowWithoutMarkdownMarks() {
+        val cleaned = GitHubUpdateManager.cleanChangelog(
+            "### Yandex Music Lite v1.13.1\n\nЧто нового:\n• один\n## Подробнее\n**жирный** текст"
+        )
+        assertEquals("Что нового:\n• один\nПодробнее\nжирный текст", cleaned)
+    }
+
+    @Test
+    fun aFinishedCheckNeverLeavesCheckingBehind() {
+        fun status(available: String? = null, upToDate: Boolean = false, error: String? = null, skipped: String? = null, silent: Boolean = false) =
+            UpdatePolicy.statusAfterCheck(available, upToDate, error, skipped, silent)
+        // Asked for in Settings: the offer shows in its window, the line is cleared (it said "Проверяем…" for good)
+        assertEquals(UpdatePolicy.Status.Clear, status(available = "1.14.0"))
+        assertEquals(UpdatePolicy.Status.Latest, status(upToDate = true))
+        // A failed check says so instead of "Проверяем…" forever
+        assertEquals(UpdatePolicy.Status.Failed("HTTP 403"), status(error = "HTTP 403"))
+        // At launch nothing is written, except that a skipped version is there
+        assertEquals(UpdatePolicy.Status.Keep, status(upToDate = true, silent = true))
+        assertEquals(UpdatePolicy.Status.Keep, status(error = "HTTP 403", silent = true))
+        assertEquals(UpdatePolicy.Status.Keep, status(available = "1.14.0", silent = true))
+        assertEquals(UpdatePolicy.Status.Skipped("1.14.0"), status(available = "1.14.0", skipped = "1.14.0", silent = true))
     }
 
     @Test

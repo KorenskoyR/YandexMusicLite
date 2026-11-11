@@ -458,8 +458,11 @@ class GitHubUpdateManager @Inject constructor(
                 .filterNot { it.contains("compare/v", ignoreCase = true) }
                 .filterNot { it.contains("github.com", ignoreCase = true) && it.contains("/compare/") }
                 .filterNot { it.startsWith("## What's Changed", ignoreCase = true) }
+                // The window's own header already names the app and the version
+                .filterNot { it.trim().matches(Regex("#{1,6}\\s*Yandex Music Lite\\s+v?[0-9][0-9.]*", RegexOption.IGNORE_CASE)) }
                 .map { line ->
-                    line.replace(Regex("by @[a-zA-Z0-9_-]+ in https://\\S+"), "")
+                    line.trim().replace(Regex("^#{1,6}\\s*"), "").replace("**", "")
+                        .replace(Regex("by @[a-zA-Z0-9_-]+ in https://\\S+"), "")
                         .replace(Regex("\\[(.*?)\\]\\(https://\\S+\\)"), "$1")
                         .replace(Regex("https://github\\.com/\\S+"), "")
                         .replace(Regex("^[*-]\\s*"), "• ")

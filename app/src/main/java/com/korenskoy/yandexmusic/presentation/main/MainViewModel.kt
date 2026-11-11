@@ -21,6 +21,11 @@ import com.korenskoy.yandexmusic.data.player.WaveKnob
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.account.AccountSessionManager
+import com.korenskoy.yandexmusic.data.account.LibrarySyncPolicy
+import com.korenskoy.yandexmusic.data.dto.AlbumDto
+import com.korenskoy.yandexmusic.data.repository.LikedAlbumsRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import com.korenskoy.yandexmusic.data.download.DownloadQueueState
 import com.korenskoy.yandexmusic.data.download.DownloadScheduler
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
@@ -58,7 +63,8 @@ class MainViewModel @Inject constructor(
     networkMonitor: NetworkMonitor,
     private val reactions: TrackReactions,
     private val playRequests: PlayRequests,
-    offline: OfflineDownloads
+    offline: OfflineDownloads,
+    albums: LikedAlbumsRepository
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -69,6 +75,9 @@ class MainViewModel @Inject constructor(
     // Library and charts live in the process-wide LibraryRepository (single-flight, incremental sync)
     val tracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.likedTracks
     val likedTrackIds: StateFlow<Set<String>> = libraryRepository.likedIds
+
+    /** Albums in the collection (marked here or in the official app). */
+    val likedAlbums: StateFlow<List<AlbumDto>> = albums.albums
     val popularTracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.popularTracks
     val isLoading: StateFlow<Boolean> = libraryRepository.isSyncingLikes
     /** The likes could not be loaded; they are retried by themselves as soon as the network is back. */
@@ -142,9 +151,34 @@ class MainViewModel @Inject constructor(
 
     // region Library actions
 
-    /** Pull-to-refresh and the Library tab: sync likes (joins a sync already running). */
+    /** Pull-to-refresh: the whole library now — likes, playlists, albums (joins a sync already running). */
     fun loadLikedTracks() {
-        viewModelScope.launch { session.syncLikes() }
+        session.syncLibraryNow()
+    }
+
+    /** The library or one of its pages opened: refreshed unless it just was. */
+    fun onLibraryShown() = session.syncLibraryIfStale(LibrarySyncPolicy.ON_SHOW_MS)
+
+    private var whileShown: Job? = null
+
+    /**
+     * The app is on the screen: the library catches up with changes made in the official app, then keeps up
+     * every few minutes (a head unit never closes the app). Nothing runs while the app is hidden.
+     */
+    fun onAppShown() {
+        whileShown?.cancel()
+        whileShown = viewModelScope.launch {
+            session.syncLibraryIfStale(LibrarySyncPolicy.ON_SHOW_MS)
+            while (true) {
+                delay(LibrarySyncPolicy.WHILE_SHOWN_MS)
+                session.syncLibraryIfStale(LibrarySyncPolicy.WHILE_SHOWN_MS)
+            }
+        }
+    }
+
+    fun onAppHidden() {
+        whileShown?.cancel()
+        whileShown = null
     }
 
     /** The heart: a track's like, or a station's favourite (shared with the player in the notification). */

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Favorite
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.mutableStateOf
@@ -91,7 +93,9 @@ class CatalogActions(
     val onPlay: (tracks: List<TrackDetailsDto>, trackId: String?, shuffle: Boolean) -> Unit,
     val onToggleLike: (TrackDetailsDto) -> Unit,
     val onDownloadAlbum: (AlbumDto) -> Unit = {},
-    val onRemoveAlbum: (albumId: String) -> Unit = {}
+    val onRemoveAlbum: (albumId: String) -> Unit = {},
+    /** The heart: the album into the collection or out of it (the same as in the official app). */
+    val onToggleAlbumLike: (AlbumDto) -> Unit = {}
 )
 
 /** The page on top of the catalog stack: an artist or an album. Back returns to the previous page. */
@@ -104,7 +108,8 @@ fun CatalogPageScreen(
     contentBottom: Dp,
     actions: CatalogActions,
     downloadedTrackIds: Set<String> = emptySet(),
-    offline: OfflineState = OfflineState.None
+    offline: OfflineState = OfflineState.None,
+    albumLiked: Boolean = false
 ) {
     val back = rememberPredictiveBack(enabled = true, onBack = actions.onBack)
     val isArtist = state.page is CatalogPage.Artist
@@ -122,6 +127,7 @@ fun CatalogPageScreen(
     // An album is kept on the device like a playlist; an artist's page has nothing to keep
     val offlineButton: @Composable () -> Unit = {
         if (album != null && tracks.isNotEmpty()) {
+            AlbumHeart(albumLiked) { actions.onToggleAlbumLike(album) }
             OfflineButton(
                 offline,
                 onDownload = { actions.onDownloadAlbum(album) },
@@ -249,6 +255,23 @@ fun CatalogPageScreen(
                 }
             }
         }
+    }
+}
+
+/** The album in the collection: a red heart, like a liked track. */
+@Composable
+private fun AlbumHeart(liked: Boolean, onClick: () -> Unit) {
+    GlassCircleButton(
+        onClick = onClick,
+        contentDescription = stringResource(if (liked) R.string.album_unlike else R.string.album_like),
+        size = 48.dp
+    ) {
+        Icon(
+            if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            contentDescription = null,
+            tint = if (liked) HiFi.Love else Color.White,
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
 

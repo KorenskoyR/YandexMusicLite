@@ -230,6 +230,24 @@ data class AlbumDto(
         get() = volumes.flatten()
 }
 
+/** `users/{uid}/likes/albums`: an album in the collection; [album] only with `rich=true`. */
+@Serializable
+data class LikedAlbumDto(
+    @SerialName("id") val id: JsonElement? = null,
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("album") val album: AlbumDto? = null
+) {
+    val idString: String?
+        get() = (id as? JsonPrimitive)?.content ?: album?.idString
+}
+
+/** `users/{uid}/likes/playlists`: someone else's playlist saved to the collection. */
+@Serializable
+data class LikedPlaylistDto(
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("playlist") val playlist: UserPlaylistDto? = null
+)
+
 /** `artists/{id}/brief-info`: the artist, popular tracks and albums. */
 @Serializable
 data class ArtistBriefDto(

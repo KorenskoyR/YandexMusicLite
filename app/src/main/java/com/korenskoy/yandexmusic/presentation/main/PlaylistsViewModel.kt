@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -50,6 +51,9 @@ class PlaylistsViewModel @Inject constructor(
 
     val playlists: StateFlow<List<UserPlaylistDto>> = repository.playlists
 
+    /** Other people's playlists saved to the collection. */
+    val saved: StateFlow<List<UserPlaylistDto>> = repository.saved
+
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages: SharedFlow<String> = _messages
 
@@ -61,9 +65,11 @@ class PlaylistsViewModel @Inject constructor(
 
     init {
         // Edits (here or in Android Auto's list), server refreshes and account changes
-        repository.playlists.onEach { list ->
+        combine(repository.playlists, repository.saved) { own, saved -> own + saved }.onEach { list ->
             val opened = _opened.value ?: return@onEach
-            val now = list.firstOrNull { it.kindString == opened.playlist.kindString }
+            // The same owner first: an own playlist of an old cache (owner unknown) may share the number
+            val now = list.firstOrNull { it.ownerUid == opened.playlist.ownerUid && it.kindString == opened.playlist.kindString }
+                ?: list.firstOrNull { UserPlaylistsRepository.sameAs(it, opened.playlist) }
             when {
                 now == null -> close() // deleted, or another account
                 now.revision != opened.playlist.revision -> open(now, keepShownTracks = true)
@@ -75,18 +81,19 @@ class PlaylistsViewModel @Inject constructor(
     /** @param keepShownTracks reload in place (after an edit) instead of showing the spinner. */
     fun open(playlist: UserPlaylistDto, keepShownTracks: Boolean = false) {
         openJob?.cancel()
-        val shown = _opened.value?.takeIf { keepShownTracks && it.playlist.kindString == playlist.kindString }?.tracks.orEmpty()
-        _opened.value = OpenedPlaylist(playlist, shown, isLoading = shown.isEmpty())
+        val shown = _opened.value?.takeIf { keepShownTracks && UserPlaylistsRepository.sameAs(it.playlist, playlist) }?.tracks.orEmpty()
+        val editable = repository.isOwn(playlist)
+        _opened.value = OpenedPlaylist(playlist, shown, isLoading = shown.isEmpty(), editable = editable)
         openJob = viewModelScope.launch {
             val loaded = try {
-                OpenedPlaylist(playlist, repository.tracks(playlist), isLoading = false)
+                OpenedPlaylist(playlist, repository.tracks(playlist), isLoading = false, editable = editable)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Playlist load failed", e)
-                OpenedPlaylist(playlist, isLoading = false, failed = true, failReason = failureReason(e))
+                OpenedPlaylist(playlist, isLoading = false, failed = true, failReason = failureReason(e), editable = editable)
             }
-            if (_opened.value?.playlist?.kindString == playlist.kindString) _opened.value = loaded
+            if (_opened.value?.playlist?.let { UserPlaylistsRepository.sameAs(it, playlist) } == true) _opened.value = loaded
             if (!loaded.failed) offline.sync(OfflineCollection.keyOf(playlist), playlist.title.orEmpty(), playlist.coverUri, loaded.tracks)
         }
     }
@@ -221,7 +228,9 @@ data class OpenedPlaylist(
     val isLoading: Boolean = true,
     val failed: Boolean = false,
     /** Short and technical: a tester's screenshot should say what to fix. */
-    val failReason: String? = null
+    val failReason: String? = null,
+    /** The user's own playlist; a saved one of someone else's is only played and downloaded. */
+    val editable: Boolean = true
 )
 
 /** What went wrong with a request, in the fewest words: the HTTP status and the server's own error name, or the kind of failure. */

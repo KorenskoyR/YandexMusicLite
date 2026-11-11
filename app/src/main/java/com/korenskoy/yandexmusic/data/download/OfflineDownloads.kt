@@ -139,7 +139,8 @@ class OfflineSync @Inject constructor(
         for (kept in collections.all.value) {
             try {
                 if (!kept.isAlbum) {
-                    val playlist = playlists.playlists.value.firstOrNull { OfflineCollection.keyOf(it) == kept.key }
+                    // The user's own playlists and the saved ones of other people
+                    val playlist = (playlists.playlists.value + playlists.saved.value).firstOrNull { OfflineCollection.keyOf(it) == kept.key }
                     if (playlist != null) offline.sync(kept.key, playlist.title.orEmpty(), playlist.coverUri, playlists.tracks(playlist))
                 }
                 offline.resume(kept.key)

@@ -144,8 +144,8 @@ class MusicService : MediaLibraryService() {
             }
         }
 
-        // Equalizer apps hear about the session again whenever the sound comes back
-        equalizer.keepAnnounced(serviceScope, playerRepository.isPlaying, playerRepository.currentTrackId, playerRepository.activePlayerState)
+        // Equalizer apps hear about the session when the sound starts and after a real pause, never per track
+        equalizer.keepAnnounced(serviceScope, playerRepository.isPlaying)
 
         // Dynamically update MediaLibrarySession when active player swaps
         serviceScope.launch {

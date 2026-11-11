@@ -196,6 +196,14 @@
     <string name="library_liked">Мне нравится</string>
     <string name="library_downloaded">Скачанные</string>
     <string name="library_playlists_row">Плейлисты</string>
+    <string name="library_playlists_mine">Мои</string>
+    <string name="library_playlists_saved">Сохранённые</string>
+    <string name="library_albums_row">Альбомы</string>
+    <string name="library_albums_empty_title">Альбомов пока нет</string>
+    <string name="library_albums_empty_message">Отметьте альбом сердечком — здесь или в официальном приложении, — и он появится в этом разделе.</string>
+    <string name="album_like">Добавить альбом в коллекцию</string>
+    <string name="album_unlike">Убрать альбом из коллекции</string>
+    <string name="album_like_failed">Не удалось изменить коллекцию: нет связи с сервером</string>
     <string name="library_recent">Недавно добавленные</string>
     <string name="library_settings">Настройки</string>
     <string name="library_downloaded_empty">Скачанных треков пока нет</string>
@@ -306,6 +314,7 @@
     <string name="update_notes_default">• Улучшения стабильности и воспроизведения</string>
     <string name="update_status_checking">Проверяем обновления…</string>
     <string name="update_status_latest">Установлена последняя версия</string>
+    <string name="update_status_check_failed">Не удалось проверить: %1$s</string>
     <string name="update_status_download_failed">Не удалось скачать: %1$s</string>
     <string name="update_status_package_failed">Файл обновления не подходит: %1$s</string>
     <string name="update_status_reinstall">Обновление готово. Из‑за смены ключа подписи на официальный нужна разовая чистая переустановка.</string>
@@ -357,6 +366,7 @@
     <string name="settings_normalize_hint">Тихие и громкие треки звучат одинаково</string>
     <string name="settings_equalizer">Эквалайзер</string>
     <string name="settings_equalizer_hint">Эквалайзер телефона или магнитолы</string>
+    <string name="settings_equalizer_missing">На устройстве не найден</string>
     <string name="settings_start_music">Музыка при запуске</string>
     <string name="settings_start_music_off">Не включать</string>
     <string name="settings_start_music_continue">Продолжить</string>

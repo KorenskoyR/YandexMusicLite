@@ -62,14 +62,24 @@ class UpdateViewModel @Inject constructor(
             val result = updateManager.checkForUpdates()
             val skipped = settingsRepository.skippedUpdateVersion.first()
             val available = result as? UpdateCheckResult.UpdateAvailable
-            when {
-                // The launch check keeps quiet about a skipped version; Settings say it is there
-                available != null && !UpdatePolicy.offerOnLaunch(available.versionName, skipped, silent) ->
-                    _statusMessage.value = context.getString(R.string.update_status_skipped, available.versionName)
-                !silent || available != null -> _checkResult.value = result
-            }
-            if (result is UpdateCheckResult.UpToDate && !silent) {
-                _statusMessage.value = context.getString(R.string.update_status_latest)
+            val status = UpdatePolicy.statusAfterCheck(
+                available = available?.versionName,
+                upToDate = result is UpdateCheckResult.UpToDate,
+                error = (result as? UpdateCheckResult.Error)?.message,
+                skipped = skipped,
+                silent = silent
+            )
+            // The launch check keeps quiet about a skipped version; Settings say it is there
+            if (status !is UpdatePolicy.Status.Skipped && (!silent || available != null)) _checkResult.value = result
+            when (status) {
+                UpdatePolicy.Status.Keep -> Unit
+                UpdatePolicy.Status.Clear -> _statusMessage.value = null
+                UpdatePolicy.Status.Latest -> _statusMessage.value = context.getString(R.string.update_status_latest)
+                is UpdatePolicy.Status.Skipped -> _statusMessage.value = context.getString(R.string.update_status_skipped, status.version)
+                is UpdatePolicy.Status.Failed -> _statusMessage.value =
+                    // "Нет связи" already says it could not check
+                    status.reason.takeIf { it == context.getString(R.string.update_err_network) }
+                        ?: context.getString(R.string.update_status_check_failed, status.reason)
             }
         }
     }

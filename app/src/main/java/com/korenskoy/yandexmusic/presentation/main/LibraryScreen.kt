@@ -98,6 +98,10 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.korenskoy.yandexmusic.data.dto.AlbumDto
+import com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.ColumnScope
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.download.DownloadQueueState
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
@@ -117,14 +121,14 @@ import com.korenskoy.yandexmusic.presentation.main.components.PlaylistNameDialog
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 import com.korenskoy.yandexmusic.utils.russianQuantityString
 
-private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS }
+private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS, ALBUMS }
 
 /** The list starts to show under the header; below it, nothing is cut by a hard line. */
 private val LibraryFadeStart = 56.dp
 private val LibraryFadeLength = 22.dp
 
 /**
- * "Моя музыка": play/shuffle, the three library sections (each opens its own page) and recently
+ * "Моя музыка": play/shuffle, the library sections (each opens its own page) and recently
  * added covers. Settings — the only entry to the account — sit behind the button in the header.
  */
 @Composable
@@ -167,7 +171,14 @@ fun LibraryScreen(
     offlineCollections: List<OfflineCollection> = emptyList(),
     onDownloadedTrackClick: (String) -> Unit = onTrackClick,
     onOpenCollection: (OfflineCollection) -> Unit = {},
-    /** A section open from the start (screenshots): LIKED, DOWNLOADED or PLAYLISTS. */
+    /** Other people's playlists saved to the collection in the official app. */
+    savedPlaylists: List<UserPlaylistDto> = emptyList(),
+    /** Albums in the collection. */
+    albums: List<AlbumDto> = emptyList(),
+    onOpenAlbum: (AlbumDto) -> Unit = {},
+    /** A section page opened: the library catches up with the server unless it just did. */
+    onSectionShown: () -> Unit = {},
+    /** A section open from the start (screenshots): LIKED, DOWNLOADED, PLAYLISTS or ALBUMS. */
     initialSection: String? = null
 ) {
     var showSettings by remember { mutableStateOf(false) }
@@ -183,6 +194,8 @@ fun LibraryScreen(
     val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
     val columns = if (isLandscape) landscapeColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp) else 2
     val downloaded = downloadedTracks ?: remember(tracks, downloadedTrackIds) { tracks.filter { downloadedTrackIds.contains(it.idString) } }
+    val keptKeys = remember(offlineCollections) { offlineCollections.mapTo(mutableSetOf()) { it.key } }
+    LaunchedEffect(section) { if (section != null) onSectionShown() }
 
     if (openedPlaylist != null) {
         PlaylistScreen(
@@ -240,7 +253,8 @@ fun LibraryScreen(
                     Column(Modifier.padding(top = 14.dp)) {
                         SectionRow(Icons.Rounded.Favorite, stringResource(R.string.library_liked), tracks.size) { sectionName = LibrarySection.LIKED.name }
                         SectionRow(Icons.Rounded.DownloadDone, stringResource(R.string.library_downloaded), downloaded.size) { sectionName = LibrarySection.DOWNLOADED.name }
-                        SectionRow(Icons.AutoMirrored.Rounded.PlaylistPlay, stringResource(R.string.library_playlists_row), playlists.size) { sectionName = LibrarySection.PLAYLISTS.name }
+                        SectionRow(Icons.AutoMirrored.Rounded.PlaylistPlay, stringResource(R.string.library_playlists_row), playlists.size + savedPlaylists.size) { sectionName = LibrarySection.PLAYLISTS.name }
+                        SectionRow(Icons.Rounded.Album, stringResource(R.string.library_albums_row), albums.size) { sectionName = LibrarySection.ALBUMS.name }
                     }
                 }
                 when (LoadState.of(tracks, tracks.isEmpty(), isLoading, loadFailed)) {
@@ -345,11 +359,22 @@ fun LibraryScreen(
             LibrarySection.PLAYLISTS -> PlaylistsPage(
                 modifier = Modifier.predictiveBack(back),
                 playlists = playlists,
+                saved = savedPlaylists,
+                keptKeys = keptKeys,
                 columns = columns,
                 contentPadding = listPadding,
                 onBack = { sectionName = null },
                 onOpen = onOpenPlaylist,
                 onCreate = onCreatePlaylist
+            )
+            LibrarySection.ALBUMS -> AlbumsPage(
+                modifier = Modifier.predictiveBack(back),
+                albums = albums,
+                keptKeys = keptKeys,
+                columns = columns,
+                contentPadding = listPadding,
+                onBack = { sectionName = null },
+                onOpen = onOpenAlbum
             )
         }
     }
@@ -559,6 +584,8 @@ internal fun CoverCard(track: TrackDetailsDto, modifier: Modifier = Modifier, on
 private fun PlaylistsPage(
     modifier: Modifier,
     playlists: List<UserPlaylistDto>,
+    saved: List<UserPlaylistDto>,
+    keptKeys: Set<String>,
     columns: Int,
     contentPadding: PaddingValues,
     onBack: () -> Unit,
@@ -577,14 +604,10 @@ private fun PlaylistsPage(
     val cells: List<UserPlaylistDto?> = listOf<UserPlaylistDto?>(null) + playlists
     LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = contentPadding) {
         item(key = "header") {
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Text(stringResource(R.string.library_playlists_row), style = HiFiType.LargeTitle.copy(fontSize = 28.sp, lineHeight = 34.sp))
-            }
+            PageHeader(stringResource(R.string.library_playlists_row), onBack)
         }
+        // The groups are named only when there is a second one
+        if (saved.isNotEmpty()) item(key = "mine_title") { HiFiSectionHeader(stringResource(R.string.library_playlists_mine), Modifier.padding(bottom = 12.dp)) }
         items(cells.chunked(columns), key = { row -> "pl_" + row.joinToString("|") { it?.kindString ?: "new" } }, contentType = { "playlist_row" }) { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 row.forEach { playlist ->
@@ -608,14 +631,109 @@ private fun PlaylistsPage(
                             Spacer(Modifier.height(9.dp))
                             Text(stringResource(R.string.playlist_new), style = HiFiType.CardTitle, maxLines = 1)
                         } else {
-                            PlaylistCover(playlist, Modifier.fillMaxWidth().aspectRatio(1f).hifiSoftShadow(RoundedCornerShape(16.dp), 18.dp).clip(RoundedCornerShape(16.dp)))
-                            Spacer(Modifier.height(9.dp))
-                            Text(playlist.title ?: "", style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                russianQuantityString(playlist.trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
-                                style = HiFiType.Caption
-                            )
+                            PlaylistCard(playlist, kept = OfflineCollection.keyOf(playlist) in keptKeys)
                         }
+                    }
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        if (saved.isNotEmpty()) {
+            item(key = "saved_title") { HiFiSectionHeader(stringResource(R.string.library_playlists_saved), Modifier.padding(top = 8.dp, bottom = 12.dp)) }
+            items(saved.chunked(columns), key = { row -> "saved_" + row.joinToString("|") { UserPlaylistsRepository.savedKey(it) } }, contentType = { "playlist_row" }) { row ->
+                Row(Modifier.fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    row.forEach { playlist ->
+                        Column(Modifier.weight(1f).hifiPress({ onOpen(playlist) })) {
+                            PlaylistCard(playlist, kept = OfflineCollection.keyOf(playlist) in keptKeys)
+                        }
+                    }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PageHeader(title: String, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(title, style = HiFiType.LargeTitle.copy(fontSize = 28.sp, lineHeight = 34.sp))
+    }
+}
+
+@Composable
+private fun ColumnScope.PlaylistCard(playlist: UserPlaylistDto, kept: Boolean) {
+    Box {
+        PlaylistCover(playlist, Modifier.fillMaxWidth().aspectRatio(1f).hifiSoftShadow(RoundedCornerShape(16.dp), 18.dp).clip(RoundedCornerShape(16.dp)))
+        if (kept) KeptBadge(Modifier.align(Alignment.BottomEnd))
+    }
+    Spacer(Modifier.height(9.dp))
+    Text(playlist.title ?: "", style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(
+        russianQuantityString(playlist.trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
+        style = HiFiType.Caption
+    )
+}
+
+/** On the device: the same mark as on a kept playlist in "Скачанные". */
+@Composable
+private fun KeptBadge(modifier: Modifier) {
+    Box(
+        modifier
+            .padding(8.dp)
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(Color(0x9E0A0B0F)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Rounded.DownloadDone, contentDescription = stringResource(R.string.cd_skachan), tint = Color.White, modifier = Modifier.size(16.dp))
+    }
+}
+
+/** Albums in the collection: marked in the official app or with the heart on an album page. */
+@Composable
+private fun AlbumsPage(
+    modifier: Modifier,
+    albums: List<AlbumDto>,
+    keptKeys: Set<String>,
+    columns: Int,
+    contentPadding: PaddingValues,
+    onBack: () -> Unit,
+    onOpen: (AlbumDto) -> Unit
+) {
+    val context = LocalContext.current
+    LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = contentPadding) {
+        item(key = "header") { PageHeader(stringResource(R.string.library_albums_row), onBack) }
+        if (albums.isEmpty()) {
+            item(key = "empty") {
+                HiFiEmptyState(icon = Icons.Rounded.Album, title = stringResource(R.string.library_albums_empty_title), message = stringResource(R.string.library_albums_empty_message))
+            }
+        }
+        items(albums.chunked(columns), key = { row -> "al_" + row.joinToString("|") { it.idString.orEmpty() } }, contentType = { "album_row" }) { row ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                row.forEach { album ->
+                    Column(Modifier.weight(1f).hifiPress({ onOpen(album) })) {
+                        val shape = RoundedCornerShape(16.dp)
+                        Box(Modifier.fillMaxWidth().aspectRatio(1f).hifiSoftShadow(shape, 18.dp).clip(shape).background(HiFi.Placeholder)) {
+                            if (album.coverUri != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).cover(album.coverUri, CoverSize.Medium).build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(Icons.Rounded.Album, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.Center).size(40.dp))
+                            }
+                            if (album.idString?.let(OfflineCollection::albumKey) in keptKeys) KeptBadge(Modifier.align(Alignment.BottomEnd))
+                        }
+                        Spacer(Modifier.height(9.dp))
+                        Text(album.title.orEmpty(), style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(albumCaption(album), style = HiFiType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -623,3 +741,7 @@ private fun PlaylistsPage(
         }
     }
 }
+
+/** "Исполнитель · 2019". */
+internal fun albumCaption(album: AlbumDto): String =
+    listOfNotNull(album.artists.mapNotNull { it.name }.joinToString(", ").ifBlank { null }, album.year?.toString()).joinToString(" · ")

@@ -224,7 +224,8 @@ fun PlaylistScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 )
             }
-            if (editedOrder == null) Box {
+            // Someone else's saved playlist: only its author changes it
+            if (editedOrder == null && opened.editable) Box {
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -367,7 +368,7 @@ fun PlaylistScreen(
         }
 
         // The menu of a track listed here also offers "remove from playlist"
-        CompositionLocalProvider(LocalTrackMenuPlaylist provides playlist) {
+        CompositionLocalProvider(LocalTrackMenuPlaylist provides playlist.takeIf { opened.editable }) {
             val order = editedOrder
             val appearance = rememberAppearance(playlist.kindString)
             when {

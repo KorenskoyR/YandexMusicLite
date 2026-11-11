@@ -11,6 +11,12 @@ import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.player.PlaybackController
 import com.korenskoy.yandexmusic.data.repository.LibraryRepository
 import com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
+import com.korenskoy.yandexmusic.data.repository.LikedAlbumsRepository
+import com.korenskoy.yandexmusic.data.network.NetworkMonitor
+import com.korenskoy.yandexmusic.data.player.LinkState
+import android.os.SystemClock
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -36,6 +42,8 @@ class AccountSessionManager @Inject constructor(
     private val playbackController: PlaybackController,
     private val libraryRepository: LibraryRepository,
     private val playlistsRepository: UserPlaylistsRepository,
+    private val albumsRepository: LikedAlbumsRepository,
+    private val networkMonitor: NetworkMonitor,
     private val cacheManager: PlaylistCacheManager,
     private val downloadManager: TrackDownloadManager,
     private val downloadScheduler: DownloadScheduler,
@@ -57,23 +65,57 @@ class AccountSessionManager @Inject constructor(
     suspend fun loadCached() {
         libraryRepository.loadCached()
         playlistsRepository.loadCached()
+        albumsRepository.loadCached()
     }
 
     /** Likes, charts, playlists and the My Wave queue. Concurrent calls join the requests already running. */
     fun syncAll() {
         scope.launch { refreshAccountStatus() }
-        scope.launch { syncLikes() }
         scope.launch { libraryRepository.refreshCharts() }
-        scope.launch {
-            playlistsRepository.loadCached()
-            playlistsRepository.refresh()
-            // Kept playlists follow what changed on the server
-            offlineSync.refreshAll()
-        }
+        syncLibraryNow()
         playbackController.primeWave()
     }
 
-    /** Likes only (pull-to-refresh); new likes are downloaded when auto-download is on. */
+    private var libraryJob: Job? = null
+    private var librarySyncedAt: Long? = null
+
+    /**
+     * Likes, playlists (own and saved) and albums from the server, all at once; kept playlists follow.
+     * A sync already running is joined, never doubled. Each list is light: likes and albums ask for ids
+     * first and fetch more only when something changed, a playlist's tracks only for a new revision.
+     */
+    fun syncLibraryNow(): Job {
+        libraryJob?.takeIf { it.isActive }?.let { return it }
+        librarySyncedAt = clock()
+        return scope.launch {
+            coroutineScope {
+                launch { syncLikes() }
+                launch { albumsRepository.loadCached(); albumsRepository.refresh() }
+                launch {
+                    playlistsRepository.loadCached()
+                    playlistsRepository.refresh()
+                    // Kept playlists follow what changed on the server
+                    offlineSync.refreshAll()
+                }
+            }
+        }.also { libraryJob = it }
+    }
+
+    /**
+     * The same as [syncLibraryNow] when the last sync is older than [maxAgeMs] — the app coming to the screen,
+     * the library opened, the timer while the app is shown. Skipped without a sign-in or a network, and while
+     * the music stream is struggling: the music comes first.
+     */
+    fun syncLibraryIfStale(maxAgeMs: Long) {
+        if (authRepository.getToken().isNullOrEmpty()) return
+        if (!LibrarySyncPolicy.due(librarySyncedAt, clock(), maxAgeMs)) return
+        if (!networkMonitor.isCurrentlyConnected() || playbackController.linkState.value != LinkState.GOOD) return
+        syncLibraryNow()
+    }
+
+    private val clock: () -> Long = SystemClock::elapsedRealtime
+
+    /** Likes only; new likes are downloaded when auto-download is on. */
     suspend fun syncLikes() {
         libraryRepository.loadCached()
         val changed = libraryRepository.syncLikes()
@@ -179,6 +221,11 @@ class AccountSessionManager @Inject constructor(
         libraryRepository.resetForAccountChange()
         // Also closes an opened playlist: it is no longer in the list
         playlistsRepository.resetForAccountChange()
+        albumsRepository.resetForAccountChange()
+        // A sync of the account just left must not stand in for the new one's
+        libraryJob?.cancel()
+        libraryJob = null
+        librarySyncedAt = null
     }
 
     private val activeFolder: String
@@ -187,4 +234,15 @@ class AccountSessionManager @Inject constructor(
     private companion object {
         const val TAG = "AccountSession"
     }
+}
+
+/** When the library is asked from the server again. Pure; unit-tested. */
+object LibrarySyncPolicy {
+    /** Again after the app comes back to the screen or the library opens, if older than this. */
+    const val ON_SHOW_MS = 30_000L
+
+    /** While the app is on the screen (a head unit never closes it): this often. */
+    const val WHILE_SHOWN_MS = 3 * 60_000L
+
+    fun due(lastSyncAt: Long?, now: Long, maxAgeMs: Long): Boolean = lastSyncAt == null || now - lastSyncAt >= maxAgeMs
 }

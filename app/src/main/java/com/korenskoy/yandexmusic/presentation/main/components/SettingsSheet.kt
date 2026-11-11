@@ -94,6 +94,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -486,8 +487,14 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
         SoundQualityRow(state.compatibleSound, actions.onCompatibleSoundChange)
         CrossfadeRow(state.crossfadeSeconds, actions.onCrossfadeChange)
         SwitchRow(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.settings_normalize), stringResource(R.string.settings_normalize_hint), state.normalizeVolume, actions.onNormalizeVolumeChange)
+        // Always in its place, so it is never "gone": without an equalizer on the device it says so
+        LaunchedEffect(Unit) { actions.onRefreshEqualizer() }
         if (state.equalizerAvailable) {
             SettingsRow(icon = Icons.Rounded.Equalizer, title = stringResource(R.string.settings_equalizer), subtitle = stringResource(R.string.settings_equalizer_hint), onClick = actions.onOpenEqualizer)
+        } else {
+            Box(Modifier.alpha(0.55f)) {
+                SettingsRow(icon = Icons.Rounded.Equalizer, title = stringResource(R.string.settings_equalizer), subtitle = stringResource(R.string.settings_equalizer_missing), onClick = null, chevron = false)
+            }
         }
     }
     SettingsGroup(stringResource(R.string.settings_g_start)) {

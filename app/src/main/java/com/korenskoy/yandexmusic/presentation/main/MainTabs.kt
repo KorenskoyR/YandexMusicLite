@@ -175,14 +175,17 @@ internal fun LibraryTab(
     val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
     val userPlaylists by playlistsVm.playlists.collectAsStateWithLifecycle()
+    val savedPlaylists by playlistsVm.saved.collectAsStateWithLifecycle()
+    val likedAlbums by viewModel.likedAlbums.collectAsStateWithLifecycle()
     val openedPlaylist by playlistsVm.opened.collectAsStateWithLifecycle()
     val openedKey = openedPlaylist?.playlist?.let(OfflineCollection::keyOf)
     val openedOffline by remember(openedKey) {
         openedPlaylist?.playlist?.let(playlistsVm::offlineState) ?: kotlinx.coroutines.flow.flowOf(OfflineState.None)
     }.collectAsStateWithLifecycle(OfflineState.None)
 
+    // Changes made in the official app show up when the library opens
     LaunchedEffect(Unit) {
-        if (viewModel.tracks.value.isEmpty()) viewModel.loadLikedTracks()
+        if (viewModel.tracks.value.isEmpty()) viewModel.loadLikedTracks() else viewModel.onLibraryShown()
     }
 
     val (settings, settingsActions) = settingsHost(viewModel, accountVm, updateVm, crashVm, onOpenAccounts, onOpenCrashLog, onAddAccount, settingsVm)
@@ -226,8 +229,12 @@ internal fun LibraryTab(
         onDownloadedTrackClick = { id -> viewModel.playTrack(id, downloadedTracks, PlaylistSource.LIBRARY) },
         onOpenCollection = { kept ->
             if (kept.isAlbum) onOpenAlbum(kept.itemId, kept.title)
-            else userPlaylists.firstOrNull { OfflineCollection.keyOf(it) == kept.key }?.let { playlistsVm.open(it) }
-        }
+            else (userPlaylists + savedPlaylists).firstOrNull { OfflineCollection.keyOf(it) == kept.key }?.let { playlistsVm.open(it) }
+        },
+        savedPlaylists = savedPlaylists,
+        albums = likedAlbums,
+        onOpenAlbum = { album -> album.idString?.let { onOpenAlbum(it, album.title.orEmpty()) } },
+        onSectionShown = { viewModel.onLibraryShown() }
     )
 }
 
@@ -375,6 +382,7 @@ internal fun settingsHost(
             onCrossfadeChange = settingsVm::setCrossfade,
             onNormalizeVolumeChange = settingsVm::setNormalizeVolume,
             onOpenEqualizer = settingsVm::openEqualizer,
+            onRefreshEqualizer = settingsVm::refreshEqualizer,
             onStartMusicChange = settingsVm::setStartMusic,
             onBluetoothAutoplayChange = settingsVm::setBluetoothAutoplay,
             onSkipExplicitChange = settingsVm::setSkipExplicit,
