@@ -36,6 +36,15 @@ interface PlayerRepository {
         startPositionMs: Long = 0L
     )
     fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?)
+
+    /**
+     * The playing track goes on from another source (its copy in the cache, a light stream) at the same
+     * second, with a short crossfade. Ignored when the track changed meanwhile.
+     */
+    fun switchSource(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) = Unit
+
+    /** Music in hand ahead of the playing position; as good as unlimited when unknown. */
+    val bufferedAheadMs: Long get() = Long.MAX_VALUE
     /** Volume multipliers by track id (1 = unchanged), for normalization; a track not listed plays as is. */
     fun setTrackGains(gains: Map<String, Float>)
 

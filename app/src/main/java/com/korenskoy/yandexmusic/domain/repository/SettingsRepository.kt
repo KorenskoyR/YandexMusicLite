@@ -79,6 +79,10 @@ interface SettingsRepository {
     val skipExplicit: Flow<Boolean>
     suspend fun setSkipExplicit(enabled: Boolean)
 
+    /** "Не прерывать музыку": on an uneven link, copies from the cache and a light stream instead of stops. */
+    val smoothPlayback: Flow<Boolean>
+    suspend fun setSmoothPlayback(enabled: Boolean)
+
     /** Downloads on the removable SD card (encrypted) instead of the internal storage. */
     val downloadsOnSdCard: Flow<Boolean>
     suspend fun setDownloadsOnSdCard(enabled: Boolean)

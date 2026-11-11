@@ -219,6 +219,9 @@ internal fun CrossfadeRow(seconds: Int, onChange: (Int) -> Unit) {
             valueRange = 0f..12f,
             steps = 11
         )
+        if (value.roundToInt() > 0) {
+            Text(stringResource(R.string.settings_crossfade_hint), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp)
+        }
     }
 }
 

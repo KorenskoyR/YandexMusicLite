@@ -383,25 +383,25 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 50",
-            buildGradle.contains("versionCode = 50"))
-        assertTrue("build.gradle.kts must be versionName 1.14.0",
-            buildGradle.contains("versionName = \"1.14.0\""))
+        assertTrue("build.gradle.kts must be versionCode 51",
+            buildGradle.contains("versionCode = 51"))
+        assertTrue("build.gradle.kts must be versionName 1.14.1",
+            buildGradle.contains("versionName = \"1.14.1\""))
     }
 
     @Test
     fun testWarmStandbyAndEqualPowerCrossfadeIntegration() {
         val playerRepo = File(sourceDir, "data/repository/PlayerRepositoryImpl.kt").readText()
-        assertTrue("PlayerRepositoryImpl must define PREPARE_STANDBY_THRESHOLD_MS",
-            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 15_000L"))
+        assertTrue("PlayerRepositoryImpl must prepare the next track a minute ahead",
+            playerRepo.contains("PREPARE_STANDBY_THRESHOLD_MS = 60_000L"))
         assertTrue("PlayerRepositoryImpl must define CROSSFADE_DURATION_MS",
             playerRepo.contains("CROSSFADE_DURATION_MS = 3000L"))
-        assertTrue("PlayerRepositoryImpl must define CROSSFADE_STEPS",
-            playerRepo.contains("CROSSFADE_STEPS = 60"))
+        assertTrue("PlayerRepositoryImpl must change the crossfade volume every 20 ms",
+            playerRepo.contains("CROSSFADE_STEP_MS = 20L"))
         assertTrue("PlayerRepositoryImpl must have prepareNextTrackEvent",
             playerRepo.contains("override val prepareNextTrackEvent: Flow<Unit>"))
-        assertTrue("PlayerRepositoryImpl must wait until the incoming track renders audio before fading",
-            playerRepo.contains("while (!incoming.isPlaying)"))
+        assertTrue("PlayerRepositoryImpl must hold the incoming track until it is ready before fading",
+            playerRepo.contains("while (incoming.playbackState != Player.STATE_READY)"))
         assertTrue("PlayerRepositoryImpl must support crossfade on every transition",
             playerRepo.contains("crossfade: Boolean"))
         assertTrue("PlayerRepositoryImpl must expose activePlayerState StateFlow",

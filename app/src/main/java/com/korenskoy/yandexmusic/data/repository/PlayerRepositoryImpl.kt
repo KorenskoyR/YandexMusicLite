@@ -1,6 +1,7 @@
 package com.korenskoy.yandexmusic.data.repository
 
 import androidx.media3.common.PlaybackException
+import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
 import androidx.core.net.toUri
 import android.os.SystemClock
@@ -45,7 +46,8 @@ class PlayerRepositoryImpl(
     private val playerB: ExoPlayer,
     private val downloadManager: TrackDownloadManager,
     private val preloadManager: TrackPreloadManager,
-    private val wakeLockHelper: PlaybackWakeLockHelper
+    private val wakeLockHelper: PlaybackWakeLockHelper,
+    private val journal: PlaybackJournal = PlaybackJournal()
 ) : PlayerRepository {
 
     private val _currentTrackId = MutableStateFlow<String?>(null)
@@ -96,6 +98,16 @@ class PlayerRepositoryImpl(
 
     /** Player fading out during a crossfade; null when no crossfade is running. */
     private var outgoingPlayer: ExoPlayer? = null
+
+    /**
+     * The incoming track of a crossfade is held silent until it has enough to sound without a stop; it still
+     * counts as playing, so nothing on the screen flickers to "paused" meanwhile.
+     */
+    private var awaitingIncoming = false
+
+    @Volatile
+    private var bufferedAhead = Long.MAX_VALUE
+    override val bufferedAheadMs: Long get() = bufferedAhead
     private var crossfadeJob: Job? = null
     private var playJob: Job? = null
     private var preloadedTrackId: String? = null
@@ -135,6 +147,10 @@ class PlayerRepositoryImpl(
             while (isActive) {
                 val currentP = activePlayer
                 if (currentP.isPlaying) {
+                    // All of the track loaded counts as plenty: the end of a track is not a reason to hold back
+                    val loadedToTheEnd = currentP.duration > 0 && currentP.bufferedPosition >= currentP.duration - 500
+                    bufferedAhead = if (loadedToTheEnd) Long.MAX_VALUE else currentP.totalBufferedDuration
+                    journal.addPlayed(PROGRESS_INTERVAL_MS)
                     updateProgress(currentP)
                     checkTransitionTriggers(currentP)
                     delay(PROGRESS_INTERVAL_MS)
@@ -165,7 +181,7 @@ class PlayerRepositoryImpl(
         if (duration <= 8_000L || position <= 0L || outgoingPlayer != null) return
         val remaining = duration - position
 
-        // 1. Warm standby preparation at 15 seconds remaining
+        // 1. The next track gets ready a minute ahead: on an uneven link it has time to load
         if (remaining <= PREPARE_STANDBY_THRESHOLD_MS && !hasEmittedPrepareForCurrent) {
             hasEmittedPrepareForCurrent = true
             _prepareNextTrackEvent.tryEmit(Unit)
@@ -253,7 +269,7 @@ class PlayerRepositoryImpl(
 
     private fun refreshPlaybackState() {
         val p = activePlayer
-        val wantsToPlay = p.playWhenReady &&
+        val wantsToPlay = (p.playWhenReady || awaitingIncoming) &&
             p.playerError == null &&
             p.mediaItemCount > 0 &&
             p.playbackState != Player.STATE_ENDED
@@ -291,11 +307,11 @@ class PlayerRepositoryImpl(
     }
 
     override fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
-        if (preloadedTrackId == trackId || outgoingPlayer != null) return
+        if (preloadedTrackId == trackId || outgoingPlayer != null || switchingSource) return
         scope.launch {
             val playUri = resolvePlayUri(trackId, url) ?: return@launch
             // State may have changed while the URL was resolving.
-            if (outgoingPlayer != null || _currentTrackId.value == trackId) return@launch
+            if (outgoingPlayer != null || switchingSource || _currentTrackId.value == trackId) return@launch
 
             val standby = standbyPlayer
             standby.stop()
@@ -310,7 +326,7 @@ class PlayerRepositoryImpl(
 
     override fun dropStandby() {
         scope.launch {
-            if (outgoingPlayer != null) return@launch
+            if (outgoingPlayer != null || switchingSource) return@launch
             preloadedTrackId = null
             hasEmittedPrepareForCurrent = false
             standbyPlayer.stop()
@@ -377,7 +393,9 @@ class PlayerRepositoryImpl(
             wakeLockHelper.acquireTransitionLock(30_000L)
             outgoingPlayer = current
             setVolume(incoming, 0f)
-            incoming.playWhenReady = true
+            // Silent and still until it can sound without a stop; the outgoing track plays its tail meanwhile
+            awaitingIncoming = true
+            incoming.playWhenReady = false
             crossfadeJob = scope.launch { runCrossfade(current, incoming) }
         } else {
             current.stop()
@@ -390,31 +408,44 @@ class PlayerRepositoryImpl(
     }
 
     /**
-     * Keeps [outgoing] audible until [incoming] actually renders audio, then blends them with an
-     * equal-power curve (cos² + sin² = 1) so perceived loudness stays constant.
+     * Keeps [outgoing] audible while [incoming] gets ready: ready to play, and with a few seconds in hand or all
+     * of it loaded. Then blends them with an equal-power curve (cos² + sin² = 1) so the loudness stays even.
+     * When the next track came too late and the previous one has already ended, it fades in quickly instead:
+     * no silence, no slow quiet start.
      */
     private suspend fun runCrossfade(outgoing: ExoPlayer, incoming: ExoPlayer) {
         val waitStart = SystemClock.elapsedRealtime()
-        while (!incoming.isPlaying) {
-            if (incoming.playerError != null) return // reported by the listener
+        while (incoming.playbackState != Player.STATE_READY) {
+            if (incoming.playerError != null) {
+                awaitingIncoming = false
+                return // reported by the listener
+            }
             if (SystemClock.elapsedRealtime() - waitStart > INCOMING_READY_TIMEOUT_MS) {
+                awaitingIncoming = false
+                incoming.playWhenReady = true
                 val id = incoming.currentMediaItem?.mediaId ?: return
                 Log.w(TAG, "Incoming track $id did not start in time")
                 _playbackErrorEvent.tryEmit(PlaybackFailure(id, 0L, "READY_TIMEOUT"))
                 return
             }
-            delay(20)
+            delay(WAIT_STEP_MS)
+        }
+        // A little more in hand while the previous track still has its tail to play
+        fun shortOfSound() = incoming.isLoading && incoming.totalBufferedDuration < CROSSFADE_HEADROOM_MS
+        while (outgoing.isPlaying && shortOfSound() && SystemClock.elapsedRealtime() - waitStart < INCOMING_READY_TIMEOUT_MS) {
+            delay(WAIT_STEP_MS)
         }
 
-        val outStartVolume = logicalVolume[indexOf(outgoing)]
-        // ~50 ms per volume step whatever the duration (60 steps for the default 3 s)
-        val steps = (crossfadeDurationMs / (CROSSFADE_DURATION_MS / CROSSFADE_STEPS)).toInt().coerceAtLeast(1)
-        val stepDelay = crossfadeDurationMs / steps
-        for (step in 1..steps) {
-            val angle = step.toDouble() / steps * (PI / 2.0)
-            setVolume(outgoing, (outStartVolume * cos(angle)).toFloat().coerceIn(0f, 1f))
-            setVolume(incoming, sin(angle).toFloat().coerceIn(0f, 1f))
-            delay(stepDelay)
+        val late = !outgoing.isPlaying
+        awaitingIncoming = false
+        incoming.playWhenReady = true
+        refreshPlaybackState()
+        journal.record(if (late) PlaybackJournal.Kind.CROSSFADE_LATE else PlaybackJournal.Kind.CROSSFADE, incoming.mediaMetadata.title?.toString())
+
+        if (late) {
+            fade(incoming, from = 0f, to = 1f, durationMs = LATE_FADE_IN_MS)
+        } else {
+            equalPowerFade(outgoing, incoming, crossfadeDurationMs)
         }
 
         outgoingPlayer = null
@@ -425,6 +456,115 @@ class PlayerRepositoryImpl(
         wakeLockHelper.releaseTransitionLock()
     }
 
+    /** [outgoing] down and [incoming] up over [durationMs], a step every [CROSSFADE_STEP_MS]: smooth to the ear. */
+    private suspend fun equalPowerFade(outgoing: ExoPlayer, incoming: ExoPlayer, durationMs: Long) {
+        val outStartVolume = logicalVolume[indexOf(outgoing)]
+        alongTheClock(durationMs) { part ->
+            val angle = part * (PI / 2.0)
+            setVolume(outgoing, (outStartVolume * cos(angle)).toFloat().coerceIn(0f, 1f))
+            setVolume(incoming, sin(angle).toFloat().coerceIn(0f, 1f))
+        }
+    }
+
+    private suspend fun fade(player: ExoPlayer, from: Float, to: Float, durationMs: Long) {
+        alongTheClock(durationMs) { part -> setVolume(player, (from + (to - from) * part).toFloat()) }
+    }
+
+    /**
+     * Calls [step] with how far along [durationMs] the clock is (0..1], about every [CROSSFADE_STEP_MS], and
+     * once more at the end. Paced by the clock, not by counting steps: a busy main thread makes the steps
+     * coarser, never the fade longer.
+     */
+    private suspend fun alongTheClock(durationMs: Long, step: (Double) -> Unit) {
+        val start = SystemClock.elapsedRealtime()
+        while (true) {
+            val part = ((SystemClock.elapsedRealtime() - start).toDouble() / durationMs).coerceAtMost(1.0)
+            step(part)
+            if (part >= 1.0) return
+            delay(CROSSFADE_STEP_MS)
+        }
+    }
+
+    /**
+     * The playing track goes on from another source — its copy in the cache or a light stream — at the same
+     * second, with a [SOURCE_SWITCH_FADE_MS] crossfade, so the change is not heard. Nothing happens when the
+     * track changed meanwhile or the new source does not get ready in time: the old one plays on.
+     */
+    override fun switchSource(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
+        if (switchingSource) return
+        switchingSource = true
+        scope.launch {
+            try {
+                switchTo(trackId, url, title, artist, coverUrl)
+            } finally {
+                switchingSource = false
+            }
+        }
+    }
+
+    /** The standby player is busy with a source switch: the next track waits for it. */
+    private var switchingSource = false
+
+    private suspend fun switchTo(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {
+        run {
+            if (_currentTrackId.value != trackId || outgoingPlayer != null) return@run
+            val playUri = resolvePlayUri(trackId, url) ?: return@run
+            val current = activePlayer
+            val incoming = standbyPlayer
+            preloadedTrackId = null
+            incoming.stop()
+            setVolume(incoming, 0f)
+            incoming.playWhenReady = false
+            incoming.setMediaItem(buildMediaItem(trackId, playUri, title, artist, coverUrl), current.currentPosition)
+            incoming.prepare()
+            fun stillWanted() = _currentTrackId.value == trackId && activePlayer === current && outgoingPlayer == null && incoming.playerError == null
+            suspend fun awaitReady(): Boolean {
+                val start = SystemClock.elapsedRealtime()
+                while (incoming.playbackState != Player.STATE_READY) {
+                    if (!stillWanted() || SystemClock.elapsedRealtime() - start > INCOMING_READY_TIMEOUT_MS) return false
+                    delay(WAIT_STEP_MS)
+                }
+                return stillWanted()
+            }
+            if (!awaitReady()) {
+                if (activePlayer !== incoming) {
+                    incoming.stop()
+                    incoming.clearMediaItems()
+                    setVolume(incoming, 1f)
+                }
+                return@run
+            }
+            // The old source moved on while the new one got ready: the same second as it now
+            incoming.seekTo(current.currentPosition)
+            if (!awaitReady()) return@run
+
+            val playing = current.playWhenReady
+            activePlayerIndex = 1 - activePlayerIndex
+            _activePlayerState.value = incoming
+            // The standby slot went to the switch: the next track is prepared again
+            hasEmittedPrepareForCurrent = false
+            if (!playing) {
+                current.stop()
+                current.clearMediaItems()
+                setVolume(current, 1f)
+                setVolume(incoming, 1f)
+                refreshPlaybackState()
+                return@run
+            }
+            outgoingPlayer = current
+            incoming.playWhenReady = true
+            refreshPlaybackState()
+            crossfadeJob = scope.launch {
+                equalPowerFade(current, incoming, SOURCE_SWITCH_FADE_MS)
+                outgoingPlayer = null
+                current.stop()
+                current.clearMediaItems()
+                setVolume(current, 1f)
+                setVolume(incoming, 1f)
+            }
+        }
+    }
+
     /**
      * The outgoing player occupies the standby slot the next track needs, so it must be released first.
      * A [QUICK_FADE_MS] fade avoids an audible click; it is stopped even if this request is superseded.
@@ -433,6 +573,7 @@ class PlayerRepositoryImpl(
         val out = outgoingPlayer ?: return
         crossfadeJob?.cancel()
         crossfadeJob = null
+        awaitingIncoming = false
         try {
             val startVolume = logicalVolume[indexOf(out)]
             for (step in 1..QUICK_FADE_STEPS) {
@@ -453,6 +594,11 @@ class PlayerRepositoryImpl(
     private fun finishCrossfadeNow(restoreActiveVolume: Boolean) {
         crossfadeJob?.cancel()
         crossfadeJob = null
+        // An incoming track held silent for its crossfade plays now (a pause right after stops it again)
+        if (awaitingIncoming) {
+            awaitingIncoming = false
+            activePlayer.playWhenReady = true
+        }
         outgoingPlayer?.let { out ->
             out.stop()
             out.clearMediaItems()
@@ -574,8 +720,15 @@ class PlayerRepositoryImpl(
     companion object {
         private const val TAG = "PlayerRepositoryImpl"
         const val CROSSFADE_DURATION_MS = 3000L
-        const val CROSSFADE_STEPS = 60
-        const val PREPARE_STANDBY_THRESHOLD_MS = 15_000L
+        const val PREPARE_STANDBY_THRESHOLD_MS = 60_000L
+        /** The next track has this much in hand, or all of it, before a crossfade starts. */
+        const val CROSSFADE_HEADROOM_MS = 5_000L
+        /** A next track that came late fades in this fast after the previous one ended. */
+        const val LATE_FADE_IN_MS = 300L
+        /** Going on from the copy or a light stream: short enough to be unheard, long enough not to click. */
+        const val SOURCE_SWITCH_FADE_MS = 400L
+        const val CROSSFADE_STEP_MS = 20L
+        private const val WAIT_STEP_MS = 20L
         const val INCOMING_READY_TIMEOUT_MS = 8_000L
         const val DUCK_VOLUME = 0.2f
         const val QUICK_FADE_MS = 150L

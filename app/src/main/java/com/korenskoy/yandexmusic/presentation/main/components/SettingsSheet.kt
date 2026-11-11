@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.Timeline
 import android.content.ActivityNotFoundException
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
@@ -519,7 +520,23 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
     }
     SettingsNote(stringResource(R.string.settings_wave_tuning_note))
     SettingsGroup(stringResource(R.string.settings_group_reserve)) {
+        SwitchRow(Icons.Rounded.Timeline, stringResource(R.string.settings_smooth), stringResource(R.string.settings_smooth_hint), state.smoothPlayback, actions.onSmoothPlaybackChange)
         RoadReserveRows(state.reserveMb, actions.onReserveChange, state.reserveUsedBytes, actions.onClearReserve)
+        // Nothing to play from while the link is uneven: said where the choice is made
+        if (state.smoothPlayback && state.reserveMb == 0) {
+            Text(
+                stringResource(R.string.settings_smooth_no_cache),
+                color = HiFi.Warning,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                modifier = Modifier
+                    .padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(HiFi.Warning.copy(alpha = 0.12f))
+                    .border(1.dp, HiFi.Warning.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            )
+        }
     }
     SettingsGroup(stringResource(R.string.settings_group_downloads)) {
         SwitchRow(Icons.Rounded.Download, stringResource(R.string.settings_auto_download), stringResource(R.string.settings_auto_download_hint), state.autoDownload, actions.onAutoDownloadChange)
@@ -619,6 +636,7 @@ private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActio
             onClick = actions.onCheckForUpdates
         )
     }
+    var journalOpen by remember { mutableStateOf(false) }
     SettingsGroup(stringResource(R.string.settings_g_help)) {
         SettingsRow(
             icon = Icons.Rounded.WarningAmber,
@@ -626,6 +644,15 @@ private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActio
             value = if (state.crashReports == 0) stringResource(R.string.crash_log_none) else state.crashReports.toString(),
             onClick = actions.onOpenCrashLog
         )
+        SettingsRow(
+            icon = Icons.Rounded.Timeline,
+            title = stringResource(R.string.journal_title),
+            value = state.journal.summary.stalls.let { if (it == 0) stringResource(R.string.journal_none) else stringResource(R.string.journal_stops_row, it) },
+            onClick = { journalOpen = true }
+        )
+    }
+    if (journalOpen) {
+        PlaybackJournalDialog(state.journal, onShare = actions.onShareJournal, onClear = actions.onClearJournal, onDismiss = { journalOpen = false })
     }
     SettingsGroup(stringResource(R.string.settings_g_project)) {
         SettingsRow(icon = Icons.Rounded.Code, title = stringResource(R.string.settings_source_code), subtitle = "github.com/KorenskoyR/YandexMusicLite", onClick = { runCatching { uri.openUri(SOURCE_URL) } })

@@ -8,6 +8,8 @@ import com.korenskoy.yandexmusic.data.download.CardStorage
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
 import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
 import com.korenskoy.yandexmusic.data.player.EncrawDataSourceFactory
+import com.korenskoy.yandexmusic.data.player.PlaybackBuffering
+import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
 import com.korenskoy.yandexmusic.data.player.SystemEqualizer
 import com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl
@@ -61,10 +63,13 @@ object PlayerModule {
         // Encrypted tracks on the SD card are read through their own source; everything else as before
         val cardAware = CardAwareDataSourceFactory(encrawDataSourceFactory, card)
         val mediaSourceFactory = DefaultMediaSourceFactory(cardAware)
+            // A broken download is retried while the music plays on from what is ahead
+            .setLoadErrorHandlingPolicy(PlaybackBuffering.PatientLoadErrors())
 
         return try {
             ExoPlayer.Builder(context, renderersFactory)
                 .setMediaSourceFactory(mediaSourceFactory)
+                .setLoadControl(PlaybackBuffering.loadControl())
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
                 .setHandleAudioBecomingNoisy(true)
                 .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -72,6 +77,7 @@ object PlayerModule {
         } catch (e: Exception) {
             ExoPlayer.Builder(context, renderersFactory)
                 .setMediaSourceFactory(mediaSourceFactory)
+                .setLoadControl(PlaybackBuffering.loadControl())
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
                 .setHandleAudioBecomingNoisy(true)
                 .build()
@@ -86,13 +92,14 @@ object PlayerModule {
         preloadManager: TrackPreloadManager,
         wakeLockHelper: PlaybackWakeLockHelper,
         equalizer: SystemEqualizer,
-        card: CardStorage
+        card: CardStorage,
+        journal: PlaybackJournal
     ): PlayerRepository {
         val playerA = createConfiguredExoPlayer(context, equalizer.audioSessionId, card)
         val playerB = createConfiguredExoPlayer(context, equalizer.audioSessionId, card)
         equalizer.announce()
         return PlayerRepositoryImpl(
-            playerA, playerB, downloadManager, preloadManager, wakeLockHelper
+            playerA, playerB, downloadManager, preloadManager, wakeLockHelper, journal
         )
     }
 

@@ -102,6 +102,29 @@ class TrackPreloadManager @Inject constructor(
         }
     }
 
+    /**
+     * A light ordinary stream for an uneven link: the best full-track variant not heavier than [maxKbps], else
+     * the lightest one. Nothing is cached here: once the link is steady the chosen quality comes back.
+     */
+    suspend fun resolveLightStream(trackId: String, maxKbps: Int): ResolvedStream? = withContext(Dispatchers.IO) {
+        try {
+            // Only the codecs this app plays, as for any other stream
+            val full = StreamVariants.ranked(api.getTrackDownloadInfo(trackId).result.orEmpty()).filter { !it.preview }
+            val order = full.filter { it.bitrateInKbps <= maxKbps }.sortedByDescending { it.bitrateInKbps } +
+                full.filter { it.bitrateInKbps > maxKbps }.sortedBy { it.bitrateInKbps }
+            order.firstNotNullOfOrNull { variant ->
+                resolveXmlToStreamUrl(variant.downloadInfoUrl, variant.codec)?.let { url ->
+                    ResolvedStream(url, StreamQuality(variant.codec, variant.bitrateInKbps))
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("TrackPreloadManager", "No light stream for $trackId", e)
+            null
+        }
+    }
+
     /** Compatible sound: what download-info offers, from the best down, previews included as usual. */
     private suspend fun resolveCompatible(trackId: String): ResolvedStream? {
         val offeredList = api.getTrackDownloadInfo(trackId).result.orEmpty()

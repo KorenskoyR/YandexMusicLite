@@ -171,6 +171,10 @@ class SettingsRepositoryImpl @Inject constructor(
     override val skipExplicit = explicitPref.first
     override suspend fun setSkipExplicit(enabled: Boolean) = explicitPref.second(enabled)
 
+    private val smoothPref = bool("smooth_playback", true)
+    override val smoothPlayback = smoothPref.first
+    override suspend fun setSmoothPlayback(enabled: Boolean) = smoothPref.second(enabled)
+
     private val sdCardPref = bool("downloads_on_sd_card", false)
     override val downloadsOnSdCard = sdCardPref.first
     override suspend fun setDownloadsOnSdCard(enabled: Boolean) = sdCardPref.second(enabled)

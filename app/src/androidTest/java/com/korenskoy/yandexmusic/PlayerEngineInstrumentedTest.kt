@@ -204,7 +204,7 @@ class PlayerEngineInstrumentedTest {
 }
 
 /** No account: this engine test drives live radio streams, so stream resolution never asks about auth. */
-private class NoAuth : AuthRepository {
+internal class NoAuth : AuthRepository {
     override val activeAccount = MutableStateFlow<UserAccount?>(null)
     override val allAccounts = MutableStateFlow<List<UserAccount>>(emptyList())
     override val defaultAccountUid = MutableStateFlow<String?>(null)

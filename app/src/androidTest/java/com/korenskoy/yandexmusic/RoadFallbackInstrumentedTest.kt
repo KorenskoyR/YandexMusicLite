@@ -137,7 +137,7 @@ class RoadFallbackInstrumentedTest {
         play(a, listOf(a))
 
         assertPlaysAudibly(a.idString)
-        assertEquals("MP3 · 192 кбит/с", vm.streamQuality.value)
+        assertEquals("MP3 · 192 кбит/с · из кэша", vm.streamQuality.value)
     }
 
     @Test
@@ -209,9 +209,24 @@ class RoadFallbackInstrumentedTest {
             }
         }
         preload.seedForTest(a.idString, STREAM, TrackPreloadManager.StreamQuality("mp3", 320))
+        // The earlier cases here cut the connection: the controller still counts the link as uneven and would
+        // rightly play the copy. This case starts from a steady link.
+        MainViewModel::class.java.getDeclaredField("playbackController").run {
+            isAccessible = true
+            get(vm)
+        }.let { controller ->
+            controller.javaClass.getDeclaredField("steadiness").run {
+                isAccessible = true
+                get(controller)
+            }.let { it.javaClass.getMethod("reset").invoke(it) }
+        }
 
         play(a, listOf(a))
-        waitUntil(30_000, "the stream plays") { vm.isPlaying.value && !vm.isBuffering.value && vm.streamQuality.value?.contains("320") == true }
+        try {
+            waitUntil(30_000, "the stream plays") { vm.isPlaying.value && !vm.isBuffering.value && vm.streamQuality.value?.contains("320") == true }
+        } catch (e: AssertionError) {
+            throw AssertionError("${e.message}: quality=${vm.streamQuality.value} playing=${vm.isPlaying.value} buffering=${vm.isBuffering.value} track=${vm.currentTrack.value?.idString}")
+        }
         Thread.sleep(3_000)
         val beforeDrop = vm.progress.value
 

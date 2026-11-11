@@ -81,7 +81,8 @@ class PlaybackController @Inject constructor(
     private val stateStore: PlaybackStateStore,
     private val settingsRepository: SettingsRepository,
     private val networkMonitor: NetworkMonitor,
-    private val reserve: RoadReserve
+    private val reserve: RoadReserve,
+    private val journal: PlaybackJournal
 ) {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
@@ -137,6 +138,15 @@ class PlaybackController @Inject constructor(
 
     // Declared before the wave and the init blocks below: both may read them at once
     private val skipExplicit = settingsRepository.skipExplicit.stateIn(scope, SharingStarted.Eagerly, false)
+    private val smoothOn = settingsRepository.smoothPlayback.stateIn(scope, SharingStarted.Eagerly, true)
+
+    /** Whether the link is uneven: the music waited for data mid-track. */
+    private val steadiness = LinkSteadiness(SystemClock::elapsedRealtime)
+    /** The track that has been heard: only its stops count, not the wait before a track starts. */
+    private var soundedTrackId: String? = null
+    private var stallLastedJob: Job? = null
+    /** Light streams already asked for while the link is uneven, so a prepared track is not asked twice. */
+    private val lightStreams = mutableMapOf<String, Pair<TrackPreloadManager.ResolvedStream, Long>>()
 
     private val _waveSeed = MutableStateFlow<TrackDetailsDto?>(null)
     /** The track a "wave by track" was started from; null while My Wave (or anything else) plays. */
@@ -218,7 +228,8 @@ class PlaybackController @Inject constructor(
             playing && signedIn && state == LinkState.GOOD && track?.isRadio != true
         },
         resolve = preloadManager::resolveOrdinaryStream,
-        streamNeedsTheLine = { isBuffering.value },
+        // The playing track comes first: the cache fills only while it has enough in hand
+        streamNeedsTheLine = { isBuffering.value || playerRepository.bufferedAheadMs < RESERVE_HEADROOM_MS },
         upcoming = { upcomingTracks() },
         moreTracks = { wave.tracks.value },
         isDownloaded = preloadManager::hasPlayableCopy,
@@ -256,6 +267,7 @@ class PlaybackController @Inject constructor(
                     _isStarting.value = false
                     consecutiveFailedTracks = 0
                     retriedTrackId = null
+                    soundedTrackId = playerRepository.currentTrackId.value
                     if (streamingTrackId != null && streamingTrackId == _currentTrack.value?.idString) updateLink { onStreamAudible() }
                 }
             }
@@ -294,6 +306,7 @@ class PlaybackController @Inject constructor(
             }
             .launchIn(scope)
 
+        watchTheSteadiness()
         keepWaveShelfFilled()
         watchTheLink()
         reserveKeeper.start()
@@ -829,7 +842,41 @@ class PlaybackController @Inject constructor(
             }
             TrackOrigin.STREAM -> Unit
         }
+        when (smoothOrigin(trackId)) {
+            SmoothOrigin.COPY -> {
+                playCopy(track, crossfade, startPositionMs)
+                return
+            }
+            SmoothOrigin.LIGHT_STREAM -> {
+                playLight(track, crossfade, startPositionMs)
+                return
+            }
+            SmoothOrigin.CHOSEN_STREAM -> Unit
+        }
+        playChosenStream(track, crossfade, startPositionMs)
+    }
 
+    /** The uneven link: a light stream, or the chosen one when no light one is offered. */
+    private fun playLight(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
+        val trackId = track.idString
+        currentPlayJob = scope.launch {
+            val light = lightStream(trackId)
+            if (_currentTrack.value?.idString != trackId) return@launch
+            if (light == null) {
+                playChosenStream(track, crossfade, startPositionMs)
+                return@launch
+            }
+            _streamQuality.value = context.getString(R.string.quality_light, light.quality.codec.uppercase(), light.quality.bitrateKbps)
+            streamingTrackId = trackId
+            playingCopyId = null
+            journal.record(PlaybackJournal.Kind.LIGHT, track.title)
+            playerRepository.playTrack(trackId, light.url, track.title, track.artists.firstOrNull()?.name, coverUrlFor(track), crossfade, startPositionMs)
+        }
+    }
+
+    /** The stream of the chosen quality, as always. */
+    private fun playChosenStream(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
+        val trackId = track.idString
         // Instant start when the URL is already resolved
         val fastUrl = preloadManager.getResolvedUrl(trackId)
         if (fastUrl != null) {
@@ -904,7 +951,7 @@ class PlaybackController @Inject constructor(
         }
         currentPlayJob?.cancel()
         _isStarting.value = true
-        _streamQuality.value = reserve.qualityOf(trackId)?.let { context.getString(R.string.quality_stream, it.codec.uppercase(), it.bitrateKbps) }
+        _streamQuality.value = reserve.qualityOf(trackId)?.let { context.getString(R.string.quality_from_cache, it.codec.uppercase(), it.bitrateKbps) }
         streamingTrackId = null
         playingCopyId = trackId
         playerRepository.playTrack(trackId, file.toUri().toString(), track.title, track.artists.firstOrNull()?.name, coverUrlFor(track), crossfade, startPositionMs)
@@ -917,8 +964,93 @@ class PlaybackController @Inject constructor(
         val trackId = track.idString
         if (!reserve.has(trackId)) return
         val position = if (playerRepository.currentTrackId.value == trackId) progress.value else restoredPositionMs.value
+        journal.record(PlaybackJournal.Kind.COPY, track.title, position)
         playCopy(track, crossfade = false, startPositionMs = position)
     }
+
+    /**
+     * Stops in the middle of a track tell an uneven link: one longer than 1.5 s, or two within two minutes.
+     * Then the playing track goes on from its copy or a light stream, and the next ones follow; after five
+     * steady minutes the chosen quality comes back with the next track.
+     */
+    private fun watchTheSteadiness() {
+        playerRepository.isBuffering.onEach { buffering ->
+            stallLastedJob?.cancel()
+            val trackId = playerRepository.currentTrackId.value
+            val track = _currentTrack.value
+            if (buffering) {
+                val midTrack = trackId != null && trackId == soundedTrackId && track?.idString == trackId && !track.isRadio
+                if (!midTrack) return@onEach
+                if (steadiness.onStall()) onLinkUneven()
+                stallLastedJob = scope.launch {
+                    delay(LinkSteadiness.LONG_STALL_MS)
+                    if (playerRepository.isBuffering.value && steadiness.onStallLasted()) onLinkUneven()
+                }
+            } else {
+                steadiness.onStallOver()?.let { journal.record(PlaybackJournal.Kind.STALL, track?.title, it) }
+            }
+        }.launchIn(scope)
+        scope.launch {
+            while (true) {
+                delay(STEADY_CHECK_MS)
+                if (steadiness.checkSteady()) {
+                    lightStreams.clear()
+                    journal.record(PlaybackJournal.Kind.STEADY)
+                }
+            }
+        }
+    }
+
+    /** The link has just become uneven. */
+    private fun onLinkUneven() {
+        journal.record(PlaybackJournal.Kind.UNEVEN)
+        if (!smoothOn.value) return
+        val track = _currentTrack.value?.takeIf { !it.isRadio } ?: return
+        val trackId = track.idString
+        val fromStream = streamingTrackId == trackId && playerRepository.currentTrackId.value == trackId
+        val switching = fromStream && switchToSmoothSource(track)
+        // The next track was prepared from the chosen stream: it follows the uneven link too
+        if (!switching) {
+            playerRepository.dropStandby()
+            prepareNextTrackInQueue()
+        }
+    }
+
+    /** The playing track goes on from its copy, or a light stream when it is heavier. @return true if it does. */
+    private fun switchToSmoothSource(track: TrackDetailsDto): Boolean {
+        val trackId = track.idString
+        val artist = track.artists.firstOrNull()?.name
+        val copy = copyUri(trackId)
+        if (copy != null) {
+            _streamQuality.value = reserve.qualityOf(trackId)?.let { context.getString(R.string.quality_from_cache, it.codec.uppercase(), it.bitrateKbps) }
+            streamingTrackId = null
+            playingCopyId = trackId
+            journal.record(PlaybackJournal.Kind.COPY, track.title, progress.value)
+            playerRepository.switchSource(trackId, copy, track.title, artist, coverUrlFor(track))
+            return true
+        }
+        val playing = preloadManager.qualityOf(trackId)
+        if (playing != null && !playing.isLossless && playing.bitrateKbps <= SmoothPlan.LIGHT_KBPS) return false
+        scope.launch {
+            val light = lightStream(trackId) ?: return@launch
+            if (_currentTrack.value?.idString != trackId || !steadiness.uneven) return@launch
+            _streamQuality.value = context.getString(R.string.quality_light, light.quality.codec.uppercase(), light.quality.bitrateKbps)
+            journal.record(PlaybackJournal.Kind.LIGHT, track.title)
+            playerRepository.switchSource(trackId, light.url, track.title, artist, coverUrlFor(track))
+        }
+        return true
+    }
+
+    /** A light ordinary stream, asked for once per track while the link is uneven. */
+    private suspend fun lightStream(trackId: String): TrackPreloadManager.ResolvedStream? {
+        lightStreams[trackId]?.takeIf { SystemClock.elapsedRealtime() - it.second < LIGHT_URL_TTL_MS }?.let { return it.first }
+        val light = preloadManager.resolveLightStream(trackId, SmoothPlan.LIGHT_KBPS) ?: return null
+        lightStreams[trackId] = light to SystemClock.elapsedRealtime()
+        return light
+    }
+
+    /** Where a track comes from while the link is uneven; the chosen stream otherwise. */
+    private fun smoothOrigin(trackId: String): SmoothOrigin = SmoothPlan.originFor(steadiness.uneven, smoothOn.value, reserve.has(trackId))
 
     /** Is the server there at all? A short check, with no data to speak of: it tells a weak link from no link. */
     private suspend fun reportTrouble() {
@@ -1135,6 +1267,8 @@ class PlaybackController @Inject constructor(
                 preloadManager.hasPlayableCopy(nextId) -> ""
                 RoadPlan.originFor(currentLink(), link.mayTryStream(), reserve.has(nextId)) == TrackOrigin.COPY -> copyUri(nextId) ?: return@launch
                 currentLink() == LinkState.NONE -> return@launch
+                smoothOrigin(nextId) == SmoothOrigin.COPY -> copyUri(nextId) ?: return@launch
+                smoothOrigin(nextId) == SmoothOrigin.LIGHT_STREAM -> lightStream(nextId)?.url ?: return@launch
                 else -> preloadManager.getOrFetchUrl(nextId)?.let { stream ->
                     val copy = reserve.qualityOf(nextId)
                     if (copy != null && RoadPlan.copyIsEnough(preloadManager.qualityOf(nextId), copy)) copyUri(nextId) ?: stream else stream
@@ -1300,6 +1434,10 @@ class PlaybackController @Inject constructor(
         private const val BUFFERING_TIMEOUT_MS = 15_000L
         /** The player's buffer is empty and the music stands: the moment to look at the link. */
         private const val LINK_STALL_MS = 6_000L
+        /** The cache fills only while the playing track has this much in hand. */
+        const val RESERVE_HEADROOM_MS = 20_000L
+        private const val STEADY_CHECK_MS = 30_000L
+        private const val LIGHT_URL_TTL_MS = 30 * 60_000L
         private const val SERVER_CHECK_INTERVAL_MS = 30_000L
         /** Long enough for a slow link to answer: a weak link must not read as no link. */
         private const val SERVER_CHECK_TIMEOUT_MS = 4_000

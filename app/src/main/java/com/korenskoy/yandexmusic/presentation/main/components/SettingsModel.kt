@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import android.net.Uri
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
@@ -21,6 +22,10 @@ data class SettingsUiState(
     val defaultAccountName: String? = null,
     val updateStatus: String? = null,
     val crashReports: Int = 0,
+    /** "Не прерывать музыку". */
+    val smoothPlayback: Boolean = true,
+    /** The last hour of music, for "Журнал воспроизведения". */
+    val journal: PlaybackJournal.Snapshot = PlaybackJournal.Snapshot(),
     val compatibleSound: Boolean = false,
     val crossfadeSeconds: Int = 3,
     val normalizeVolume: Boolean = false,
@@ -51,6 +56,9 @@ data class SettingsActions(
     val onLogout: () -> Unit = {},
     val onCheckForUpdates: () -> Unit = {},
     val onOpenCrashLog: () -> Unit = {},
+    val onSmoothPlaybackChange: (Boolean) -> Unit = {},
+    val onShareJournal: (String) -> Unit = {},
+    val onClearJournal: () -> Unit = {},
     val onCompatibleSoundChange: (Boolean) -> Unit = {},
     val onCrossfadeChange: (Int) -> Unit = {},
     val onNormalizeVolumeChange: (Boolean) -> Unit = {},
