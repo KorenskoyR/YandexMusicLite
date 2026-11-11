@@ -365,5 +365,8 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
             )
             HiFiSlider(value = value, onValueChange = { value = it }, onValueChangeFinished = { onManualChange(value) }, valueRange = 0.5f..2.0f, steps = 29)
         }
+        // The car screen fits itself to the screen whatever the scale: said here, where the scale is looked for
+        Spacer(Modifier.height(8.dp))
+        Text(stringResource(R.string.settings_ui_scale_car_note), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp)
     }
 }

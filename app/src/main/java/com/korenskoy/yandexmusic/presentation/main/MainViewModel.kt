@@ -1,5 +1,19 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import android.content.res.Resources
+import kotlinx.serialization.SerializationException
+import retrofit2.HttpException
+import java.io.IOException
+import android.util.Log
+import com.korenskoy.yandexmusic.data.player.VoiceSearch
+import com.korenskoy.yandexmusic.R
+import androidx.annotation.StringRes
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.korenskoy.yandexmusic.data.download.RemoveOutcome
+import com.korenskoy.yandexmusic.data.download.TrackOfflineState
 import com.korenskoy.yandexmusic.data.download.OfflineCollection
 import com.korenskoy.yandexmusic.data.download.OfflineDownloads
 import com.korenskoy.yandexmusic.data.download.OfflineRules
@@ -63,7 +77,8 @@ class MainViewModel @Inject constructor(
     networkMonitor: NetworkMonitor,
     private val reactions: TrackReactions,
     private val playRequests: PlayRequests,
-    offline: OfflineDownloads,
+    private val offline: OfflineDownloads,
+    private val voiceSearch: VoiceSearch,
     albums: LikedAlbumsRepository
 ) : ViewModel() {
 
@@ -120,6 +135,92 @@ class MainViewModel @Inject constructor(
     val currentSource: StateFlow<PlaylistSource> = playbackController.currentSource
     val currentPlaylist: StateFlow<List<TrackDetailsDto>> = playbackController.currentPlaylist
     val currentTrack: StateFlow<TrackDetailsDto?> = playbackController.currentTrack
+
+    /** The playing track on the device: the player's download button. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentTrackOffline: StateFlow<TrackOfflineState> = playbackController.currentTrack
+        .flatMapLatest { track -> if (track == null || track.isRadio) flowOf(TrackOfflineState.NONE) else offline.trackState(track.idString) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrackOfflineState.NONE)
+
+    /** A track's place on the device, for its menu. */
+    fun trackOffline(trackId: String): Flow<TrackOfflineState> = offline.trackState(trackId)
+
+    private fun voiceFailed(e: Exception) {
+        Log.w("MainViewModel", "Voice search failed", e)
+        _trackMessages.tryEmit(UiMessage(R.string.voice_failed))
+    }
+
+    /** A message for the snackbar: a text and what goes into it (a track's title, a phrase). */
+    data class UiMessage(@param:StringRes val text: Int, val args: List<String> = emptyList()) {
+        fun text(resources: Resources): String = when (args.size) {
+            0 -> resources.getString(text)
+            1 -> resources.getString(text, args[0])
+            2 -> resources.getString(text, args[0], args[1])
+            else -> resources.getString(text, args[0], args[1], args[2])
+        }
+    }
+
+    private val _trackMessages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 4)
+    val trackMessages: SharedFlow<UiMessage> = _trackMessages
+
+    /** "Скачать" for one track: in the background, then among the downloads. */
+    fun downloadTrack(track: TrackDetailsDto) {
+        viewModelScope.launch {
+            offline.downloadTrack(track)
+            _trackMessages.tryEmit(UiMessage(R.string.track_download_started, listOf(track.title.orEmpty())))
+        }
+    }
+
+    /** "Убрать с устройства" for one track, and why it stays when something else keeps it. */
+    fun removeTrackFromDevice(track: TrackDetailsDto) {
+        viewModelScope.launch {
+            val text = when (offline.removeTrackFromDevice(track.idString)) {
+                RemoveOutcome.REMOVED -> R.string.track_removed
+                RemoveOutcome.KEPT_BY_COLLECTION -> R.string.track_kept_by_collection
+                RemoveOutcome.KEPT_BY_AUTO_DOWNLOAD -> R.string.track_kept_by_auto_download
+            }
+            _trackMessages.tryEmit(UiMessage(text, listOf(track.title.orEmpty())))
+        }
+    }
+
+    /**
+     * The car's microphone: what was said plays at once, without a list to pick from while driving — a named
+     * station, or what the search thinks was meant; a message says what plays.
+     */
+    fun playByVoice(phrase: String) {
+        viewModelScope.launch {
+            val pick = try {
+                voiceSearch.pick(phrase)
+            } catch (e: IOException) {
+                voiceFailed(e)
+                return@launch
+            } catch (e: HttpException) {
+                voiceFailed(e)
+                return@launch
+            } catch (e: SerializationException) {
+                voiceFailed(e)
+                return@launch
+            }
+            when (pick) {
+                is VoiceSearch.Pick.Station -> {
+                    playRequests.userStarted()
+                    playbackController.playRadioStation(pick.station)
+                    _trackMessages.tryEmit(UiMessage(R.string.voice_station, listOf(pick.query, pick.station.name)))
+                }
+                is VoiceSearch.Pick.Tracks -> {
+                    val first = pick.tracks.first()
+                    playRequests.userStarted()
+                    playbackController.playTrack(first.idString, pick.tracks, PlaylistSource.SEARCH)
+                    val more = pick.tracks.size - 1
+                    _trackMessages.tryEmit(
+                        if (more > 0) UiMessage(R.string.voice_playing_more, listOf(pick.query, first.title.orEmpty(), more.toString()))
+                        else UiMessage(R.string.voice_playing, listOf(pick.query, first.title.orEmpty()))
+                    )
+                }
+                is VoiceSearch.Pick.Nothing -> _trackMessages.tryEmit(UiMessage(R.string.voice_nothing, listOf(pick.query)))
+            }
+        }
+    }
     val currentTrackId: StateFlow<String?> = playbackController.currentTrack
         .map { it?.idString }
         .stateIn(viewModelScope, SharingStarted.Eagerly, playbackController.currentTrack.value?.idString)

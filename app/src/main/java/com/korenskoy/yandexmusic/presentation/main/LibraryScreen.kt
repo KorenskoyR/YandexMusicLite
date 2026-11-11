@@ -308,11 +308,13 @@ fun LibraryScreen(
                             onBack = { sectionName = null }
                         )
                     }
-                    if (shown == LibrarySection.DOWNLOADED && offlineCollections.isNotEmpty()) {
+                    // Tracks downloaded one by one are in the list below, not a card of their own
+                    val keptCards = offlineCollections.filterNot { it.isSingles }
+                    if (shown == LibrarySection.DOWNLOADED && keptCards.isNotEmpty()) {
                         item(key = "kept") {
                             KeptRow(
                                 liked = tracks.filter { it.idString in downloadedTrackIds },
-                                kept = offlineCollections,
+                                kept = keptCards,
                                 downloadedTrackIds = downloadedTrackIds,
                                 onOpenLiked = { sectionName = LibrarySection.LIKED.name },
                                 onOpen = onOpenCollection

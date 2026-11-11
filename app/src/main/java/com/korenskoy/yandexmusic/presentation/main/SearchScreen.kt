@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.material.icons.rounded.Mic
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
@@ -122,6 +123,8 @@ fun SearchScreen(
     onRemoveFromHistory: (String) -> Unit = {},
     onClearHistory: () -> Unit = {},
     onSubmit: () -> Unit = {},
+    /** The microphone in the field; null when the device has no voice input. */
+    onVoice: (() -> Unit)? = null,
     initiallyShowHistory: Boolean = false
 ) {
     val isLandscape = LocalConfiguration.current.orientation ==
@@ -230,6 +233,7 @@ fun SearchScreen(
                 hasHistory = history.isNotEmpty(),
                 historyOpen = historyOpen,
                 onHistory = { historyPanel.targetState = !historyOpen },
+                onVoice = onVoice,
                 modifier = Modifier.weight(1f)
             )
             if (focused || query.isNotEmpty()) {
@@ -317,7 +321,8 @@ internal fun SearchField(
     hasHistory: Boolean,
     historyOpen: Boolean,
     onHistory: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onVoice: (() -> Unit)? = null
 ) {
     val lit by animateFloatAsState(if (focused) 1f else 0f, HiFiMotion.standard(), label = "field_rim")
     Row(
@@ -345,11 +350,18 @@ internal fun SearchField(
                 modifier = Modifier.fillMaxWidth().onFocusChanged { onFocusChange(it.isFocused) }
             )
         }
-        when {
-            query.isNotEmpty() -> FieldIconButton(onClick = { onQueryChange("") }, description = stringResource(R.string.cd_ochistit)) {
+        if (query.isNotEmpty()) {
+            FieldIconButton(onClick = { onQueryChange("") }, description = stringResource(R.string.cd_ochistit)) {
                 Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
             }
-            hasHistory -> {
+        } else {
+            // An empty field offers the voice and the recent queries
+            if (onVoice != null) {
+                FieldIconButton(onClick = onVoice, description = stringResource(R.string.voice_search)) {
+                    Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
+                }
+            }
+            if (hasHistory) {
                 Spacer(Modifier.size(width = 1.dp, height = 24.dp).background(Color.White.copy(alpha = 0.14f)))
                 FieldIconButton(onClick = onHistory, description = stringResource(R.string.search_recent_button), selected = historyOpen) {
                     Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White.copy(alpha = if (historyOpen) 1f else 0.78f), modifier = Modifier.size(20.dp))

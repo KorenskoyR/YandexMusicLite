@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.runtime.remember
+import com.korenskoy.yandexmusic.data.download.TrackOfflineState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +47,7 @@ internal fun TrackMenuHost(
     val playNextDone = stringResource(R.string.track_menu_play_next_done)
     val scope = rememberCoroutineScope()
     val track = request.track
+    val offline by remember(track.idString) { viewModel.trackOffline(track.idString) }.collectAsStateWithLifecycle(TrackOfflineState.NONE)
     TrackContextMenu(
         track = track,
         inPlaylist = request.playlist,
@@ -61,6 +64,9 @@ internal fun TrackMenuHost(
         onCreatePlaylist = { playlistsVm.create(it, thenAdd = track) },
         onRemoveFromPlaylist = { request.playlist?.let { playlistsVm.removeTrack(it, track.idString) } },
         onTrackWave = { viewModel.startTrackWave(track) },
+        offline = offline.takeUnless { track.isRadio },
+        onDownload = { viewModel.downloadTrack(track) },
+        onRemoveDownload = { viewModel.removeTrackFromDevice(track) },
         onOpenArtist = track.artists.firstNotNullOfOrNull { artist -> artist.idString?.let { id -> id to artist.name.orEmpty() } }
             ?.let { (id, name) ->
                 {

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.data.player.VoicePhrase
+import com.korenskoy.yandexmusic.presentation.voice.rememberVoiceInput
 import androidx.compose.runtime.LaunchedEffect
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
@@ -115,6 +117,11 @@ internal fun SearchTab(
     val history by searchVm.history.collectAsStateWithLifecycle()
     val weeklyHits by searchVm.weeklyHits.collectAsStateWithLifecycle()
     val trendTracks by searchVm.trendTracks.collectAsStateWithLifecycle()
+    // What was said goes into the field without "включи" and the like, and the search runs at once
+    val voice = rememberVoiceInput { phrase ->
+        searchVm.onQueryChange(VoicePhrase.query(phrase))
+        searchVm.rememberQuery()
+    }
     SearchScreen(
         query = query,
         onQueryChange = { searchVm.onQueryChange(it) },
@@ -148,7 +155,8 @@ internal fun SearchTab(
         },
         onRemoveFromHistory = { searchVm.removeFromHistory(it) },
         onClearHistory = { searchVm.clearHistory() },
-        onSubmit = { searchVm.rememberQuery() }
+        onSubmit = { searchVm.rememberQuery() },
+        onVoice = voice
     )
 }
 
@@ -298,6 +306,8 @@ internal fun CarTab(
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
+    // Said in the car, played at once: no list to pick from while driving
+    val voice = rememberVoiceInput { phrase -> viewModel.playByVoice(phrase) }
     val track = now.track
     // What will really play next, by the player's own rule (explicit passed over, a playlist goes on from its start)
     val upcoming = remember(queue, now.trackId, now.source, skipExplicit, track?.isRadio) {
@@ -337,7 +347,8 @@ internal fun CarTab(
         onWaveTuningChange = viewModel::setWaveTuning,
         onTrackWave = viewModel::startTrackWave,
         onBackToMyWave = viewModel::returnToMyWave,
-        onOpenSettings = { showSettings = true }
+        onOpenSettings = { showSettings = true },
+        onVoiceSearch = voice
     )
 }
 

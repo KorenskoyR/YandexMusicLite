@@ -381,7 +381,12 @@ fun MainScreen(
                 LaunchedEffect(lifecycleOwner) {
                     // Collected only while visible, so a message raised in the background falls back to a toast
                     lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                        merge(viewModel.playbackMessages, playlistsVm.messages, catalogVm.messages.map { resources.getString(it) }).collect { snackbar.showSnackbar(it) }
+                        merge(
+                            viewModel.playbackMessages,
+                            playlistsVm.messages,
+                            catalogVm.messages.map { resources.getString(it) },
+                            viewModel.trackMessages.map { it.text(resources) }
+                        ).collect { snackbar.showSnackbar(it) }
                     }
                 }
                 // A wave by a track has started: say so, and offer to undo it
@@ -478,6 +483,7 @@ private fun PlayerHost(
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsStateWithLifecycle()
     val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
+    val offline by viewModel.currentTrackOffline.collectAsStateWithLifecycle()
     val stationId = track.idString.removePrefix("radio_")
     FullScreenPlayer(
         track = track,
@@ -508,6 +514,9 @@ private fun PlayerHost(
         onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
         onCancelSleepTimer = { viewModel.cancelSleepTimer() },
         onAddToPlaylist = onAddToPlaylist,
+        offline = offline.takeUnless { track.isRadio },
+        onDownload = { viewModel.downloadTrack(track) },
+        onRemoveDownload = { viewModel.removeTrackFromDevice(track) },
         onQualityClick = onQualityClick,
         coverModifier = coverModifier
     )

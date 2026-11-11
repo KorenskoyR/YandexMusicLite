@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.data.download
 
+import kotlinx.coroutines.flow.first
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flowOn
@@ -33,7 +36,8 @@ class OfflineDownloads @Inject constructor(
     @ApplicationContext private val context: Context,
     private val collections: OfflineCollections,
     private val downloads: TrackDownloadManager,
-    private val library: LibraryRepository
+    private val library: LibraryRepository,
+    private val settings: SettingsRepository
 ) {
     private val workManager get() = WorkManager.getInstance(context)
 
@@ -79,6 +83,65 @@ class OfflineDownloads @Inject constructor(
         val kept = collections.get(key) ?: return
         if (OfflineRules.missing(kept, downloads.downloadedTrackIds.value).isNotEmpty()) enqueue(key)
     }
+
+    // region One track at a time
+
+    /** Where [trackId] is: the player's download button and a track's menu follow it. */
+    fun trackState(trackId: String): Flow<TrackOfflineState> = combine(
+        collections.all.map { list -> list.firstOrNull { it.isSingles } },
+        downloads.downloadedTrackIds
+    ) { singles, onDevice -> OfflineRules.trackState(trackId, onDevice, singles) }.distinctUntilChanged()
+
+    /**
+     * "Скачать" for one track: it joins the tracks downloaded one by one and is fetched in the background
+     * (on through a closed app and a lost connection), then listed among the downloads.
+     */
+    suspend fun downloadTrack(track: TrackDetailsDto) {
+        if (track.isRadio || track.idString.isEmpty()) return
+        val singles = collections.get(OfflineCollection.SINGLES_KEY)
+        if (singles?.trackIds?.contains(track.idString) == true) {
+            enqueue(OfflineCollection.SINGLES_KEY)
+            return
+        }
+        // The newest first, as in "Скачанные"
+        collections.save(
+            OfflineCollection(
+                OfflineCollection.SINGLES_KEY,
+                context.getString(R.string.offline_singles_title),
+                tracks = listOf(track) + singles?.tracks.orEmpty()
+            )
+        )
+        enqueue(OfflineCollection.SINGLES_KEY)
+    }
+
+    /**
+     * "Убрать с устройства" for one track: out of the tracks downloaded one by one (its download stops), and
+     * its file goes unless something else keeps it — then [RemoveOutcome] says what.
+     */
+    suspend fun removeTrackFromDevice(trackId: String): RemoveOutcome {
+        val singles = collections.get(OfflineCollection.SINGLES_KEY)
+        if (singles != null && trackId in singles.trackIds) {
+            // The track may be the one downloading now: the work stops and goes on with the rest
+            workManager.cancelUniqueWork(workName(OfflineCollection.SINGLES_KEY))
+            val rest = singles.tracks.filterNot { it.idString == trackId }
+            if (rest.isEmpty()) collections.remove(OfflineCollection.SINGLES_KEY)
+            else {
+                collections.save(singles.copy(tracks = rest))
+                resume(OfflineCollection.SINGLES_KEY)
+            }
+        }
+        val outcome = OfflineRules.removeOutcome(
+            inKeptCollection = trackId in collections.keptTrackIds(),
+            liked = library.likedTracks.value.any { it.idString == trackId },
+            autoDownloadLiked = settings.autoDownloadLikedTracks.first()
+        )
+        if (outcome == RemoveOutcome.REMOVED) {
+            runCatching { downloads.removeTrack(trackId) }.onFailure { Log.w(TAG, "Not removed: $trackId", it) }
+        }
+        return outcome
+    }
+
+    // endregion
 
     /** "Очистить": every download is gone, so no playlist is kept any more. */
     suspend fun forgetAll() {

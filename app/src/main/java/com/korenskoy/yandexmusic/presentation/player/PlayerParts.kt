@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material.icons.rounded.DownloadDone
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.Crossfade
+import com.korenskoy.yandexmusic.data.download.TrackOfflineState
 import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.LocalDensity
@@ -385,7 +392,16 @@ internal fun PlayerCover(
 // --- Title, quality, timeline ------------------------------------------------------------------------
 
 @Composable
-internal fun TitleRow(track: TrackDetailsDto, direction: Int, compact: Boolean, onAddToPlaylist: () -> Unit, onTrackWave: (() -> Unit)? = null) {
+internal fun TitleRow(
+    track: TrackDetailsDto,
+    direction: Int,
+    compact: Boolean,
+    onAddToPlaylist: () -> Unit,
+    onTrackWave: (() -> Unit)? = null,
+    /** The track on the device; null: no download button (a station). */
+    offline: TrackOfflineState? = null,
+    onDownloadClick: () -> Unit = {}
+) {
     val lite = LocalHiFiLite.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         AnimatedContent(
@@ -417,6 +433,10 @@ internal fun TitleRow(track: TrackDetailsDto, direction: Int, compact: Boolean, 
         }
         }
         if (!track.isRadio) {
+            if (offline != null) {
+                TrackDownloadButton(offline, onDownloadClick)
+                Spacer(Modifier.width(10.dp))
+            }
             GlassCircleButton(
                 onClick = onAddToPlaylist,
                 contentDescription = stringResource(R.string.track_context_menu_dobavit_v_pleylist),
@@ -428,6 +448,42 @@ internal fun TitleRow(track: TrackDetailsDto, direction: Int, compact: Boolean, 
                 Spacer(Modifier.width(10.dp))
                 GlassCircleButton(onClick = onTrackWave, contentDescription = stringResource(R.string.wave_by_track_cd), size = 44.dp) {
                     Icon(Icons.Rounded.Waves, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * "Скачать" for the playing track: an arrow, then a ring that turns while it downloads (a tap stops it), then
+ * the mark every downloaded track has. Glass like its neighbours; the ring stands still in the light mode.
+ */
+@Composable
+internal fun TrackDownloadButton(state: TrackOfflineState, onClick: () -> Unit, size: Dp = 44.dp) {
+    val description = stringResource(
+        when (state) {
+            TrackOfflineState.NONE -> R.string.track_download
+            TrackOfflineState.DOWNLOADING -> R.string.track_download_stop
+            TrackOfflineState.DONE -> R.string.track_on_device
+        }
+    )
+    GlassCircleButton(onClick = onClick, contentDescription = description, size = size) {
+        Crossfade(targetState = state, animationSpec = HiFiMotion.quick(), label = "download_state") { shown ->
+            Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+                when (shown) {
+                    TrackOfflineState.NONE -> Icon(Icons.Rounded.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    TrackOfflineState.DONE -> Icon(Icons.Rounded.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    TrackOfflineState.DOWNLOADING -> {
+                        val lite = LocalHiFiLite.current
+                        val turn = if (lite) null else rememberInfiniteTransition(label = "download_ring")
+                            .animateFloat(0f, 360f, infiniteRepeatable(tween(1_100, easing = LinearEasing)), label = "download_turn")
+                        Canvas(Modifier.fillMaxSize().padding(5.dp)) {
+                            val stroke = 2.5.dp.toPx()
+                            drawArc(Color.White.copy(alpha = 0.16f), 0f, 360f, false, style = Stroke(stroke))
+                            drawArc(Color.White, (turn?.value ?: 0f) - 90f, 110f, false, style = Stroke(stroke, cap = StrokeCap.Round))
+                        }
+                        Box(Modifier.size(11.dp).clip(RoundedCornerShape(2.5.dp)).background(Color.White))
+                    }
                 }
             }
         }

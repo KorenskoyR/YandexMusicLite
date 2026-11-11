@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.DownloadDone
+import androidx.compose.material.icons.rounded.Download
+import com.korenskoy.yandexmusic.data.download.TrackOfflineState
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import com.korenskoy.yandexmusic.presentation.hifi.AppScale
@@ -99,7 +102,11 @@ fun TrackContextMenu(
     onRemoveFromPlaylist: () -> Unit,
     onOpenArtist: (() -> Unit)? = null,
     onOpenAlbum: (() -> Unit)? = null,
-    onTrackWave: (() -> Unit)? = null
+    onTrackWave: (() -> Unit)? = null,
+    /** The track on the device; null: no download item (a station). */
+    offline: TrackOfflineState? = null,
+    onDownload: () -> Unit = {},
+    onRemoveDownload: () -> Unit = {}
 ) {
     var picking by remember { mutableStateOf(startWithPlaylists) }
     var naming by remember { mutableStateOf(false) }
@@ -200,6 +207,20 @@ fun TrackContextMenu(
                 }
                 ContextMenuItem(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.track_context_menu_dobavit_v_pleylist)) {
                     picking = true
+                }
+                // One track on the device, out of a long liked list: a download, or taking it off again
+                if (offline != null && !track.isRadio) {
+                    if (offline == TrackOfflineState.NONE) {
+                        ContextMenuItem(Icons.Rounded.Download, stringResource(R.string.track_download)) {
+                            onDownload()
+                            onDismiss()
+                        }
+                    } else {
+                        ContextMenuItem(Icons.Rounded.DownloadDone, stringResource(R.string.track_remove_from_device)) {
+                            onRemoveDownload()
+                            onDismiss()
+                        }
+                    }
                 }
                 if (inPlaylist != null) {
                     ContextMenuItem(Icons.Default.PlaylistRemove, stringResource(R.string.track_menu_remove_from_playlist)) {

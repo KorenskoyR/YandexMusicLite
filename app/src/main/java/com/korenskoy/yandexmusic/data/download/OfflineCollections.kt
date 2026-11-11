@@ -21,11 +21,13 @@ import javax.inject.Singleton
 
 /**
  * A playlist or an album kept on the device: its tracks are downloaded, and new ones follow. The tracks
- * themselves are kept here too, so the list shows and plays without a connection.
+ * themselves are kept here too, so the list shows and plays without a connection. Single tracks downloaded
+ * one by one ("Скачать" in the player or a track's menu) are one more such set, [SINGLES_KEY]: the same rules
+ * of keeping, moving and cleaning apply to them.
  */
 @Serializable
 data class OfflineCollection(
-    /** "playlist:<owner>:<kind>" or "album:<id>". */
+    /** "playlist:<owner>:<kind>", "album:<id>" or [SINGLES_KEY]. */
     val key: String,
     val title: String,
     val coverUri: String? = null,
@@ -34,17 +36,27 @@ data class OfflineCollection(
     val trackIds: List<String> get() = tracks.map { it.idString }
     val isAlbum: Boolean get() = key.startsWith(ALBUM)
 
+    /** The tracks downloaded one by one: listed among the downloads, never as a playlist of its own. */
+    val isSingles: Boolean get() = key == SINGLES_KEY
+
     /** The album's id, or the playlist's kind. */
     val itemId: String get() = key.substringAfterLast(':')
 
     companion object {
         private const val PLAYLIST = "playlist:"
         private const val ALBUM = "album:"
+        const val SINGLES_KEY = "tracks:singles"
 
         fun keyOf(playlist: UserPlaylistDto) = "$PLAYLIST${playlist.ownerUid ?: "me"}:${playlist.kindString}"
         fun albumKey(albumId: String) = "$ALBUM$albumId"
     }
 }
+
+/** One track on the device: not there, on its way (or waiting for a connection), there. */
+enum class TrackOfflineState { NONE, DOWNLOADING, DONE }
+
+/** What "Убрать с устройства" did, so the screen can say why a track stays. */
+enum class RemoveOutcome { REMOVED, KEPT_BY_COLLECTION, KEPT_BY_AUTO_DOWNLOAD }
 
 /** What a playlist's download button shows. */
 sealed interface OfflineState {
@@ -65,6 +77,23 @@ object OfflineRules {
     /** Tracks of [collection] not on the device yet, each once. */
     fun missing(collection: OfflineCollection, downloaded: Set<String>): List<TrackDetailsDto> =
         collection.tracks.filter { !it.isRadio && it.idString !in downloaded }.distinctBy { it.idString }
+
+    /**
+     * "Убрать с устройства" for one track: its file goes unless a kept playlist or album holds it, or liked
+     * tracks are downloaded by themselves (it would only come back).
+     */
+    fun removeOutcome(inKeptCollection: Boolean, liked: Boolean, autoDownloadLiked: Boolean): RemoveOutcome = when {
+        inKeptCollection -> RemoveOutcome.KEPT_BY_COLLECTION
+        liked && autoDownloadLiked -> RemoveOutcome.KEPT_BY_AUTO_DOWNLOAD
+        else -> RemoveOutcome.REMOVED
+    }
+
+    /** One track's place on the device, for the player's download button and a track's menu. */
+    fun trackState(trackId: String, onDevice: Set<String>, singles: OfflineCollection?): TrackOfflineState = when {
+        trackId in onDevice -> TrackOfflineState.DONE
+        singles != null && trackId in singles.trackIds -> TrackOfflineState.DOWNLOADING
+        else -> TrackOfflineState.NONE
+    }
 
     /** A downloaded track stays while it is liked or in any kept playlist or album. */
     fun kept(collections: List<OfflineCollection>, liked: Set<String>): Set<String> =

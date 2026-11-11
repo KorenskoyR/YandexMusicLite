@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.foundation.layout.heightIn
@@ -143,6 +144,60 @@ internal fun CarQueuePanel(
         ) {
             current?.let { track -> item(key = "now") { QueueRow(u, track, isCurrent = true, onClick = null) } }
             items(upcoming.size, key = { "q" + it + upcoming[it].idString }) { index ->
+                val track = upcoming[index]
+                QueueRow(u, track, isCurrent = false) { onClick(track) }
+            }
+            if (loading && upcoming.isEmpty()) items(3, key = { "wait$it" }) { QueueRowPlaceholder(u) }
+            if (!loading && upcoming.isEmpty()) item(key = "empty") {
+                Text(
+                    stringResource(R.string.car_queue_empty),
+                    color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(17f),
+                    modifier = Modifier.padding(horizontal = u(10f), vertical = u(16f))
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The next tracks always in sight on a flat head unit, between the player and the cover: what plays now, then
+ * what follows; a tap plays it. The same rows as "Очередь", without opening anything.
+ */
+@Composable
+internal fun CarNextList(
+    u: Scale,
+    modifier: Modifier,
+    caption: String,
+    count: String,
+    current: TrackDetailsDto?,
+    upcoming: List<TrackDetailsDto>,
+    loading: Boolean,
+    onClick: (TrackDetailsDto) -> Unit
+) {
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().padding(start = u(10f), end = u(10f), bottom = u(10f)), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                caption.uppercase(), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.14.em, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+            )
+            if (upcoming.isNotEmpty()) {
+                Spacer(Modifier.width(u(12f)))
+                Text(count, color = Color.White.copy(alpha = 0.55f), fontSize = u.sp(15f), maxLines = 1)
+            }
+        }
+        val shape = RoundedCornerShape(u(30f))
+        LazyColumn(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clip(shape)
+                .background(HiFi.SheetFill.copy(alpha = 0.55f))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), shape),
+            contentPadding = PaddingValues(horizontal = u(12f), vertical = u(10f)),
+            verticalArrangement = Arrangement.spacedBy(u(4f))
+        ) {
+            current?.let { track -> item(key = "now") { QueueRow(u, track, isCurrent = true, onClick = null) } }
+            items(upcoming.size, key = { "n" + it + upcoming[it].idString }) { index ->
                 val track = upcoming[index]
                 QueueRow(u, track, isCurrent = false) { onClick(track) }
             }

@@ -3,7 +3,6 @@ package com.korenskoy.yandexmusic.data.player
 import android.util.Log
 import com.korenskoy.yandexmusic.data.download.OfflineCollections
 import com.korenskoy.yandexmusic.data.download.OfflineRules
-import com.korenskoy.yandexmusic.data.repository.SearchRepository
 import kotlinx.coroutines.CancellationException
 import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.Context
@@ -36,7 +35,7 @@ class MediaLibraryTree @Inject constructor(
     private val radioRepository: RadioRepository,
     private val downloadManager: TrackDownloadManager,
     private val playbackController: PlaybackController,
-    private val searchRepository: SearchRepository,
+    private val voiceSearch: VoiceSearch,
     private val playlistsRepository: UserPlaylistsRepository,
     private val offlineCollections: OfflineCollections
 ) {
@@ -123,21 +122,24 @@ class MediaLibraryTree @Inject constructor(
         }
     }
 
-    /** "Play <station>" picks the station, anything else the top search results; My Wave when nothing matches. */
+    /**
+     * "Play <station>" picks the station, anything else what the search thinks was meant (as the car's
+     * microphone does); My Wave when nothing matches or there is no connection: something always plays.
+     */
     private suspend fun searchAction(query: String): () -> Unit {
-        radioRepository.getBuiltinStations().firstOrNull { it.name.contains(query, ignoreCase = true) }?.let { station ->
-            return { playbackController.playRadioStation(station) }
-        }
-        val found = try {
-            searchRepository.searchTracks(query)
+        val pick = try {
+            voiceSearch.pick(query)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w("MediaLibraryTree", "Voice search failed", e)
-            emptyList()
+            null
         }
-        val first = found.firstOrNull() ?: return { playbackController.playMyVibe() }
-        return { playbackController.playTrack(first.idString, found, PlaylistSource.SEARCH) }
+        return when (pick) {
+            is VoiceSearch.Pick.Station -> ({ playbackController.playRadioStation(pick.station) })
+            is VoiceSearch.Pick.Tracks -> ({ playbackController.playTrack(pick.tracks.first().idString, pick.tracks, PlaylistSource.SEARCH) })
+            is VoiceSearch.Pick.Nothing, null -> ({ playbackController.playMyVibe() })
+        }
     }
 
     private fun queueAction(trackId: String, playlist: List<TrackDetailsDto>, liked: List<TrackDetailsDto>): (() -> Unit)? {

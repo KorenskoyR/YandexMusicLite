@@ -306,9 +306,18 @@ data class DownloadInfoResponseDto(
 
 @Serializable
 data class SearchResponseDto(
+    /** What the service thinks was meant: a track, an artist, an album… */
+    @SerialName("best") val best: SearchBestDto? = null,
     @SerialName("tracks") val tracks: SearchTracksResultDto? = null,
     @SerialName("artists") val artists: SearchArtistsResultDto? = null,
     @SerialName("albums") val albums: SearchAlbumsResultDto? = null
+)
+
+/** The best result of a search: [type] tells what [result] is ("track", "artist", "album", …). */
+@Serializable
+data class SearchBestDto(
+    @SerialName("type") val type: String? = null,
+    @SerialName("result") val result: JsonElement? = null
 )
 
 @Serializable

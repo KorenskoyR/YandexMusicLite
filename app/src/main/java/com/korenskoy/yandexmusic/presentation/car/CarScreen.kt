@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.material.icons.rounded.Mic
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.material3.LocalTextStyle
@@ -189,7 +190,9 @@ fun CarScreen(
     initialTuneOpen: Boolean = false,
     initialQueueOpen: Boolean = false,
     /** Opens the same settings as on "Моя музыка"; null — no button. */
-    onOpenSettings: (() -> Unit)? = null
+    onOpenSettings: (() -> Unit)? = null,
+    /** The microphone: what is said plays at once; null — the device has no voice input. */
+    onVoiceSearch: (() -> Unit)? = null
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
@@ -365,7 +368,8 @@ fun CarScreen(
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
             CarHeader(
                 u, onExit, showClock, pills = if (isLandscape) wavePills else null,
-                onOpenSettings = onOpenSettings, showCaption = isLandscape || onOpenSettings == null
+                onOpenSettings = onOpenSettings, onVoiceSearch = onVoiceSearch,
+                showCaption = isLandscape || (onOpenSettings == null && onVoiceSearch == null)
             )
             if (!isLandscape) {
                 Row(
@@ -373,11 +377,49 @@ fun CarScreen(
                     horizontalArrangement = Arrangement.spacedBy(u(12f))
                 ) { wavePills() }
             }
-            if (isLandscape) {
-                Row(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(start = u(48f), end = u(40f), bottom = u(28f)),
+            if (isLandscape) BoxWithConstraints(
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = u(48f), end = u(40f), bottom = u(28f))
+            ) {
+                val wide = CarWide.layout(maxWidth.value / u.factor, maxHeight.value / u.factor)
+                if (wide != null) {
+                    // A flat head unit: the player, the next tracks with the sources, the cover as tall as the row
+                    val big = Scale(u.factor * wide.driverScale)
+                    val driver: @Composable () -> Unit = {
+                        DriverPanel(
+                            u = big, track = currentTrack, sourceLabel = sourceLabel, isPlaying = isPlaying, isLiked = isLiked,
+                            ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
+                            onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
+                            onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
+                            sources = sources, active = active, onSeek = onSeek,
+                            modifier = Modifier.width(big(CarWide.DRIVER_WIDTH)).fillMaxHeight(),
+                            showDock = false
+                        )
+                    }
+                    val middle: @Composable () -> Unit = {
+                        Column(Modifier.width(u(wide.middle)).fillMaxHeight()) {
+                            if (isRadio) {
+                                Spacer(Modifier.weight(1f))
+                            } else {
+                                CarNextList(
+                                    u = u, modifier = Modifier.weight(1f).fillMaxWidth(), caption = nextCaption, count = queueCount,
+                                    current = currentTrack, upcoming = upcoming, loading = upcomingLoading, onClick = onUpcomingClick
+                                )
+                            }
+                            Spacer(Modifier.height(u(14f)))
+                            Dock(u, sources, active, compact = false, narrow = true)
+                        }
+                    }
+                    val cover: @Composable () -> Unit = {
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far_wide")
+                        CarCover(u, currentTrack, Modifier.size(u(wide.cover)).graphicsLayer { alpha = farAlpha })
+                    }
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(u(CarWide.GAP))) {
+                        if (steeringWheelOnLeft) { driver(); middle(); cover() } else { cover(); middle(); driver() }
+                    }
+                } else Row(
+                    Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(u(40f))
                 ) {
                     val driver: @Composable () -> Unit = {
@@ -553,6 +595,7 @@ private fun CarHeader(
     showClock: Boolean,
     pills: (@Composable () -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
+    onVoiceSearch: (() -> Unit)? = null,
     showCaption: Boolean = true
 ) {
     Row(
@@ -579,6 +622,17 @@ private fun CarHeader(
                 size = u(56f)
             ) {
                 Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
+            }
+        }
+        // The microphone beside it, the same well: one tap, then say what to play
+        if (onVoiceSearch != null) {
+            Spacer(Modifier.width(u(16f)))
+            HiFiWellButton(
+                onClick = onVoiceSearch,
+                contentDescription = stringResource(R.string.voice_search),
+                size = u(56f)
+            ) {
+                Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
             }
         }
         Spacer(Modifier.width(u(16f)))
@@ -649,7 +703,9 @@ private fun DriverPanel(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
     compactDock: Boolean = false,
-    beforeDock: (@Composable () -> Unit)? = null
+    beforeDock: (@Composable () -> Unit)? = null,
+    /** False on a flat head unit: the sources live beside, and the gauge takes the height they leave. */
+    showDock: Boolean = true
 ) {
     Column(modifier) {
         if (sourceLabel.isNotEmpty()) {
@@ -686,6 +742,7 @@ private fun DriverPanel(
             }
         }
 
+        if (!showDock) Spacer(Modifier.weight(1f))
         // The gauge cluster. Standing (544 wide) all of it is smaller, so the five never touch:
         // 60 + 80 + 196 + 80 + 60 = 476, about 17 between neighbours; lying (652 wide) 19 between them
         val sideSize = if (compactDock) 60f else 72f
@@ -733,8 +790,14 @@ private fun DriverPanel(
             }
         }
         // A timeline without digits under the gauge; radio is live and shows the on-air line
+        if (!showDock) Spacer(Modifier.weight(1f))
         if (isRadio) CarLiveLine(u, Modifier.padding(top = u(10f)))
         else CarTimeline(u, progress, durationMs, isPlaying, onSeek, Modifier.padding(top = u(10f)))
+        if (!showDock) {
+            // Level with the middle of the sources beside
+            Spacer(Modifier.height(u(30f)))
+            return@Column
+        }
         Spacer(Modifier.weight(1f))
         if (beforeDock != null) {
             beforeDock()
@@ -758,8 +821,8 @@ private fun GlassRound(size: Dp, description: String, onClick: () -> Unit, conte
 
 /** Five big source tiles; the playing one is dark metal with a steel rim. */
 @Composable
-private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: Boolean) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(u(12f))) {
+private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: Boolean, narrow: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(u(if (narrow) 8f else 12f))) {
         items.forEach { item ->
             val selected = item.source == active
             val shape = RoundedCornerShape(u(22f))
@@ -780,7 +843,7 @@ private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: B
                 Text(
                     item.label,
                     color = if (selected) Color.White else Color.White.copy(alpha = 0.86f),
-                    fontSize = u.sp(16f),
+                    fontSize = u.sp(if (narrow) 14f else 16f),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

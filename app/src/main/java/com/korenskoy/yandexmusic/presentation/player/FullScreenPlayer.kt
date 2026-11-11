@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.Text
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogActionKind
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
+import com.korenskoy.yandexmusic.data.download.TrackOfflineState
 import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
@@ -121,12 +128,35 @@ fun FullScreenPlayer(
     onCancelSleepTimer: () -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
     onTrackWave: (() -> Unit)? = null,
+    /** The track on the device: the download button beside "add to playlist"; null hides it. */
+    offline: TrackOfflineState? = null,
+    onDownload: () -> Unit = {},
+    onRemoveDownload: () -> Unit = {},
     onQualityClick: () -> Unit = {},
     coverModifier: Modifier = Modifier,
     /** Opens with the queue sheet up (screenshots). */
     initialQueueOpen: Boolean = false
 ) {
     var showQueue by remember { mutableStateOf(initialQueueOpen) }
+    // Taking a downloaded track off the device is asked first; stopping a download is not
+    var askRemove by remember { mutableStateOf(false) }
+    if (askRemove) {
+        HiFiAlertDialog(
+            onDismissRequest = { askRemove = false },
+            title = stringResource(R.string.track_remove_title),
+            content = { Text(stringResource(R.string.track_remove_message, track.title.orEmpty()), color = HiFi.TextSecondary, fontSize = 15.sp, lineHeight = 21.sp) },
+            confirm = { HiFiDialogAction(stringResource(R.string.track_remove_confirm), { askRemove = false; onRemoveDownload() }, HiFiDialogActionKind.Danger) },
+            dismiss = { HiFiDialogAction(stringResource(R.string.track_remove_cancel), { askRemove = false }, HiFiDialogActionKind.Quiet) }
+        )
+    }
+    val onDownloadClick = {
+        when (offline) {
+            TrackOfflineState.NONE -> onDownload()
+            TrackOfflineState.DOWNLOADING -> onRemoveDownload()
+            TrackOfflineState.DONE -> askRemove = true
+            null -> Unit
+        }
+    }
     val back = rememberPredictiveBack(enabled = !showQueue, onBack = onCollapse)
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -158,7 +188,7 @@ fun FullScreenPlayer(
         PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier)
     }
     val details = @Composable { compact: Boolean ->
-        TitleRow(track, direction, compact, onAddToPlaylist, onTrackWave)
+        TitleRow(track, direction, compact, onAddToPlaylist, onTrackWave, offline, onDownloadClick)
         Spacer(Modifier.height(10.dp))
         QualityChip(track.isRadio, onQualityClick)
         Spacer(Modifier.height(if (compact) 4.dp else 12.dp))

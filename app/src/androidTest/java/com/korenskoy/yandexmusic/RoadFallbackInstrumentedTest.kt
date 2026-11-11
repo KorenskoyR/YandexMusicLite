@@ -11,6 +11,7 @@ import com.korenskoy.yandexmusic.data.player.LinkState
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.reserve.RoadReserve
 import com.korenskoy.yandexmusic.presentation.main.MainViewModel
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.After
@@ -110,11 +111,14 @@ class RoadFallbackInstrumentedTest {
         runBlocking { reserve.clear() }
     }
 
+    private var smoothOff: SettingsRepository? = null
+
     @After
     fun tearDown() {
         setNetwork(true)
         instrumentation.runOnMainSync { vm.stopAndClearPlayer() }
         runBlocking { reserve.clear() }
+        smoothOff?.let { runBlocking { it.setSmoothPlayback(true) } }
         scenario.close()
     }
 
@@ -209,6 +213,14 @@ class RoadFallbackInstrumentedTest {
             }
         }
         preload.seedForTest(a.idString, STREAM, TrackPreloadManager.StreamQuality("mp3", 320))
+        // This case is about a dropped connection; "Не прерывать музыку" would rightly switch to the copy at the
+        // first stall of the live stream already, so it is off here (and back on afterwards)
+        val settings = MainViewModel::class.java.getDeclaredField("settingsRepository").run {
+            isAccessible = true
+            get(vm) as SettingsRepository
+        }
+        runBlocking { settings.setSmoothPlayback(false) }
+        smoothOff = settings
         // The earlier cases here cut the connection: the controller still counts the link as uneven and would
         // rightly play the copy. This case starts from a steady link.
         MainViewModel::class.java.getDeclaredField("playbackController").run {
