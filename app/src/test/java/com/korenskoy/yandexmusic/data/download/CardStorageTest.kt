@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.download
 
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.first
 import android.app.Application
 import android.content.Context
 import android.net.Uri
@@ -50,7 +52,10 @@ class CardStorageTest {
     }
     private val client = OkHttpClient.Builder().addInterceptor(server).build()
 
-    private fun card(wanted: Boolean = true) = testCard(context, cardRoot, key, wanted)
+    // The choice reaches the storage on a background thread: a download started before it would go to the phone
+    private fun card(wanted: Boolean = true) = testCard(context, cardRoot, key, wanted).also { card ->
+        runBlocking { withTimeout(5_000) { card.wanted.first { it == wanted } } }
+    }
 
     private fun encrypted(): File {
         val file = File(cardRoot, "x.enc")
