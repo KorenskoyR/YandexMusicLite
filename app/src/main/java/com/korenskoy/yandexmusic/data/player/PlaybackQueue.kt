@@ -2,7 +2,9 @@ package com.korenskoy.yandexmusic.data.player
 
 /** Where the current queue came from. */
 enum class PlaylistSource {
-    LIBRARY, VIBE, SEARCH, TRENDS, RADIO, NONE
+    LIBRARY, VIBE, SEARCH, TRENDS, RADIO, NONE,
+    /** The user's own music on the device ("Музыка с устройства"). */
+    DEVICE
 }
 
 /** Sleep timer: either a moment in [android.os.SystemClock.elapsedRealtime] time or "at the end of this track". */

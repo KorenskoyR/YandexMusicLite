@@ -27,10 +27,13 @@ class VoiceSearch @Inject constructor(
         data class Station(override val query: String, val station: RadioStation) : Pick
         data class Tracks(override val query: String, val tracks: List<TrackDetailsDto>) : Pick
         data class Nothing(override val query: String) : Pick
+        /** What lies on the device ("включи с флешки", "включи скачанное"): it plays without the network. */
+        data class Offline(override val query: String, val target: VoicePhrase.Offline) : Pick
     }
 
     /** Throws on a network error, so the caller can tell "nothing found" from "no connection". */
     suspend fun pick(phrase: String): Pick {
+        VoicePhrase.offline(phrase)?.let { return Pick.Offline(phrase.trim(), it) }
         val spoken = VoicePhrase.of(phrase)
         val query = spoken.query
         if (query.isBlank()) {
@@ -76,6 +79,31 @@ object VoicePhrase {
         val wantsRadio = radioWords.containsMatchIn(text)
         text = radioWords.replace(text, "").trim()
         return Spoken(text.ifEmpty { if (wantsRadio) "" else phrase.trim() }, wantsRadio)
+    }
+
+    /** What lies on the device, asked for by where it lies. */
+    enum class Offline { DOWNLOADED, DEVICE, PHONE, SD, FLASH }
+
+    private val offlinePhrases: Map<Offline, Set<String>> = mapOf(
+        Offline.FLASH to setOf("с флешки", "с флэшки", "флешку", "флэшку", "флешка", "с usb", "с юсб", "с юэсби", "с накопителя", "из флешки"),
+        Offline.SD to setOf("с карты", "с карты памяти", "с sd карты", "с sd", "с сд карты", "с сд", "с карточки", "с флеш карты", "с флешкарты"),
+        Offline.PHONE to setOf("с телефона", "из телефона", "с памяти телефона", "из памяти телефона", "на телефоне"),
+        Offline.DEVICE to setOf("с устройства", "на устройстве", "свою музыку", "мою музыку с устройства", "с магнитолы"),
+        Offline.DOWNLOADED to setOf("скачанное", "скачанные", "скачанные треки", "скачанную", "скачанную музыку", "загруженное", "загруженные", "офлайн", "без интернета")
+    )
+
+    /**
+     * "включи музыку с флешки", "поставь скачанное": the device's own music, never a search (a song called
+     * "Флешка" would still be found by "включи песню флешка" — the word "песню" makes it a search).
+     */
+    fun offline(phrase: String): Offline? {
+        var text = phrase.trim().trimEnd('.', '!', '?', ',').trim()
+        text = trailing.replace(text, "")
+        text = asking.replace(text, "")
+        if (Regex("^(?:песню|трек|альбом)\\s", RegexOption.IGNORE_CASE).containsMatchIn(text)) return null
+        text = what.replace(text, "")
+        val said = normalize(text)
+        return offlinePhrases.entries.firstOrNull { (_, words) -> said in words }?.key
     }
 
     /** The search text alone: for the search page's field. */

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import com.korenskoy.yandexmusic.data.local.LocalArtProvider
 import androidx.media3.common.PlaybackException
 import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import com.korenskoy.yandexmusic.data.player.PlaybackWakeLockHelper
@@ -47,7 +48,9 @@ class PlayerRepositoryImpl(
     private val downloadManager: TrackDownloadManager,
     private val preloadManager: TrackPreloadManager,
     private val wakeLockHelper: PlaybackWakeLockHelper,
-    private val journal: PlaybackJournal = PlaybackJournal()
+    private val journal: PlaybackJournal = PlaybackJournal(),
+    /** Reads a cover of the user's own music (this app's own address) as a picture. */
+    private val readArtwork: (String) -> ByteArray? = { null }
 ) : PlayerRepository {
 
     private val _currentTrackId = MutableStateFlow<String?>(null)
@@ -282,6 +285,8 @@ class PlayerRepositoryImpl(
     override fun getPlayer(): Player = activePlayer
 
     private suspend fun resolvePlayUri(trackId: String, url: String): String? {
+        // The user's own music: the file itself, never a link of the service
+        if (trackId.startsWith("local_")) return url.takeIf { it.isNotBlank() }
         val local = withContext(Dispatchers.IO) { preloadManager.playableUri(trackId) }
         if (local != null) return local
         // A copy from the road reserve was chosen on purpose: a resolved stream must not replace it
@@ -292,18 +297,28 @@ class PlayerRepositoryImpl(
         return if (trackId.startsWith("radio_")) null else preloadManager.getOrFetchUrl(trackId)
     }
 
-    private fun buildMediaItem(trackId: String, uri: String, title: String?, artist: String?, coverUrl: String?): MediaItem {
-        val mediaMetadata = MediaMetadata.Builder()
+    private suspend fun buildMediaItem(trackId: String, uri: String, title: String?, artist: String?, coverUrl: String?): MediaItem {
+        val metadata = MediaMetadata.Builder()
             .setTitle(title ?: "Unknown Track")
             .setDisplayTitle(title ?: "Unknown Track")
             .setArtist(artist ?: "Unknown Artist")
-            .setArtworkUri(coverUrl?.toUri())
-            .build()
+        // The cover of the user's own file is this app's alone: the system panel would fail to open its address
+        // (and Android 11's SystemUI falls over on it), so it goes as the picture itself
+        if (LocalArtProvider.isOurs(coverUrl)) {
+            localArtwork(coverUrl)?.let { metadata.setArtworkData(it, MediaMetadata.PICTURE_TYPE_FRONT_COVER) }
+        } else {
+            metadata.setArtworkUri(coverUrl?.toUri())
+        }
+        val mediaMetadata = metadata.build()
         return MediaItem.Builder()
             .setMediaId(trackId)
             .setUri(uri)
             .setMediaMetadata(mediaMetadata)
             .build()
+    }
+
+    private suspend fun localArtwork(coverUrl: String?): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { coverUrl?.let(readArtwork) }.getOrNull()
     }
 
     override fun prepareNextTrack(trackId: String, url: String, title: String?, artist: String?, coverUrl: String?) {

@@ -97,7 +97,7 @@ class OfflineDownloads @Inject constructor(
      * (on through a closed app and a lost connection), then listed among the downloads.
      */
     suspend fun downloadTrack(track: TrackDetailsDto) {
-        if (track.isRadio || track.idString.isEmpty()) return
+        if (track.isRadio || track.isLocal || track.idString.isEmpty()) return
         val singles = collections.get(OfflineCollection.SINGLES_KEY)
         if (singles?.trackIds?.contains(track.idString) == true) {
             enqueue(OfflineCollection.SINGLES_KEY)

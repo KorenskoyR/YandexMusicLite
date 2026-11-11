@@ -23,7 +23,8 @@ internal object SessionButtons {
 
     /** Which buttons to show, left to right. Pure; unit-tested. */
     fun kindsFor(track: TrackDetailsDto?, liked: Boolean): List<Kind> = when {
-        track == null -> emptyList()
+        // The user's own file: nothing to like or dislike in the service
+        track == null || track.isLocal -> emptyList()
         track.isRadio -> listOf(if (liked) Kind.UNLIKE else Kind.LIKE)
         else -> listOf(Kind.DISLIKE, if (liked) Kind.UNLIKE else Kind.LIKE)
     }

@@ -73,6 +73,7 @@ fun playerSourceLabelRes(source: PlaylistSource, isRadio: Boolean): Int? = when 
     source == PlaylistSource.VIBE -> R.string.car_source_wave
     source == PlaylistSource.TRENDS -> R.string.car_source_hits
     source == PlaylistSource.LIBRARY -> R.string.library_title
+    source == PlaylistSource.DEVICE -> R.string.local_title
     else -> null
 }
 
@@ -203,6 +204,7 @@ fun FullScreenPlayer(
             isPlaying = isPlaying,
             isLiked = isLiked,
             isRadio = track.isRadio,
+            canReact = !track.isLocal,
             compact = compact,
             onDislike = onDislikeClick,
             onPrev = onPrevClick,

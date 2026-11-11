@@ -120,8 +120,12 @@ import com.korenskoy.yandexmusic.presentation.main.components.DownloadProgressMo
 import com.korenskoy.yandexmusic.presentation.main.components.PlaylistNameDialog
 import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 import com.korenskoy.yandexmusic.utils.russianQuantityString
+import com.korenskoy.yandexmusic.presentation.local.LocalFolderCard
+import com.korenskoy.yandexmusic.presentation.local.LocalMusicPage
+import com.korenskoy.yandexmusic.presentation.local.LocalMusicUi
+import com.korenskoy.yandexmusic.presentation.local.showsCard
 
-private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS, ALBUMS }
+private enum class LibrarySection { LIKED, DOWNLOADED, PLAYLISTS, ALBUMS, LOCAL }
 
 /** The list starts to show under the header; below it, nothing is cut by a hard line. */
 private val LibraryFadeStart = 56.dp
@@ -178,14 +182,21 @@ fun LibraryScreen(
     onOpenAlbum: (AlbumDto) -> Unit = {},
     /** A section page opened: the library catches up with the server unless it just did. */
     onSectionShown: () -> Unit = {},
-    /** A section open from the start (screenshots): LIKED, DOWNLOADED, PLAYLISTS or ALBUMS. */
-    initialSection: String? = null
+    /** "Музыка с устройства": a folder in "Скачанные"; null — none (screenshots of other pages). */
+    localMusic: LocalMusicUi? = null,
+    /** A section open from the start (screenshots): LIKED, DOWNLOADED, PLAYLISTS, ALBUMS or LOCAL. */
+    initialSection: String? = null,
+    /** The view "Музыка с устройства" opens on (screenshots). */
+    initialLocalView: Int = 0
 ) {
     var showSettings by remember { mutableStateOf(false) }
     var showProgressModal by remember { mutableStateOf(false) }
     var sectionName by rememberSaveable { mutableStateOf(initialSection) }
     val section = sectionName?.let { LibrarySection.valueOf(it) }
-    val back = rememberPredictiveBack(enabled = section != null && openedPlaylist == null) { sectionName = null }
+    // "Музыка с устройства" lies inside "Скачанные": back leads there
+    val back = rememberPredictiveBack(enabled = section != null && openedPlaylist == null) {
+        sectionName = if (section == LibrarySection.LOCAL) LibrarySection.DOWNLOADED.name else null
+    }
 
     val isLandscape = LocalConfiguration.current.orientation ==
         Configuration.ORIENTATION_LANDSCAPE
@@ -310,14 +321,18 @@ fun LibraryScreen(
                     }
                     // Tracks downloaded one by one are in the list below, not a card of their own
                     val keptCards = offlineCollections.filterNot { it.isSingles }
-                    if (shown == LibrarySection.DOWNLOADED && keptCards.isNotEmpty()) {
+                    // The music already on the device: a folder first in the row
+                    val local = localMusic?.takeIf { shown == LibrarySection.DOWNLOADED && it.library.showsCard }
+                    if (shown == LibrarySection.DOWNLOADED && (keptCards.isNotEmpty() || local != null)) {
                         item(key = "kept") {
                             KeptRow(
                                 liked = tracks.filter { it.idString in downloadedTrackIds },
                                 kept = keptCards,
                                 downloadedTrackIds = downloadedTrackIds,
                                 onOpenLiked = { sectionName = LibrarySection.LIKED.name },
-                                onOpen = onOpenCollection
+                                onOpen = onOpenCollection,
+                                local = local,
+                                onOpenLocal = { sectionName = LibrarySection.LOCAL.name }
                             )
                         }
                         item(key = "all_title") {
@@ -369,6 +384,17 @@ fun LibraryScreen(
                 onOpen = onOpenPlaylist,
                 onCreate = onCreatePlaylist
             )
+            LibrarySection.LOCAL -> if (localMusic != null) {
+                LocalMusicPage(
+                    ui = localMusic,
+                    currentTrackId = currentTrackId,
+                    isPlaying = isPlaying,
+                    contentBottom = contentBottom,
+                    onBack = { sectionName = LibrarySection.DOWNLOADED.name },
+                    modifier = Modifier.predictiveBack(back),
+                    initialView = initialLocalView
+                )
+            }
             LibrarySection.ALBUMS -> AlbumsPage(
                 modifier = Modifier.predictiveBack(back),
                 albums = albums,
@@ -435,14 +461,20 @@ private fun KeptRow(
     kept: List<OfflineCollection>,
     downloadedTrackIds: Set<String>,
     onOpenLiked: () -> Unit,
-    onOpen: (OfflineCollection) -> Unit
+    onOpen: (OfflineCollection) -> Unit,
+    local: LocalMusicUi? = null,
+    onOpenLocal: () -> Unit = {}
 ) {
     Column {
-        HiFiSectionHeader(stringResource(R.string.offline_on_device), Modifier.padding(start = 12.dp, top = 6.dp, bottom = 12.dp))
+        // With the device's own music the row holds more than playlists
+        HiFiSectionHeader(stringResource(if (local != null) R.string.local_on_device else R.string.offline_on_device), Modifier.padding(start = 12.dp, top = 6.dp, bottom = 12.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (local != null) item(key = "local") {
+                LocalFolderCard(local.library, isNew = !local.seen, onClick = onOpenLocal)
+            }
             if (liked.isNotEmpty()) item(key = "liked") {
                 KeptCard(stringResource(R.string.library_liked), liked.size, cover = null, isLiked = true, onClick = onOpenLiked)
             }
@@ -457,10 +489,10 @@ private fun KeptRow(
 private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean, isAlbum: Boolean = false, onClick: () -> Unit) {
     val context = LocalContext.current
     val shape = RoundedCornerShape(18.dp)
+    // Not clipped as a whole: the rounded corner would cut the first letters of the caption under the cover
     Column(
         Modifier
             .width(132.dp)
-            .clip(shape)
             .hifiPress(onClick)
     ) {
         Box(

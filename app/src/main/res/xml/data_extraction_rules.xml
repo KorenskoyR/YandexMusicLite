@@ -12,6 +12,9 @@
         <exclude domain="file" path="tracks/" />
         <exclude domain="sharedpref" path="card_storage.xml" />
         <exclude domain="file" path="offline_collections.json" />
+        <!-- Added folders: their access stays with this device -->
+        <exclude domain="sharedpref" path="local_music.xml" />
+        <exclude domain="file" path="local_folder_tags.json" />
         <exclude domain="file" path="playback_state.json" />
     </cloud-backup>
     <device-transfer>
@@ -22,5 +25,8 @@
         <exclude domain="file" path="tracks/" />
         <exclude domain="sharedpref" path="card_storage.xml" />
         <exclude domain="file" path="offline_collections.json" />
+        <!-- Added folders: their access stays with this device -->
+        <exclude domain="sharedpref" path="local_music.xml" />
+        <exclude domain="file" path="local_folder_tags.json" />
     </device-transfer>
 </data-extraction-rules>

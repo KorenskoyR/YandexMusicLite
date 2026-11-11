@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.di
 
+import androidx.core.net.toUri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -99,7 +100,8 @@ object PlayerModule {
         val playerB = createConfiguredExoPlayer(context, equalizer.audioSessionId, card)
         equalizer.announce()
         return PlayerRepositoryImpl(
-            playerA, playerB, downloadManager, preloadManager, wakeLockHelper, journal
+            playerA, playerB, downloadManager, preloadManager, wakeLockHelper, journal,
+            readArtwork = { uri -> context.contentResolver.openInputStream(uri.toUri())?.use { it.readBytes() } }
         )
     }
 

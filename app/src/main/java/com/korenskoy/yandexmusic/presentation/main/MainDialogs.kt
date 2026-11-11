@@ -64,7 +64,7 @@ internal fun TrackMenuHost(
         onCreatePlaylist = { playlistsVm.create(it, thenAdd = track) },
         onRemoveFromPlaylist = { request.playlist?.let { playlistsVm.removeTrack(it, track.idString) } },
         onTrackWave = { viewModel.startTrackWave(track) },
-        offline = offline.takeUnless { track.isRadio },
+        offline = offline.takeUnless { track.isRadio || track.isLocal },
         onDownload = { viewModel.downloadTrack(track) },
         onRemoveDownload = { viewModel.removeTrackFromDevice(track) },
         onOpenArtist = track.artists.firstNotNullOfOrNull { artist -> artist.idString?.let { id -> id to artist.name.orEmpty() } }

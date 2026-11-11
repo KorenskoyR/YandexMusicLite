@@ -124,8 +124,14 @@ data class TrackDetailsDto(
     @Transient val isRadio: Boolean = false,
     @SerialName("albums") val albums: List<TrackAlbumDto> = emptyList(),
     @SerialName("r128") val r128: R128Dto? = null,
-    @SerialName("contentWarning") val contentWarning: String? = null
+    @SerialName("contentWarning") val contentWarning: String? = null,
+    /** A file of the user's own music (content://); kept with the session, so it plays again after a restart. */
+    @SerialName("localUri") val localUri: String? = null
 ) {
+    /** The user's own music on the device, not a track of the service: no likes, no wave, nothing sent anywhere. */
+    val isLocal: Boolean
+        get() = localUri != null || idString.startsWith("local_")
+
     /** Marked 18+ by the service. */
     val isExplicit: Boolean
         get() = contentWarning.equals("explicit", ignoreCase = true)

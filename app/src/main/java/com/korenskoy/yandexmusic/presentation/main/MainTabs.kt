@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.local.LocalMusicUi
 import com.korenskoy.yandexmusic.data.player.VoicePhrase
 import com.korenskoy.yandexmusic.presentation.voice.rememberVoiceInput
 import androidx.compose.runtime.LaunchedEffect
@@ -185,6 +186,22 @@ internal fun LibraryTab(
     val userPlaylists by playlistsVm.playlists.collectAsStateWithLifecycle()
     val savedPlaylists by playlistsVm.saved.collectAsStateWithLifecycle()
     val likedAlbums by viewModel.likedAlbums.collectAsStateWithLifecycle()
+    val localLibrary by viewModel.localLibrary.collectAsStateWithLifecycle()
+    val localSeen by viewModel.localSeen.collectAsStateWithLifecycle()
+    val localMusic = remember(localLibrary, localSeen) {
+        LocalMusicUi(
+            library = localLibrary,
+            seen = localSeen,
+            toTrack = viewModel::localTrack,
+            onPlay = viewModel::playLocal,
+            onPlayAll = viewModel::playLocalAll,
+            onAccessChanged = viewModel::onLocalAccessChanged,
+            onAddFolder = viewModel::addLocalFolder,
+            onRemoveFolder = viewModel::removeLocalFolder,
+            pickerStart = viewModel::localPickerStart,
+            onOpened = viewModel::markLocalSeen
+        )
+    }
     val openedPlaylist by playlistsVm.opened.collectAsStateWithLifecycle()
     val openedKey = openedPlaylist?.playlist?.let(OfflineCollection::keyOf)
     val openedOffline by remember(openedKey) {
@@ -242,7 +259,8 @@ internal fun LibraryTab(
         savedPlaylists = savedPlaylists,
         albums = likedAlbums,
         onOpenAlbum = { album -> album.idString?.let { onOpenAlbum(it, album.title.orEmpty()) } },
-        onSectionShown = { viewModel.onLibraryShown() }
+        onSectionShown = { viewModel.onLibraryShown() },
+        localMusic = localMusic
     )
 }
 
@@ -306,6 +324,7 @@ internal fun CarTab(
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
+    val deviceMusic by viewModel.carDeviceMusic.collectAsStateWithLifecycle()
     // Said in the car, played at once: no list to pick from while driving
     val voice = rememberVoiceInput { phrase -> viewModel.playByVoice(phrase) }
     val track = now.track
@@ -348,6 +367,8 @@ internal fun CarTab(
         onTrackWave = viewModel::startTrackWave,
         onBackToMyWave = viewModel::returnToMyWave,
         onOpenSettings = { showSettings = true },
+        deviceMusic = deviceMusic,
+        onPlayDevice = { key -> viewModel.playDevice(key) },
         onVoiceSearch = voice
     )
 }

@@ -6,6 +6,15 @@ import retrofit2.HttpException
 import java.io.IOException
 import android.util.Log
 import com.korenskoy.yandexmusic.data.player.VoiceSearch
+import com.korenskoy.yandexmusic.data.player.VoicePhrase
+import com.korenskoy.yandexmusic.data.local.LocalMusicRepository
+import com.korenskoy.yandexmusic.data.local.LocalRules
+import com.korenskoy.yandexmusic.data.local.LocalSource
+import com.korenskoy.yandexmusic.data.local.LocalTrack
+import com.korenskoy.yandexmusic.presentation.car.CAR_DEVICE_FOLDERS
+import com.korenskoy.yandexmusic.presentation.car.CarDeviceFolder
+import com.korenskoy.yandexmusic.presentation.car.CarDeviceMusic
+import android.net.Uri
 import com.korenskoy.yandexmusic.R
 import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -79,7 +88,8 @@ class MainViewModel @Inject constructor(
     private val playRequests: PlayRequests,
     private val offline: OfflineDownloads,
     private val voiceSearch: VoiceSearch,
-    albums: LikedAlbumsRepository
+    albums: LikedAlbumsRepository,
+    private val localMusic: LocalMusicRepository
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -124,6 +134,71 @@ class MainViewModel @Inject constructor(
         OfflineRules.downloadedTracks(liked, kept, ids)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    // region Music on the device
+
+    /** "Музыка с устройства": the phone's, the SD card's and the flash drives' own music. */
+    val localLibrary: StateFlow<LocalMusicRepository.Library> = localMusic.library
+    val localSeen: StateFlow<Boolean> = localMusic.seen
+
+    /** "Скачанные" in the car: with music on the device the tile opens a choice of what to play. */
+    val carDeviceMusic: StateFlow<CarDeviceMusic?> = combine(localMusic.library, downloadedTracks) { library, downloaded ->
+        if (library.tracks.isEmpty()) {
+            null
+        } else {
+            CarDeviceMusic(
+                downloadedCount = downloaded.size,
+                deviceCount = library.tracks.size,
+                sources = LocalSource.entries.filter { s -> library.tracks.any { it.source == s } },
+                folders = LocalRules.carFolders(library.tracks, CAR_DEVICE_FOLDERS)
+                    .takeIf { it.size > 1 }.orEmpty()
+                    .map { CarDeviceFolder(it.key, it.name, it.tracks.size, it.source) }
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun localTrack(track: LocalTrack): TrackDetailsDto = localMusic.toDto(track)
+
+    /** A track of the device's own music, with [queue] after it. */
+    fun playLocal(track: LocalTrack, queue: List<LocalTrack>) {
+        playRequests.userStarted()
+        playbackController.playOnDevice(track.id, localMusic.toDtos(queue))
+    }
+
+    /** "Слушать" / "Перемешать" for what the page shows. */
+    fun playLocalAll(queue: List<LocalTrack>, shuffle: Boolean) {
+        val order = if (shuffle) queue.shuffled() else queue
+        val first = order.firstOrNull() ?: return
+        playLocal(first, order)
+    }
+
+    /**
+     * The car: all the music on the device, folder by folder as it lies on the drive, or one folder by its key.
+     * @return false when there is none.
+     */
+    fun playDevice(folderKey: String? = null, only: LocalSource? = null): Boolean {
+        val tracks = localMusic.library.value.tracks.filter { only == null || it.source == only }
+        val folders = LocalRules.folders(tracks)
+        val queue = if (folderKey != null) folders.firstOrNull { it.key == folderKey }?.tracks.orEmpty() else folders.flatMap { it.tracks }
+        val first = queue.firstOrNull() ?: return false
+        playLocal(first, queue)
+        return true
+    }
+
+    fun onLocalAccessChanged() = localMusic.onAccessMaybeChanged()
+    fun markLocalSeen() = localMusic.markSeen()
+    fun removeLocalFolder(uri: String) = localMusic.removeFolder(uri)
+    fun localPickerStart(): Uri? = localMusic.pickerStart()
+
+    /** A folder picked in the system's window: kept, read, and said so. */
+    fun addLocalFolder(uri: Uri) {
+        val ok = localMusic.addFolder(uri)
+        val name = uri.let { runCatching { android.provider.DocumentsContract.getTreeDocumentId(it) }.getOrNull() }
+            ?.let { LocalRules.placeOfDocument(it).second.trimEnd('/').substringAfterLast('/') }.orEmpty()
+        _trackMessages.tryEmit(if (ok) UiMessage(R.string.local_folder_added, listOf(name)) else UiMessage(R.string.local_folder_failed))
+    }
+
+    // endregion
+
     val steeringWheelOnLeft: StateFlow<Boolean> = settingsRepository.steeringWheelOnLeft
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_STEERING_WHEEL_ON_LEFT)
     val linkState = playbackController.linkState
@@ -139,7 +214,7 @@ class MainViewModel @Inject constructor(
     /** The playing track on the device: the player's download button. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val currentTrackOffline: StateFlow<TrackOfflineState> = playbackController.currentTrack
-        .flatMapLatest { track -> if (track == null || track.isRadio) flowOf(TrackOfflineState.NONE) else offline.trackState(track.idString) }
+        .flatMapLatest { track -> if (track == null || track.isRadio || track.isLocal) flowOf(TrackOfflineState.NONE) else offline.trackState(track.idString) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrackOfflineState.NONE)
 
     /** A track's place on the device, for its menu. */
@@ -218,9 +293,35 @@ class MainViewModel @Inject constructor(
                     )
                 }
                 is VoiceSearch.Pick.Nothing -> _trackMessages.tryEmit(UiMessage(R.string.voice_nothing, listOf(pick.query)))
+                is VoiceSearch.Pick.Offline -> playOffline(pick)
             }
         }
     }
+    private fun playOffline(pick: VoiceSearch.Pick.Offline) {
+        val phrase = pick.query
+        when (pick.target) {
+            VoicePhrase.Offline.DOWNLOADED -> if (downloadedTracks.value.isNotEmpty()) {
+                playDownloaded()
+                _trackMessages.tryEmit(UiMessage(R.string.voice_downloaded, listOf(phrase)))
+            } else {
+                _trackMessages.tryEmit(UiMessage(R.string.car_downloads_in_app_none))
+            }
+            else -> {
+                val (only, what) = when (pick.target) {
+                    VoicePhrase.Offline.PHONE -> LocalSource.PHONE to R.string.voice_device_phone
+                    VoicePhrase.Offline.SD -> LocalSource.SD to R.string.voice_device_sd
+                    VoicePhrase.Offline.FLASH -> LocalSource.FLASH to R.string.voice_device_flash
+                    else -> null to R.string.voice_device_all
+                }
+                if (playDevice(only = only)) {
+                    _trackMessages.tryEmit(UiMessage(what, listOf(phrase)))
+                } else {
+                    _trackMessages.tryEmit(UiMessage(R.string.voice_device_none, listOf(phrase)))
+                }
+            }
+        }
+    }
+
     val currentTrackId: StateFlow<String?> = playbackController.currentTrack
         .map { it?.idString }
         .stateIn(viewModelScope, SharingStarted.Eagerly, playbackController.currentTrack.value?.idString)

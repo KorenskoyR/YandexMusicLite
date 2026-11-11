@@ -57,6 +57,7 @@ class TrackReactions @Inject constructor(
 
     /** The heart: like / unlike a track (a new like is downloaded when auto-download is on), favourite a station. */
     fun toggleLike(track: TrackDetailsDto) {
+        if (track.isLocal) return
         if (track.isRadio) {
             scope.launch { radioRepository.toggleFavorite(stationId(track)) }
             return
@@ -75,6 +76,7 @@ class TrackReactions @Inject constructor(
 
     /** "Не нравится": the track leaves the wave and the next one plays; a station leaves the favourites. */
     fun dislike(track: TrackDetailsDto) {
+        if (track.isLocal) return
         if (track.isRadio) {
             scope.launch { radioRepository.removeFavorite(stationId(track)) }
             return

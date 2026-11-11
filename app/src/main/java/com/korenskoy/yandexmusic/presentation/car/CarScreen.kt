@@ -140,6 +140,7 @@ fun carSourceOf(source: PlaylistSource, isRadio: Boolean): CarSource? = when {
     source == PlaylistSource.VIBE -> CarSource.WAVE
     source == PlaylistSource.LIBRARY -> CarSource.LIKED
     source == PlaylistSource.TRENDS -> CarSource.HITS
+    source == PlaylistSource.DEVICE -> CarSource.DOWNLOADED
     else -> null
 }
 
@@ -192,12 +193,21 @@ fun CarScreen(
     /** Opens the same settings as on "Моя музыка"; null — no button. */
     onOpenSettings: (() -> Unit)? = null,
     /** The microphone: what is said plays at once; null — the device has no voice input. */
-    onVoiceSearch: (() -> Unit)? = null
+    onVoiceSearch: (() -> Unit)? = null,
+    /** The user's own music: with some, "Скачанные" opens a choice; null — it plays the downloads at once. */
+    deviceMusic: CarDeviceMusic? = null,
+    /** Plays the music on the device, or one of its folders by key. */
+    onPlayDevice: (folderKey: String?) -> Unit = {},
+    initialDownloadsOpen: Boolean = false
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
+    var downloadsOpen by rememberSaveable { mutableStateOf(initialDownloadsOpen && deviceMusic?.opensPanel == true) }
     BackHandler(enabled = tuneOpen) { tuneOpen = false }
     BackHandler(enabled = queueOpen) { queueOpen = false }
+    BackHandler(enabled = downloadsOpen) { downloadsOpen = false }
+    // The music left the device (the drive was taken out): the choice goes with it
+    LaunchedEffect(deviceMusic?.opensPanel) { if (deviceMusic?.opensPanel != true) downloadsOpen = false }
     BackHandler(onBack = onExit)
     val view = LocalView.current
     DisposableEffect(Unit) {
@@ -213,7 +223,7 @@ fun CarScreen(
     val withQueue = underCover == CarUnderCover.QUEUE
     // A station has no queue: the panel never stays open over one
     LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
-    val openQueue = { tuneOpen = false; queueOpen = true }
+    val openQueue = { tuneOpen = false; downloadsOpen = false; queueOpen = true }
     val active = carSourceOf(source, isRadio)
     val nextCaption = when {
         source == PlaylistSource.VIBE && trackWaveSeed != null -> stringResource(R.string.car_next_track_wave)
@@ -228,6 +238,7 @@ fun CarScreen(
         CarSource.LIKED -> stringResource(R.string.library_liked)
         CarSource.RADIO -> stringResource(R.string.car_source_radio)
         CarSource.HITS -> stringResource(R.string.car_source_hits)
+        CarSource.DOWNLOADED -> stringResource(R.string.local_title)
         else -> ""
     }
     val coverUrl = currentTrack?.coverUri.toCoverUrl(CoverSize.Medium)
@@ -243,7 +254,15 @@ fun CarScreen(
         DockItem(CarSource.LIKED, Icons.Rounded.Favorite, stringResource(R.string.car_source_liked), onPlayFavorites),
         DockItem(CarSource.RADIO, Icons.Rounded.Radio, stringResource(R.string.car_source_radio), onPlayRadio),
         DockItem(CarSource.HITS, Icons.AutoMirrored.Rounded.TrendingUp, stringResource(R.string.car_source_hits), onPlayHits),
-        DockItem(CarSource.DOWNLOADED, Icons.Rounded.DownloadDone, stringResource(R.string.car_source_downloaded), onPlayDownloaded)
+        DockItem(CarSource.DOWNLOADED, Icons.Rounded.DownloadDone, stringResource(R.string.car_source_downloaded)) {
+            if (deviceMusic?.opensPanel == true) {
+                tuneOpen = false
+                queueOpen = false
+                downloadsOpen = true
+            } else {
+                onPlayDownloaded()
+            }
+        }
     )
 
     val latestPrev by androidx.compose.runtime.rememberUpdatedState(onPrevClick)
@@ -343,6 +362,17 @@ fun CarScreen(
                 onClick = { queueOpen = false; onUpcomingClick(it) }, onClose = { queueOpen = false }
             )
         }
+        // "Скачанные" with the user's own music: in the queue's place
+        val downloadsPanel: @Composable (Modifier) -> Unit = { panelModifier ->
+            deviceMusic?.let { music ->
+                CarDownloadsPanel(
+                    u = u, modifier = panelModifier, music = music,
+                    onPlayDownloaded = { downloadsOpen = false; onPlayDownloaded() },
+                    onPlayDevice = { key -> downloadsOpen = false; onPlayDevice(key) },
+                    onClose = { downloadsOpen = false }
+                )
+            }
+        }
         val queueCount = russianQuantityString(upcoming.size, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many)
         // The wave's buttons: in the header on a wide screen, in a row under it on a tall one
         val onWave = active == CarSource.WAVE
@@ -352,15 +382,15 @@ fun CarScreen(
             if (trackWaveSeed != null && onWave) {
                 WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
                 WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !waveTuning.isDefault, height = pillHeight, fontSize = pillFont,
-                    onClick = { queueOpen = false; tuneOpen = true }, description = stringResource(R.string.wave_tune_title))
+                    onClick = { queueOpen = false; downloadsOpen = false; tuneOpen = true }, description = stringResource(R.string.wave_tune_title))
             } else {
-                currentTrack?.takeIf { !it.isRadio }?.let { track ->
+                currentTrack?.takeIf { !it.isRadio && !it.isLocal }?.let { track ->
                     WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_by_track), active = false, height = pillHeight, fontSize = pillFont, onClick = { onTrackWave(track) })
                 }
                 if (onWave) {
                     val summary = waveTuningSummary(waveTuning)
                     WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), active = summary != null, height = pillHeight, fontSize = pillFont,
-                        onClick = { queueOpen = false; tuneOpen = true }, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
+                        onClick = { queueOpen = false; downloadsOpen = false; tuneOpen = true }, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
                 }
             }
         }
@@ -412,7 +442,7 @@ fun CarScreen(
                         }
                     }
                     val cover: @Composable () -> Unit = {
-                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far_wide")
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen || downloadsOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far_wide")
                         CarCover(u, currentTrack, Modifier.size(u(wide.cover)).graphicsLayer { alpha = farAlpha })
                     }
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(u(CarWide.GAP))) {
@@ -435,7 +465,7 @@ fun CarScreen(
                     // The cover alone, and under it the covers of what comes next: nothing lies on the cover
                     val far: @Composable () -> Unit = {
                         // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
-                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen || queueOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen || queueOpen || downloadsOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
                         Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
                             if (isRadio) {
                                 CarCover(u, currentTrack, Modifier.size(u(500f)))
@@ -489,6 +519,7 @@ fun CarScreen(
                         targetState = when {
                             tuneOpen -> 1
                             queueOpen -> 2
+                            downloadsOpen -> 3
                             else -> 0
                         },
                         modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth(),
@@ -498,6 +529,8 @@ fun CarScreen(
                             when (open) {
                                 1 -> tunePanel(Modifier.fillMaxWidth(), true)
                                 2 -> queuePanel(Modifier.fillMaxWidth().height(u(400f)))
+                                // Taller than the queue: two big rows and the folders under them
+                                3 -> downloadsPanel(Modifier.fillMaxWidth().height(u(470f)))
                                 else -> CarCover(u, currentTrack, Modifier.size(u(if (isRadio || withQueue) 400f else 310f)))
                             }
                         }
@@ -514,7 +547,7 @@ fun CarScreen(
                         modifier = Modifier.widthIn(max = u(560f)).fillMaxWidth().weight(1f),
                         compactDock = true,
                         beforeDock = when {
-                            isRadio || tuneOpen -> null
+                            isRadio || tuneOpen || downloadsOpen -> null
                             withQueue -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { QueuePill(u, queueCount, onClick = openQueue) } } }
                             else -> { { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick, onCaptionClick = openQueue) } }
                         }
@@ -532,6 +565,24 @@ fun CarScreen(
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
                 queuePanel(
+                    Modifier
+                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                        .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
+                        .width(panelWidth)
+                        .fillMaxHeight()
+                )
+            }
+        }
+        // "Скачанные" lying down: over the cover column too, the whole height of it
+        if (downloadsOpen && isLandscape) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { downloadsOpen = false }
+            )
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                downloadsPanel(
                     Modifier
                         .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
                         .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
@@ -756,8 +807,14 @@ private fun DriverPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            GlassRound(u(sideSize), stringResource(R.string.cd_ne_nravitsya), onDislike) {
-                Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(u(sideIcon)))
+            // The user's own file: nothing to like or dislike, the knobs keep their places
+            val canReact = track?.isLocal != true
+            if (canReact) {
+                GlassRound(u(sideSize), stringResource(R.string.cd_ne_nravitsya), onDislike) {
+                    Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(u(sideIcon)))
+                }
+            } else {
+                Spacer(Modifier.size(u(sideSize)))
             }
             HiFiKnob(onClick = onPrev, contentDescription = stringResource(R.string.cd_predyduschiy_trek), size = u(skipSize)) {
                 Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(skipIcon)))
@@ -780,13 +837,17 @@ private fun DriverPanel(
             HiFiKnob(onClick = onNext, contentDescription = stringResource(R.string.cd_sleduyuschiy_trek), size = u(skipSize)) {
                 Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(skipIcon)))
             }
-            GlassRound(u(sideSize), stringResource(R.string.cd_nravitsya), onLike) {
-                Icon(
-                    if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                    contentDescription = null,
-                    tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.88f),
-                    modifier = Modifier.size(u(sideIcon))
-                )
+            if (canReact) {
+                GlassRound(u(sideSize), stringResource(R.string.cd_nravitsya), onLike) {
+                    Icon(
+                        if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.88f),
+                        modifier = Modifier.size(u(sideIcon))
+                    )
+                }
+            } else {
+                Spacer(Modifier.size(u(sideSize)))
             }
         }
         // A timeline without digits under the gauge; radio is live and shows the on-air line

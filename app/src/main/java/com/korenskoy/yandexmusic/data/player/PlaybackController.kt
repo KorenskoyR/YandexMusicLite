@@ -14,6 +14,8 @@ import com.korenskoy.yandexmusic.domain.model.WaveTuning
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.korenskoy.yandexmusic.utils.prefetchCovers
 import com.korenskoy.yandexmusic.utils.CoverSize
+import com.korenskoy.yandexmusic.data.local.LocalArtProvider
+import com.korenskoy.yandexmusic.data.local.LocalMusicRepository
 import com.korenskoy.yandexmusic.data.reserve.RoadReserve
 import com.korenskoy.yandexmusic.data.reserve.ReservePolicy
 import com.korenskoy.yandexmusic.data.reserve.ReserveKeeper
@@ -82,7 +84,8 @@ class PlaybackController @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val networkMonitor: NetworkMonitor,
     private val reserve: RoadReserve,
-    private val journal: PlaybackJournal
+    private val journal: PlaybackJournal,
+    private val localMusic: LocalMusicRepository
 ) {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
@@ -225,7 +228,8 @@ class PlaybackController @Inject constructor(
             _currentTrack,
             authRepository.isAuthorized()
         ) { playing, state, track, signedIn ->
-            playing && signedIn && state == LinkState.GOOD && track?.isRadio != true
+            // The user's own music needs no network: the cache does not spend traffic while it plays
+            playing && signedIn && state == LinkState.GOOD && track?.isRadio != true && track?.isLocal != true
         },
         resolve = preloadManager::resolveOrdinaryStream,
         // The playing track comes first: the cache fills only while it has enough in hand
@@ -292,8 +296,8 @@ class PlaybackController @Inject constructor(
                     val trackId = _currentTrack.value?.idString
                     stallWatchdog = scope.launch {
                         delay(LINK_STALL_MS)
-                        val track = _currentTrack.value
-                        if (isBuffering.value && track != null && track.idString == trackId && !track.isRadio) onStreamStalled(track)
+                        val stalled = _currentTrack.value?.takeIf { it.idString == trackId && it.isStreamed }
+                        if (isBuffering.value && stalled != null) onStreamStalled(stalled)
                     }
                     bufferingWatchdog = scope.launch {
                         delay(BUFFERING_TIMEOUT_MS)
@@ -353,11 +357,14 @@ class PlaybackController @Inject constructor(
         _currentTrack.value = track
         restoredPositionMs.value = startPositionMs
 
-        recordTrackPlayed(trackId)
-        reserve.markPlayed(trackId)
+        if (!track.isLocal) {
+            recordTrackPlayed(trackId)
+            reserve.markPlayed(trackId)
+        }
 
         val currentIndex = playlist.indexOfFirst { it.idString == trackId }
-        val upcoming = playlist.drop(currentIndex + 1).take(3).map { it.idString }
+        // The user's own files need no links
+        val upcoming = playlist.drop(currentIndex + 1).take(3).filterNot { it.isLocal || it.isRadio }.map { it.idString }
         if (upcoming.isNotEmpty()) preloadManager.preloadTracks(upcoming)
         playlist.getOrNull(currentIndex + 1)?.let { prepareStandby(it) }
 
@@ -426,6 +433,12 @@ class PlaybackController @Inject constructor(
         if (hitsList.isEmpty()) return
         val trackToPlay = hitsList.firstOrNull { it.idString !in recentPlayedTrackIds } ?: hitsList.first()
         playTrack(trackToPlay.idString, hitsList, PlaylistSource.TRENDS)
+    }
+
+    /** The user's own music ("Музыка с устройства"): the queue is [playlist], nothing of it goes to the network. */
+    fun playOnDevice(trackId: String, playlist: List<TrackDetailsDto>) {
+        if (playlist.none { it.idString == trackId }) return
+        playTrack(trackId, playlist, PlaylistSource.DEVICE)
     }
 
     fun playRadioStation(station: RadioStation) {
@@ -683,6 +696,8 @@ class PlaybackController @Inject constructor(
      * before is kept, so [undoTrackWave] can go back to it.
      */
     fun startTrackWave(track: TrackDetailsDto) {
+        // The user's own file is not in the service: there is no wave by it
+        if (track.isLocal) return
         if (track.isRadio || isOffline()) {
             if (isOffline()) showMessage(context.getString(R.string.msg_offline_no_downloads))
             return
@@ -789,10 +804,12 @@ class PlaybackController @Inject constructor(
             play()
             withTimeoutOrNull(RESUMPTION_START_TIMEOUT_MS) { playerRepository.isPlaying.first { it } }
         }
+        val cover = coverUrlFor(track)
         val metadata = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist(track.artists.firstOrNull()?.name)
-            .setArtworkUri(coverUrlFor(track)?.toUri())
+            // The cover of the user's own file is this app's alone: never its address to the system
+            .apply { if (!LocalArtProvider.isOurs(cover)) setArtworkUri(cover?.toUri()) }
             .build()
         val item = MediaItem.Builder()
             .setMediaId(track.idString)
@@ -819,6 +836,10 @@ class PlaybackController @Inject constructor(
                 return
             }
             playerRepository.playTrack(trackId, station.streamUrl, title, artist, coverUrl, crossfade, 0L)
+            return
+        }
+        if (track.isLocal) {
+            playLocalFile(track, crossfade, startPositionMs)
             return
         }
 
@@ -854,6 +875,48 @@ class PlaybackController @Inject constructor(
             SmoothOrigin.CHOSEN_STREAM -> Unit
         }
         playChosenStream(track, crossfade, startPositionMs)
+    }
+
+    /** A file of the user's own music: straight from the device, no network, no cache. */
+    private fun playLocalFile(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
+        val uri = track.localUri
+        if (uri == null) {
+            _isStarting.value = false
+            skipToNextLocal(track)
+            return
+        }
+        _streamQuality.value = localMusic.qualityOf(track.idString)
+        streamingTrackId = null
+        playingCopyId = null
+        playerRepository.playTrack(track.idString, uri, track.title, track.artists.firstOrNull()?.name, coverUrlFor(track), crossfade, startPositionMs)
+    }
+
+    /**
+     * A file of the user's music would not open: the flash drive was taken out, the file deleted. The next one
+     * that still opens plays; with none left the music stops and says why.
+     */
+    private fun skipToNextLocal(from: TrackDetailsDto) {
+        val queue = _currentPlaylist.value
+        val start = queue.indexOfFirst { it.idString == from.idString }
+        val request = ++startRequestId
+        currentPlayJob?.cancel()
+        currentPlayJob = scope.launch {
+            val order = (queue.drop(start + 1) + queue.take(start.coerceAtLeast(0))).filter { it.idString != from.idString }
+            val next = order.firstOrNull { candidate ->
+                val uri = candidate.localUri
+                // A track of the service plays from the network or the device as always
+                if (!candidate.isLocal) true else uri != null && localMusic.isReachable(uri)
+            }
+            if (request != startRequestId) return@launch
+            if (next != null) {
+                playTrack(next.idString, queue)
+            } else {
+                _isStarting.value = false
+                playerRepository.stop()
+                restoredPositionMs.value = 0L
+                showMessage(context.getString(R.string.msg_local_unavailable))
+            }
+        }
     }
 
     /** The uneven link: a light stream, or the chosen one when no light one is offered. */
@@ -979,7 +1042,8 @@ class PlaybackController @Inject constructor(
             val trackId = playerRepository.currentTrackId.value
             val track = _currentTrack.value
             if (buffering) {
-                val midTrack = trackId != null && trackId == soundedTrackId && track?.idString == trackId && !track.isRadio
+                // A slow flash drive is not a bad link
+                val midTrack = trackId != null && trackId == soundedTrackId && track?.idString == trackId && track.isStreamed
                 if (!midTrack) return@onEach
                 if (steadiness.onStall()) onLinkUneven()
                 stallLastedJob = scope.launch {
@@ -1005,7 +1069,7 @@ class PlaybackController @Inject constructor(
     private fun onLinkUneven() {
         journal.record(PlaybackJournal.Kind.UNEVEN)
         if (!smoothOn.value) return
-        val track = _currentTrack.value?.takeIf { !it.isRadio } ?: return
+        val track = _currentTrack.value?.takeIf { !it.isRadio && !it.isLocal } ?: return
         val trackId = track.idString
         val fromStream = streamingTrackId == trackId && playerRepository.currentTrackId.value == trackId
         val switching = fromStream && switchToSmoothSource(track)
@@ -1102,7 +1166,7 @@ class PlaybackController @Inject constructor(
     private fun upcomingTracks(): List<TrackDetailsDto> {
         val queue = _currentPlaylist.value
         val currentId = _currentTrack.value?.idString
-        return queue.drop(queue.indexOfFirst { it.idString == currentId } + 1)
+        return queue.drop(queue.indexOfFirst { it.idString == currentId } + 1).filterNot { it.isLocal }
     }
 
     /**
@@ -1112,6 +1176,10 @@ class PlaybackController @Inject constructor(
     private fun onPlaybackFailure(failure: PlaybackFailure) {
         val current = _currentTrack.value ?: return
         if (failure.trackId != current.idString) return // stale event from a track we already left
+        if (current.isLocal) {
+            onLocalFailure(current, failure)
+            return
+        }
 
         preloadManager.evictUrl(failure.trackId)
         // A copy that does not play is no use to anyone
@@ -1163,6 +1231,25 @@ class PlaybackController @Inject constructor(
         }
     }
 
+    /**
+     * A file of the user's music failed. Taken out with the drive, it is skipped at once; a file that is there
+     * but does not play (a format the device does not know) is skipped too, and several in a row stop the music.
+     */
+    private fun onLocalFailure(current: TrackDetailsDto, failure: PlaybackFailure) {
+        Log.w(TAG, "Local file ${failure.trackId} failed: ${failure.reason}")
+        retriedTrackId = null
+        consecutiveFailedTracks++
+        if (consecutiveFailedTracks >= PlaybackQueue.MAX_FAILED_TRACKS) {
+            consecutiveFailedTracks = 0
+            _isStarting.value = false
+            playerRepository.stop()
+            restoredPositionMs.value = failure.positionMs
+            showMessage(context.getString(R.string.msg_local_unavailable))
+            return
+        }
+        skipToNextLocal(current)
+    }
+
     /** What plays now and what the server offered, for the player's quality details. */
     data class QualityDetails(
         val playing: String?,
@@ -1173,6 +1260,7 @@ class PlaybackController @Inject constructor(
     fun qualityDetails(): QualityDetails? {
         val track = _currentTrack.value?.takeIf { !it.isRadio } ?: return null
         val id = track.idString
+        if (track.isLocal) return QualityDetails(_streamQuality.value, offered = null)
         val hasPlus = authRepository.getActiveAccount()?.hasPlus
         return QualityDetails(
             _streamQuality.value,
@@ -1202,7 +1290,7 @@ class PlaybackController @Inject constructor(
 
     private fun currentLink(): LinkState = if (isOffline()) LinkState.NONE else link.state
 
-    private fun isOnDevice(trackId: String): Boolean = preloadManager.hasPlayableCopy(trackId) || reserve.has(trackId)
+    private fun isOnDevice(track: TrackDetailsDto): Boolean = track.isLocal || preloadManager.hasPlayableCopy(track.idString) || reserve.has(track.idString)
 
     /**
      * No connection and the queue has nothing more on the device: the rest of the reserve (what has not
@@ -1213,7 +1301,9 @@ class PlaybackController @Inject constructor(
             .map { it.track }
             .filterNot { preloadManager.hasPlayableCopy(it.idString) }
         val downloaded = libraryTracks.filter { preloadManager.hasPlayableCopy(it.idString) }.shuffled()
-        val mix = (reserved + downloaded).distinctBy { it.idString }
+        // Nothing of the service on the device: the user's own music plays rather than silence
+        val own = if (reserved.isEmpty() && downloaded.isEmpty()) localMusic.toDtos(localMusic.library.value.tracks).shuffled() else emptyList()
+        val mix = (reserved + downloaded + own).distinctBy { it.idString }
         if (mix.isEmpty()) {
             _isStarting.value = false
             waitingForConnection = true
@@ -1237,7 +1327,7 @@ class PlaybackController @Inject constructor(
         }
         val queue = _currentPlaylist.value
         val start = queue.indexOfFirst { it.idString == from.idString }
-        val next = PlaybackQueue.nextMatching(queue, start) { isOnDevice(it.idString) }
+        val next = PlaybackQueue.nextMatching(queue, start) { isOnDevice(it) }
         if (next != null) playTrack(queue[next].idString, queue) else playOfflineMix(ReturnPoint(_currentSource.value, queue, from.idString))
     }
 
@@ -1264,6 +1354,7 @@ class PlaybackController @Inject constructor(
         scope.launch {
             val nextId = track.idString
             val url = when {
+                track.isLocal -> track.localUri ?: return@launch
                 preloadManager.hasPlayableCopy(nextId) -> ""
                 RoadPlan.originFor(currentLink(), link.mayTryStream(), reserve.has(nextId)) == TrackOrigin.COPY -> copyUri(nextId) ?: return@launch
                 currentLink() == LinkState.NONE -> return@launch
@@ -1421,6 +1512,9 @@ class PlaybackController @Inject constructor(
             _messages.tryEmit(text)
         }
     }
+
+    /** Comes over the network: not a station (live, no copy) and not the user's own file. */
+    private val TrackDetailsDto.isStreamed: Boolean get() = !isRadio && !isLocal
 
     companion object {
         const val WAVE_RETRY_START_MS = 2_000L

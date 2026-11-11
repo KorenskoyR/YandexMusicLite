@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- "Музыка с устройства": reads the music files on the phone, the SD card and flash drives (never writes) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <!-- Android 11+ package visibility: lets the in-app updater find the system package installer -->
     <queries>
@@ -118,6 +123,12 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <!-- The covers of the user's own music files, for this app only -->
+        <provider
+            android:name=".data.local.LocalArtProvider"
+            android:authorities="${applicationId}.localart"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

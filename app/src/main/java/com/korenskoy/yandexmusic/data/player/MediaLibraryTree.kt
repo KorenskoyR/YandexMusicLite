@@ -18,6 +18,9 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.repository.LibraryRepository
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
 import com.korenskoy.yandexmusic.data.repository.UserPlaylistsRepository
+import com.korenskoy.yandexmusic.data.local.LocalMusicRepository
+import com.korenskoy.yandexmusic.data.local.LocalRules
+import com.korenskoy.yandexmusic.data.local.LocalSource
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -37,7 +40,8 @@ class MediaLibraryTree @Inject constructor(
     private val playbackController: PlaybackController,
     private val voiceSearch: VoiceSearch,
     private val playlistsRepository: UserPlaylistsRepository,
-    private val offlineCollections: OfflineCollections
+    private val offlineCollections: OfflineCollections,
+    private val localMusic: LocalMusicRepository
 ) {
     fun root(): MediaItem = folder(ROOT_ID, context.getString(R.string.app_name), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         .withExtras(Bundle().apply {
@@ -54,6 +58,10 @@ class MediaLibraryTree @Inject constructor(
             val kind = parentId.removePrefix(PLAYLIST_PREFIX)
             return playlistTracks(kind)?.map { trackItem("$PLAYLIST_TRACK_PREFIX$kind/", it) }
         }
+        if (parentId.startsWith(LOCAL_FOLDER_PREFIX)) {
+            val key = Uri.decode(parentId.removePrefix(LOCAL_FOLDER_PREFIX))
+            return deviceQueue(key)?.map { localItem(key, it) }
+        }
         return when (parentId) {
             ROOT_ID -> listOf(
                 playable(
@@ -67,7 +75,27 @@ class MediaLibraryTree @Inject constructor(
                     .withExtras(Bundle().apply { putInt(CONTENT_STYLE_PLAYABLE_HINT, CONTENT_STYLE_GRID) })
             )
             LIKED_ID -> libraryRepository.likedTracks.value.map { trackItem(LIKED_PREFIX, it) }
-            DOWNLOADED_ID -> downloaded().map { trackItem(DOWNLOADED_PREFIX, it) }
+            // With music on the device: what the app downloaded and the device's own, side by side
+            DOWNLOADED_ID -> if (localMusic.current().tracks.isEmpty()) {
+                downloaded().map { trackItem(DOWNLOADED_PREFIX, it) }
+            } else {
+                listOf(
+                    folder(DOWNLOADED_APP_ID, context.getString(R.string.auto_downloaded_in_app), MediaMetadata.MEDIA_TYPE_PLAYLIST),
+                    folder(LOCAL_ID, context.getString(R.string.local_title), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                )
+            }
+            DOWNLOADED_APP_ID -> downloaded().map { trackItem(DOWNLOADED_PREFIX, it) }
+            // The device's folders, as on the drive; with one folder, its tracks at once
+            LOCAL_ID -> {
+                val folders = LocalRules.folders(localMusic.current().tracks)
+                if (folders.size > 1) {
+                    folders.map { f ->
+                        folder(LOCAL_FOLDER_PREFIX + Uri.encode(f.key), f.name ?: sourceLabel(f.source), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                    }
+                } else {
+                    deviceQueue(ALL_DEVICE)?.map { localItem(ALL_DEVICE, it) }
+                }
+            }
             PLAYLISTS_ID -> playlistsRepository.playlists.value.map { playlist ->
                 folder(PLAYLIST_PREFIX + playlist.kindString, playlist.title.orEmpty(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
                     .withArtwork(playlist.coverUri.toCoverUrl(CoverSize.Medium))
@@ -90,7 +118,12 @@ class MediaLibraryTree @Inject constructor(
                 PLAYLIST_PREFIX + mediaId.removePrefix(PLAYLIST_TRACK_PREFIX).substringBefore('/')
             mediaId.startsWith(PLAYLIST_PREFIX) -> PLAYLISTS_ID
             mediaId.startsWith(LIKED_PREFIX) -> LIKED_ID
-            mediaId.startsWith(DOWNLOADED_PREFIX) -> DOWNLOADED_ID
+            mediaId.startsWith(DOWNLOADED_PREFIX) -> if (localMusic.current().tracks.isEmpty()) DOWNLOADED_ID else DOWNLOADED_APP_ID
+            mediaId.startsWith(LOCAL_TRACK_PREFIX) -> mediaId.removePrefix(LOCAL_TRACK_PREFIX).substringBefore('|').let { key ->
+                if (key == Uri.encode(ALL_DEVICE)) LOCAL_ID else LOCAL_FOLDER_PREFIX + key
+            }
+            mediaId.startsWith(LOCAL_FOLDER_PREFIX) -> LOCAL_ID
+            mediaId == LOCAL_ID || mediaId == DOWNLOADED_APP_ID -> DOWNLOADED_ID
             mediaId.startsWith(RADIO_PREFIX) -> RADIO_ID
             else -> ROOT_ID
         }
@@ -115,6 +148,11 @@ class MediaLibraryTree @Inject constructor(
                 val (kind, trackId) = mediaId.removePrefix(PLAYLIST_TRACK_PREFIX).split('/', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
                 queueAction(trackId, playlistTracks(kind).orEmpty(), liked)
             }
+            mediaId.startsWith(LOCAL_TRACK_PREFIX) -> {
+                val (key, trackId) = mediaId.removePrefix(LOCAL_TRACK_PREFIX).split('|', limit = 2).let { Uri.decode(it[0]) to it.getOrElse(1) { "" } }
+                val queue = deviceQueue(key).orEmpty()
+                if (queue.none { it.idString == trackId }) null else ({ playbackController.playOnDevice(trackId, queue) })
+            }
             mediaId.startsWith(RADIO_PREFIX) -> radioRepository.getBuiltinStations()
                 .firstOrNull { it.id == mediaId.removePrefix(RADIO_PREFIX) }
                 ?.let { station -> { playbackController.playRadioStation(station) } }
@@ -138,9 +176,53 @@ class MediaLibraryTree @Inject constructor(
         return when (pick) {
             is VoiceSearch.Pick.Station -> ({ playbackController.playRadioStation(pick.station) })
             is VoiceSearch.Pick.Tracks -> ({ playbackController.playTrack(pick.tracks.first().idString, pick.tracks, PlaylistSource.SEARCH) })
+            is VoiceSearch.Pick.Offline -> offlineAction(pick.target)
             is VoiceSearch.Pick.Nothing, null -> ({ playbackController.playMyVibe() })
         }
     }
+
+    /** "Включи с флешки", "включи скачанное": what lies there; the wave when nothing does. */
+    private suspend fun offlineAction(target: VoicePhrase.Offline): () -> Unit {
+        if (target == VoicePhrase.Offline.DOWNLOADED) {
+            val downloaded = downloaded()
+            val liked = libraryRepository.likedTracks.value
+            return downloaded.firstOrNull()?.let { queueAction(it.idString, downloaded, liked) } ?: { playbackController.playMyVibe() }
+        }
+        val only = when (target) {
+            VoicePhrase.Offline.PHONE -> LocalSource.PHONE
+            VoicePhrase.Offline.SD -> LocalSource.SD
+            VoicePhrase.Offline.FLASH -> LocalSource.FLASH
+            else -> null
+        }
+        val tracks = localMusic.current().tracks.filter { only == null || it.source == only }
+        val queue = localMusic.toDtos(LocalRules.folders(tracks).flatMap { it.tracks })
+        val first = queue.firstOrNull() ?: return { playbackController.playMyVibe() }
+        return { playbackController.playOnDevice(first.idString, queue) }
+    }
+
+    /** The device's music in folder order: all of it ([ALL_DEVICE]) or one folder; null for a folder that is gone. */
+    private suspend fun deviceQueue(folderKey: String): List<TrackDetailsDto>? {
+        val folders = LocalRules.folders(localMusic.current().tracks)
+        val tracks = if (folderKey == ALL_DEVICE) folders.flatMap { it.tracks } else folders.firstOrNull { it.key == folderKey }?.tracks ?: return null
+        return localMusic.toDtos(tracks)
+    }
+
+    /** A file of the device's music; its cover is the app's own and stays in the app, so the list shows none. */
+    private fun localItem(folderKey: String, track: TrackDetailsDto): MediaItem = playable(
+        LOCAL_TRACK_PREFIX + Uri.encode(folderKey) + "|" + track.idString,
+        track.title.orEmpty(),
+        track.artists.joinToString(", ") { it.name.orEmpty() },
+        artwork = null,
+        mediaType = MediaMetadata.MEDIA_TYPE_MUSIC
+    )
+
+    private fun sourceLabel(source: LocalSource): String = context.getString(
+        when (source) {
+            LocalSource.PHONE -> R.string.local_source_phone
+            LocalSource.SD -> R.string.local_source_sd
+            LocalSource.FLASH -> R.string.local_source_flash
+        }
+    )
 
     private fun queueAction(trackId: String, playlist: List<TrackDetailsDto>, liked: List<TrackDetailsDto>): (() -> Unit)? {
         if (playlist.none { it.idString == trackId }) return null
@@ -217,6 +299,12 @@ class MediaLibraryTree @Inject constructor(
         const val WAVE_ID = "wave"
         const val LIKED_ID = "liked"
         const val DOWNLOADED_ID = "downloaded"
+        const val DOWNLOADED_APP_ID = "downloaded_app"
+        const val LOCAL_ID = "device"
+        private const val LOCAL_FOLDER_PREFIX = "devfolder/"
+        private const val LOCAL_TRACK_PREFIX = "devtrack/"
+        /** The key of "all the device's music" in a track's id. */
+        private const val ALL_DEVICE = "*"
         const val RADIO_ID = "radio"
         const val PLAYLISTS_ID = "playlists"
         private const val PLAYLIST_PREFIX = "playlist/"

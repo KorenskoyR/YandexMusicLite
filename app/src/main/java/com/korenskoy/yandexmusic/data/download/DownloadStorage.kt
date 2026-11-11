@@ -163,4 +163,5 @@ interface StorageAccess {
     fun downloads(): TrackDownloadManager
     fun usb(): UsbStorage
     fun card(): CardStorage
+    fun localMusic(): com.korenskoy.yandexmusic.data.local.LocalMusicRepository
 }

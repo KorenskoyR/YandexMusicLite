@@ -78,18 +78,7 @@ class UsbStorage(
      * Where the system window opens: the root of a removable drive that is in, a USB one first (a head unit
      * may have a card too). Null on Android 9 and older, or with nothing plugged in: the window opens as usual.
      */
-    fun pickerStart(): Uri? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-        val storage = context.getSystemService(StorageManager::class.java) ?: return null
-        return runCatching {
-            storage.storageVolumes
-                .filter { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }
-                .sortedByDescending { it.getDescription(context).contains("USB", ignoreCase = true) }
-                .firstNotNullOfOrNull {
-                    IntentCompat.getParcelableExtra(it.createOpenDocumentTreeIntent(), DocumentsContract.EXTRA_INITIAL_URI, Uri::class.java)
-                }
-        }.getOrNull()
-    }
+    fun pickerStart(): Uri? = removableDriveRoot(context)
 
     /** The folder's name, like "USB-накопитель › YandexMusicLite". */
     fun label(): String? {
@@ -211,4 +200,21 @@ class UsbStorage(
         private const val MIME = "application/octet-stream"
         private const val PART = ".part"
     }
+}
+
+/**
+ * Where the system's folder window opens: the root of a removable drive that is in, a USB one first (a head unit
+ * may have a card too). Null on Android 9 and older, or with nothing plugged in: the window opens as usual.
+ */
+fun removableDriveRoot(context: Context): Uri? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+    val storage = context.getSystemService(StorageManager::class.java) ?: return null
+    return runCatching {
+        storage.storageVolumes
+            .filter { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }
+            .sortedByDescending { it.getDescription(context).contains("USB", ignoreCase = true) }
+            .firstNotNullOfOrNull {
+                IntentCompat.getParcelableExtra(it.createOpenDocumentTreeIntent(), DocumentsContract.EXTRA_INITIAL_URI, Uri::class.java)
+            }
+    }.getOrNull()
 }

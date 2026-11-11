@@ -432,7 +432,8 @@ internal fun TitleRow(
             )
         }
         }
-        if (!track.isRadio) {
+        // A station, or the user's own file: nothing to keep, add or start a wave from
+        if (!track.isRadio && !track.isLocal) {
             if (offline != null) {
                 TrackDownloadButton(offline, onDownloadClick)
                 Spacer(Modifier.width(10.dp))

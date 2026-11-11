@@ -195,7 +195,7 @@ fun TrackContextMenu(
                     }
                 }
             } else {
-                if (onTrackWave != null && !track.isRadio) {
+                if (onTrackWave != null && !track.isRadio && !track.isLocal) {
                     ContextMenuItem(Icons.Rounded.Waves, stringResource(R.string.wave_by_track)) {
                         onTrackWave()
                         onDismiss()
@@ -205,11 +205,14 @@ fun TrackContextMenu(
                     onPlayNext()
                     onDismiss()
                 }
-                ContextMenuItem(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.track_context_menu_dobavit_v_pleylist)) {
-                    picking = true
+                // The user's own file is not in the service: it cannot go into a playlist there
+                if (!track.isLocal) {
+                    ContextMenuItem(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.track_context_menu_dobavit_v_pleylist)) {
+                        picking = true
+                    }
                 }
                 // One track on the device, out of a long liked list: a download, or taking it off again
-                if (offline != null && !track.isRadio) {
+                if (offline != null && !track.isRadio && !track.isLocal) {
                     if (offline == TrackOfflineState.NONE) {
                         ContextMenuItem(Icons.Rounded.Download, stringResource(R.string.track_download)) {
                             onDownload()

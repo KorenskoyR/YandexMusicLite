@@ -514,7 +514,7 @@ private fun PlayerHost(
         onSleepAtEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
         onCancelSleepTimer = { viewModel.cancelSleepTimer() },
         onAddToPlaylist = onAddToPlaylist,
-        offline = offline.takeUnless { track.isRadio },
+        offline = offline.takeUnless { track.isRadio || track.isLocal },
         onDownload = { viewModel.downloadTrack(track) },
         onRemoveDownload = { viewModel.removeTrackFromDevice(track) },
         onQualityClick = onQualityClick,
