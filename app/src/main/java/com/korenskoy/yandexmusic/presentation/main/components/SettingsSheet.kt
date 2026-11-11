@@ -520,6 +520,7 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
         SwitchRow(Icons.Rounded.Explicit, stringResource(R.string.settings_explicit), stringResource(R.string.settings_explicit_hint), state.skipExplicit, actions.onSkipExplicitChange)
         SwitchRow(Icons.Rounded.AutoAwesome, stringResource(R.string.settings_skip_ai), stringResource(R.string.settings_skip_ai_hint), state.skipAi, actions.onSkipAiChange)
     }
+    SettingsNote(stringResource(R.string.settings_skip_ai_note))
     SettingsNote(stringResource(R.string.settings_wave_tuning_note))
     SettingsGroup(stringResource(R.string.settings_group_reserve)) {
         SwitchRow(Icons.Rounded.Timeline, stringResource(R.string.settings_smooth), stringResource(R.string.settings_smooth_hint), state.smoothPlayback, actions.onSmoothPlaybackChange)

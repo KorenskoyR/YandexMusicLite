@@ -603,5 +603,6 @@
     <string name="ai_mark_cd">Создан с использованием ИИ</string>
     <string name="ai_menu_source">По данным Яндекс Музыки</string>
     <string name="settings_skip_ai">Пропускать музыку, созданную ИИ</string>
-    <string name="settings_skip_ai_hint">Треки, которые Яндекс отметил как созданные с использованием ИИ, не включаются сами</string>
+    <string name="settings_skip_ai_hint">Пропуск треков, которые Яндекс отметил как созданные с использованием ИИ</string>
+    <string name="settings_skip_ai_note">Такие треки игнорируются — в «Моей волне», в плейлистах, в машине. Трек, который вы выбрали сами, играет. Метка «ИИ» у «ИИ» треков отображается всегда.</string>
 </resources>
