@@ -20,13 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -149,9 +145,15 @@ fun LyricsPanel(
 ) {
     val answer = lyrics.answer
     BoxWithConstraints(
-        modifier = modifier
+        modifier
             .fillMaxSize()
-            .background(veil),
+            .background(veil)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClickLabel = stringResource(if (answer == LyricsAnswer.Failed) R.string.lyrics_failed else R.string.lyrics_hide)
+            ) { if (answer == LyricsAnswer.Failed) lyrics.retry() else onClose() },
         contentAlignment = Alignment.Center
     ) {
         val fit = with(LocalDensity.current) { (maxWidth / FIT_LETTERS).toSp() }
@@ -169,40 +171,46 @@ fun LyricsPanel(
                 lines = answer.lines,
                 progress = progress,
                 onSeek = onSeek,
-                onClose = onClose,
                 fontSize = scaledFontSize,
                 lineHeight = scaledLineHeight,
                 padding = padding,
                 modifier = Modifier.fillMaxSize()
             )
-            is LyricsAnswer.Text -> PlainLyricsView(
-                text = answer.text,
-                onClose = onClose,
-                fontSize = scaledFontSize,
-                lineHeight = scaledLineHeight,
-                padding = padding,
-                modifier = Modifier.fillMaxSize()
-            )
-            else -> Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        role = Role.Button,
-                        onClickLabel = stringResource(if (answer == LyricsAnswer.Failed) R.string.lyrics_failed else R.string.lyrics_none)
-                    ) { if (answer == LyricsAnswer.Failed) lyrics.retry() else onClose() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stringResource(if (answer == LyricsAnswer.Failed) R.string.lyrics_failed else R.string.lyrics_none),
-                    color = Color.White.copy(alpha = 0.82f),
-                    fontSize = scaledFontSize * 0.84f,
-                    lineHeight = scaledLineHeight * 0.84f,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(padding)
-                )
+            is LyricsAnswer.Text -> {
+                val scroll = rememberScrollState()
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            val edge = padding.toPx()
+                            if (scroll.canScrollBackward) {
+                                drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, endY = edge), blendMode = BlendMode.DstIn)
+                            }
+                            if (scroll.canScrollForward) {
+                                drawRect(
+                                    Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = size.height - edge, endY = size.height),
+                                    blendMode = BlendMode.DstIn
+                                )
+                            }
+                        }
+                        .verticalScroll(scroll)
+                        .padding(padding)
+                ) {
+                    Text(answer.text, color = Color.White, fontSize = scaledFontSize, lineHeight = scaledLineHeight, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(padding))
+                    Text(stringResource(R.string.lyrics_source), color = Color.White.copy(alpha = 0.55f), fontSize = scaledFontSize * 0.62f, lineHeight = scaledFontSize * 0.86f)
+                }
             }
+            else -> Text(
+                stringResource(if (answer == LyricsAnswer.Failed) R.string.lyrics_failed else R.string.lyrics_none),
+                color = Color.White.copy(alpha = 0.82f),
+                fontSize = scaledFontSize * 0.84f,
+                lineHeight = scaledLineHeight * 0.84f,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(padding)
+            )
         }
     }
 }
@@ -212,7 +220,6 @@ private fun SyncedLyricsView(
     lines: List<LyricLine>,
     progress: () -> Long,
     onSeek: (Long) -> Unit,
-    onClose: () -> Unit,
     fontSize: TextUnit,
     lineHeight: TextUnit,
     padding: Dp,
@@ -352,98 +359,6 @@ private fun SyncedLyricsView(
                     lineHeight = fontSize * 0.86f
                 )
             }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(padding / 2)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                    onClickLabel = stringResource(R.string.lyrics_hide),
-                    onClick = onClose
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = stringResource(R.string.lyrics_hide),
-                tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlainLyricsView(
-    text: String,
-    onClose: () -> Unit,
-    fontSize: TextUnit,
-    lineHeight: TextUnit,
-    padding: Dp,
-    modifier: Modifier = Modifier
-) {
-    val scroll = rememberScrollState()
-    Box(modifier = modifier) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                    onClickLabel = stringResource(R.string.lyrics_hide)
-                ) { onClose() }
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    val edge = padding.toPx()
-                    if (scroll.canScrollBackward) {
-                        drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, endY = edge), blendMode = BlendMode.DstIn)
-                    }
-                    if (scroll.canScrollForward) {
-                        drawRect(
-                            Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = size.height - edge, endY = size.height),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-                }
-                .verticalScroll(scroll)
-                .padding(padding)
-        ) {
-            Text(text, color = Color.White, fontSize = fontSize, lineHeight = lineHeight, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(padding))
-            Text(stringResource(R.string.lyrics_source), color = Color.White.copy(alpha = 0.55f), fontSize = fontSize * 0.62f, lineHeight = fontSize * 0.86f)
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(padding / 2)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                    onClickLabel = stringResource(R.string.lyrics_hide),
-                    onClick = onClose
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = stringResource(R.string.lyrics_hide),
-                tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }

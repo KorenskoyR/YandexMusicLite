@@ -1,32 +1,17 @@
 package com.korenskoy.yandexmusic.data.lyrics
 
-import com.korenskoy.yandexmusic.data.dto.LyricsDownloadDto
-import com.korenskoy.yandexmusic.data.dto.ResponseWrapper
-import com.korenskoy.yandexmusic.data.dto.SupplementLyricsDto
+import com.korenskoy.yandexmusic.data.dto.LyricsInfoDto
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
-import com.korenskoy.yandexmusic.data.dto.TrackSupplementDto
 import com.korenskoy.yandexmusic.data.network.LosslessSigner
-import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.Call
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
-import retrofit2.HttpException
 import java.io.File
-import java.io.IOException
 
 class SyncedLyricsTest {
 
@@ -152,7 +137,7 @@ class SyncedLyricsTest {
             id = JsonPrimitive("100"),
             title = "Track",
             lyricsAvailable = false,
-            lyricsInfo = com.korenskoy.yandexmusic.data.dto.LyricsInfoDto(hasAvailableSyncLyrics = true)
+            lyricsInfo = LyricsInfoDto(hasAvailableSyncLyrics = true)
         )
         assertTrue("track with synced lyrics is allowed to ask", LyricsRules.canHave(trackWithSync))
 
@@ -160,7 +145,7 @@ class SyncedLyricsTest {
             id = JsonPrimitive("101"),
             title = "Track",
             lyricsAvailable = false,
-            lyricsInfo = com.korenskoy.yandexmusic.data.dto.LyricsInfoDto(hasAvailableSyncLyrics = false)
+            lyricsInfo = LyricsInfoDto(hasAvailableSyncLyrics = false)
         )
         assertFalse("track with explicitly denied lyrics is rejected", LyricsRules.canHave(trackDenied))
     }

@@ -2,8 +2,8 @@ package com.korenskoy.yandexmusic.presentation
 
 import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.korenskoy.yandexmusic.data.lyrics.LyricLine
 import com.korenskoy.yandexmusic.data.lyrics.LyricsAnswer
@@ -63,7 +63,7 @@ class SyncedLyricsUiTest {
     }
 
     @Test
-    fun clickingCloseButtonClosesLyrics() {
+    fun clickingPanelClosesLyrics() {
         val lines = listOf(LyricLine(1_000L, "First line"))
         val lyrics = TrackLyrics(
             answer = LyricsAnswer.Synced(lines),
@@ -81,8 +81,8 @@ class SyncedLyricsUiTest {
             )
         }
 
-        compose.onNodeWithContentDescription("Скрыть текст").performClick()
-        assertTrue("close button clicked", closed)
+        compose.onRoot().performClick()
+        assertTrue("panel clicked to close", closed)
     }
 
     @Test

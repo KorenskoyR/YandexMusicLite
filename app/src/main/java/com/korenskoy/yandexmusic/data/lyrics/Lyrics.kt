@@ -105,14 +105,22 @@ object LyricsRules {
  */
 @Singleton
 class Lyrics internal constructor(
-    private val fetch: suspend (String) -> LyricsAnswer,
-    private val cacheDir: File? = null
+    private val fetch: suspend (String) -> LyricsAnswer
 ) {
+    private var cacheDir: File? = null
+
+    internal constructor(
+        fetch: suspend (String) -> LyricsAnswer,
+        cacheDir: File?
+    ) : this(fetch) {
+        this.cacheDir = cacheDir
+    }
+
     @Inject
     constructor(
         api: YandexMusicApi,
         @ApplicationContext context: Context,
-        @param:UpdateClient downloadClient: OkHttpClient
+        @UpdateClient downloadClient: OkHttpClient
     ) : this({ id -> ask(api, downloadClient, id) }, File(context.cacheDir, "lyrics"))
 
     private val known = object : LinkedHashMap<String, LyricsAnswer>(KEEP, 0.75f, true) {
@@ -186,77 +194,87 @@ class Lyrics internal constructor(
         private const val TAG = "Lyrics"
         private const val KEEP = 64
 
+        private sealed interface FetchOutcome {
+            data class Success(val answer: LyricsAnswer) : FetchOutcome
+            data object Missing : FetchOutcome
+            data object NetworkError : FetchOutcome
+        }
+
         internal suspend fun ask(
             api: YandexMusicApi,
             downloadClient: OkHttpClient,
             id: String
         ): LyricsAnswer {
             val cleanId = id.substringBefore(':').trim()
-            var networkError = false
+            var hadNetworkError = false
 
-            // 1. Try signed LRC format
-            try {
-                val sign = LosslessSigner.signLyrics(cleanId)
-                val resp = api.getTrackLyrics(cleanId, format = "LRC", timeStamp = sign.ts, sign = sign.sign)
-                val downloadUrl = resp.result?.downloadUrl?.takeIf { it.isNotBlank() }
-                if (downloadUrl != null) {
-                    val content = downloadFile(downloadClient, downloadUrl)
-                    if (content != null) {
-                        val lines = LyricsRules.parseLrc(content)
-                        if (lines.isNotEmpty()) return LyricsAnswer.Synced(lines)
-                    }
-                }
-            } catch (e: HttpException) {
-                if (e.code() !in 400..499) {
-                    Log.d(TAG, "LRC of $cleanId failed: HTTP ${e.code()}")
-                    networkError = true
-                }
-            } catch (e: IOException) {
-                Log.d(TAG, "LRC of $cleanId network error: ${e.message}")
-                networkError = true
-            } catch (e: SerializationException) {
-                Log.d(TAG, "LRC of $cleanId unreadable: ${e.message}")
+            when (val lrc = fetchSigned(api, downloadClient, cleanId, "LRC")) {
+                is FetchOutcome.Success -> return lrc.answer
+                FetchOutcome.NetworkError -> hadNetworkError = true
+                FetchOutcome.Missing -> Unit
             }
 
-            // 2. Try signed TEXT format
-            try {
-                val sign = LosslessSigner.signLyrics(cleanId)
-                val resp = api.getTrackLyrics(cleanId, format = "TEXT", timeStamp = sign.ts, sign = sign.sign)
-                val downloadUrl = resp.result?.downloadUrl?.takeIf { it.isNotBlank() }
-                if (downloadUrl != null) {
-                    val content = downloadFile(downloadClient, downloadUrl)
-                    val trimmed = content?.trim()
-                    if (!trimmed.isNullOrEmpty()) return LyricsAnswer.Text(trimmed)
-                }
-            } catch (e: HttpException) {
-                if (e.code() !in 400..499) {
-                    Log.d(TAG, "TEXT of $cleanId failed: HTTP ${e.code()}")
-                    networkError = true
-                }
-            } catch (e: IOException) {
-                Log.d(TAG, "TEXT of $cleanId network error: ${e.message}")
-                networkError = true
-            } catch (e: SerializationException) {
-                Log.d(TAG, "TEXT of $cleanId unreadable: ${e.message}")
+            when (val text = fetchSigned(api, downloadClient, cleanId, "TEXT")) {
+                is FetchOutcome.Success -> return text.answer
+                FetchOutcome.NetworkError -> hadNetworkError = true
+                FetchOutcome.Missing -> Unit
             }
 
-            // 3. Fallback to open supplement endpoint
-            try {
-                val supplement = api.getTrackSupplement(cleanId)
-                LyricsRules.textOf(supplement.result)?.let { return LyricsAnswer.Text(it) }
-            } catch (e: HttpException) {
-                if (e.code() !in 400..499) {
-                    Log.d(TAG, "Supplement of $cleanId failed: HTTP ${e.code()}")
-                    networkError = true
-                }
-            } catch (e: IOException) {
-                Log.d(TAG, "Supplement of $cleanId network error: ${e.message}")
-                networkError = true
-            } catch (e: SerializationException) {
-                Log.d(TAG, "Supplement of $cleanId unreadable: ${e.message}")
+            when (val supp = fetchSupplement(api, cleanId)) {
+                is FetchOutcome.Success -> return supp.answer
+                FetchOutcome.NetworkError -> hadNetworkError = true
+                FetchOutcome.Missing -> Unit
             }
 
-            return if (networkError) LyricsAnswer.Failed else LyricsAnswer.None
+            return if (hadNetworkError) LyricsAnswer.Failed else LyricsAnswer.None
+        }
+
+        private suspend fun fetchSigned(
+            api: YandexMusicApi,
+            downloadClient: OkHttpClient,
+            cleanId: String,
+            format: String
+        ): FetchOutcome = try {
+            val sign = LosslessSigner.signLyrics(cleanId)
+            val resp = api.getTrackLyrics(cleanId, format, sign.ts, sign.sign)
+            val url = resp.result?.downloadUrl?.takeIf { it.isNotBlank() }
+            if (url == null) FetchOutcome.Missing
+            else parseDownloaded(downloadFile(downloadClient, url)?.trim(), format)
+        } catch (e: HttpException) {
+            if (e.code() in 400..499) FetchOutcome.Missing else { Log.d(TAG, "$format of $cleanId: HTTP ${e.code()}"); FetchOutcome.NetworkError }
+        } catch (e: IOException) {
+            Log.d(TAG, "$format of $cleanId: ${e.message}")
+            FetchOutcome.NetworkError
+        } catch (e: SerializationException) {
+            Log.d(TAG, "$format of $cleanId unreadable: ${e.message}")
+            FetchOutcome.Missing
+        }
+
+        private fun parseDownloaded(content: String?, format: String): FetchOutcome {
+            if (content.isNullOrEmpty()) return FetchOutcome.Missing
+            if (format == "LRC") {
+                val lines = LyricsRules.parseLrc(content)
+                if (lines.isNotEmpty()) return FetchOutcome.Success(LyricsAnswer.Synced(lines))
+                return FetchOutcome.Missing
+            }
+            return FetchOutcome.Success(LyricsAnswer.Text(content))
+        }
+
+        private suspend fun fetchSupplement(
+            api: YandexMusicApi,
+            cleanId: String
+        ): FetchOutcome = try {
+            val supplement = api.getTrackSupplement(cleanId)
+            val text = LyricsRules.textOf(supplement.result)
+            if (text != null) FetchOutcome.Success(LyricsAnswer.Text(text)) else FetchOutcome.Missing
+        } catch (e: HttpException) {
+            if (e.code() in 400..499) FetchOutcome.Missing else { Log.d(TAG, "Supplement of $cleanId: HTTP ${e.code()}"); FetchOutcome.NetworkError }
+        } catch (e: IOException) {
+            Log.d(TAG, "Supplement of $cleanId: ${e.message}")
+            FetchOutcome.NetworkError
+        } catch (e: SerializationException) {
+            Log.d(TAG, "Supplement of $cleanId unreadable: ${e.message}")
+            FetchOutcome.Missing
         }
 
         private fun downloadFile(client: OkHttpClient, url: String): String? {
@@ -264,7 +282,7 @@ class Lyrics internal constructor(
             val request = Request.Builder().url(httpUrl).build()
             return client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
-                response.body?.string()
+                response.body.string()
             }
         }
     }
