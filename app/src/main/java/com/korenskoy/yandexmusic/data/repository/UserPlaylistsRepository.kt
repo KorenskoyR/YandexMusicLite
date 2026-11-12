@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import android.util.Log
 import com.korenskoy.yandexmusic.data.cache.PlaylistCacheManager
@@ -37,6 +38,12 @@ class UserPlaylistsRepository @Inject constructor(
 
     /** Serializes server refreshes and edits, so a refresh never overwrites a list mid-edit. */
     private val mutex = Mutex()
+
+    private val pendingMutex = Mutex()
+    private val _pendingAdds = MutableStateFlow<List<PendingPlaylistAdd>>(emptyList())
+
+    /** Tracks added to playlists without a connection, still to go to the server. */
+    val pendingAdds: StateFlow<List<PendingPlaylistAdd>> = _pendingAdds.asStateFlow()
     private var loadedFolder: String? = null
 
     private val activeFolder: String
@@ -49,6 +56,7 @@ class UserPlaylistsRepository @Inject constructor(
         loadedFolder = folder
         _playlists.value = cacheManager.loadUserPlaylists(folder)
         _saved.value = cacheManager.loadSavedPlaylists(folder)
+        _pendingAdds.value = loadPending(folder)
     }
 
     /**
@@ -188,6 +196,54 @@ class UserPlaylistsRepository @Inject constructor(
         if (activeFolder == folder) applyTrackChange(folder, fresh, changed, listOf(track) + before)
         AddTrackResult.ADDED
     }
+
+    /** The user's playlists that have [trackId], as far as the saved copies know; the queued ones too. */
+    suspend fun playlistsWith(trackId: String): Set<String> {
+        val folder = activeFolder
+        val saved = _playlists.value.filter { playlist ->
+            cacheManager.loadPlaylistTracks(folder, playlist.kindString, playlist.revision).any { it.idString == trackId }
+        }.map { it.kindString }
+        return (saved + _pendingAdds.value.filter { it.trackId == trackId }.map { it.kind }).toSet()
+    }
+
+    /** Keeps [track] for [playlist] until the connection is back: [flushPendingAdds] sends it. */
+    suspend fun queueAdd(playlist: UserPlaylistDto, track: TrackDetailsDto): Unit = pendingMutex.withLock {
+        val folder = activeFolder
+        val queue = PendingPlaylistAdds.add(loadPending(folder), PendingPlaylistAdd(playlist.kindString, track))
+        cacheManager.savePendingPlaylistAdds(folder, queue.map(PendingPlaylistAdds::save))
+        if (activeFolder == folder) _pendingAdds.value = queue
+    }
+
+    /** Sends what was added without a connection, oldest first; what still cannot go stays for the next time. */
+    suspend fun flushPendingAdds(): Unit = pendingMutex.withLock {
+        val folder = activeFolder
+        val queue = loadPending(folder)
+        if (queue.isEmpty()) return@withLock
+        loadCached()
+        // Without the list of playlists nothing can be told apart yet: the queue waits
+        val known = _playlists.value.takeIf { it.isNotEmpty() } ?: return@withLock
+        var left = queue
+        for (add in queue) {
+            try {
+                // A playlist deleted meanwhile takes its queued tracks with it
+                known.firstOrNull { it.kindString == add.kind }?.let { addTrack(it, add.track) }
+            } catch (e: IOException) {
+                Log.w(TAG, "Still no connection for the queued playlist tracks", e)
+                break
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The server refused this one: sending it again will not help
+                Log.e(TAG, "Queued track ${add.trackId} refused for playlist ${add.kind}", e)
+            }
+            left = left - add
+        }
+        cacheManager.savePendingPlaylistAdds(folder, left.map(PendingPlaylistAdds::save))
+        if (activeFolder == folder) _pendingAdds.value = left
+    }
+
+    private suspend fun loadPending(folder: String): List<PendingPlaylistAdd> =
+        cacheManager.loadPendingPlaylistAdds(folder).mapNotNull(PendingPlaylistAdds::parse)
 
     /** Removes every occurrence of [trackId] from [playlist]. */
     suspend fun removeTrack(playlist: UserPlaylistDto, trackId: String): Unit = mutex.withLock {

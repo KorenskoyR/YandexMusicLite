@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.Usb
+import com.korenskoy.yandexmusic.data.download.RemovableDrives
+import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
+import com.korenskoy.yandexmusic.presentation.car.carWidePossible
+import androidx.compose.material.icons.rounded.ViewColumn
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import androidx.compose.material.icons.rounded.Waves
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import androidx.compose.material.icons.rounded.Timeline
@@ -553,6 +559,23 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
             onClick = actions.onUpgradeDownloads
         )
         StoragePlaceRow(state.storage, actions)
+        val storage = state.storage
+        // Several drives the app can write to by itself: which one (shown while the downloads are on one)
+        if (storage.place == Place.CARD && storage.drives.size > 1 && storage.moving == null) {
+            RadioListRow(
+                icon = Icons.Rounded.Usb,
+                title = stringResource(R.string.settings_storage_drives),
+                options = storage.drives.map { drive ->
+                    drive.label to stringResource(R.string.settings_storage_drive_sub, RemovableDrives.volumeRoot(drive.path), formatSize(drive.freeBytes))
+                },
+                selectedIndex = storage.drives.indexOfFirst { it.path == storage.cardPath },
+                onSelect = { actions.onDriveChosen(storage.drives[it].path) }
+            )
+        }
+        // No system folder window: the flash drive's path by hand
+        if (!storage.pickerAvailable && storage.moving == null) {
+            StoragePathRow(storage.pathCheck, noDrive = storage.drives.isEmpty() && !storage.onCard, onCheck = actions.onCheckPath)
+        }
         SettingsRow(
             icon = Icons.Rounded.Storage,
             title = stringResource(R.string.settings_storage),
@@ -625,6 +648,24 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
             )
             Spacer(Modifier.heightIn(min = 10.dp))
             SettingsHint(stringResource(R.string.settings_car_under_hint))
+        }
+        // Only where three columns can be at all: a flat head unit, not a phone or a tablet
+        val window = currentWindowSizeDp()
+        if (carWidePossible(maxOf(window.widthDp, window.heightDp).dp, minOf(window.widthDp, window.heightDp).dp)) {
+            SegmentedRow(Icons.Rounded.ViewColumn, stringResource(R.string.settings_car_layout)) {
+                HiFiSegmented(
+                    options = listOf(
+                        stringResource(R.string.settings_car_layout_auto),
+                        stringResource(R.string.settings_car_layout_three),
+                        stringResource(R.string.settings_car_layout_two)
+                    ),
+                    selectedIndex = state.carLayout.ordinal,
+                    onSelect = { actions.onCarLayoutChange(CarLayout.entries[it]) },
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.heightIn(min = 10.dp))
+                SettingsHint(stringResource(R.string.settings_car_layout_hint))
+            }
         }
     }
     SettingsGroup(stringResource(R.string.settings_g_look)) {
@@ -768,17 +809,20 @@ private fun StoragePlaceRow(storage: StorageStatus, actions: SettingsActions) {
         }
     }
     val withCard = storage.cardAvailable || storage.onCard
-    val places = listOfNotNull(Place.INTERNAL, Place.CARD.takeIf { withCard }, Place.USB)
+    // A drive the app writes to by itself is named for what it is: a flash drive or an SD card
+    val cardName = stringResource(if (storage.cardIsUsb) R.string.settings_storage_flash else R.string.settings_storage_card)
+    // The flash drive's picked folder: where the system window is (and no flash drive is offered already), or chosen before
+    val withUsb = storage.onUsb || storage.usbChosen || (storage.pickerAvailable && !(withCard && storage.cardIsUsb))
+    val places = listOfNotNull(Place.INTERNAL, Place.CARD.takeIf { withCard }, Place.USB.takeIf { withUsb })
     SegmentedRow(Icons.Rounded.SdCard, stringResource(R.string.settings_storage_place)) {
-        HiFiSegmented(
+        // Only the phone's memory: nothing to switch between, the line under it says why
+        if (places.size > 1) HiFiSegmented(
             options = places.map {
-                stringResource(
-                    when (it) {
-                        Place.INTERNAL -> R.string.settings_storage_internal_short
-                        Place.CARD -> R.string.settings_storage_card
-                        Place.USB -> R.string.settings_storage_usb
-                    }
-                )
+                when (it) {
+                    Place.INTERNAL -> stringResource(R.string.settings_storage_internal_short)
+                    Place.CARD -> cardName
+                    Place.USB -> stringResource(R.string.settings_storage_usb)
+                }
             },
             selectedIndex = places.indexOf(storage.place).coerceAtLeast(0),
             onSelect = { index ->
@@ -790,19 +834,25 @@ private fun StoragePlaceRow(storage: StorageStatus, actions: SettingsActions) {
             },
             fontSize = 13.sp
         )
-        Spacer(Modifier.heightIn(min = 10.dp))
         val moving = storage.moving
-        SettingsHint(
-            when {
-                moving != null -> stringResource(R.string.settings_storage_moving, moving.first, moving.second)
-                noPicker -> stringResource(R.string.settings_storage_usb_no_picker)
-                storage.place == Place.USB && !storage.usbAvailable -> stringResource(R.string.settings_storage_usb_missing)
-                storage.place == Place.USB -> stringResource(R.string.settings_storage_usb_note, storage.usbLabel ?: stringResource(R.string.settings_storage_usb), formatSize(storage.usbFreeBytes))
-                storage.place == Place.CARD && !storage.cardAvailable -> stringResource(R.string.settings_storage_card_missing)
-                withCard -> stringResource(R.string.settings_storage_card_note, formatSize(storage.cardFreeBytes))
-                else -> stringResource(R.string.settings_storage_usb_hint)
-            }
-        )
+        val hint = when {
+            moving != null -> stringResource(R.string.settings_storage_moving, moving.first, moving.second)
+            noPicker -> stringResource(R.string.settings_storage_usb_no_picker)
+            storage.place == Place.USB && !storage.usbAvailable -> stringResource(R.string.settings_storage_usb_missing)
+            storage.place == Place.USB -> stringResource(R.string.settings_storage_usb_note, storage.usbLabel ?: stringResource(R.string.settings_storage_usb), formatSize(storage.usbFreeBytes))
+            storage.place == Place.CARD && !storage.cardAvailable -> stringResource(R.string.settings_storage_card_missing)
+            withCard && (storage.cardIsUsb || storage.cardPath?.let(RemovableDrives::isAppFolder) == false) -> stringResource(
+                if (storage.cardPath?.let(RemovableDrives::isAppFolder) == true) R.string.settings_storage_drive_note_app else R.string.settings_storage_drive_note,
+                cardName, formatSize(storage.cardFreeBytes)
+            )
+            withCard -> stringResource(R.string.settings_storage_card_note, formatSize(storage.cardFreeBytes))
+            // No window and no drive: the amber note under it says so, not twice
+            !storage.pickerAvailable && storage.drives.isEmpty() -> null
+            !storage.pickerAvailable -> stringResource(R.string.settings_storage_usb_no_picker)
+            else -> stringResource(R.string.settings_storage_usb_hint)
+        }
+        if (places.size > 1 && hint != null) Spacer(Modifier.heightIn(min = 10.dp))
+        hint?.let { SettingsHint(it) }
         if (storage.place == Place.USB && moving == null) {
             TextButton(onClick = { pickFolder() }) {
                 Text(stringResource(R.string.settings_storage_usb_other), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

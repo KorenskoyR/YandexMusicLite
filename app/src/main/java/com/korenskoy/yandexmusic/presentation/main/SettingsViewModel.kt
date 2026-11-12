@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.util.Log
@@ -55,7 +56,7 @@ class SettingsViewModel @Inject constructor(
 
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
     private val equalizerFound = MutableStateFlow(false)
-    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE, val mini: MiniOnWave = MiniOnWave.LANDSCAPE)
+    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE, val mini: MiniOnWave = MiniOnWave.LANDSCAPE, val carLayout: CarLayout = CarLayout.AUTO)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(
         val reserveMb: Int,
@@ -76,8 +77,9 @@ class SettingsViewModel @Inject constructor(
     private val look: Flow<Look> = combine(
         combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
         settings.carUnderCover,
-        settings.miniOnWave
-    ) { look, under, mini -> look.copy(under = under, mini = mini) }
+        settings.miniOnWave,
+        settings.carLayout
+    ) { look, under, mini, carLayout -> look.copy(under = under, mini = mini, carLayout = carLayout) }
 
     private val scale: Flow<Scale> = combine(settings.uiScaleAuto, settings.uiScaleManual, settings.animationMode, ::Scale)
 
@@ -113,6 +115,7 @@ class SettingsViewModel @Inject constructor(
             carClock = l.clock,
             carUnderCover = l.under,
             miniOnWave = l.mini,
+            carLayout = l.carLayout,
             uiScaleAuto = sc.auto,
             uiScaleManual = sc.manual,
             animationMode = sc.animations
@@ -176,6 +179,8 @@ class SettingsViewModel @Inject constructor(
     fun setDownloadsOnCard(onCard: Boolean) = storage.moveTo(onCard)
     fun setStoragePlace(place: TrackDownloadManager.Place) = storage.moveTo(place)
     fun useUsbFolder(tree: Uri) = storage.useUsbFolder(tree)
+    fun useDrive(path: String) = storage.useDrive(path)
+    fun checkStoragePath(input: String) = storage.checkPath(input)
     fun setStartPage(value: StartPage) = save { setStartPage(value) }
     fun setExpandPlayer(enabled: Boolean) = save { setExpandPlayerOnPlay(enabled) }
     fun setSwipeToClose(enabled: Boolean) = save { setSwipeToCloseMiniPlayer(enabled) }
@@ -183,6 +188,7 @@ class SettingsViewModel @Inject constructor(
     fun setCarClock(enabled: Boolean) = save { setCarClock(enabled) }
     fun setCarUnderCover(value: CarUnderCover) = save { setCarUnderCover(value) }
     fun setMiniOnWave(value: MiniOnWave) = save { setMiniOnWave(value) }
+    fun setCarLayout(value: CarLayout) = save { setCarLayout(value) }
     fun setUiScaleAuto(enabled: Boolean) = save { setUiScaleAuto(enabled) }
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }

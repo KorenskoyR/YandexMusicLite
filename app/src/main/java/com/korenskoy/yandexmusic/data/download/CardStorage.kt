@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.download
 
+import java.io.IOException
+import android.os.storage.StorageManager
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.TransferListener
 import kotlinx.coroutines.flow.Flow
@@ -56,20 +58,85 @@ class CardStorage(
     private val context: Context,
     wantsCard: Flow<Boolean>,
     private val keyProvider: () -> ByteArray?,
-    private val cardRootOverride: (() -> File?)? = null
+    private val cardRootOverride: (() -> File?)? = null,
+    chosenRoot: Flow<String?> = flowOf(null)
 ) {
     @Inject
     constructor(@ApplicationContext context: Context, settings: SettingsRepository) :
-        this(context, settings.downloadsOnSdCard, KeystoreKey(context)::key)
+        this(context, settings.downloadsOnSdCard, KeystoreKey(context)::key, chosenRoot = settings.cardRoot)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** The user's choice; whether the card is there is checked separately each time. */
     val wanted: StateFlow<Boolean> = wantsCard.stateIn(scope, SharingStarted.Eagerly, false)
 
-    /** The app's own folder on a mounted removable card; null without a card. */
+    /** The drive's folder chosen in the settings (found or typed); null — the first removable drive. */
+    val chosen: StateFlow<String?> = chosenRoot.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /**
+     * Where the encrypted downloads go: the chosen folder while its drive is in, else (nothing chosen) the app's own
+     * folder on the first mounted removable drive; null without one.
+     */
     fun cardRoot(): File? {
         cardRootOverride?.let { return it() }
+        chosen.value?.let { return File(it).takeIf(::writableDir) }
+        return defaultRoot()
+    }
+
+    /** The removable drives the app may write to by itself (its own folder on each), with their system names. */
+    fun drives(): List<Drive> {
+        val storage = context.getSystemService(StorageManager::class.java)
+        return runCatching {
+            context.getExternalFilesDirs(null).drop(1).filterNotNull().filter { mounted(it) }.map { dir ->
+                val name = runCatching { storage?.getStorageVolume(dir)?.getDescription(context) }.getOrNull()
+                Drive(dir.path, name ?: RemovableDrives.volumeRoot(dir.path), RemovableDrives.isUsb(name, dir.path), free(dir))
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Whether the downloads' place is a flash drive (by the system's name for it, or its path). */
+    fun rootIsUsb(): Boolean {
+        val root = cardRoot()?.path ?: return false
+        return drives().firstOrNull { it.path == root }?.usb ?: RemovableDrives.isUsb(null, root)
+    }
+
+    /**
+     * A path typed by the user: on a drive the app knows, its own folder there; any other folder — a folder of
+     * the app's made in it, if the system lets the app write there (tried with a small file, then removed).
+     */
+    fun check(input: String): PathCheck {
+        val path = RemovableDrives.normalize(input) ?: return PathCheck.NotFound
+        RemovableDrives.driveFor(path, drives())?.let { return PathCheck.Ok(it.path, it.freeBytes) }
+        val base = File(path)
+        if (!base.isDirectory) return PathCheck.NotFound
+        val folder = File(base, RemovableDrives.FOLDER)
+        return if (probe(folder)) PathCheck.Ok(folder.path, free(folder)) else PathCheck.NotWritable
+    }
+
+    private fun probe(dir: File): Boolean = try {
+        if (!dir.isDirectory) dir.mkdirs()
+        val file = File(dir, ".write-check")
+        file.writeBytes(PROBE)
+        val read = file.readBytes()
+        file.delete()
+        read.contentEquals(PROBE)
+    } catch (e: IOException) {
+        Log.i(TAG, "Cannot write to $dir", e)
+        false
+    } catch (e: SecurityException) {
+        Log.i(TAG, "Not allowed to write to $dir", e)
+        false
+    }
+
+    private fun writableDir(dir: File): Boolean = mounted(dir) && (dir.isDirectory || dir.mkdirs()) && dir.canWrite()
+
+    /** A path the system does not know as a drive ("unknown") counts as there; its folder check decides. */
+    private fun mounted(dir: File): Boolean = runCatching { Environment.getExternalStorageState(dir) }.getOrNull()
+        .let { it == Environment.MEDIA_MOUNTED || it == Environment.MEDIA_UNKNOWN }
+
+    private fun free(dir: File): Long = runCatching { StatFs(dir.path).availableBytes }.getOrDefault(0L)
+
+    private fun defaultRoot(): File? {
         return runCatching {
             context.getExternalFilesDirs(null).drop(1).firstOrNull { dir ->
                 dir != null && Environment.isExternalStorageRemovable(dir) && Environment.getExternalStorageState(dir) == Environment.MEDIA_MOUNTED
@@ -96,6 +163,7 @@ class CardStorage(
     companion object {
         const val TAG = "CardStorage"
         const val EXTENSION = "enc"
+        private val PROBE = byteArrayOf(0x59, 0x4D, 0x4C)
         private const val IV_BYTES = 16
 
         /** Wraps [out] so what is written lands encrypted; writes the IV first. */

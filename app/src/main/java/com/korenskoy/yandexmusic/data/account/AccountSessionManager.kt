@@ -93,6 +93,8 @@ class AccountSessionManager @Inject constructor(
                 launch { albumsRepository.loadCached(); albumsRepository.refresh() }
                 launch {
                     playlistsRepository.loadCached()
+                    // First what was added without a connection, so the refreshed list already has it
+                    playlistsRepository.flushPendingAdds()
                     playlistsRepository.refresh()
                     // Kept playlists follow what changed on the server
                     offlineSync.refreshAll()

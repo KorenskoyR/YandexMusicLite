@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.car.CarPlaylists
 import com.korenskoy.yandexmusic.presentation.car.CarRadio
 import com.korenskoy.yandexmusic.presentation.local.LocalMusicUi
 import com.korenskoy.yandexmusic.data.player.VoicePhrase
@@ -320,6 +321,7 @@ internal fun CarTab(
     onOpenAccounts: () -> Unit,
     onOpenCrashLog: () -> Unit,
     onAddAccount: () -> Unit,
+    playlistsVm: PlaylistsViewModel,
     settingsVm: SettingsViewModel = hiltViewModel()
 ) {
     // The same settings as on "Моя музыка"; closing them returns here, the music goes on
@@ -336,6 +338,7 @@ internal fun CarTab(
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
     val showClock by viewModel.carClock.collectAsStateWithLifecycle()
     val underCover by viewModel.carUnderCover.collectAsStateWithLifecycle()
+    val carLayout by viewModel.carLayout.collectAsStateWithLifecycle()
     val waveTuning by viewModel.waveTuning.collectAsStateWithLifecycle()
     val waveSeed by viewModel.waveSeed.collectAsStateWithLifecycle()
     val skipExplicit by viewModel.skipExplicit.collectAsStateWithLifecycle()
@@ -348,6 +351,12 @@ internal fun CarTab(
     val onAir = now.track?.takeIf { it.isRadio }?.idString?.removePrefix("radio_")
     val radio = remember(stations, favouriteStations, onAir) {
         CarRadio(stations, favouriteStations, onAir, onPlay = radioVm::play, onToggleFavourite = radioVm::toggleFavorite)
+    }
+    // «В плейлист»: the user's own playlists, a tap adds the track on screen
+    val ownPlaylists by playlistsVm.playlists.collectAsStateWithLifecycle()
+    val quickAdd by playlistsVm.quickAdd.collectAsStateWithLifecycle()
+    val carPlaylists = remember(ownPlaylists, quickAdd) {
+        CarPlaylists(ownPlaylists, quickAdd, onOpen = playlistsVm::quickAddOpened, onAdd = playlistsVm::quickAdd, onCreate = playlistsVm::quickCreate)
     }
     // Said in the car, played at once: no list to pick from while driving
     val voice = rememberVoiceInput { phrase -> viewModel.playByVoice(phrase) }
@@ -387,6 +396,8 @@ internal fun CarTab(
         isBuffering = now.isBuffering,
         showClock = showClock,
         underCover = underCover,
+        layout = carLayout,
+        playlists = carPlaylists,
         waveTuning = waveTuning,
         trackWaveSeed = waveSeed,
         onWaveTuningChange = viewModel::setWaveTuning,
@@ -467,8 +478,11 @@ internal fun settingsHost(
             onCarClockChange = settingsVm::setCarClock,
             onCarUnderCoverChange = settingsVm::setCarUnderCover,
             onMiniOnWaveChange = settingsVm::setMiniOnWave,
+            onCarLayoutChange = settingsVm::setCarLayout,
             onStoragePlaceChange = settingsVm::setStoragePlace,
             onUsbFolderChosen = settingsVm::useUsbFolder,
+            onDriveChosen = settingsVm::useDrive,
+            onCheckPath = settingsVm::checkStoragePath,
             onUiScaleAutoChange = settingsVm::setUiScaleAuto,
             onUiScaleManualChange = settingsVm::setUiScaleManual,
             onAnimationModeChange = settingsVm::setAnimationMode

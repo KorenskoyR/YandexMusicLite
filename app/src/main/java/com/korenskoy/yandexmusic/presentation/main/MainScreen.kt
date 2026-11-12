@@ -301,7 +301,8 @@ fun MainScreen(
                                 accountVm = accountVm, updateVm = updateVm, crashVm = crashVm,
                                 onOpenAccounts = { showAccountDialog = true },
                                 onOpenCrashLog = { showCrashLog = true },
-                                onAddAccount = onNavigateToAuth
+                                onAddAccount = onNavigateToAuth,
+                                playlistsVm = playlistsVm
                             )
                         }
                         }

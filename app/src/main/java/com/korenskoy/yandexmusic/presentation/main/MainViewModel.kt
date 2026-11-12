@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.presentation.hifi.LyricsUi
 import com.korenskoy.yandexmusic.data.lyrics.Lyrics
@@ -509,6 +510,8 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val carUnderCover: StateFlow<CarUnderCover> = settingsRepository.carUnderCover
         .stateIn(viewModelScope, SharingStarted.Eagerly, CarUnderCover.QUEUE)
+    val carLayout: StateFlow<CarLayout> = settingsRepository.carLayout
+        .stateIn(viewModelScope, SharingStarted.Eagerly, CarLayout.AUTO)
     val animationMode: StateFlow<AnimationMode?> = settingsRepository.animationMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val miniOnWave: StateFlow<MiniOnWave> = settingsRepository.miniOnWave

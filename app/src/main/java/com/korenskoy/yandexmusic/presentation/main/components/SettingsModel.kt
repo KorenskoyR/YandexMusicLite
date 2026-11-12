@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import android.net.Uri
@@ -47,6 +48,7 @@ data class SettingsUiState(
     val carClock: Boolean = true,
     val carUnderCover: CarUnderCover = CarUnderCover.QUEUE,
     val miniOnWave: MiniOnWave = MiniOnWave.LANDSCAPE,
+    val carLayout: CarLayout = CarLayout.AUTO,
     val uiScaleAuto: Boolean = true,
     val uiScaleManual: Float = 1f,
     val animationMode: AnimationMode = AnimationMode.AUTO
@@ -86,8 +88,12 @@ data class SettingsActions(
     val onCarClockChange: (Boolean) -> Unit = {},
     val onCarUnderCoverChange: (CarUnderCover) -> Unit = {},
     val onMiniOnWaveChange: (MiniOnWave) -> Unit = {},
+    val onCarLayoutChange: (CarLayout) -> Unit = {},
     val onStoragePlaceChange: (TrackDownloadManager.Place) -> Unit = {},
     val onUsbFolderChosen: (Uri) -> Unit = {},
+    /** A removable drive's folder the app writes to by itself (found, or a typed path that passed). */
+    val onDriveChosen: (String) -> Unit = {},
+    val onCheckPath: (String) -> Unit = {},
     val onUiScaleAutoChange: (Boolean) -> Unit = {},
     val onUiScaleManualChange: (Float) -> Unit = {},
     val onAnimationModeChange: (AnimationMode) -> Unit = {}

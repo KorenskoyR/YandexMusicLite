@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.runtime.SideEffect
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Lyrics
 import com.korenskoy.yandexmusic.presentation.hifi.rememberLyrics
@@ -188,6 +190,8 @@ fun CarScreen(
     isBuffering: Boolean = false,
     showClock: Boolean = true,
     underCover: CarUnderCover = CarUnderCover.QUEUE,
+    /** Lying on a wide head unit: three columns, two, or by the room ([CarWide]). */
+    layout: CarLayout = CarLayout.AUTO,
     waveTuning: WaveTuning = WaveTuning(),
     trackWaveSeed: TrackDetailsDto? = null,
     onWaveTuningChange: (WaveTuning) -> Unit = {},
@@ -210,7 +214,10 @@ fun CarScreen(
     onToggleShuffle: () -> Unit = {},
     /** The stations, the favourites, and what a tap on them does; null — no «Станции». */
     radio: CarRadio? = null,
-    initialStationsOpen: Boolean = false
+    initialStationsOpen: Boolean = false,
+    /** The user's playlists for «В плейлист»; null — no such button (not signed in, a preview). */
+    playlists: CarPlaylists? = null,
+    initialPlaylistsOpen: Boolean = false
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
@@ -225,8 +232,23 @@ fun CarScreen(
     BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
     var stationsOpen by rememberSaveable { mutableStateOf(initialStationsOpen) }
     BackHandler(enabled = stationsOpen) { stationsOpen = false }
+    val canAdd = playlists != null && canAddToPlaylist(currentTrack)
+    var playlistsOpen by rememberSaveable { mutableStateOf(initialPlaylistsOpen && canAdd) }
+    BackHandler(enabled = playlistsOpen) { playlistsOpen = false }
+    // A station or a file of the user's own has no playlists: the panel goes with such a track
+    LaunchedEffect(canAdd) { if (!canAdd) playlistsOpen = false }
+    // Any other panel takes the same place
+    LaunchedEffect(tuneOpen, queueOpen, downloadsOpen, lyricsOpen, stationsOpen) {
+        if (listOf(tuneOpen, queueOpen, downloadsOpen, lyricsOpen, stationsOpen).any { it }) playlistsOpen = false
+    }
+    val togglePlaylists = {
+        if (!playlistsOpen) { tuneOpen = false; queueOpen = false; downloadsOpen = false; lyricsOpen = false; stationsOpen = false }
+        playlistsOpen = !playlistsOpen
+    }
+    // On a flat head unit the panels lying down are as wide as the cover column, never over the next tracks
+    var wideCover by remember { mutableStateOf<Dp?>(null) }
     // A panel over the cover column: the column fades away under it
-    val panelOpen = tuneOpen || queueOpen || downloadsOpen || lyricsOpen || stationsOpen
+    val panelOpen = tuneOpen || queueOpen || downloadsOpen || lyricsOpen || stationsOpen || playlistsOpen
     // The music left the device (the drive was taken out): the choice goes with it
     LaunchedEffect(deviceMusic?.opensPanel) { if (deviceMusic?.opensPanel != true) downloadsOpen = false }
     BackHandler(onBack = onExit)
@@ -242,6 +264,7 @@ fun CarScreen(
     val playPause = { if (!isPlaying && currentTrack == null) onPlayMyVibe() else onPlayPauseClick() }
     val isRadio = currentTrack?.isRadio == true
     val withQueue = underCover == CarUnderCover.QUEUE
+    val wideShown = remember { WideShown() }
     // A station has no queue: the panel never stays open over one
     LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
     // A station leaves «Станции» open only while the radio plays
@@ -322,6 +345,11 @@ fun CarScreen(
         val bars = WindowInsets.systemBars.asPaddingValues()
         val usableHeight = maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding()
         val u = Scale(carScaleOf(maxWidth, maxHeight, usableHeight, isLandscape))
+        // A panel lying down covers the cover column only: never wider than the driver's panel leaves (u(652)
+        // with u(48) + u(40) + u(40) around it), and on a flat head unit as wide as the cover column itself
+        val lyingPanelWidth: (Dp) -> Dp = { width ->
+            (wideCover ?: androidx.compose.ui.unit.min(u(500f), width - u(780f))).coerceAtLeast(u(400f))
+        }
         val farFocus = if (isLandscape) Offset(if (steeringWheelOnLeft) 0.78f else 0.22f, 0.45f) else Offset(0.5f, 0.25f)
         HiFiBackdrop(tint = tint, coverUrl = coverUrl, glowCenter = farFocus, bottomFade = !isLandscape)
         if (isLandscape) {
@@ -464,7 +492,10 @@ fun CarScreen(
                     .fillMaxSize()
                     .padding(start = u(48f), end = u(40f), bottom = u(28f))
             ) {
-                val wide = CarWide.layout(maxWidth.value / u.factor, maxHeight.value / u.factor)
+                val wide = CarWide.layout(maxWidth.value / u.factor, maxHeight.value / u.factor, layout, wideShown.wide)
+                SideEffect { wideShown.wide = wide != null }
+                val coverColumn = wide?.let { u(it.cover) }
+                SideEffect { wideCover = coverColumn }
                 if (wide != null) {
                     // A flat head unit: the player, the next tracks with the sources, the cover as tall as the row
                     val big = Scale(u.factor * wide.driverScale)
@@ -476,7 +507,8 @@ fun CarScreen(
                             onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
                             sources = sources, active = active, onSeek = onSeek,
                             modifier = Modifier.width(big(CarWide.DRIVER_WIDTH)).fillMaxHeight(),
-                            showDock = false
+                            showDock = false,
+                            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen
                         )
                     }
                     val middle: @Composable () -> Unit = {
@@ -513,7 +545,8 @@ fun CarScreen(
                             onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
                             onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
                             sources = sources, active = active, onSeek = onSeek,
-                            modifier = Modifier.width(u(652f)).fillMaxHeight()
+                            modifier = Modifier.width(u(652f)).fillMaxHeight(),
+                            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen
                         )
                     }
                     // The cover alone, and under it the covers of what comes next: nothing lies on the cover
@@ -591,6 +624,7 @@ fun CarScreen(
                             downloadsOpen -> 3
                             lyricsOpen -> 4
                             stationsOpen -> 5
+                            playlistsOpen -> 6
                             else -> 0
                         },
                         modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth(),
@@ -604,6 +638,9 @@ fun CarScreen(
                                 3 -> downloadsPanel(Modifier.fillMaxWidth().height(u(470f)))
                                 4 -> lyricsPanel(Modifier.fillMaxWidth().height(u(400f)))
                                 5 -> radio?.let { CarStationsPanel(u, it, Modifier.fillMaxWidth().height(u(470f)), onClose = { stationsOpen = false }) }
+                                6 -> if (playlists != null && currentTrack != null) {
+                                    CarPlaylistsPanel(u, playlists, currentTrack, Modifier.fillMaxWidth().height(u(470f)), onClose = { playlistsOpen = false })
+                                }
                                 else -> CarCover(u, currentTrack, Modifier.size(u(if (isRadio || withQueue) 400f else 310f)))
                             }
                         }
@@ -619,9 +656,10 @@ fun CarScreen(
                         // stay together instead of spreading to the edges
                         modifier = Modifier.widthIn(max = u(560f)).fillMaxWidth().weight(1f),
                         compactDock = true,
+                        onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen,
                         beforeDock = when {
                             isRadio && radio != null && !stationsOpen -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { StationsPill(u, radio.favourites.size, onClick = openStations) } } }
-                            isRadio || tuneOpen || downloadsOpen -> null
+                            isRadio || tuneOpen || downloadsOpen || playlistsOpen -> null
                             withQueue -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { QueuePill(u, queueCount, onClick = openQueue) } } }
                             else -> { { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick, onCaptionClick = openQueue) } }
                         }
@@ -637,7 +675,7 @@ fun CarScreen(
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { queueOpen = false }
             )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
-                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                val panelWidth = lyingPanelWidth(maxWidth)
                 queuePanel(
                     Modifier
                         .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
@@ -655,13 +693,34 @@ fun CarScreen(
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { downloadsOpen = false }
             )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
-                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                val panelWidth = lyingPanelWidth(maxWidth)
                 downloadsPanel(
                     Modifier
                         .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
                         .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
                         .width(panelWidth)
                         .fillMaxHeight()
+                )
+            }
+        }
+        // «В плейлист» lying down: over the cover column, the whole height of it
+        val lyingPlaylists = playlists?.takeIf { playlistsOpen && isLandscape }
+        if (lyingPlaylists != null && currentTrack != null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { playlistsOpen = false }
+            )
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+                val panelWidth = lyingPanelWidth(maxWidth)
+                CarPlaylistsPanel(
+                    u, lyingPlaylists, currentTrack,
+                    Modifier
+                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                        .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
+                        .width(panelWidth)
+                        .fillMaxHeight(),
+                    onClose = { playlistsOpen = false }
                 )
             }
         }
@@ -673,7 +732,7 @@ fun CarScreen(
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { stationsOpen = false }
             )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
-                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                val panelWidth = lyingPanelWidth(maxWidth)
                 CarStationsPanel(
                     u, radio,
                     Modifier
@@ -693,7 +752,7 @@ fun CarScreen(
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { lyricsOpen = false }
             )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
-                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                val panelWidth = lyingPanelWidth(maxWidth)
                 lyricsPanel(
                     Modifier
                         .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
@@ -713,7 +772,7 @@ fun CarScreen(
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
             // Over the cover column only: never wider than what the driver's panel leaves (it is u(652) wide
             // with u(48) + u(40) + u(40) around it), so the controls and the sources stay uncovered
-            val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+            val panelWidth = lyingPanelWidth(maxWidth)
             tunePanel(
                 Modifier
                     .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
@@ -729,6 +788,22 @@ fun CarScreen(
 }
 
 /** The car layout's scale for a screen: the 1280×720 design lying, 600×1200 standing (by the height the bars leave). */
+/**
+ * Whether «В авто» can have three columns on a screen of [width] × [height] dp lying (the settings offer the
+ * choice only then): the header and the margins taken off as on the car screen.
+ */
+fun carWidePossible(width: Dp, height: Dp): Boolean {
+    val s = carScaleOf(width, height, height, isLandscape = true)
+    return CarWide.possible(width.value / s - CAR_SIDE_MARGINS, height.value / s - CAR_HEADER_AND_BOTTOM)
+}
+
+/** Lying: 48 + 40 at the sides; the header (22 + 58 + 10) and 28 at the bottom. */
+private const val CAR_SIDE_MARGINS = 88f
+private const val CAR_HEADER_AND_BOTTOM = 118f
+
+/** What the screen showed last, wide or not: «Авто» holds it near the edge ([CarWide.HOLD]). */
+private class WideShown(var wide: Boolean? = null)
+
 internal fun carScaleOf(maxWidth: Dp, maxHeight: Dp, usableHeight: Dp, isLandscape: Boolean): Float {
     val s = if (isLandscape) minOf(maxWidth / 1280.dp, maxHeight / 720.dp) else minOf(maxWidth / 600.dp, usableHeight / 1200.dp)
     return s.coerceIn(0.55f, 2f)
@@ -868,7 +943,10 @@ private fun DriverPanel(
     compactDock: Boolean = false,
     beforeDock: (@Composable () -> Unit)? = null,
     /** False on a flat head unit: the sources live beside, and the gauge takes the height they leave. */
-    showDock: Boolean = true
+    showDock: Boolean = true,
+    /** «В плейлист» beside the title; null — not for this track. */
+    onAddToPlaylist: (() -> Unit)? = null,
+    playlistsOpen: Boolean = false
 ) {
     Column(modifier) {
         if (sourceLabel.isNotEmpty()) {
@@ -876,11 +954,13 @@ private fun DriverPanel(
             Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
         AnimatedContent(
             targetState = track,
             contentKey = { it?.idString },
             transitionSpec = { (fadeIn(HiFiMotion.large()) + slideInVertically(HiFiMotion.large()) { it / 10 }) togetherWith fadeOut(HiFiMotion.quick()) },
-            label = "car_title"
+            label = "car_title",
+            modifier = Modifier.weight(1f)
         ) { shown ->
             Column {
                 Text(
@@ -908,6 +988,11 @@ private fun DriverPanel(
                     if (aiMark != null) AiChip(Modifier.padding(start = u(12f)), fontSize = u.sp(15f), height = u(28f), horizontal = u(10f))
                 }
             }
+        }
+        if (onAddToPlaylist != null) {
+            Spacer(Modifier.width(u(16f)))
+            AddToPlaylistButton(u(if (compactDock) 64f else 72f), open = playlistsOpen, onClick = onAddToPlaylist)
+        }
         }
 
         if (!showDock) Spacer(Modifier.weight(1f))

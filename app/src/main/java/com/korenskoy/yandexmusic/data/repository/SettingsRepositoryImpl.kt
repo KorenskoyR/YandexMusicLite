@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
@@ -156,6 +157,10 @@ class SettingsRepositoryImpl @Inject constructor(
     override val carUnderCover = carUnderCoverPref.first
     override suspend fun setCarUnderCover(value: CarUnderCover) = carUnderCoverPref.second(value)
 
+    private val carLayoutPref = choice("car_layout", CarLayout.AUTO)
+    override val carLayout = carLayoutPref.first
+    override suspend fun setCarLayout(value: CarLayout) = carLayoutPref.second(value)
+
     private val animationPref = choice("animation_mode", AnimationMode.AUTO)
     override val animationMode = animationPref.first
     override suspend fun setAnimationMode(value: AnimationMode) = animationPref.second(value)
@@ -196,5 +201,11 @@ class SettingsRepositoryImpl @Inject constructor(
     override val usbFolder: Flow<String?> = context.dataStore.data.map { it[USB_FOLDER_KEY] }
     override suspend fun setUsbFolder(uri: String?) {
         context.dataStore.edit { if (uri == null) it.remove(USB_FOLDER_KEY) else it[USB_FOLDER_KEY] = uri }
+    }
+
+    private val CARD_ROOT_KEY = stringPreferencesKey("card_root")
+    override val cardRoot: Flow<String?> = context.dataStore.data.map { it[CARD_ROOT_KEY] }
+    override suspend fun setCardRoot(path: String?) {
+        context.dataStore.edit { if (path == null) it.remove(CARD_ROOT_KEY) else it[CARD_ROOT_KEY] = path }
     }
 }

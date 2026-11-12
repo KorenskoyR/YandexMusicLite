@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.WindowInsets
+import android.view.MotionEvent
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
 import com.korenskoy.yandexmusic.presentation.crash.CrashLogDialog
 import com.korenskoy.yandexmusic.presentation.crash.CrashLogViewModel
@@ -37,7 +43,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuthScreen(
     onAuthSuccess: () -> Unit,
@@ -55,6 +62,10 @@ fun AuthScreen(
     val phoneState by viewModel.phone.collectAsStateWithLifecycle()
     val signedIn by viewModel.signedIn.collectAsStateWithLifecycle()
     LaunchedEffect(signedIn) { if (signedIn) onAuthSuccess() }
+    // The sign-in by code is always there as a way out of Yandex's page: an old WebView can break it
+    val byCodeAvailable = viewModel.phoneSignInAvailable && phoneState != PhoneSignInState.Misconfigured
+    var byCode by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = byCode) { byCode = false }
 
     // A crash before signing in never reaches the journal in the settings: offer it here, once
     val crashReports by crashVm.reports.collectAsStateWithLifecycle()
@@ -93,9 +104,16 @@ fun AuthScreen(
                 }
             )
         }
+    } else if (byCode && byCodeAvailable) {
+        LaunchedEffect(Unit) { viewModel.startPhoneSignIn() }
+        PhoneSignInScreen(phoneState, onNewCode = viewModel::newPhoneCode, onBackToPage = { byCode = false })
     } else {
+        // The page came back to its start after the user had done something on it: the strip stands out
+        var startedOver by remember { mutableStateOf(false) }
+        val keyboard = WindowInsets.isImeVisible
+        Column(Modifier.fillMaxSize().background(Color(0xFF05060A)).systemBarsPadding().imePadding()) {
         AndroidView(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.weight(1f).fillMaxWidth(),
         factory = { context ->
             val cookieManager = android.webkit.CookieManager.getInstance()
             cookieManager.removeAllCookies(null)
@@ -115,6 +133,17 @@ fun AuthScreen(
                 settings.allowContentAccess = false
 
                 var tokenHandled = false
+                var startPage: String? = null
+                var touched = false
+                setOnTouchListener { _, event ->
+                    if (event.actionMasked == MotionEvent.ACTION_UP) touched = true
+                    false
+                }
+                fun notePage(url: String?) {
+                    val page = signInPageKey(url) ?: return
+                    if (startPage == null) startPage = page
+                    else if (signInStartedOver(startPage, page, touched)) startedOver = true
+                }
                 // The token is returned in the URL fragment: #access_token=...
                 fun handleTokenUrl(url: String): Boolean {
                     if (tokenHandled || !isTrustedYandexUrl(url)) return false
@@ -129,6 +158,17 @@ fun AuthScreen(
                     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                         super.onPageStarted(view, url, favicon)
                         url?.let { handleTokenUrl(it) }
+                    }
+
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        notePage(url)
+                    }
+
+                    // A page that changes its address by itself (no new load) is seen here
+                    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                        super.doUpdateVisitedHistory(view, url, isReload)
+                        notePage(url)
                     }
 
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -171,6 +211,9 @@ fun AuthScreen(
             webView.destroy()
         }
     )
+        // Not while typing: the keyboard needs the room, and the page is in use
+        if (byCodeAvailable && !keyboard) CodeFallbackStrip(startedOver, onSignInByCode = { byCode = true })
+        }
     }
 }
 

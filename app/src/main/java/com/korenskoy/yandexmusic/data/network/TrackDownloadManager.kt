@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.network
 
+import java.io.IOException
 import android.net.Uri
 import android.util.Log
 import com.korenskoy.yandexmusic.data.download.UsbStorage
@@ -351,6 +352,29 @@ class TrackDownloadManager @Inject constructor(
     }
 
     /** The two-place move of before: to the card or back to the internal storage. */
+    /**
+     * Moves the encrypted copies (and their quality notes) from one drive's folder to another's: the key is the
+     * same, so the files go as they are. False when something could not be moved (the drive was taken out).
+     */
+    suspend fun moveCardFiles(from: File, to: File, onProgress: (Int, Int) -> Unit): Boolean = withContext(Dispatchers.IO) {
+        val files = from.listFiles { f -> f.extension == CardStorage.EXTENSION || f.extension == "quality" }.orEmpty()
+        var allMoved = true
+        onProgress(0, files.size)
+        files.forEachIndexed { index, file ->
+            val dest = File(to, file.name)
+            try {
+                file.copyTo(dest, overwrite = true)
+                file.delete()
+            } catch (e: IOException) {
+                Log.w("TrackDownloadManager", "Move of ${file.name} between drives failed", e)
+                allMoved = false
+            }
+            onProgress(index + 1, files.size)
+        }
+        refresh()
+        allMoved
+    }
+
     suspend fun moveAll(toCard: Boolean, onProgress: (Int, Int) -> Unit): Boolean =
         moveAll(if (toCard) Place.CARD else Place.INTERNAL, onProgress)
 

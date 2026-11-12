@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.text.TextStyle
 import java.util.Locale
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -207,7 +208,13 @@ private fun Step(m: SignInMetrics, number: Int, title: String, hint: String?) {
 
 /** "Вход с телефона": the code to enter at ya.ru/device, a QR code to the page, and the wait. */
 @Composable
-fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit, outdatedWebView: Int? = null) {
+fun PhoneSignInScreen(
+    state: PhoneSignInState,
+    onNewCode: () -> Unit,
+    outdatedWebView: Int? = null,
+    /** Chosen instead of Yandex's page that is there: the way back to it; null — the page cannot be had. */
+    onBackToPage: (() -> Unit)? = null
+) {
     val code = (state as? PhoneSignInState.Waiting)?.code
     val page = code?.verificationUrl ?: "https://ya.ru/device"
     // The address never breaks across lines: word joiners after its dots and slashes
@@ -215,7 +222,11 @@ fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit, outdatedWe
     val minutes = ((code?.expiresInSeconds ?: 300) + 59) / 60
     SignInPage(
         title = stringResource(R.string.auth_phone_title),
-        why = if (outdatedWebView != null) stringResource(R.string.auth_phone_why_old, outdatedWebView) else stringResource(R.string.auth_phone_why),
+        why = when {
+            onBackToPage != null -> stringResource(R.string.auth_phone_why_chosen)
+            outdatedWebView != null -> stringResource(R.string.auth_phone_why_old, outdatedWebView)
+            else -> stringResource(R.string.auth_phone_why)
+        },
         steps = { m ->
             Step(m, 1, stringResource(R.string.auth_phone_step1, shownPage), stringResource(R.string.auth_phone_step1_hint_qr))
             Spacer(Modifier.height(m.stepGap))
@@ -228,7 +239,7 @@ fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit, outdatedWe
             Spacer(Modifier.height(if (m.big) 24.dp else 18.dp))
             QrCode(page, if (m.big) 196.dp else 152.dp, dimmed = code == null)
             Spacer(Modifier.height(if (m.big) 26.dp else 20.dp))
-            StatusAndButton(state, m, onNewCode)
+            StatusAndButton(state, m, onNewCode, onBackToPage)
         },
         // One column, as in the mockup: the code (with the QR beside it when there is room) between steps 2 and 3
         single = { m, width ->
@@ -251,13 +262,13 @@ fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit, outdatedWe
             Spacer(Modifier.height(m.stepGap + 4.dp))
             Step(m, 3, stringResource(R.string.auth_phone_step3), stringResource(R.string.auth_phone_step3_hint))
             Spacer(Modifier.height(if (m.big) 30.dp else 22.dp))
-            StatusAndButton(state, m, onNewCode)
+            StatusAndButton(state, m, onNewCode, onBackToPage)
         }
     )
 }
 
 @Composable
-private fun StatusAndButton(state: PhoneSignInState, m: SignInMetrics, onNewCode: () -> Unit) {
+private fun StatusAndButton(state: PhoneSignInState, m: SignInMetrics, onNewCode: () -> Unit, onBackToPage: (() -> Unit)?) {
     SignInStatus(state, m)
     if (state !is PhoneSignInState.GettingCode) {
         Spacer(Modifier.height(if (m.big) 26.dp else 20.dp))
@@ -265,6 +276,15 @@ private fun StatusAndButton(state: PhoneSignInState, m: SignInMetrics, onNewCode
             text = stringResource(R.string.auth_phone_new_code),
             onClick = onNewCode,
             icon = Icons.Rounded.Refresh,
+            height = m.button
+        )
+    }
+    if (onBackToPage != null) {
+        Spacer(Modifier.height(if (m.big) 14.dp else 10.dp))
+        GlassPillButton(
+            text = stringResource(R.string.auth_phone_back_to_page),
+            onClick = onBackToPage,
+            icon = Icons.AutoMirrored.Rounded.ArrowBack,
             height = m.button
         )
     }

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.domain.repository
 
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
@@ -65,6 +66,10 @@ interface SettingsRepository {
     val carUnderCover: Flow<CarUnderCover>
     suspend fun setCarUnderCover(value: CarUnderCover)
 
+    /** «В авто» lying on a wide head unit: three columns, two, or by the room. */
+    val carLayout: Flow<CarLayout>
+    suspend fun setCarLayout(value: CarLayout)
+
     val animationMode: Flow<AnimationMode>
     suspend fun setAnimationMode(value: AnimationMode)
 
@@ -103,6 +108,13 @@ interface SettingsRepository {
     /** The folder on the flash drive picked in the system window (a tree uri); null until one was. */
     val usbFolder: Flow<String?>
     suspend fun setUsbFolder(uri: String?)
+
+    /**
+     * The removable drive's folder chosen without the system window (from the drives found, or typed); null —
+     * the first removable drive, as before.
+     */
+    val cardRoot: Flow<String?>
+    suspend fun setCardRoot(path: String?)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3

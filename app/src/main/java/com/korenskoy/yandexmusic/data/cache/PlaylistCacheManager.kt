@@ -156,6 +156,20 @@ class PlaylistCacheManager @Inject constructor(
     suspend fun loadPendingReactions(userFolder: String): List<String> =
         io { dao().loadIds(sanitizeUserFolder(userFolder), PENDING_REACTIONS) }.orEmpty()
 
+    /** Tracks added to playlists without a connection, in their saved form. */
+    suspend fun savePendingPlaylistAdds(userFolder: String, adds: List<String>) {
+        val owner = sanitizeUserFolder(userFolder)
+        io {
+            database.withTransaction {
+                dao().deleteList(owner, PENDING_PLAYLIST_ADDS)
+                dao().insertItems(adds.mapIndexed { i, saved -> ListItemEntity(owner, PENDING_PLAYLIST_ADDS, i, saved) })
+            }
+        }
+    }
+
+    suspend fun loadPendingPlaylistAdds(userFolder: String): List<String> =
+        io { dao().loadIds(sanitizeUserFolder(userFolder), PENDING_PLAYLIST_ADDS) }.orEmpty()
+
     suspend fun clearUserCache(userFolder: String): Boolean {
         val owner = sanitizeUserFolder(userFolder)
         return io {
@@ -266,6 +280,7 @@ class PlaylistCacheManager @Inject constructor(
         const val WAVE = "wave"
         const val RECENT = "recent"
         const val PENDING_REACTIONS = "pending_reactions"
+        const val PENDING_PLAYLIST_ADDS = "pending_playlist_adds"
         const val WEEKLY_HITS = "weekly_hits"
         const val TRENDS = "trends"
         const val POPULAR = "popular"

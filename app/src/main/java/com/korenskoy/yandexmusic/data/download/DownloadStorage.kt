@@ -45,7 +45,16 @@ data class StorageStatus(
     /** Where the folder picker opens: a removable drive that is in, if any. */
     val usbPickerStart: Uri? = null,
     /** Moved so far and in all while the downloads move between the places; null otherwise. */
-    val moving: Pair<Int, Int>? = null
+    val moving: Pair<Int, Int>? = null,
+    /** The system's folder window is on this device (some head units lack it). */
+    val pickerAvailable: Boolean = true,
+    /** Removable drives the app may write to by itself, without that window. */
+    val drives: List<Drive> = emptyList(),
+    /** The encrypted downloads' folder (on a card or a flash drive) and whether it is a flash drive. */
+    val cardPath: String? = null,
+    val cardIsUsb: Boolean = false,
+    /** The answer about the last path typed by the user. */
+    val pathCheck: PathCheck? = null
 ) {
     val place: Place get() = when {
         onUsb -> Place.USB
@@ -57,7 +66,7 @@ data class StorageStatus(
 /** Where the downloads live: the internal storage or, encrypted, the removable SD card or a flash drive. */
 @Singleton
 class DownloadStorage @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val card: CardStorage,
     private val usb: UsbStorage,
     private val downloads: TrackDownloadManager,
@@ -69,7 +78,7 @@ class DownloadStorage @Inject constructor(
     private var moveJob: Job? = null
 
     init {
-        scope.launch { combine(card.wanted, usb.wanted, usb.folder) { _, _, _ -> }.collectLatest { refresh() } }
+        scope.launch { combine(card.wanted, card.chosen, usb.wanted, usb.folder) { _, _, _, _ -> }.collectLatest { refresh() } }
         // A card or a flash drive put in or taken out while the app is open (a head unit never closes it)
         val volumes = IntentFilter().apply {
             addAction(Intent.ACTION_MEDIA_MOUNTED)
@@ -95,8 +104,15 @@ class DownloadStorage @Inject constructor(
         scope.launch {
             val cardUsable = card.cardUsable
             val usbThere = usb.present
+            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).resolveActivity(context.packageManager) != null
+            val drives = card.drives()
+            val cardPath = card.cardRoot()?.path
             _state.update {
                 it.copy(
+                    pickerAvailable = picker,
+                    drives = drives,
+                    cardPath = cardPath,
+                    cardIsUsb = cardPath != null && card.rootIsUsb(),
                     cardAvailable = cardUsable,
                     onCard = card.wanted.value && !usb.wanted.value,
                     cardFreeBytes = if (cardUsable) card.freeBytes() else 0L,
@@ -118,23 +134,60 @@ class DownloadStorage @Inject constructor(
     /** Switches where new downloads go and moves what is already downloaded there. */
     fun moveTo(place: Place) {
         if (moveJob?.isActive == true) return
-        val reachable = when (place) {
-            Place.INTERNAL -> true
-            Place.CARD -> card.cardUsable
-            Place.USB -> usb.present && card.key() != null
-        }
-        if (!reachable) {
+        if (!reachable(place)) {
             refresh()
             return
         }
+        moveJob = scope.launch { move(place) }
+    }
+
+    private fun reachable(place: Place): Boolean = when (place) {
+        Place.INTERNAL -> true
+        Place.CARD -> card.cardUsable
+        Place.USB -> usb.present && card.key() != null
+    }
+
+    private suspend fun move(place: Place) {
+        choose(place)
+        _state.update { it.copy(onCard = place == Place.CARD, onUsb = place == Place.USB, moving = 0 to 0) }
+        val done = downloads.moveAll(place) { moved, total -> _state.update { it.copy(moving = moved to total) } }
+        // Could not finish (the card or the drive was taken out): new downloads stay in the phone's memory
+        if (!done && place != Place.INTERNAL) choose(Place.INTERNAL)
+        _state.update { it.copy(moving = null) }
+        refresh()
+    }
+
+    /**
+     * The downloads go to the drive's folder [path] (one of the drives found, or a typed path that passed the
+     * check). What is already on another drive's folder moves along as it is (the same key); from the phone's
+     * memory or a flash drive's picked folder it moves as for "SD-карта".
+     */
+    fun useDrive(path: String) {
+        if (moveJob?.isActive == true) return
         moveJob = scope.launch {
-            choose(place)
-            _state.update { it.copy(onCard = place == Place.CARD, onUsb = place == Place.USB, moving = 0 to 0) }
-            val done = downloads.moveAll(place) { moved, total -> _state.update { it.copy(moving = moved to total) } }
-            // Could not finish (the card or the drive was taken out): new downloads stay in the phone's memory
-            if (!done && place != Place.INTERNAL) choose(Place.INTERNAL)
-            _state.update { it.copy(moving = null) }
+            val onDrive = card.wanted.value && !usb.wanted.value
+            val before = if (onDrive) card.cardTracksDir() else null
+            settings.setCardRoot(path)
+            card.chosen.first { it == path }
+            val after = card.cardTracksDir()
+            when {
+                !onDrive -> if (reachable(Place.CARD)) move(Place.CARD)
+                before != null && after != null && before != after -> {
+                    _state.update { it.copy(moving = 0 to 0) }
+                    downloads.moveCardFiles(before, after) { moved, total -> _state.update { it.copy(moving = moved to total) } }
+                    _state.update { it.copy(moving = null) }
+                }
+            }
             refresh()
+        }
+    }
+
+    /** Checks a path typed by the user; a usable one is taken at once. */
+    fun checkPath(input: String) {
+        scope.launch {
+            val result = card.check(input)
+            _state.update { it.copy(pathCheck = result) }
+            if (result is PathCheck.Ok) useDrive(result.path)
         }
     }
 
@@ -164,4 +217,5 @@ interface StorageAccess {
     fun usb(): UsbStorage
     fun card(): CardStorage
     fun localMusic(): com.korenskoy.yandexmusic.data.local.LocalMusicRepository
+    fun settings(): SettingsRepository
 }

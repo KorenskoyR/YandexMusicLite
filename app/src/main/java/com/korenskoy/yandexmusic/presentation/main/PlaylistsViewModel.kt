@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.flow.update
+import com.korenskoy.yandexmusic.data.network.NetworkMonitor
 import com.korenskoy.yandexmusic.data.download.OfflineDownloads
 import com.korenskoy.yandexmusic.data.player.PlayRequests
 import java.io.IOException
@@ -46,7 +48,8 @@ class PlaylistsViewModel @Inject constructor(
     private val repository: UserPlaylistsRepository,
     private val playbackController: PlaybackController,
     private val playRequests: PlayRequests,
-    private val offline: OfflineDownloads
+    private val offline: OfflineDownloads,
+    networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     val playlists: StateFlow<List<UserPlaylistDto>> = repository.playlists
@@ -64,6 +67,10 @@ class PlaylistsViewModel @Inject constructor(
     private var openJob: Job? = null
 
     init {
+        // What was added to playlists without a connection goes out as soon as there is one
+        networkMonitor.isConnectedFlow
+            .onEach { online -> if (online) repository.flushPendingAdds() }
+            .launchIn(viewModelScope)
         // Edits (here or in Android Auto's list), server refreshes and account changes
         combine(repository.playlists, repository.saved) { own, saved -> own + saved }.onEach { list ->
             val opened = _opened.value ?: return@onEach
@@ -168,6 +175,91 @@ class PlaylistsViewModel @Inject constructor(
         say(if (result == AddTrackResult.ALREADY_THERE) R.string.playlist_msg_already else R.string.playlist_msg_added, playlist.title.orEmpty())
     }
 
+    // region «В плейлист» in the car: the panel stays open, each row says what became of the track
+
+    private val _quickAdd = MutableStateFlow(QuickAdd())
+    val quickAdd: StateFlow<QuickAdd> = _quickAdd.asStateFlow()
+
+    /** The panel opens for [track]: the playlists that already have it are marked at once. */
+    fun quickAddOpened(track: TrackDetailsDto) {
+        val id = track.idString
+        if (_quickAdd.value.trackId != id) _quickAdd.value = QuickAdd(trackId = id)
+        viewModelScope.launch {
+            val waiting = repository.pendingAdds.value.filter { it.trackId == id }.map { it.kind }.toSet()
+            val known = repository.playlistsWith(id).associateWith { if (it in waiting) QuickMark.WAITING else QuickMark.ALREADY }
+            _quickAdd.update { if (it.trackId != id) it else it.copy(marks = known + it.marks) }
+        }
+    }
+
+    /** Adds [track] to [playlist]; without a connection it is queued and goes out later. Never twice. */
+    fun quickAdd(playlist: UserPlaylistDto, track: TrackDetailsDto) {
+        val id = track.idString
+        val kind = playlist.kindString
+        val title = playlist.title.orEmpty()
+        if (_quickAdd.value.trackId != id) _quickAdd.value = QuickAdd(trackId = id)
+        if (_quickAdd.value.marks[kind] != null) return
+        mark(id, kind, QuickMark.ADDING)
+        viewModelScope.launch {
+            val outcome = try {
+                if (repository.addTrack(playlist, track) == AddTrackResult.ALREADY_THERE) QuickMark.ALREADY else QuickMark.ADDED
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                Log.w(TAG, "No connection: «$title» gets the track later", e)
+                repository.queueAdd(playlist, track)
+                QuickMark.WAITING
+            } catch (e: Exception) {
+                Log.e(TAG, "Quick add failed", e)
+                null
+            }
+            mark(id, kind, outcome)
+            note(
+                when (outcome) {
+                    QuickMark.ADDED -> R.string.playlist_msg_added
+                    QuickMark.ALREADY -> R.string.playlist_msg_already
+                    QuickMark.WAITING -> R.string.car_playlist_note_waiting
+                    else -> R.string.car_playlist_note_failed
+                },
+                title
+            )
+        }
+    }
+
+    /** A new playlist with [track] in it; that needs the connection. */
+    fun quickCreate(title: String, track: TrackDetailsDto) {
+        val id = track.idString
+        viewModelScope.launch {
+            try {
+                val created = repository.create(title)
+                mark(id, created.kindString, QuickMark.ADDING)
+                repository.addTrack(created, track)
+                mark(id, created.kindString, QuickMark.ADDED)
+                note(R.string.playlist_msg_added, created.title ?: title.trim())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                Log.w(TAG, "No connection for a new playlist", e)
+                note(R.string.car_playlist_note_create_offline, title.trim())
+            } catch (e: Exception) {
+                Log.e(TAG, "Quick create failed", e)
+                note(R.string.car_playlist_note_failed, title.trim())
+            }
+        }
+    }
+
+    private fun mark(trackId: String, kind: String, mark: QuickMark?) {
+        _quickAdd.update {
+            if (it.trackId != trackId) it
+            else it.copy(marks = if (mark == null) it.marks - kind else it.marks + (kind to mark))
+        }
+    }
+
+    private fun note(resId: Int, title: String) {
+        _quickAdd.update { it.copy(note = QuickNote(context.getString(resId, title), it.note?.id?.plus(1) ?: 0L)) }
+    }
+
+    // endregion
+
     fun removeTrack(playlist: UserPlaylistDto, trackId: String) = edit {
         repository.removeTrack(playlist, trackId)
         say(R.string.playlist_msg_removed, playlist.title.orEmpty())
@@ -220,6 +312,15 @@ class PlaylistsViewModel @Inject constructor(
         const val TAG = "Playlists"
     }
 }
+
+/** What became of the track in a playlist through «В плейлист». */
+enum class QuickMark { ADDING, ADDED, ALREADY, WAITING }
+
+/** A short line at the bottom of «В плейлист»; [id] makes the same words show again. */
+data class QuickNote(val text: String, val id: Long)
+
+/** «В плейлист» for the track [trackId]: each playlist's mark by its kind, and the last note. */
+data class QuickAdd(val trackId: String? = null, val marks: Map<String, QuickMark> = emptyMap(), val note: QuickNote? = null)
 
 /** A playlist opened from the library, with its tracks once loaded. */
 data class OpenedPlaylist(

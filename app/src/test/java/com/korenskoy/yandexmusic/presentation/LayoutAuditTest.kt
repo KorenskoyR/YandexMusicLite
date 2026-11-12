@@ -1,5 +1,17 @@
 package com.korenskoy.yandexmusic.presentation
 
+import androidx.compose.foundation.layout.Column
+import com.korenskoy.yandexmusic.data.download.StorageStatus
+import com.korenskoy.yandexmusic.data.download.Drive
+import com.korenskoy.yandexmusic.data.auth.DeviceSignIn
+import com.korenskoy.yandexmusic.presentation.auth.CodeFallbackStrip
+import com.korenskoy.yandexmusic.presentation.auth.PhoneSignInScreen
+import com.korenskoy.yandexmusic.presentation.auth.PhoneSignInState
+import com.korenskoy.yandexmusic.presentation.main.QuickNote
+import com.korenskoy.yandexmusic.presentation.main.QuickMark
+import com.korenskoy.yandexmusic.presentation.main.QuickAdd
+import com.korenskoy.yandexmusic.presentation.car.CarPlaylists
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
@@ -179,7 +191,9 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         lyricsOpen: Boolean = false,
         shuffled: Boolean = false,
         onRadio: Boolean = false,
-        stationsOpen: Boolean = false
+        stationsOpen: Boolean = false,
+        playlistsOpen: Boolean = false,
+        layout: CarLayout = CarLayout.AUTO
     ) = show {
         val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
         val radio = CarRadio(stations, setOf(stations[0].id, stations[3].id, stations[9].id, stations[14].id), onAir = stations[0].id, onPlay = {}, onToggleFavourite = {})
@@ -194,9 +208,27 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = landscape, progress = { 82_000L }, durationMs = 215_000,
             upcoming = tracks.drop(2), source = source, initialTuneOpen = tune, initialQueueOpen = queue, initialLyricsOpen = lyricsOpen,
             shuffled = shuffled, onOpenSettings = {}, onVoiceSearch = {}, waveTuning = WaveTuning(),
-            radio = radio, initialStationsOpen = stationsOpen, isLiked = onRadio
+            radio = radio, initialStationsOpen = stationsOpen, isLiked = onRadio,
+            playlists = carPlaylists(tracks[1].idString), initialPlaylistsOpen = playlistsOpen, layout = layout
         )
     }
+
+    /** Five playlists, each row in another state, and the note at the bottom: the fullest the panel gets. */
+    private fun carPlaylists(trackId: String): CarPlaylists {
+        val names = listOf("Рок", "Русское и очень длинное название для проверки", "Спокойное", "Для пробежки", "В дорогу")
+        val own = names.mapIndexed { i, name -> UserPlaylistDto(kind = JsonPrimitive(1003 + i), title = name, trackCount = 10 * i + 1, revision = 1) }
+        val marks = mapOf("1003" to QuickMark.ADDED, "1004" to QuickMark.ALREADY, "1005" to QuickMark.WAITING, "1006" to QuickMark.ADDING)
+        return CarPlaylists(own, QuickAdd(trackId, marks, QuickNote("Добавится в «Спокойное», когда появится связь", 0)), onOpen = {}, onAdd = { _, _ -> }, onCreate = { _, _ -> })
+    }
+
+    private fun waiting() = PhoneSignInState.Waiting(
+        DeviceSignIn.Code("d", "LH2EL4HK", "https://ya.ru/device", 5, 300), expiresAt = android.os.SystemClock.elapsedRealtime() + 300_000L
+    )
+
+    private val drives = listOf(
+        Drive("/storage/1A2B-3C4D/Android/data/app/files", "USB-накопитель", usb = true, freeBytes = 28_400_000_000L),
+        Drive("/storage/5F1E-22A0/Android/data/app/files", "USB-накопитель (2)", usb = true, freeBytes = 7_100_000_000L)
+    )
 
     @Test
     fun audit() {
@@ -281,6 +313,25 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "car_liked" -> car(source = PlaylistSource.LIBRARY, shuffled = true)
             "car_radio" -> car(source = PlaylistSource.RADIO, onRadio = true)
             "car_stations" -> car(source = PlaylistSource.RADIO, onRadio = true, stationsOpen = true)
+            "car_playlists" -> car(playlistsOpen = true)
+            "car_three" -> car(layout = CarLayout.THREE)
+            "auth_strip" -> show {
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxWidth())
+                    CodeFallbackStrip(reset = true, onSignInByCode = {})
+                }
+            }
+            "auth_code" -> show { PhoneSignInScreen(waiting(), onNewCode = {}, onBackToPage = {}) }
+            "settings_drives" -> show {
+                val storage = StorageStatus(
+                    cardAvailable = true, onCard = true, cardFreeBytes = 28_400_000_000L, pickerAvailable = false,
+                    drives = drives, cardPath = drives[0].path, cardIsUsb = true
+                )
+                SettingsSheet(state = SettingsUiState(storage = storage), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
+            }
+            "settings_no_drive" -> show {
+                SettingsSheet(state = SettingsUiState(storage = StorageStatus(pickerAvailable = false)), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
+            }
             else -> error(screen)
         }
         keepPictures()
@@ -312,7 +363,8 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         private val SCREENS = listOf(
             "wave_paused", "wave_playing", "wave_mini", "wave_tune", "player", "player_lyrics", "track_menu", "mini_player",
             "settings_interface", "settings_playback", "library", "search", "radio",
-            "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations"
+            "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations",
+            "car_playlists", "car_three", "auth_strip", "auth_code", "settings_drives", "settings_no_drive"
         )
 
         /** Phones, standing units (the Geely's 960×1280), flat units (the Monjaro's 1280×480, 1920×720), old 800×480. */
