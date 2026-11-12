@@ -163,7 +163,14 @@ data class TrackDetailsDto(
 /** A track's credits: lines like "Исполнитель — Кино", "Использование ИИ — Трек полностью создан с использованием ИИ". */
 @Serializable
 data class LyricsInfoDto(
-    @SerialName("hasAvailableTextLyrics") val hasAvailableTextLyrics: Boolean? = null
+    @SerialName("hasAvailableTextLyrics") val hasAvailableTextLyrics: Boolean? = null,
+    @SerialName("hasAvailableSyncLyrics") val hasAvailableSyncLyrics: Boolean? = null
+)
+
+/** The signed "tracks/{id}/lyrics" answer: gives a download URL for LRC or TEXT. */
+@Serializable
+data class LyricsDownloadDto(
+    @SerialName("downloadUrl") val downloadUrl: String? = null
 )
 
 /** "tracks/{id}/supplement": the words of a track, open to any signed-in client. */

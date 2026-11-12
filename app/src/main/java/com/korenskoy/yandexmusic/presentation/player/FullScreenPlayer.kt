@@ -206,7 +206,12 @@ fun FullScreenPlayer(
     val cover = @Composable { modifier: Modifier ->
         PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier) {
             AnimatedVisibility(visible = lyricsOpen && lyrics != null, enter = fadeIn(HiFiMotion.quick()), exit = fadeOut(HiFiMotion.quick())) {
-                if (lyrics != null) LyricsPanel(lyrics, onClose = { lyricsOpen = false })
+                if (lyrics != null) LyricsPanel(
+                    lyrics = lyrics,
+                    onClose = { lyricsOpen = false },
+                    progress = progress,
+                    onSeek = onSeekTo
+                )
             }
         }
     }

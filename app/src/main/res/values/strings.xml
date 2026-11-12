@@ -621,6 +621,7 @@
     <string name="lyrics_source">Текст: Яндекс Музыка</string>
     <string name="lyrics_none">У Яндекса нет текста этой песни</string>
     <string name="lyrics_failed">Текст не загрузился. Коснитесь, чтобы повторить</string>
+    <string name="lyrics_seek_line">Перемотать на эту строку</string>
     <string name="settings_mini_on_wave">Мини-плеер на «Моей волне»</string>
     <string name="settings_mini_always">Всегда</string>
     <string name="settings_mini_portrait">Вертикально</string>

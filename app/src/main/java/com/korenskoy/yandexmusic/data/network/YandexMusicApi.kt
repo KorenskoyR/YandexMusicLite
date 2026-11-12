@@ -130,6 +130,15 @@ interface YandexMusicApi {
         @retrofit2.http.Field("revision") revision: Int
     ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.UserPlaylistDto>
 
+    /** The signed lyrics endpoint: LRC (timed lines) or TEXT; answers with a downloadUrl. */
+    @GET("tracks/{trackId}/lyrics")
+    suspend fun getTrackLyrics(
+        @Path("trackId") trackId: String,
+        @retrofit2.http.Query("format") format: String,
+        @retrofit2.http.Query("timeStamp") timeStamp: Long,
+        @retrofit2.http.Query("sign") sign: String
+    ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.LyricsDownloadDto>
+
     /** The words of a track (plain text, no timing); an open method, nothing to sign. */
     @GET("tracks/{trackId}/supplement")
     suspend fun getTrackSupplement(@Path("trackId") trackId: String): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.TrackSupplementDto>

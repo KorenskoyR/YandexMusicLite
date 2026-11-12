@@ -388,7 +388,12 @@ fun CarScreen(
             LocalDensity provides carDensity,
             LocalTextStyle provides LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified),
             // The words, as in the player: on the cover itself, wherever the cover is (lying, flat, standing)
-            LocalCoverWords provides CoverWords(lyrics?.takeIf { lyricsOpen }, onClose = { lyricsOpen = false })
+            LocalCoverWords provides CoverWords(
+                lyrics = lyrics?.takeIf { lyricsOpen },
+                progress = progress,
+                onSeek = onSeek,
+                onClose = { lyricsOpen = false }
+            )
         ) {
         // "Настроить волну": big enough to hit without aiming. Lying down it opens over the cover column,
         // standing it takes the cover's place — the controls and the sources are never covered
@@ -1136,7 +1141,13 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
             words.lyrics?.let { kept[0] = it }
             kept[0]?.let {
                 LyricsPanel(
-                    it, onClose = words.onClose, fontSize = u.sp(26f), lineHeight = u.sp(38f), padding = u(28f),
+                    lyrics = it,
+                    onClose = words.onClose,
+                    progress = words.progress,
+                    onSeek = words.onSeek,
+                    fontSize = u.sp(26f),
+                    lineHeight = u.sp(38f),
+                    padding = u(28f),
                     veil = Color.Black.copy(alpha = 0.72f)
                 )
             }
@@ -1144,8 +1155,13 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
     }
 }
 
-/** The words a car cover shows over itself, and what closes them; none — the cover alone. */
-internal class CoverWords(val lyrics: TrackLyrics?, val onClose: () -> Unit)
+/** The words a car cover shows over itself, and what closes or seeks them; none — the cover alone. */
+internal class CoverWords(
+    val lyrics: TrackLyrics?,
+    val progress: () -> Long = { 0L },
+    val onSeek: (Long) -> Unit = {},
+    val onClose: () -> Unit
+)
 
 internal val LocalCoverWords = compositionLocalOf { CoverWords(null) {} }
 

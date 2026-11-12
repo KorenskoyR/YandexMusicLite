@@ -169,4 +169,25 @@ object LosslessSigner {
         val sign = base64String.trimEnd('=')
         return FileInfoSign(ts = tsSeconds, sign = sign)
     }
+
+    /**
+     * Signs a `/tracks/{trackId}/lyrics` request for [trackId].
+     *
+     * The signature message format is: "$numericTrackId$tsSeconds"
+     * Digested via HMAC-SHA256, encoded as standard Base64 (with '=' padding preserved).
+     */
+    fun signLyrics(
+        trackId: String,
+        tsSeconds: Long = System.currentTimeMillis() / 1000L,
+        key: String = ANDROID_SIGN_KEY
+    ): FileInfoSign {
+        val cleanId = trackId.substringBefore(':').trim()
+        val message = "$cleanId$tsSeconds"
+
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key.toByteArray(StandardCharsets.UTF_8), "HmacSHA256"))
+        val digest = mac.doFinal(message.toByteArray(StandardCharsets.UTF_8))
+        val sign = digest.toByteString().base64()
+        return FileInfoSign(ts = tsSeconds, sign = sign)
+    }
 }

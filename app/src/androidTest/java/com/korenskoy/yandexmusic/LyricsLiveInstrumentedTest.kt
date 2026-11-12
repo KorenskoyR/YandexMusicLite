@@ -61,7 +61,9 @@ class LyricsLiveInstrumentedTest {
         assertEquals(true, track.lyricsAvailable)
         assertTrue(LyricsRules.canHave(track))
         val words = vm.lyricsUi.load(track.idString)
-        assertTrue("words: $words", words is LyricsAnswer.Text && words.text.lines().size > 10)
+        val hasWords = (words is LyricsAnswer.Synced && words.lines.size > 10) ||
+            (words is LyricsAnswer.Text && words.text.lines().size > 10)
+        assertTrue("words: $words", hasWords)
     }
 
     @Test
@@ -70,7 +72,7 @@ class LyricsLiveInstrumentedTest {
         assertTrue("the chart is there: ${ids.size}", ids.size >= 20)
         val tracks = api.getTracksMetadataQuery(ids.joinToString(",")).result.orEmpty()
         val wrong = tracks.filter { t ->
-            val hasWords = vm.lyricsUi.load(t.idString) is LyricsAnswer.Text
+            val hasWords = vm.lyricsUi.load(t.idString).let { it is LyricsAnswer.Synced || it is LyricsAnswer.Text }
             hasWords != (t.lyricsAvailable == true)
         }
         assertTrue("lyricsAvailable and the words disagree: ${wrong.map { "${it.idString} ${it.title} ${it.lyricsAvailable}" }}", wrong.isEmpty())
