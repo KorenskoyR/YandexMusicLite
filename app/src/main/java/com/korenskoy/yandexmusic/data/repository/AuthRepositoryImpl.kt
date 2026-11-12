@@ -219,9 +219,10 @@ class AuthRepositoryImpl @Inject constructor(
                 token = account.token.ifBlank { currentAccounts[existingIndex].token },
                 avatarUrl = account.avatarUrl ?: currentAccounts[existingIndex].avatarUrl,
                 lastActiveTimestamp = System.currentTimeMillis(),
-                // Trust the fresh value: both callers set it from getAccountStatus, so an expired
-                // Plus now clears instead of sticking true forever.
-                hasPlus = account.hasPlus
+                // The fresher word about Plus wins: an expired Plus clears, and a save that knows nothing
+                // about Plus (a new token) does not take back what the server said
+                hasPlus = if (account.plusCheckedAt >= currentAccounts[existingIndex].plusCheckedAt) account.hasPlus else currentAccounts[existingIndex].hasPlus,
+                plusCheckedAt = maxOf(account.plusCheckedAt, currentAccounts[existingIndex].plusCheckedAt)
             )
         } else {
             account.copy(lastActiveTimestamp = System.currentTimeMillis())

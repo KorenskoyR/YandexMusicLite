@@ -138,15 +138,27 @@ class AccountSessionManager @Inject constructor(
                     displayName = status.displayUserName.ifBlank { active.displayName },
                     login = status.account?.login?.ifBlank { active.login } ?: active.login,
                     avatarUrl = avatar ?: active.avatarUrl,
-                    hasPlus = status.hasPlus
+                    // Only a clear answer changes what is known about Plus
+                    hasPlus = if (status.plusKnown) status.hasPlus else active.hasPlus,
+                    plusCheckedAt = if (status.plusKnown) System.currentTimeMillis() else active.plusCheckedAt
                 )
             )
-            Log.i(TAG, "Account status refreshed: hasPlus=${status.hasPlus}")
+            Log.i(TAG, "Account status refreshed: hasPlus=${status.hasPlus} (known=${status.plusKnown})")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.d(TAG, "Account status refresh: ${e.message}")
         }
+    }
+
+    private var plusAskedAt = 0L
+
+    /** Asks again whether the account has Plus, unless that was asked less than [PLUS_RECHECK_MS] ago. */
+    fun refreshPlusIfStale() {
+        val now = clock()
+        if (plusAskedAt != 0L && now - plusAskedAt < PLUS_RECHECK_MS) return
+        plusAskedAt = now
+        scope.launch { refreshAccountStatus() }
     }
 
     /** Fills in the name and avatar of an account saved before they were known. */
@@ -235,6 +247,9 @@ class AccountSessionManager @Inject constructor(
 
     private companion object {
         const val TAG = "AccountSession"
+
+        /** Plus is asked about at most this often when the app comes to the screen. */
+        const val PLUS_RECHECK_MS = 60_000L
     }
 }
 

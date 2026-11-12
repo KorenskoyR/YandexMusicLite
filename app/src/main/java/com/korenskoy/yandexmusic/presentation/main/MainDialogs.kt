@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.remember
 import com.korenskoy.yandexmusic.data.download.TrackOfflineState
 import androidx.compose.material3.SnackbarHostState
@@ -91,6 +92,12 @@ internal fun UpdateHost(updateVm: UpdateViewModel) {
     val progress by updateVm.downloadProgress.collectAsStateWithLifecycle()
     val status by updateVm.statusMessage.collectAsStateWithLifecycle()
     val mismatch by updateVm.isSignatureMismatch.collectAsStateWithLifecycle()
+    val install by updateVm.installState.collectAsStateWithLifecycle()
+    // Back from the system's "install?" window: the clock for a hung install starts
+    LifecycleResumeEffect(Unit) {
+        updateVm.onAppResumed()
+        onPauseOrDispose { }
+    }
     val update = result as? UpdateCheckResult.UpdateAvailable ?: return
     UpdateDialog(
         updateInfo = update,
@@ -103,7 +110,11 @@ internal fun UpdateHost(updateVm: UpdateViewModel) {
         onInstall = { updateVm.installDownloaded(forceSystemInstall = true) },
         onShareOrSave = { updateVm.shareOrSaveDownloadedApk() },
         onDismiss = { updateVm.dismiss() },
-        onSkip = { updateVm.skip() }
+        onSkip = { updateVm.skip() },
+        installState = install,
+        failedBefore = updateVm.failedBefore(update.versionName),
+        onRetry = { updateVm.retryInstall() },
+        onSaveFile = { updateVm.saveDownloadedApk() }
     )
 }
 

@@ -190,7 +190,21 @@ class PlaybackController @Inject constructor(
 
     private var beforeTrackWave: BeforeTrackWave? = null
 
+    /** The server has said the account has no Plus: nothing plays (the app shows how to get it). */
+    val plusMissing: StateFlow<Boolean> = authRepository.activeAccount
+        .map { it?.plusMissing == true }
+        .distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, authRepository.getActiveAccount()?.plusMissing == true)
+
+    /** Every way in to the music asks this first. */
+    private fun blocked(): Boolean = plusMissing.value.also { if (it) Log.i(TAG, "No Plus: nothing plays") }
+
     init {
+        // No Plus: what plays stops and the queue goes; a Play from a headset, the car or a widget finds nothing
+        plusMissing.onEach { if (it) stopAndClear() }.launchIn(scope)
+        combine(plusMissing, playerRepository.isPlaying) { missing, playing -> missing && playing }
+            .onEach { if (it) playerRepository.pause() }
+            .launchIn(scope)
         // Volume normalization: the gains of the queued tracks, applied as each one plays
         combine(_currentPlaylist, settingsRepository.normalizeVolume) { queue, on ->
             if (!on) emptyMap() else queue.mapNotNull { track -> track.r128?.integrated?.let { track.idString to Loudness.gainFor(it) } }.toMap()
@@ -373,6 +387,7 @@ class PlaybackController @Inject constructor(
         /** Picked by the user (a row, a search, the voice); false when the queue moves on by itself. */
         chosen: Boolean = true
     ) {
+        if (blocked()) return
         val track = playlist.find { it.idString == trackId } ?: return
         if (!chosen && skippedOnTheWay(track)) {
             // Reached by the queue though it is to be passed over (its mark came late): the next that is not
@@ -422,6 +437,7 @@ class PlaybackController @Inject constructor(
 
     /** Starts the wave from a track of its preview (the wave page's "next up" shelf). */
     fun playWaveFrom(trackId: String) {
+        if (blocked()) return
         val waveList = wave.tracks.value
         if (waveList.none { it.idString == trackId }) {
             playMyVibe()
@@ -435,6 +451,7 @@ class PlaybackController @Inject constructor(
     suspend fun awaitRestoredSession() = sessionRestored.await()
 
     fun playMyVibe() {
+        if (blocked()) return
         if (isOffline()) {
             playOfflineMix(ReturnPoint(PlaylistSource.VIBE, emptyList(), null))
             return
@@ -517,6 +534,7 @@ class PlaybackController @Inject constructor(
     }
 
     fun play() {
+        if (blocked()) return
         val current = _currentTrack.value
         if (current == null) {
             playMyVibe()
@@ -889,6 +907,7 @@ class PlaybackController @Inject constructor(
      */
     suspend fun prepareResumption(startPlayback: Boolean): Pair<MediaItem, Long>? {
         sessionRestored.await()
+        if (blocked()) return null
         val track = _currentTrack.value ?: return null
         if (startPlayback) {
             play()
@@ -911,6 +930,7 @@ class PlaybackController @Inject constructor(
     // endregion
 
     private fun resolveAndPlay(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
+        if (blocked()) return
         currentPlayJob?.cancel()
         val trackId = track.idString
         val title = track.title

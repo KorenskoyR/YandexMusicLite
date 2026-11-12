@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.TrackLyrics
+import com.korenskoy.yandexmusic.presentation.hifi.LyricsPanel
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.korenskoy.yandexmusic.presentation.hifi.lyricsClose
@@ -252,7 +256,7 @@ fun CarScreen(
     // On a flat head unit the panels lying down are as wide as the cover column, never over the next tracks
     var wideCover by remember { mutableStateOf<Dp?>(null) }
     // A panel over the cover column: the column fades away under it
-    val panelOpen = tuneOpen || queueOpen || downloadsOpen || lyricsOpen || stationsOpen || playlistsOpen
+    val panelOpen = tuneOpen || queueOpen || downloadsOpen || stationsOpen || playlistsOpen
     // The music left the device (the drive was taken out): the choice goes with it
     LaunchedEffect(deviceMusic?.opensPanel) { if (deviceMusic?.opensPanel != true) downloadsOpen = false }
     BackHandler(onBack = onExit)
@@ -382,7 +386,9 @@ fun CarScreen(
         }
         CompositionLocalProvider(
             LocalDensity provides carDensity,
-            LocalTextStyle provides LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified)
+            LocalTextStyle provides LocalTextStyle.current.copy(lineHeight = TextUnit.Unspecified),
+            // The words, as in the player: on the cover itself, wherever the cover is (lying, flat, standing)
+            LocalCoverWords provides CoverWords(lyrics?.takeIf { lyricsOpen }, onClose = { lyricsOpen = false })
         ) {
         // "Настроить волну": big enough to hit without aiming. Lying down it opens over the cover column,
         // standing it takes the cover's place — the controls and the sources are never covered
@@ -473,10 +479,6 @@ fun CarScreen(
                     }
                 )
             }
-        }
-        // The words: big enough to read while parked, on the same sheet as the other panels
-        val lyricsPanel: @Composable (Modifier) -> Unit = { panelModifier ->
-            if (lyrics != null) CarLyricsPanel(u, currentTrack, lyrics, onClose = { lyricsOpen = false }, modifier = panelModifier)
         }
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
@@ -628,7 +630,6 @@ fun CarScreen(
                             tuneOpen -> 1
                             queueOpen -> 2
                             downloadsOpen -> 3
-                            lyricsOpen -> 4
                             stationsOpen -> 5
                             playlistsOpen -> 6
                             else -> 0
@@ -642,7 +643,6 @@ fun CarScreen(
                                 2 -> queuePanel(Modifier.fillMaxWidth().height(u(400f)))
                                 // Taller than the queue: two big rows and the folders under them
                                 3 -> downloadsPanel(Modifier.fillMaxWidth().height(u(470f)))
-                                4 -> lyricsPanel(Modifier.fillMaxWidth().height(u(400f)))
                                 5 -> radio?.let { CarStationsPanel(u, it, Modifier.fillMaxWidth().height(u(470f)), onClose = { stationsOpen = false }) }
                                 6 -> if (playlists != null && currentTrack != null) {
                                     CarPlaylistsPanel(u, playlists, currentTrack, Modifier.fillMaxWidth().height(u(470f)), onClose = { playlistsOpen = false })
@@ -727,19 +727,6 @@ fun CarScreen(
                         .width(panelWidth)
                         .fillMaxHeight(),
                     onClose = { stationsOpen = false }
-                )
-            }
-        }
-        // The words lying down: over the cover column too, the whole height of it
-        if (lyricsOpen && isLandscape) {
-            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
-                val panelWidth = lyingPanelWidth(maxWidth)
-                lyricsPanel(
-                    Modifier
-                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
-                        .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
-                        .width(panelWidth)
-                        .fillMaxHeight()
                 )
             }
         }
@@ -1141,8 +1128,26 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
                     }
                 }
         )
+        // The words over the darkened cover, as the player shows them; a tap on them closes them
+        val words = LocalCoverWords.current
+        AnimatedVisibility(visible = words.lyrics != null, enter = fadeIn(HiFiMotion.quick()), exit = fadeOut(HiFiMotion.quick())) {
+            // Kept while it fades out, after the words were closed (a plain holder: no state written while composing)
+            val kept = remember { arrayOfNulls<TrackLyrics>(1) }
+            words.lyrics?.let { kept[0] = it }
+            kept[0]?.let {
+                LyricsPanel(
+                    it, onClose = words.onClose, fontSize = u.sp(26f), lineHeight = u.sp(38f), padding = u(28f),
+                    veil = Color.Black.copy(alpha = 0.72f)
+                )
+            }
+        }
     }
 }
+
+/** The words a car cover shows over itself, and what closes them; none — the cover alone. */
+internal class CoverWords(val lyrics: TrackLyrics?, val onClose: () -> Unit)
+
+internal val LocalCoverWords = compositionLocalOf { CoverWords(null) {} }
 
 /** Standing, a screen at least this wide (in the car's design units) keeps the icons on a row of three pills and more. */
 private const val WIDE_STANDING_ROW = 820f

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic
 
+import com.korenskoy.yandexmusic.presentation.account.NoPlusScreen
+import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
 import android.app.SearchManager
 import android.graphics.Color
 import android.provider.MediaStore
@@ -205,13 +207,28 @@ fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
             )
         }
         composable("main") {
-            MainScreen(
-                viewModel = mainViewModel,
-                openPlayerSignal = openPlayerSignal,
-                onNavigateToAuth = {
-                    navController.navigate("auth")
-                }
-            )
+            // Without Plus (the server said so) the app does not play: it shows how to get it
+            val plusMissing by mainViewModel.plusMissing.collectAsStateWithLifecycle()
+            if (plusMissing) {
+                val accountVm: AccountViewModel = hiltViewModel()
+                val account by accountVm.accountName.collectAsStateWithLifecycle()
+                val checking by mainViewModel.plusChecking.collectAsStateWithLifecycle()
+                NoPlusScreen(
+                    account = account,
+                    checking = checking,
+                    onCheck = mainViewModel::recheckPlus,
+                    onOtherAccount = { navController.navigate("auth") },
+                    onSignOut = accountVm::logoutCurrentAccount
+                )
+            } else {
+                MainScreen(
+                    viewModel = mainViewModel,
+                    openPlayerSignal = openPlayerSignal,
+                    onNavigateToAuth = {
+                        navController.navigate("auth")
+                    }
+                )
+            }
         }
     }
 }

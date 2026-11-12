@@ -35,6 +35,10 @@ data class AccountStatusResponseDto(
     val hasPlus: Boolean
         get() = plus?.hasPlus == true
 
+    /** The answer says something about Plus at all (without the "plus" part nothing is known). */
+    val plusKnown: Boolean
+        get() = plus != null
+
     val uidLong: Long?
         get() = account?.uidLong ?: when (directUid) {
             is JsonPrimitive -> directUid.content.toLongOrNull()

@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import androidx.core.content.edit
+import com.korenskoy.yandexmusic.data.player.PlaybackController
+import com.korenskoy.yandexmusic.data.updater.InstallState
+import com.korenskoy.yandexmusic.data.updater.SessionInstaller
 import android.content.Context
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,8 +32,20 @@ import javax.inject.Inject
 class UpdateViewModel @Inject constructor(
     private val updateManager: GitHubUpdateManager,
     private val settingsRepository: SettingsRepository,
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val installer: SessionInstaller,
+    private val playbackController: PlaybackController
 ) : ViewModel() {
+
+    /** What Android's installer said about the update being installed; null while nothing is installed. */
+    val installState: StateFlow<InstallState?> = installer.state
+
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** An earlier try at installing this very version did not finish: the file is offered at once. */
+    fun failedBefore(versionName: String): Boolean = prefs.getString(FAILED_VERSION, null) == versionName
+
+    private var watchdog: Job? = null
 
     private val _checkResult = MutableStateFlow<UpdateCheckResult?>(null)
     val checkResult: StateFlow<UpdateCheckResult?> = _checkResult.asStateFlow()
@@ -52,6 +70,11 @@ class UpdateViewModel @Inject constructor(
         }
         // Leftover update files from an earlier session
         viewModelScope.launch(Dispatchers.IO) { updateManager.cleanupUpdateFiles() }
+        // A refused install is remembered too: next time the file is offered at once
+        installer.state.onEach { state ->
+            val version = (_checkResult.value as? UpdateCheckResult.UpdateAvailable)?.versionName
+            if (state is InstallState.Failed && version != null) prefs.edit { putString(FAILED_VERSION, version) }
+        }.launchIn(viewModelScope)
     }
 
     fun checkForUpdates(silent: Boolean = false) {
@@ -125,8 +148,71 @@ class UpdateViewModel @Inject constructor(
             return
         }
 
-        updateManager.installApk(file).onFailure { err ->
-            _statusMessage.value = err.localizedMessage
+        // A signing-key change needs the system's own "reinstall" path; otherwise the session, which answers back
+        if (preCheck is ApkInstallPreCheck.SignatureMismatch) {
+            updateManager.installApk(file).onFailure { err -> _statusMessage.value = err.localizedMessage }
+            return
+        }
+        if (!updateManager.canRequestPackageInstalls()) {
+            updateManager.openInstallPermissionSettings()
+            _statusMessage.value = context.getString(R.string.update_err_allow_install)
+            return
+        }
+        // Nothing playing holds the app while Android replaces it (a head unit's media source may restart it)
+        playbackController.pause()
+        playbackController.persistNow()
+        _statusMessage.value = null
+        viewModelScope.launch {
+            installer.install(file)
+                .onSuccess {
+                    // No confirmation asked within a moment: it installs by itself, so the clock starts now
+                    delay(CONFIRM_GRACE_MS)
+                    if (installer.state.value == InstallState.Started) startWatchdog()
+                }
+                .onFailure {
+                    // A unit that refuses sessions: the system installer the old way
+                    updateManager.installApk(file).onFailure { err -> _statusMessage.value = err.localizedMessage }
+                }
+        }
+    }
+
+    /**
+     * The app is back on the screen after the system's "install?" window: if it was confirmed, the install runs now,
+     * and [NO_ANSWER_MS] later without an answer it has hung (the app is replaced on success, so no answer means
+     * it did not finish).
+     */
+    fun onAppResumed() {
+        if (installer.state.value == InstallState.Confirming) startWatchdog()
+    }
+
+    private fun startWatchdog() {
+        if (watchdog?.isActive == true) return
+        val version = (_checkResult.value as? UpdateCheckResult.UpdateAvailable)?.versionName
+        watchdog = viewModelScope.launch {
+            delay(NO_ANSWER_MS)
+            installer.noAnswer()
+            if (installer.state.value == InstallState.NoAnswer && version != null) prefs.edit { putString(FAILED_VERSION, version) }
+        }
+    }
+
+    /** «Ещё раз» after a failed install. */
+    fun retryInstall() {
+        watchdog?.cancel()
+        installer.reset()
+        installDownloaded()
+    }
+
+    /** «Сохранить файл»: into «Загрузки» (Android 10+), else the share window (a file manager, «Сохранить»). */
+    fun saveDownloadedApk() {
+        val file = downloadedApkFile ?: return
+        val version = (_checkResult.value as? UpdateCheckResult.UpdateAvailable)?.versionName ?: return
+        viewModelScope.launch {
+            val saved = installer.saveToDownloads(file, version)
+            if (saved != null) {
+                _statusMessage.value = context.getString(R.string.update_saved, SessionInstaller.fileNameFor(version))
+            } else {
+                updateManager.shareOrSaveApk(file)
+            }
         }
     }
 
@@ -151,11 +237,24 @@ class UpdateViewModel @Inject constructor(
 
     fun dismiss() {
         // Closing the window stops a download in flight: it used to run on to the end unseen
+        watchdog?.cancel()
+        installer.reset()
         downloadJob?.cancel()
         downloadJob = null
         _checkResult.value = null
         _downloadProgress.value = -1f
         _statusMessage.value = null
         _isSignatureMismatch.value = false
+    }
+
+    private companion object {
+        const val PREFS = "update_install"
+        const val FAILED_VERSION = "failed_version"
+
+        /** Without a confirmation window within this, the installer is working on its own. */
+        const val CONFIRM_GRACE_MS = 5_000L
+
+        /** An install that has not finished this long after it was confirmed has hung. */
+        const val NO_ANSWER_MS = 120_000L
     }
 }

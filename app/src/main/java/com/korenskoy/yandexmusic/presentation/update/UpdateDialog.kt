@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import com.korenskoy.yandexmusic.data.updater.InstallState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.geometry.Offset
 import java.util.Locale
@@ -67,8 +71,16 @@ fun UpdateDialog(
     onShareOrSave: () -> Unit = {},
     onDismiss: () -> Unit,
     /** "Пропустить эту версию"; offered until a download starts. */
-    onSkip: (() -> Unit)? = null
+    onSkip: (() -> Unit)? = null,
+    /** What Android's installer said; null while nothing is being installed. */
+    installState: InstallState? = null,
+    /** An earlier try at this version did not finish: the file is offered beside "Установить". */
+    failedBefore: Boolean = false,
+    onRetry: () -> Unit = {},
+    onSaveFile: () -> Unit = {}
 ) {
+    val installFailed = installState is InstallState.Failed || installState == InstallState.NoAnswer
+    val installing = installState == InstallState.Started || installState == InstallState.Confirming
     AppDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -244,6 +256,11 @@ fun UpdateDialog(
                     )
                 }
 
+                if (installFailed || (failedBefore && downloadProgress >= 2f)) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    InstallFailedNote(installState, failedBefore = !installFailed)
+                }
+
                 if (isSignatureMismatch) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Box(
@@ -354,10 +371,31 @@ fun UpdateDialog(
                         }
                     }
 
+                    // The file for installing by hand, once an install did not finish
+                    val offerFile = downloadProgress >= 2f && (installFailed || failedBefore)
+                    if (offerFile && !isSignatureMismatch) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)), RoundedCornerShape(14.dp))
+                                .clickable { onSaveFile() }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.update_save_file),
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.width(8.dp))
 
                     // Primary Action Button (Download / Install)
-                    val isDownloading = downloadProgress in 0f..1f
+                    val isDownloading = downloadProgress in 0f..1f || installing
                     val isReadyToInstall = downloadProgress >= 2f
 
                     Box(
@@ -372,6 +410,8 @@ fun UpdateDialog(
                                 if (isReadyToInstall) {
                                     if (!hasInstallPermission) {
                                         onRequestPermission()
+                                    } else if (installFailed) {
+                                        onRetry()
                                     } else {
                                         onInstall()
                                     }
@@ -387,7 +427,7 @@ fun UpdateDialog(
                                 HiFiActivityIndicator(size = 16.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(R.string.update_zagruzka),
+                                    text = stringResource(if (installing) R.string.update_installing else R.string.update_zagruzka),
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -415,7 +455,13 @@ fun UpdateDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(if (isSignatureMismatch) R.string.update_open_installer else R.string.update_install),
+                                    text = stringResource(
+                                        when {
+                                            isSignatureMismatch -> R.string.update_open_installer
+                                            installFailed -> R.string.update_retry
+                                            else -> R.string.update_install
+                                        }
+                                    ),
                                     color = Color.White,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -476,3 +522,29 @@ private val UpdateWindowMinHeight = 280.dp
 
 /** The note under "Пропустить эту версию" only where the screen has room for it. */
 private val UpdateWindowRoomForHint = 560.dp
+
+/** «Обновление не установилось», with the system's own words when it gave any (or a note about an earlier try). */
+@Composable
+private fun InstallFailedNote(state: InstallState?, failedBefore: Boolean) {
+    val text = when {
+        failedBefore -> stringResource(R.string.update_failed_before)
+        state == InstallState.NoAnswer -> stringResource(R.string.update_failed_no_answer)
+        state is InstallState.Failed && !state.reason.isNullOrBlank() -> stringResource(R.string.update_failed_reason, state.reason)
+        else -> stringResource(R.string.update_failed_unknown)
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(HiFi.Warning.copy(alpha = 0.12f))
+            .border(BorderStroke(1.dp, HiFi.Warning.copy(alpha = 0.4f)), RoundedCornerShape(14.dp))
+            .padding(14.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+    ) {
+        if (!failedBefore) {
+            Text(stringResource(R.string.update_failed_title), color = HiFi.Warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        Text(text, color = Color.White.copy(alpha = 0.86f), fontSize = 12.5.sp, lineHeight = 18.sp)
+    }
+}

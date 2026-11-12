@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation
 
+import com.korenskoy.yandexmusic.data.updater.InstallState
+import com.korenskoy.yandexmusic.data.updater.UpdateCheckResult
+import com.korenskoy.yandexmusic.presentation.update.UpdateDialog
+import com.korenskoy.yandexmusic.presentation.account.NoPlusScreen
 import androidx.compose.foundation.layout.Column
 import com.korenskoy.yandexmusic.data.download.StorageStatus
 import com.korenskoy.yandexmusic.data.download.Drive
@@ -335,6 +339,14 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "settings_support" -> show {
                 SettingsSheet(state = SettingsUiState(), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.SUPPORT)
             }
+            "no_plus" -> show { NoPlusScreen(account = "ivan.petrov", checking = false, onCheck = {}, onOtherAccount = {}, onSignOut = {}) }
+            "update_failed" -> show {
+                UpdateDialog(
+                    updateInfo = UpdateCheckResult.UpdateAvailable("1.14.5", "Yandex Music Lite v1.14.5", "• 🛠 Исправления и улучшения", "https://github.com/x.apk", 9_000_000L),
+                    downloadProgress = 2f, onStartDownload = {}, onInstall = {}, onDismiss = {},
+                    installState = InstallState.NoAnswer, onRetry = {}, onSaveFile = {}
+                )
+            }
             "settings_no_drive" -> show {
                 SettingsSheet(state = SettingsUiState(storage = StorageStatus(pickerAvailable = false)), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
             }
@@ -371,7 +383,7 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "settings_interface", "settings_playback", "library", "search", "radio",
             "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations",
             "car_playlists", "car_three", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
-            "settings_about", "settings_support"
+            "settings_about", "settings_support", "no_plus", "update_failed"
         )
 
         /** Phones, standing units (the Geely's 960×1280), flat units (the Monjaro's 1280×480, 1920×720), old 800×480. */

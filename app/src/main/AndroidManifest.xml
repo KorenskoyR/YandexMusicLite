@@ -119,6 +119,20 @@
             android:name=".widget.WidgetSkipReceiver"
             android:exported="false" />
 
+        <!-- Android's installer answers about the update being installed (only to this app) -->
+        <receiver
+            android:name=".data.updater.UpdateInstallReceiver"
+            android:exported="false" />
+
+        <!-- Just updated: opens the app again (Android 9 and older) or offers it with a notification -->
+        <receiver
+            android:name=".data.updater.UpdatedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Headset/Bluetooth Play after the process died: resumes the saved session -->
         <receiver
             android:name="androidx.media3.session.MediaButtonReceiver"

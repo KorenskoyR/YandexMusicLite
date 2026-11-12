@@ -202,7 +202,8 @@ class LibraryRepository @Inject constructor(
                     displayName = status.displayUserName,
                     token = token,
                     avatarUrl = avatar ?: account?.avatarUrl,
-                    hasPlus = status.hasPlus
+                    hasPlus = if (status.plusKnown) status.hasPlus else account?.hasPlus == true,
+                    plusCheckedAt = if (status.plusKnown) System.currentTimeMillis() else account?.plusCheckedAt ?: 0L
                 )
             )
         }

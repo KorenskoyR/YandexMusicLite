@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.presentation.hifi.LyricsUi
@@ -375,12 +377,33 @@ class MainViewModel @Inject constructor(
      * every few minutes (a head unit never closes the app). Nothing runs while the app is hidden.
      */
     fun onAppShown() {
+        // Bought Plus on the phone, or it ran out: the app learns it when it comes back to the screen
+        session.refreshPlusIfStale()
         whileShown?.cancel()
         whileShown = viewModelScope.launch {
             session.syncLibraryIfStale(LibrarySyncPolicy.ON_SHOW_MS)
             while (true) {
                 delay(LibrarySyncPolicy.WHILE_SHOWN_MS)
                 session.syncLibraryIfStale(LibrarySyncPolicy.WHILE_SHOWN_MS)
+            }
+        }
+    }
+
+    /** No Plus (the server said so): the app shows how to get it instead of the music. */
+    val plusMissing: StateFlow<Boolean> = playbackController.plusMissing
+
+    private val _plusChecking = MutableStateFlow(false)
+    val plusChecking: StateFlow<Boolean> = _plusChecking.asStateFlow()
+
+    /** «Проверить снова»: asks the server now. */
+    fun recheckPlus() {
+        if (_plusChecking.value) return
+        viewModelScope.launch {
+            _plusChecking.value = true
+            try {
+                session.refreshAccountStatus()
+            } finally {
+                _plusChecking.value = false
             }
         }
     }
