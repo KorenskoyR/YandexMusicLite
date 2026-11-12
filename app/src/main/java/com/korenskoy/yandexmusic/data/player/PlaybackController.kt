@@ -127,8 +127,8 @@ class PlaybackController @Inject constructor(
         playing || starting
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
-    val isBuffering: StateFlow<Boolean> = combine(playerRepository.isBuffering, _isStarting) { buffering, starting ->
-        buffering || starting
+    val isBuffering: StateFlow<Boolean> = combine(playerRepository.isBuffering, _isStarting, playerRepository.soundingTrackId) { buffering, starting, sounding ->
+        buffering || (starting && sounding == null)
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
     val progress: StateFlow<Long> = combine(
@@ -240,7 +240,10 @@ class PlaybackController @Inject constructor(
         },
         resolve = preloadManager::resolveOrdinaryStream,
         // The playing track comes first: the cache fills only while it has enough in hand
-        streamNeedsTheLine = { isBuffering.value || playerRepository.bufferedAheadMs < RESERVE_HEADROOM_MS },
+        streamNeedsTheLine = {
+            isBuffering.value || playerRepository.inTransition || progress.value < TRACK_SETTLE_MS ||
+                playerRepository.bufferedAheadMs < RESERVE_HEADROOM_MS
+        },
         upcoming = { upcomingTracks() },
         moreTracks = { wave.tracks.value },
         isDownloaded = preloadManager::hasPlayableCopy,
@@ -272,14 +275,19 @@ class PlaybackController @Inject constructor(
             .launchIn(scope)
 
         // A track that actually renders audio resets error recovery.
-        combine(playerRepository.isPlaying, playerRepository.isBuffering) { playing, buffering -> playing && !buffering }
+        combine(playerRepository.soundingTrackId, playerRepository.isBuffering, playerRepository.currentTrackId) { sounding, buffering, current ->
+            sounding != null && sounding == current && !buffering
+        }
+            .distinctUntilChanged()
             .onEach { audible ->
                 if (audible) {
                     _isStarting.value = false
                     consecutiveFailedTracks = 0
                     retriedTrackId = null
                     soundedTrackId = playerRepository.currentTrackId.value
-                    if (streamingTrackId != null && streamingTrackId == _currentTrack.value?.idString) updateLink { onStreamAudible() }
+                    if (streamingTrackId != null && streamingTrackId == _currentTrack.value?.idString) {
+                        updateLink(LinkReason.STREAM_SOUNDS) { onStreamAudible() }
+                    }
                 }
             }
             .launchIn(scope)
@@ -386,7 +394,7 @@ class PlaybackController @Inject constructor(
         // The user's own files need no links
         val upcoming = playlist.drop(currentIndex + 1).take(3).filterNot { it.isLocal || it.isRadio }.map { it.idString }
         if (upcoming.isNotEmpty()) preloadManager.preloadTracks(upcoming)
-        playlist.getOrNull(currentIndex + 1)?.let { prepareStandby(it) }
+        playlist.getOrNull(currentIndex + 1)?.let { prepareStandbyWhenSettled(it) }
 
         // Continuous queue auto-refill: fewer than 20 tracks left in My Wave
         if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 20) {
@@ -996,10 +1004,11 @@ class PlaybackController @Inject constructor(
                     preloadManager.getOrFetchUrl(trackId)
                 }
             if (url != null) {
+                updateLink(LinkReason.SERVER_ANSWERED) { onServerReachable() }
                 playStreamOrEqualCopy(track, url, crossfade, startPositionMs)
             } else {
                 Log.e(TAG, "Failed to resolve mp3 URL for track $trackId")
-                reportTrouble()
+                reportTrouble(LinkReason.REQUEST_FAILED)
                 if (_currentTrack.value?.idString != trackId) return@launch
                 onPlaybackFailure(PlaybackFailure(trackId, startPositionMs, "URL_RESOLVE"))
             }
@@ -1065,7 +1074,7 @@ class PlaybackController @Inject constructor(
     /** The music has stood still long enough to matter: go on from the copy if there is one, and find out why. */
     private fun onStreamStalled(track: TrackDetailsDto) {
         // In its own job: the music coming back ends the watchdog, and the music must not wait for the check
-        scope.launch { reportTrouble() }
+        scope.launch { reportTrouble(LinkReason.STREAM_STALLED) }
         val trackId = track.idString
         if (!reserve.has(trackId)) return
         val position = if (playerRepository.currentTrackId.value == trackId) progress.value else restoredPositionMs.value
@@ -1159,31 +1168,47 @@ class PlaybackController @Inject constructor(
     private fun smoothOrigin(trackId: String): SmoothOrigin = SmoothPlan.originFor(steadiness.uneven, smoothOn.value, reserve.has(trackId))
 
     /** Is the server there at all? A short check, with no data to speak of: it tells a weak link from no link. */
-    private suspend fun reportTrouble() {
+    private suspend fun reportTrouble(why: LinkReason) {
         // A second try: on a very slow, busy link one connection can fail with the server still there
         val reachable = networkMonitor.isCurrentlyConnected() &&
             (networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS) || networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS))
-        updateLink { onTrouble(reachable) }
+        updateLink(if (reachable) why else LinkReason.SERVER_SILENT) { onTrouble(reachable) }
     }
 
-    private fun updateLink(change: LinkTracker.() -> Unit) {
+    /** Changes the link's state; a change is written to the journal with [why], so a report can be read later. */
+    private fun updateLink(why: LinkReason? = null, change: LinkTracker.() -> Unit) {
+        val before = link.state
         link.change()
-        _linkState.value = link.state
+        val after = link.state
+        _linkState.value = after
+        if (before != after && why != null) {
+            val kind = when (after) {
+                LinkState.WEAK -> PlaybackJournal.Kind.LINK_WEAK
+                LinkState.NONE -> PlaybackJournal.Kind.LINK_NONE
+                LinkState.GOOD -> PlaybackJournal.Kind.LINK_BACK
+            }
+            journal.record(kind, valueMs = why.ordinal.toLong())
+        }
     }
 
     /** The system's word on the network, the check of the server while it is out of reach, and coming back. */
     private fun watchTheLink() {
-        networkMonitor.isConnectedFlow.onEach { present -> updateLink { onNetwork(present) } }.launchIn(scope)
+        networkMonitor.isConnectedFlow.onEach { present ->
+            updateLink(if (present) LinkReason.NETWORK_BACK else LinkReason.NETWORK_GONE) { onNetwork(present) }
+        }.launchIn(scope)
         scope.launch {
             _linkState.collectLatest { state ->
                 if (state == LinkState.GOOD && waitingForConnection) {
                     waitingForConnection = false
                     play()
                 }
+                // Soon at first (a short drop), then every half-minute
+                var pause = SERVER_CHECK_FIRST_MS
                 while (state == LinkState.NONE) {
-                    delay(SERVER_CHECK_INTERVAL_MS)
+                    delay(pause)
+                    pause = SERVER_CHECK_INTERVAL_MS
                     if (networkMonitor.isCurrentlyConnected() && networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS)) {
-                        updateLink { onServerReachable() }
+                        updateLink(LinkReason.SERVER_ANSWERED) { onServerReachable() }
                     }
                 }
             }
@@ -1391,6 +1416,24 @@ class PlaybackController @Inject constructor(
         nextTrack?.let { prepareStandby(it) }
     }
 
+    private var standbyJob: Job? = null
+
+    /**
+     * The next track is readied once the current one has [RESERVE_HEADROOM_MS] in hand and no track change runs:
+     * both loading at the start of a track split the line exactly when the new one needs all of it.
+     */
+    private fun prepareStandbyWhenSettled(track: TrackDetailsDto) {
+        standbyJob?.cancel()
+        val current = _currentTrack.value?.idString
+        standbyJob = scope.launch {
+            while (playerRepository.inTransition || playerRepository.bufferedAheadMs < RESERVE_HEADROOM_MS || playerRepository.currentTrackId.value != current) {
+                if (_currentTrack.value?.idString != current) return@launch
+                delay(STANDBY_POLL_MS)
+            }
+            prepareStandby(track)
+        }
+    }
+
     private fun prepareStandby(track: TrackDetailsDto) {
         if (track.isRadio) return
         scope.launch {
@@ -1579,6 +1622,10 @@ class PlaybackController @Inject constructor(
         private const val STEADY_CHECK_MS = 30_000L
         private const val LIGHT_URL_TTL_MS = 30 * 60_000L
         private const val SERVER_CHECK_INTERVAL_MS = 30_000L
+        private const val SERVER_CHECK_FIRST_MS = 5_000L
+        /** The first half-minute of a track: its own, not the cache's. */
+        private const val TRACK_SETTLE_MS = 30_000L
+        private const val STANDBY_POLL_MS = 500L
         /** Long enough for a slow link to answer: a weak link must not read as no link. */
         private const val SERVER_CHECK_TIMEOUT_MS = 4_000
     }

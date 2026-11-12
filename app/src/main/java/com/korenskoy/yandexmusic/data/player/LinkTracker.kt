@@ -48,8 +48,9 @@ internal class LinkTracker(private val now: () -> Long) {
         serverReachable = true
     }
 
-    /** A stream really plays: the weak-link mode is over. */
+    /** A stream really plays: the server is there and the weak-link mode is over. */
     fun onStreamAudible() {
+        serverReachable = true
         weakSinceMs = null
     }
 
@@ -63,6 +64,11 @@ internal class LinkTracker(private val now: () -> Long) {
     companion object {
         const val WEAK_RETRY_MS = 5 * 60 * 1000L
     }
+}
+
+/** Why the link's state changed: written to the playback journal. */
+enum class LinkReason {
+    STREAM_STALLED, REQUEST_FAILED, SERVER_SILENT, NETWORK_GONE, NETWORK_BACK, STREAM_SOUNDS, SERVER_ANSWERED
 }
 
 /** Where a track that is not downloaded should come from. */

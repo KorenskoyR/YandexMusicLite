@@ -30,7 +30,13 @@ class PlaybackJournal(private val now: () -> Long) {
         /** A crossfade with the next track ready in time. */
         CROSSFADE,
         /** A crossfade where the next track came late and faded in after the previous one. */
-        CROSSFADE_LATE
+        CROSSFADE_LATE,
+        /** "Слабая связь" lit up; [Event.valueMs] is the [LinkReason]'s ordinal. */
+        LINK_WEAK,
+        /** "Нет связи"; [Event.valueMs] is the [LinkReason]'s ordinal. */
+        LINK_NONE,
+        /** The link is good again; [Event.valueMs] is the [LinkReason]'s ordinal. */
+        LINK_BACK
     }
 
     data class Event(val atMs: Long, val kind: Kind, val title: String? = null, val valueMs: Long = 0L) {

@@ -14,6 +14,8 @@ interface PlayerRepository {
     val isPlaying: StateFlow<Boolean>
     /** True while playback is requested but audio is not yet rendering. */
     val isBuffering: StateFlow<Boolean>
+    /** The track one actually hears now: during a crossfade's wait still the previous one; null in silence. */
+    val soundingTrackId: StateFlow<String?>
     val progress: StateFlow<Long>
     val trackEndedEvent: Flow<Unit>
     val prepareNextTrackEvent: Flow<Unit>
@@ -45,6 +47,9 @@ interface PlayerRepository {
 
     /** Music in hand ahead of the playing position; as good as unlimited when unknown. */
     val bufferedAheadMs: Long get() = Long.MAX_VALUE
+
+    /** A track change (a crossfade, its wait) or a source switch is under way: the line belongs to it. */
+    val inTransition: Boolean get() = false
     /** Volume multipliers by track id (1 = unchanged), for normalization; a track not listed plays as is. */
     fun setTrackGains(gains: Map<String, Float>)
 

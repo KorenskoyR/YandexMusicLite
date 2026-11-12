@@ -262,6 +262,16 @@
     <string name="journal_event_steady">Связь ровная — снова выбранное качество</string>
     <string name="journal_event_crossfade">Кроссфейд %1$s</string>
     <string name="journal_event_crossfade_late">%1$s не успел к кроссфейду — мягкое начало вместо тишины</string>
+    <string name="journal_event_link_weak">Слабая связь — %1$s</string>
+    <string name="journal_event_link_none">Нет связи — %1$s</string>
+    <string name="journal_event_link_back">Связь есть — %1$s</string>
+    <string name="journal_why_stalled">поток стоял дольше 6 с</string>
+    <string name="journal_why_request">сервер не дал ссылку на трек</string>
+    <string name="journal_why_server_silent">сервер не ответил на проверку</string>
+    <string name="journal_why_network_gone">Android сообщил, что сети нет</string>
+    <string name="journal_why_network_back">Android сообщил, что сеть снова есть</string>
+    <string name="journal_why_sounds">поток зазвучал</string>
+    <string name="journal_why_server_answered">сервер ответил</string>
     <string name="settings_reserve_size">Размер кэша</string>
     <string name="settings_reserve_hint">Следующие треки сохраняются заранее и играют, когда связь слабая или её нет</string>
     <string name="settings_reserve_off">Выкл</string>

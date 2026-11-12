@@ -62,6 +62,9 @@ class PlayerRepositoryImpl(
     private val _isBuffering = MutableStateFlow(false)
     override val isBuffering: StateFlow<Boolean> = _isBuffering.asStateFlow()
 
+    private val _soundingTrackId = MutableStateFlow<String?>(null)
+    override val soundingTrackId: StateFlow<String?> = _soundingTrackId.asStateFlow()
+
     private val _progress = MutableStateFlow(0L)
     override val progress: StateFlow<Long> = _progress.asStateFlow()
 
@@ -149,10 +152,10 @@ class PlayerRepositoryImpl(
         scope.launch {
             while (isActive) {
                 val currentP = activePlayer
+                // The track that plays now, or the one a crossfade waits for: never the previous one, loaded to
+                // its end long ago — the cache would take the line from the new track at its start
+                if (currentP.isPlaying || awaitingIncoming) bufferedAhead = aheadOf(currentP)
                 if (currentP.isPlaying) {
-                    // All of the track loaded counts as plenty: the end of a track is not a reason to hold back
-                    val loadedToTheEnd = currentP.duration > 0 && currentP.bufferedPosition >= currentP.duration - 500
-                    bufferedAhead = if (loadedToTheEnd) Long.MAX_VALUE else currentP.totalBufferedDuration
                     journal.addPlayed(PROGRESS_INTERVAL_MS)
                     updateProgress(currentP)
                     checkTransitionTriggers(currentP)
@@ -163,6 +166,14 @@ class PlayerRepositoryImpl(
             }
         }
     }
+
+    /** All of a track loaded counts as plenty: its end is no reason to hold back. */
+    private fun aheadOf(player: ExoPlayer): Long {
+        val loadedToTheEnd = player.duration > 0 && player.bufferedPosition >= player.duration - 500
+        return if (loadedToTheEnd) Long.MAX_VALUE else player.totalBufferedDuration
+    }
+
+    override val inTransition: Boolean get() = outgoingPlayer != null || awaitingIncoming || switchingSource
 
     private fun updateProgress(player: ExoPlayer) {
         val position = player.currentPosition
@@ -279,7 +290,14 @@ class PlayerRepositoryImpl(
         _isPlaying.value = wantsToPlay
         // Only a real STATE_BUFFERING counts as loading: a paused-but-wants-to-play limbo (focus loss) is not a
         // spinner, otherwise the indicator sticks when playback is interrupted mid-start.
-        _isBuffering.value = wantsToPlay && p.playbackState == Player.STATE_BUFFERING
+        val outgoing = outgoingPlayer
+        val tailSounds = awaitingIncoming && outgoing != null && outgoing.isPlaying
+        _isBuffering.value = wantsToPlay && !tailSounds && p.playbackState == Player.STATE_BUFFERING
+        _soundingTrackId.value = when {
+            outgoing != null && outgoing.isPlaying && (awaitingIncoming || !p.isPlaying) -> outgoing.currentMediaItem?.mediaId
+            p.isPlaying -> p.currentMediaItem?.mediaId
+            else -> null
+        }
     }
 
     override fun getPlayer(): Player = activePlayer
@@ -383,6 +401,8 @@ class PlayerRepositoryImpl(
         lastSeekTimestamp = 0L
         _currentTrackId.value = trackId
         _progress.value = startPositionMs
+        // Nothing of the new track is in hand yet: the cache waits until it has its own buffer
+        bufferedAhead = 0L
 
         val current = activePlayer
         val incoming = standbyPlayer

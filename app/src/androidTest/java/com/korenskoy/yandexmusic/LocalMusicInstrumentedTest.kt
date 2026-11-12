@@ -238,10 +238,12 @@ class LocalMusicInstrumentedTest {
         instrumentation.runOnMainSync { vm.playNext() }
         waitUntil(20_000, "the third file plays instead: ${vm.currentTrack.value?.title}") { vm.currentTrack.value?.idString == queue[2].id }
         assertPlaysAudibly(queue[2].id)
-        // Nothing left that opens: the music stops and says why, no endless skipping
+        // Nothing left that opens: the music stops and says why, no endless skipping. (A file deleted after the
+        // player opened it plays on to its end, as on any Linux; a drive taken out breaks the reading instead)
+        instrumentation.runOnMainSync { vm.stopAndClearPlayer() }
         resolver.delete(queue[0].uri.toUri(), null, null)
         resolver.delete(queue[2].uri.toUri(), null, null)
-        instrumentation.runOnMainSync { vm.playNext() }
+        instrumentation.runOnMainSync { vm.playLocal(queue[0], queue) }
         waitUntil(20_000, "the music stops: ${vm.currentTrack.value?.title} playing=${vm.isPlaying.value}") { !vm.isPlaying.value }
     }
 

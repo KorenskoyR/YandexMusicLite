@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.korenskoy.yandexmusic.R
+import com.korenskoy.yandexmusic.data.player.LinkReason
 import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
@@ -80,8 +81,8 @@ fun PlaybackJournalDialog(
 private const val SHOWN = 30
 
 private fun eventColor(kind: PlaybackJournal.Kind): Color = when (kind) {
-    PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE -> HiFi.Warning
-    PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY -> HiFi.Success
+    PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE -> HiFi.Warning
+    PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY, PlaybackJournal.Kind.LINK_BACK -> HiFi.Success
     else -> Color.White.copy(alpha = 0.82f)
 }
 
@@ -107,8 +108,24 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.STEADY -> r.getString(R.string.journal_event_steady)
         PlaybackJournal.Kind.CROSSFADE -> r.getString(R.string.journal_event_crossfade, title).trim()
         PlaybackJournal.Kind.CROSSFADE_LATE -> r.getString(R.string.journal_event_crossfade_late, title).trim()
+        PlaybackJournal.Kind.LINK_WEAK -> r.getString(R.string.journal_event_link_weak, reason(r, e.valueMs))
+        PlaybackJournal.Kind.LINK_NONE -> r.getString(R.string.journal_event_link_none, reason(r, e.valueMs))
+        PlaybackJournal.Kind.LINK_BACK -> r.getString(R.string.journal_event_link_back, reason(r, e.valueMs))
     }
 }
+
+/** Why the link's state changed, in words. */
+private fun reason(r: Resources, ordinal: Long): String = r.getString(
+    when (LinkReason.entries.getOrNull(ordinal.toInt())) {
+        LinkReason.STREAM_STALLED -> R.string.journal_why_stalled
+        LinkReason.REQUEST_FAILED -> R.string.journal_why_request
+        LinkReason.SERVER_SILENT -> R.string.journal_why_server_silent
+        LinkReason.NETWORK_GONE -> R.string.journal_why_network_gone
+        LinkReason.NETWORK_BACK -> R.string.journal_why_network_back
+        LinkReason.STREAM_SOUNDS -> R.string.journal_why_sounds
+        LinkReason.SERVER_ANSWERED, null -> R.string.journal_why_server_answered
+    }
+)
 
 /** The journal as plain text, for a message to the developer. */
 internal fun journalText(r: Resources, snapshot: PlaybackJournal.Snapshot, time: SimpleDateFormat): String = buildString {

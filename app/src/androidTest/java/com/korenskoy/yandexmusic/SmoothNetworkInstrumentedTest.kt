@@ -256,6 +256,96 @@ class SmoothNetworkInstrumentedTest {
         assertEquals("only b sounds", 1, onMain { players.count { it.isPlaying } })
     }
 
+    /**
+     * The GitHub report: with a crossfade every track stumbled at its start and "Слабая связь" lit up on a good link;
+     * with the cache on, tracks went to their copy "с 0:05". While the previous track's tail still sounds, the next
+     * one loading is no stall; and what the cache yields to is the next track's own buffer, not the previous one's,
+     * loaded to its end long ago.
+     */
+    @Test
+    fun theTailOfTheLastTrackIsNoStallAndTheCacheMindsTheNextOne() {
+        // "a" loads fast; "b" answers after 3 s, then only a little faster than it plays
+        val lines = mapOf("a" to Line(rate = BYTES_PER_SECOND * 20), "b" to Line(rate = BYTES_PER_SECOND * 3 / 2, firstByteDelayMs = 3_000))
+        val engine = engine(lines, newRules = true)
+        onMain {
+            engine.setCrossfadeDuration(10_000)
+            engine.playTrack("a", "jitter://a/a.wav", "a", "test", null, false, 0L)
+        }
+        waitUntil(10_000, "a plays") { onMain { engine.getPlayer().isPlaying } }
+        waitUntil(30_000, "a loaded to its end") { onMain { engine.getPlayer().let { it.bufferedPosition >= it.duration - 500 } } }
+        onMain { engine.seekTo(TRACK_SECONDS * 1000L - 10_500) }
+        waitUntil(10_000, "a plays its tail") { onMain { engine.getPlayer().isPlaying } }
+        onMain { engine.playTrack("b", "jitter://b/a.wav", "b", "test", null, true, 0L) }
+        // The switch itself starts a moment later, on the player's own coroutine
+        waitUntil(5_000, "the crossfade begins") { onMain { engine.currentTrackId.value == "b" } }
+
+        var stallWhileATailSounds = false
+        val ahead = mutableListOf<Long>()
+        val sounding = mutableListOf<String?>()
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < 9_000) {
+            onMain {
+                val aSounds = players.any { it.isPlaying && it.currentMediaItem?.mediaId == "a" }
+                if (aSounds && engine.isBuffering.value) stallWhileATailSounds = true
+                ahead += engine.bufferedAheadMs
+                engine.soundingTrackId.value.let { if (sounding.lastOrNull() != it) sounding += it }
+            }
+            Thread.sleep(100)
+        }
+        Log.i(TAG, "crossfade start: ahead $ahead, sounding $sounding")
+        assertFalse("a's tail sounds: the next track loading is no stall", stallWhileATailSounds)
+        assertTrue("the cache minds b's buffer, never a's finished one: $ahead", ahead.all { it < 20_000 })
+        assertEquals("what sounds: a, then b", listOf("a", "b"), sounding.filterNotNull().distinct())
+    }
+
+    /** "Every track stumbles at its start": six crossfades in a row on a line just a little faster than the music. */
+    @Test
+    fun sixCrossfadesInARowAreNeverSilentNorAStall() {
+        val names = listOf("t1", "t2", "t3", "t4", "t5", "t6", "t7")
+        val lines = names.associateWith { Line(rate = BYTES_PER_SECOND * 2, firstByteDelayMs = 2_000) }
+        val engine = engine(lines, newRules = true)
+        onMain {
+            engine.setCrossfadeDuration(6_000)
+            engine.playTrack("t1", "jitter://t1/a.wav", "t1", "test", null, false, 0L)
+        }
+        waitUntil(15_000, "t1 plays") { onMain { engine.getPlayer().isPlaying } }
+        var silentMs = 0L
+        var silentSince = 0L
+        var stallsReported = 0
+        var wasBuffering = false
+        fun watch(ms: Long) {
+            val until = System.currentTimeMillis() + ms
+            while (System.currentTimeMillis() < until) {
+                val (sounds, buffering) = onMain { players.any { it.isPlaying } to engine.isBuffering.value }
+                val now = System.currentTimeMillis()
+                if (!sounds && silentSince == 0L) silentSince = now
+                if (sounds && silentSince != 0L) {
+                    if (now - silentSince > STOP_MS) silentMs += now - silentSince
+                    silentSince = 0L
+                }
+                if (buffering && !wasBuffering) stallsReported++
+                wasBuffering = buffering
+                Thread.sleep(50)
+            }
+        }
+        for (next in names.drop(1)) {
+            // To the last 9 s of the track (the test's own jump waits for its data, unmeasured), then the next
+            // one with a crossfade: only the change of tracks is measured
+            onMain { engine.seekTo(TRACK_SECONDS * 1000L - 14_000) }
+            waitUntil(20_000, "the tail is loaded and plays") { onMain { engine.getPlayer().let { it.isPlaying && it.totalBufferedDuration > 4_000 } } }
+            silentSince = 0L
+            wasBuffering = false
+            onMain { engine.playTrack(next, "jitter://$next/a.wav", next, "test", null, true, 0L) }
+            watch(20_000)
+        }
+        val summary = journal.state.value.summary
+        Log.i(TAG, "six crossfades: silent $silentMs ms, stalls reported $stallsReported, $summary")
+        assertEquals("no silence heard at any track's start", 0L, silentMs)
+        assertEquals("no track change taken for a stall", 0, stallsReported)
+        // Whether the next one came in time depends on the device's speed; when late it fades in, no silence (above)
+        assertEquals("six crossfades", 6, summary.crossfades)
+    }
+
     @Test
     fun theSourceSwitchesAtTheSameSecond() {
         val lines = mapOf("stream" to Line(rate = BYTES_PER_SECOND * 2), "copy" to Line(rate = Int.MAX_VALUE))
