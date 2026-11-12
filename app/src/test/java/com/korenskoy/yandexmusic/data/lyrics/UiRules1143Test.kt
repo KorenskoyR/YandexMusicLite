@@ -46,7 +46,9 @@ class UiRules1143Test {
         assertTrue(LyricsRules.canHave(track("123")))
         assertTrue(LyricsRules.canHave(track("123", available = true)))
         assertFalse("Yandex said no words", LyricsRules.canHave(track("123", available = false)))
-        assertFalse("lyricsInfo wins over the older flag", LyricsRules.canHave(track("123", available = true, info = false)))
+        // lyricsInfo speaks of words behind a signed method: the open one follows lyricsAvailable only
+        assertTrue("lyricsInfo does not decide", LyricsRules.canHave(track("123", available = true, info = false)))
+        assertFalse("lyricsInfo does not decide", LyricsRules.canHave(track("123", available = false, info = true)))
         assertFalse("a station", LyricsRules.canHave(track("123").copy(isRadio = true)))
         assertFalse("the user's own file", LyricsRules.canHave(track("local_5")))
         assertFalse("an upload", LyricsRules.canHave(track("abc-def")))
@@ -55,8 +57,9 @@ class UiRules1143Test {
     @Test
     fun theServerSaysWhetherATrackHasWords() {
         val json = Json { ignoreUnknownKeys = true }
+        // Most of the chart says so (live check, 100 tracks: 74 like this, none had words from "supplement")
         val withInfo = json.decodeFromString<TrackDetailsDto>("""{"id":"1","lyricsAvailable":false,"lyricsInfo":{"hasAvailableTextLyrics":true,"hasAvailableSyncLyrics":false}}""")
-        assertEquals(true, withInfo.hasLyrics)
+        assertEquals(false, withInfo.hasLyrics)
         val old = json.decodeFromString<TrackDetailsDto>("""{"id":"1","lyricsAvailable":true}""")
         assertEquals(true, old.hasLyrics)
         assertNull(json.decodeFromString<TrackDetailsDto>("""{"id":"1"}""").hasLyrics)

@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
 import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
 import androidx.compose.material.icons.rounded.RestartAlt
 import android.content.res.Configuration
@@ -166,7 +169,9 @@ fun WavePill(
     fontSize: TextUnit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    description: String? = null
+    description: String? = null,
+    /** False on a crowded row: the word alone, so every pill says its whole name. */
+    showIcon: Boolean = true
 ) {
     val shape = RoundedCornerShape(height / 2)
     Row(
@@ -178,12 +183,21 @@ fun WavePill(
                 else Modifier.background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.16f), shape)
             )
             .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
-            .padding(start = height * 0.3f, end = height * 0.42f),
+            .padding(start = if (showIcon) height * 0.3f else height * 0.42f, end = height * 0.42f),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(height * 0.5f))
-        Spacer(Modifier.width(height * 0.2f))
-        Text(text, color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (showIcon) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(height * 0.5f))
+            Spacer(Modifier.width(height * 0.2f))
+        }
+        BasicText(
+            text,
+            style = TextStyle(color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Bold),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = fontSize * 0.8f, maxFontSize = fontSize, stepSize = 0.5.sp),
+            modifier = Modifier.weight(1f, fill = false)
+        )
     }
 }
 

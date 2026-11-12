@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -342,6 +343,13 @@ internal object LayoutAudit {
             val over = layout.didOverflowHeight
             if (over && layout.lineCount > 0 && !layout.isLineEllipsized(layout.lineCount - 1) && node.boundsInRoot.height > 0f) {
                 problems += "text «${layout.layoutInput.text.text.take(40)}» is cut off"
+            }
+            // A button says what it does in full: "Те…" is no label (a track's long title may end in "…")
+            // (a card with a title and an artist is content, not a label: only a button with one line of words)
+            val button = node.config.getOrNull(SemanticsProperties.Role) == Role.Button && node.config.getOrNull(SemanticsActions.OnClick) != null &&
+                node.config.getOrNull(SemanticsProperties.Text)?.size == 1
+            if (button && layout.lineCount > 0 && layout.isLineEllipsized(layout.lineCount - 1)) {
+                problems += "button label «${layout.layoutInput.text.text.take(40)}» is cut to an ellipsis"
             }
         }
         return problems.distinct()

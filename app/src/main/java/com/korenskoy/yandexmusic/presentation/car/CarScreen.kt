@@ -394,33 +394,37 @@ fun CarScreen(
         val queueCount = russianQuantityString(upcoming.size, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many)
         // The wave's buttons: in the header on a wide screen, in a row under it on a tall one
         val onWave = active == CarSource.WAVE
-        val wavePills: @Composable () -> Unit = {
+        val wavePills: @Composable (Modifier) -> Unit = { pill ->
             val pillHeight = u(56f)
             val pillFont = u.sp(18f)
+            // Standing on a phone three pills and more go without icons: each says its whole name
+            val pills = (if (trackWaveSeed != null && onWave) 2 else listOf(currentTrack?.let { !it.isRadio && !it.isLocal } == true, onWave).count { it }) +
+                listOf(active == CarSource.LIKED, lyrics?.offered == true).count { it }
+            val icons = isLandscape || pills < 3 || maxWidth.value / u.factor >= WIDE_STANDING_ROW
             if (trackWaveSeed != null && onWave) {
-                WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
-                WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !waveTuning.isDefault, height = pillHeight, fontSize = pillFont,
+                WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), modifier = pill, showIcon = icons, active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
+                WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), modifier = pill, showIcon = icons, active = !waveTuning.isDefault, height = pillHeight, fontSize = pillFont,
                     onClick = openTune, description = stringResource(R.string.wave_tune_title))
             } else {
                 currentTrack?.takeIf { !it.isRadio && !it.isLocal }?.let { track ->
-                    WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_by_track), active = false, height = pillHeight, fontSize = pillFont, onClick = { onTrackWave(track) })
+                    WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_by_track), modifier = pill, showIcon = icons, active = false, height = pillHeight, fontSize = pillFont, onClick = { onTrackWave(track) })
                 }
                 if (onWave) {
                     val summary = waveTuningSummary(waveTuning)
-                    WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), active = summary != null, height = pillHeight, fontSize = pillFont,
+                    WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), modifier = pill, showIcon = icons, active = summary != null, height = pillHeight, fontSize = pillFont,
                         onClick = openTune, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
                 }
             }
             // "Любимое": its own order or shuffled; the current track plays on either way
             if (active == CarSource.LIKED) {
                 WavePill(
-                    Icons.Rounded.Shuffle, stringResource(if (shuffled) R.string.car_shuffled else R.string.car_shuffle), active = shuffled,
+                    Icons.Rounded.Shuffle, stringResource(if (shuffled) R.string.car_shuffled else R.string.car_shuffle), modifier = pill, showIcon = icons, active = shuffled,
                     height = pillHeight, fontSize = pillFont, onClick = onToggleShuffle
                 )
             }
             if (lyrics?.offered == true) {
                 WavePill(
-                    Icons.Rounded.Lyrics, stringResource(R.string.lyrics_short), active = lyricsOpen, height = pillHeight, fontSize = pillFont,
+                    Icons.Rounded.Lyrics, stringResource(R.string.lyrics_short), modifier = pill, showIcon = icons, active = lyricsOpen, height = pillHeight, fontSize = pillFont,
                     description = stringResource(if (lyricsOpen) R.string.lyrics_hide else R.string.lyrics_show),
                     onClick = {
                         tuneOpen = false; queueOpen = false; downloadsOpen = false
@@ -436,7 +440,7 @@ fun CarScreen(
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
             CarHeader(
-                u, onExit, showClock, pills = if (isLandscape) wavePills else null,
+                u, onExit, showClock, pills = if (isLandscape) ({ wavePills(Modifier) }) else null,
                 onOpenSettings = onOpenSettings, onVoiceSearch = onVoiceSearch,
                 showCaption = isLandscape || (onOpenSettings == null && onVoiceSearch == null)
             )
@@ -444,7 +448,7 @@ fun CarScreen(
                 Row(
                     Modifier.fillMaxWidth().padding(start = u(28f), end = u(28f), bottom = u(14f)),
                     horizontalArrangement = Arrangement.spacedBy(u(12f))
-                ) { wavePills() }
+                ) { wavePills(Modifier.weight(1f, fill = false)) }
             }
             if (isLandscape) BoxWithConstraints(
                 Modifier
@@ -1024,3 +1028,6 @@ private fun CarCover(u: Scale, track: TrackDetailsDto?, modifier: Modifier) {
         )
     }
 }
+
+/** Standing, a screen at least this wide (in the car's design units) keeps the icons on a row of three pills and more. */
+private const val WIDE_STANDING_ROW = 820f

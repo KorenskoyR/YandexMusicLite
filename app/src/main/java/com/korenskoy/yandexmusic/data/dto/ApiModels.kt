@@ -127,13 +127,18 @@ data class TrackDetailsDto(
     @SerialName("contentWarning") val contentWarning: String? = null,
     /** A file of the user's own music (content://); kept with the session, so it plays again after a restart. */
     @SerialName("localUri") val localUri: String? = null,
-    /** Whether Yandex has the words of the track; null when the server did not say. */
+    /** Whether the open "supplement" method has the words of the track; null when the server did not say. */
     @SerialName("lyricsAvailable") val lyricsAvailable: Boolean? = null,
+    /** The newer words, only behind a signed method this app does not use: read, never relied on. */
     @SerialName("lyricsInfo") val lyricsInfo: LyricsInfoDto? = null
 ) {
-    /** Yandex has the words (true), has not (false), or did not say (null: ask). */
+    /**
+     * The words can be had (true), cannot (false), the server did not say (null: ask). Only [lyricsAvailable]
+     * tells it: on 100 chart tracks it matched "supplement" every time, while lyricsInfo said "yes" for 74
+     * tracks whose words that method does not give.
+     */
     val hasLyrics: Boolean?
-        get() = lyricsInfo?.hasAvailableTextLyrics ?: lyricsAvailable
+        get() = lyricsAvailable
 
     /** The user's own music on the device, not a track of the service: no likes, no wave, nothing sent anywhere. */
     val isLocal: Boolean

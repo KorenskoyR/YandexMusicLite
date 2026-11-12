@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
@@ -60,7 +61,7 @@ val LocalLyrics = compositionLocalOf { LyricsUi() }
 class TrackLyrics(
     /** The words, "none", "failed", or null while asked. */
     val answer: LyricsAnswer?,
-    /** Whether the "Текст" button is shown: Yandex said it has the words, or they came. */
+    /** Whether the "Текст" button is shown: only once the words have come, so it never shows and then goes. */
     val offered: Boolean,
     val retry: () -> Unit
 )
@@ -75,14 +76,23 @@ fun rememberLyrics(track: TrackDetailsDto?): TrackLyrics? {
     val id = track?.takeIf { LyricsRules.canHave(it) }?.idString ?: return null
     var attempt by remember(id) { mutableIntStateOf(0) }
     val answer by produceState(ui.known(id), id, attempt) {
-        if (value == null || value == LyricsAnswer.Failed) {
-            value = null
-            value = ui.load(id)
+        if (value != null && value != LyricsAnswer.Failed) return@produceState
+        value = null
+        // No connection for a moment: asked again a little later, a few times, while the track is shown
+        for (n in 1..LOAD_TRIES) {
+            val got = ui.load(id)
+            value = got
+            if (got != LyricsAnswer.Failed) break
+            if (n < LOAD_TRIES) delay(RETRY_MS * n)
         }
     }
-    val offered = answer is LyricsAnswer.Text || (track.hasLyrics == true && answer != LyricsAnswer.None)
+    val offered = answer is LyricsAnswer.Text
     return TrackLyrics(answer, offered) { attempt++ }
 }
+
+/** Asking for the words: this many times at most, the pauses growing from [RETRY_MS]. */
+private const val LOAD_TRIES = 3
+private const val RETRY_MS = 4_000L
 
 /** The words get about this many letters' width per line at their largest; below [MIN_TYPE] sp they do not go. */
 private const val FIT_LETTERS = 17f
