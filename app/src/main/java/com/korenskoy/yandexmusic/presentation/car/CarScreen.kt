@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Lyrics
+import com.korenskoy.yandexmusic.presentation.hifi.rememberLyrics
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
 import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.material.icons.rounded.Mic
@@ -200,7 +203,11 @@ fun CarScreen(
     deviceMusic: CarDeviceMusic? = null,
     /** Plays the music on the device, or one of its folders by key. */
     onPlayDevice: (folderKey: String?) -> Unit = {},
-    initialDownloadsOpen: Boolean = false
+    initialDownloadsOpen: Boolean = false,
+    initialLyricsOpen: Boolean = false,
+    /** "Любимое" plays shuffled; [onToggleShuffle] turns it on and off. */
+    shuffled: Boolean = false,
+    onToggleShuffle: () -> Unit = {}
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
@@ -208,6 +215,13 @@ fun CarScreen(
     BackHandler(enabled = tuneOpen) { tuneOpen = false }
     BackHandler(enabled = queueOpen) { queueOpen = false }
     BackHandler(enabled = downloadsOpen) { downloadsOpen = false }
+    // The words of the track, over the cover column; a new track closes them
+    val lyrics = rememberLyrics(currentTrack)
+    var lyricsOpen by rememberSaveable(currentTrack?.idString) { mutableStateOf(initialLyricsOpen) }
+    LaunchedEffect(lyrics?.offered) { if (lyrics?.offered != true) lyricsOpen = false }
+    BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
+    // A panel over the cover column: the column fades away under it
+    val panelOpen = tuneOpen || queueOpen || downloadsOpen || lyricsOpen
     // The music left the device (the drive was taken out): the choice goes with it
     LaunchedEffect(deviceMusic?.opensPanel) { if (deviceMusic?.opensPanel != true) downloadsOpen = false }
     BackHandler(onBack = onExit)
@@ -225,7 +239,8 @@ fun CarScreen(
     val withQueue = underCover == CarUnderCover.QUEUE
     // A station has no queue: the panel never stays open over one
     LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
-    val openQueue = { tuneOpen = false; downloadsOpen = false; queueOpen = true }
+    val openQueue = { tuneOpen = false; downloadsOpen = false; lyricsOpen = false; queueOpen = true }
+    val openTune = { queueOpen = false; downloadsOpen = false; lyricsOpen = false; tuneOpen = true }
     val active = carSourceOf(source, isRadio)
     val nextCaption = when {
         source == PlaylistSource.VIBE && trackWaveSeed != null -> stringResource(R.string.car_next_track_wave)
@@ -237,7 +252,7 @@ fun CarScreen(
         else -> null
     } ?: when (active) {
         CarSource.WAVE -> stringResource(R.string.car_source_wave)
-        CarSource.LIKED -> stringResource(R.string.library_liked)
+        CarSource.LIKED -> if (shuffled) stringResource(R.string.car_liked_shuffled) else stringResource(R.string.library_liked)
         CarSource.RADIO -> stringResource(R.string.car_source_radio)
         CarSource.HITS -> stringResource(R.string.car_source_hits)
         CarSource.DOWNLOADED -> stringResource(R.string.local_title)
@@ -260,6 +275,7 @@ fun CarScreen(
             if (deviceMusic?.opensPanel == true) {
                 tuneOpen = false
                 queueOpen = false
+                lyricsOpen = false
                 downloadsOpen = true
             } else {
                 onPlayDownloaded()
@@ -384,7 +400,7 @@ fun CarScreen(
             if (trackWaveSeed != null && onWave) {
                 WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
                 WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !waveTuning.isDefault, height = pillHeight, fontSize = pillFont,
-                    onClick = { queueOpen = false; downloadsOpen = false; tuneOpen = true }, description = stringResource(R.string.wave_tune_title))
+                    onClick = openTune, description = stringResource(R.string.wave_tune_title))
             } else {
                 currentTrack?.takeIf { !it.isRadio && !it.isLocal }?.let { track ->
                     WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_by_track), active = false, height = pillHeight, fontSize = pillFont, onClick = { onTrackWave(track) })
@@ -392,9 +408,30 @@ fun CarScreen(
                 if (onWave) {
                     val summary = waveTuningSummary(waveTuning)
                     WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), active = summary != null, height = pillHeight, fontSize = pillFont,
-                        onClick = { queueOpen = false; downloadsOpen = false; tuneOpen = true }, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
+                        onClick = openTune, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
                 }
             }
+            // "Любимое": its own order or shuffled; the current track plays on either way
+            if (active == CarSource.LIKED) {
+                WavePill(
+                    Icons.Rounded.Shuffle, stringResource(if (shuffled) R.string.car_shuffled else R.string.car_shuffle), active = shuffled,
+                    height = pillHeight, fontSize = pillFont, onClick = onToggleShuffle
+                )
+            }
+            if (lyrics?.offered == true) {
+                WavePill(
+                    Icons.Rounded.Lyrics, stringResource(R.string.lyrics_short), active = lyricsOpen, height = pillHeight, fontSize = pillFont,
+                    description = stringResource(if (lyricsOpen) R.string.lyrics_hide else R.string.lyrics_show),
+                    onClick = {
+                        tuneOpen = false; queueOpen = false; downloadsOpen = false
+                        lyricsOpen = !lyricsOpen
+                    }
+                )
+            }
+        }
+        // The words: big enough to read while parked, on the same sheet as the other panels
+        val lyricsPanel: @Composable (Modifier) -> Unit = { panelModifier ->
+            if (lyrics != null) CarLyricsPanel(u, currentTrack, lyrics, onClose = { lyricsOpen = false }, modifier = panelModifier)
         }
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
@@ -444,7 +481,7 @@ fun CarScreen(
                         }
                     }
                     val cover: @Composable () -> Unit = {
-                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen || downloadsOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far_wide")
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen && !queueOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far_wide")
                         CarCover(u, currentTrack, Modifier.size(u(wide.cover)).graphicsLayer { alpha = farAlpha })
                     }
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(u(CarWide.GAP))) {
@@ -467,7 +504,7 @@ fun CarScreen(
                     // The cover alone, and under it the covers of what comes next: nothing lies on the cover
                     val far: @Composable () -> Unit = {
                         // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
-                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (tuneOpen || queueOpen || downloadsOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
+                        val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
                         Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
                             if (isRadio) {
                                 CarCover(u, currentTrack, Modifier.size(u(500f)))
@@ -522,6 +559,7 @@ fun CarScreen(
                             tuneOpen -> 1
                             queueOpen -> 2
                             downloadsOpen -> 3
+                            lyricsOpen -> 4
                             else -> 0
                         },
                         modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth(),
@@ -533,6 +571,7 @@ fun CarScreen(
                                 2 -> queuePanel(Modifier.fillMaxWidth().height(u(400f)))
                                 // Taller than the queue: two big rows and the folders under them
                                 3 -> downloadsPanel(Modifier.fillMaxWidth().height(u(470f)))
+                                4 -> lyricsPanel(Modifier.fillMaxWidth().height(u(400f)))
                                 else -> CarCover(u, currentTrack, Modifier.size(u(if (isRadio || withQueue) 400f else 310f)))
                             }
                         }
@@ -585,6 +624,24 @@ fun CarScreen(
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
                 downloadsPanel(
+                    Modifier
+                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                        .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
+                        .width(panelWidth)
+                        .fillMaxHeight()
+                )
+            }
+        }
+        // The words lying down: over the cover column too, the whole height of it
+        if (lyricsOpen && isLandscape) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { lyricsOpen = false }
+            )
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                lyricsPanel(
                     Modifier
                         .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
                         .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))

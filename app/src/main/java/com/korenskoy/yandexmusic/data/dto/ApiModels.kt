@@ -126,8 +126,15 @@ data class TrackDetailsDto(
     @SerialName("r128") val r128: R128Dto? = null,
     @SerialName("contentWarning") val contentWarning: String? = null,
     /** A file of the user's own music (content://); kept with the session, so it plays again after a restart. */
-    @SerialName("localUri") val localUri: String? = null
+    @SerialName("localUri") val localUri: String? = null,
+    /** Whether Yandex has the words of the track; null when the server did not say. */
+    @SerialName("lyricsAvailable") val lyricsAvailable: Boolean? = null,
+    @SerialName("lyricsInfo") val lyricsInfo: LyricsInfoDto? = null
 ) {
+    /** Yandex has the words (true), has not (false), or did not say (null: ask). */
+    val hasLyrics: Boolean?
+        get() = lyricsInfo?.hasAvailableTextLyrics ?: lyricsAvailable
+
     /** The user's own music on the device, not a track of the service: no likes, no wave, nothing sent anywhere. */
     val isLocal: Boolean
         get() = localUri != null || idString.startsWith("local_")
@@ -145,6 +152,24 @@ data class TrackDetailsDto(
 }
 
 /** A track's credits: lines like "Исполнитель — Кино", "Использование ИИ — Трек полностью создан с использованием ИИ". */
+@Serializable
+data class LyricsInfoDto(
+    @SerialName("hasAvailableTextLyrics") val hasAvailableTextLyrics: Boolean? = null
+)
+
+/** "tracks/{id}/supplement": the words of a track, open to any signed-in client. */
+@Serializable
+data class TrackSupplementDto(
+    @SerialName("lyrics") val lyrics: SupplementLyricsDto? = null
+)
+
+@Serializable
+data class SupplementLyricsDto(
+    @SerialName("fullLyrics") val fullLyrics: String? = null,
+    @SerialName("hasRights") val hasRights: Boolean? = null,
+    @SerialName("textLanguage") val textLanguage: String? = null
+)
+
 @Serializable
 data class TrackCreditsDto(
     @SerialName("credits") val credits: List<CreditDto> = emptyList()

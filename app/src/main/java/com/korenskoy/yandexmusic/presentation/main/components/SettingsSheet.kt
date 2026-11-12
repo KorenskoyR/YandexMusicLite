@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.Waves
+import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import androidx.compose.material.icons.rounded.Timeline
 import android.content.ActivityNotFoundException
 import android.util.Log
@@ -582,6 +584,20 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
         )
     }
     SettingsGroup(stringResource(R.string.settings_g_player)) {
+        SegmentedRow(Icons.Rounded.Waves, stringResource(R.string.settings_mini_on_wave)) {
+            HiFiSegmented(
+                options = listOf(
+                    stringResource(R.string.settings_mini_always),
+                    stringResource(R.string.settings_mini_portrait),
+                    stringResource(R.string.settings_mini_landscape)
+                ),
+                selectedIndex = state.miniOnWave.ordinal,
+                onSelect = { actions.onMiniOnWaveChange(MiniOnWave.entries[it]) },
+                fontSize = 13.sp
+            )
+            Spacer(Modifier.heightIn(min = 10.dp))
+            SettingsHint(stringResource(R.string.settings_mini_on_wave_hint))
+        }
         SwitchRow(Icons.Rounded.MusicNote, stringResource(R.string.settings_expand_player), stringResource(R.string.settings_expand_player_hint), state.expandPlayerOnPlay, actions.onExpandPlayerChange)
         SwitchRow(Icons.Rounded.SwipeLeft, stringResource(R.string.settings_swipe_close), stringResource(R.string.settings_swipe_close_hint), state.swipeToCloseMiniPlayer, actions.onSwipeToCloseChange)
     }
@@ -592,6 +608,8 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
                 selectedIndex = if (state.steeringWheelOnLeft) 0 else 1,
                 onSelect = { actions.onSteeringWheelChange(it == 0) }
             )
+            Spacer(Modifier.heightIn(min = 10.dp))
+            SettingsHint(stringResource(R.string.settings_steering_hint))
         }
         SwitchRow(Icons.Rounded.Schedule, stringResource(R.string.settings_car_clock), stringResource(R.string.settings_car_clock_hint), state.carClock, actions.onCarClockChange)
         SegmentedRow(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.settings_car_under)) {

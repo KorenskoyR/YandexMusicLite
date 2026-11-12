@@ -275,6 +275,7 @@ fun RadioScreen(
                 stringResource(R.string.radio_on_air_station, current.name),
                 color = Color.White.copy(alpha = 0.84f),
                 fontSize = 13.sp,
+                lineHeight = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

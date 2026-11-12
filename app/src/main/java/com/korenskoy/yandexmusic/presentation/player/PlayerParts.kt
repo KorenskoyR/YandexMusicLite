@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.ui.platform.LocalConfiguration
+import com.korenskoy.yandexmusic.presentation.hifi.TrackLyrics
+import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.ui.unit.TextUnit
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
 import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.ui.unit.Dp
@@ -293,7 +297,9 @@ internal fun PlayerCover(
     coverModifier: Modifier,
     onPrev: () -> Unit,
     onNext: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    /** Drawn over the cover inside its frame: the words of the track. */
+    overlay: @Composable () -> Unit = {}
 ) {
     val context = LocalContext.current
     val lite = LocalHiFiLite.current
@@ -383,6 +389,7 @@ internal fun PlayerCover(
                                 }
                             }
                     )
+                    overlay()
                 }
             }
             // A station's cover has "В эфире" in this corner
@@ -402,10 +409,20 @@ internal fun TitleRow(
     onTrackWave: (() -> Unit)? = null,
     /** The track on the device; null: no download button (a station). */
     offline: TrackOfflineState? = null,
-    onDownloadClick: () -> Unit = {}
+    onDownloadClick: () -> Unit = {},
+    /** The words of the track: the "Текст" button shows when Yandex has them. */
+    lyrics: TrackLyrics? = null,
+    lyricsOpen: Boolean = false,
+    onLyrics: () -> Unit = {}
 ) {
     val lite = LocalHiFiLite.current
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // A narrow row (a small phone, a low unit lying down): the round buttons beside the title are a little
+    // smaller and closer, so the title keeps its room
+    val narrow = maxWidth < NARROW_TITLE_ROW_DP.dp
+    val button = if (narrow) 40.dp else 44.dp
+    val gap = if (narrow) 8.dp else 10.dp
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 12.dp)) {
         AnimatedContent(
             targetState = track,
             contentKey = { it.idString },
@@ -440,27 +457,41 @@ internal fun TitleRow(
         }
         }
         // A station, or the user's own file: nothing to keep, add or start a wave from
-        if (!track.isRadio && !track.isLocal) {
-            if (offline != null) {
-                TrackDownloadButton(offline, onDownloadClick)
-                Spacer(Modifier.width(10.dp))
-            }
+        if (!track.isRadio && !track.isLocal) Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+            if (lyrics?.offered == true) LyricsButton(open = lyricsOpen, size = button, onClick = onLyrics)
+            if (offline != null) TrackDownloadButton(offline, onDownloadClick, size = button)
             GlassCircleButton(
                 onClick = onAddToPlaylist,
                 contentDescription = stringResource(R.string.track_context_menu_dobavit_v_pleylist),
-                size = 44.dp
+                size = button
             ) {
                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
             }
             if (onTrackWave != null) {
-                Spacer(Modifier.width(10.dp))
-                GlassCircleButton(onClick = onTrackWave, contentDescription = stringResource(R.string.wave_by_track_cd), size = 44.dp) {
+                GlassCircleButton(onClick = onTrackWave, contentDescription = stringResource(R.string.wave_by_track_cd), size = button) {
                     Icon(Icons.Rounded.Waves, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                 }
             }
         }
     }
+    }
 }
+
+/** "Текст": glass, lit while the words are shown over the cover. */
+@Composable
+internal fun LyricsButton(open: Boolean, onClick: () -> Unit, size: Dp = 44.dp) {
+    GlassCircleButton(
+        onClick = onClick,
+        contentDescription = stringResource(if (open) R.string.lyrics_hide else R.string.lyrics_show),
+        size = size,
+        modifier = if (open) Modifier.background(Color.White.copy(alpha = 0.92f), CircleShape) else Modifier
+    ) {
+        Icon(Icons.Rounded.Lyrics, contentDescription = null, tint = if (open) HiFi.Ground else Color.White, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** Narrower than this, the buttons beside the player's title are smaller. */
+private const val NARROW_TITLE_ROW_DP = 400
 
 /**
  * "Скачать" for the playing track: an arrow, then a ring that turns while it downloads (a tap stops it), then
@@ -538,7 +569,14 @@ internal fun PlayerTimeline(progress: () -> Long, durationMs: Long, isPlaying: B
 
 /** "1:22 … −3:24": recomposes once a second (or with the finger), not with every progress tick. */
 @Composable
-private fun TimeReadout(progress: () -> Long, durationMs: Long, scrub: Float?) {
+internal fun TimeReadout(
+    progress: () -> Long,
+    durationMs: Long,
+    scrub: Float?,
+    fontSize: TextUnit = 13.sp,
+    lineHeight: TextUnit = 16.sp,
+    lift: Dp = 4.dp
+) {
     val currentProgress by rememberUpdatedState(progress)
     val second by remember(durationMs, scrub) {
         derivedStateOf { (scrub?.let { TimelineMath.seekPosition(it, durationMs) } ?: currentProgress()) / 1000L }
@@ -549,9 +587,9 @@ private fun TimeReadout(progress: () -> Long, durationMs: Long, scrub: Float?) {
         HiFiMotion.quick(),
         label = "time_color"
     )
-    Row(Modifier.fillMaxWidth().offset(y = (-4).dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(elapsed, color = color, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, style = TextStyle(fontFeatureSettings = "tnum"))
-        Text(remaining, color = color, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, style = TextStyle(fontFeatureSettings = "tnum"))
+    Row(Modifier.fillMaxWidth().offset(y = -lift), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(elapsed, color = color, fontSize = fontSize, lineHeight = lineHeight, fontWeight = FontWeight.SemiBold, style = TextStyle(fontFeatureSettings = "tnum"))
+        Text(remaining, color = color, fontSize = fontSize, lineHeight = lineHeight, fontWeight = FontWeight.SemiBold, style = TextStyle(fontFeatureSettings = "tnum"))
     }
 }
 

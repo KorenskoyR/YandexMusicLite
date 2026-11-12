@@ -1,5 +1,19 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.korenskoy.yandexmusic.presentation.hifi.AppDialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
 import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.material.icons.rounded.DownloadDone
@@ -134,23 +148,27 @@ fun TrackContextMenu(
     // A tap outside or a swipe down closes the menu; Back goes one step back (handled below, because the
     // sheet's own Back would hide it first)
     val appDensity = LocalDensity.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = HiFiDialogDefaults.Container,
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
-    ) {
-        AppScale(appDensity) {
+    val configuration = LocalConfiguration.current
+    // A low screen on its side (a flat head unit): a panel at the side, the whole height of it, so every item
+    // can be reached; anywhere else the sheet from the bottom. Both scroll when the items do not fit
+    val window = currentWindowSizeDp()
+    val asSidePanel = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && window.heightDp < SIDE_PANEL_BELOW_DP
+    val menuScroll = rememberScrollState()
+    val close: () -> Unit = {
+        if (asSidePanel) onDismiss() else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    }
+    val menuBody: @Composable () -> Unit = {
         BackHandler {
-            if (pickerStepsBack) picking = false
-            else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+            if (pickerStepsBack) picking = false else close()
         }
+        Box {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp)
+                .verticalScroll(menuScroll)
+                .padding(bottom = if (asSidePanel) 12.dp else 32.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (pickerStepsBack) 12.dp else 24.dp, end = 24.dp, top = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (pickerStepsBack) 12.dp else 24.dp, end = if (asSidePanel) 12.dp else 24.dp, top = 4.dp)) {
                 if (pickerStepsBack) {
                     // Back to the track's actions
                     val backLabel = stringResource(R.string.cd_nazad)
@@ -171,8 +189,23 @@ fun TrackContextMenu(
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
+                if (asSidePanel) {
+                    // No swipe to close a side panel: a button does it
+                    val closeLabel = stringResource(R.string.cd_zakryt)
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable(role = Role.Button, onClickLabel = closeLabel, onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Close, contentDescription = closeLabel, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
             }
             Text(
                 text = if (picking) stringResource(R.string.track_context_menu_dobavit_v_pleylist)
@@ -275,9 +308,60 @@ fun TrackContextMenu(
                 }
             }
         }
+        // More below: a soft fade says so
+        if (menuScroll.canScrollForward) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, HiFiDialogDefaults.Container)))
+            )
+        }
+        }
+    }
+    if (asSidePanel) {
+        AppDialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false, dismissOnBackPress = false)
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
+                )
+                Box(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(sidePanelWidth(window.widthDp.dp).coerceAtMost(SIDE_PANEL_MAX))
+                        .fillMaxHeight()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(HiFiDialogDefaults.Container)
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                        .padding(top = 14.dp)
+                ) { menuBody() }
+            }
+        }
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            containerColor = HiFiDialogDefaults.Container,
+            properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
+        ) {
+            AppScale(appDensity) { menuBody() }
+        }
     }
 }
-}
+
+/** Lower than this on its side, the track menu is a panel at the side instead of a sheet. */
+private const val SIDE_PANEL_BELOW_DP = 600
+private val SIDE_PANEL_MAX = 420.dp
 
 @Composable
 private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {

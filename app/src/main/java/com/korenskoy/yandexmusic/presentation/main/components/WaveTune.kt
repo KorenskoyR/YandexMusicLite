@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
 import androidx.compose.material.icons.rounded.RestartAlt
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
@@ -310,6 +311,9 @@ private fun TuneLabel(text: String, picked: Boolean, fontSize: TextUnit, color: 
     }
 }
 
+/** The side panel's width on a screen [screenWidth] wide: 45% of it, at least 360 and at most 520 dp. Pure; unit-tested. */
+fun sidePanelWidth(screenWidth: Dp): Dp = (screenWidth * 0.45f).coerceIn(360.dp, 520.dp).coerceAtMost(screenWidth)
+
 /**
  * "Настроить волну": a sheet from the bottom on a phone; on a side (head unit, phone on its side) a panel
  * on the right, so the wave stays in view.
@@ -339,9 +343,11 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                 modifier = Modifier.align(if (isLandscape) Alignment.CenterEnd else Alignment.BottomCenter)
             ) {
                 val shape = if (isLandscape) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+                // On a side the panel follows the screen: wide enough for the words, never more than half of it
+                val sideWidth = sidePanelWidth(currentWindowSizeDp().widthDp.dp)
                 Column(
                     Modifier
-                        .then(if (isLandscape) Modifier.width(460.dp).fillMaxHeight().statusBarsPadding().navigationBarsPadding().padding(12.dp) else Modifier.widthIn(max = 640.dp).fillMaxWidth())
+                        .then(if (isLandscape) Modifier.width(sideWidth).fillMaxHeight().statusBarsPadding().navigationBarsPadding().padding(12.dp) else Modifier.widthIn(max = 640.dp).fillMaxWidth())
                         .clip(shape)
                         .background(HiFi.SheetFill)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
@@ -360,14 +366,25 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                         Spacer(Modifier.height(12.dp))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.wave_tune_title), style = HiFiType.LargeTitle.copy(fontSize = 24.sp, lineHeight = 30.sp), modifier = Modifier.weight(1f))
-                        WavePill(Icons.Rounded.RestartAlt, stringResource(R.string.wave_tune_reset), active = false, height = 36.dp, fontSize = 14.sp, onClick = { onChange(WaveTuning()) })
+                        Text(
+                            stringResource(R.string.wave_tune_title), style = HiFiType.LargeTitle.copy(fontSize = 24.sp, lineHeight = 30.sp),
+                            maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                        )
+                        // On a side the reset is a round button: the title keeps its one line beside it
+                        if (isLandscape) {
+                            GlassCircleButton(onClick = { onChange(WaveTuning()) }, contentDescription = stringResource(R.string.wave_tune_reset)) {
+                                Icon(Icons.Rounded.RestartAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        } else {
+                            WavePill(Icons.Rounded.RestartAlt, stringResource(R.string.wave_tune_reset), active = false, height = 36.dp, fontSize = 14.sp, onClick = { onChange(WaveTuning()) })
+                        }
                         Spacer(Modifier.width(8.dp))
                         GlassCircleButton(onClick = close, contentDescription = stringResource(R.string.cd_zakryt)) {
                             Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
-                    WaveTuneChoices(tuning, onChange, segments = isLandscape, optionHeight = if (isLandscape) 52.dp else 44.dp, fontSize = if (isLandscape) 14.sp else 15.sp)
+                    // Options wrap onto the next line wherever the panel is: a strip of five cuts the words short
+                    WaveTuneChoices(tuning, onChange, segments = false, optionHeight = 44.dp, fontSize = 15.sp, gap = if (isLandscape) 14.dp else 18.dp)
                     Text(
                         stringResource(R.string.wave_tune_note),
                         color = HiFi.TextTertiary,

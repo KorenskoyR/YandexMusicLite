@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.domain.repository
 
+import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
@@ -66,6 +67,10 @@ interface SettingsRepository {
 
     val animationMode: Flow<AnimationMode>
     suspend fun setAnimationMode(value: AnimationMode)
+
+    /** "Моя волна": in which orientation the mini-player shows under the playing wave. */
+    val miniOnWave: Flow<MiniOnWave>
+    suspend fun setMiniOnWave(value: MiniOnWave)
 
     /** Quiet the tracks louder than the target so all of them sound alike. */
     val normalizeVolume: Flow<Boolean>

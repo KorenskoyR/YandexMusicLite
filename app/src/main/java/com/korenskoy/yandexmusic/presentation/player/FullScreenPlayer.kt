@@ -1,5 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
+import com.korenskoy.yandexmusic.presentation.hifi.LyricsPanel
+import com.korenskoy.yandexmusic.presentation.hifi.rememberLyrics
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.Text
@@ -136,7 +143,11 @@ fun FullScreenPlayer(
     onQualityClick: () -> Unit = {},
     coverModifier: Modifier = Modifier,
     /** Opens with the queue sheet up (screenshots). */
-    initialQueueOpen: Boolean = false
+    initialQueueOpen: Boolean = false,
+    /** Opens with the words over the cover (screenshots). */
+    initialLyricsOpen: Boolean = false,
+    /** Lying down, the cover is on the passenger's side ("Сторона руля"): on the right with the wheel on the left. */
+    coverOnRight: Boolean = false
 ) {
     var showQueue by remember { mutableStateOf(initialQueueOpen) }
     // Taking a downloaded track off the device is asked first; stopping a download is not
@@ -185,11 +196,18 @@ fun FullScreenPlayer(
         )
         SleepTimerCaption(state = sleepTimer)
     }
+    // The words of the track take the cover's place while asked for; a new track shows its cover again
+    val lyrics = rememberLyrics(track)
+    var lyricsOpen by remember(track.idString) { mutableStateOf(initialLyricsOpen) }
     val cover = @Composable { modifier: Modifier ->
-        PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier)
+        PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier) {
+            AnimatedVisibility(visible = lyricsOpen && lyrics != null, enter = fadeIn(HiFiMotion.quick()), exit = fadeOut(HiFiMotion.quick())) {
+                if (lyrics != null) LyricsPanel(lyrics, onClose = { lyricsOpen = false })
+            }
+        }
     }
     val details = @Composable { compact: Boolean ->
-        TitleRow(track, direction, compact, onAddToPlaylist, onTrackWave, offline, onDownloadClick)
+        TitleRow(track, direction, compact, onAddToPlaylist, onTrackWave, offline, onDownloadClick, lyrics, lyricsOpen) { lyricsOpen = !lyricsOpen }
         Spacer(Modifier.height(10.dp))
         QualityChip(track.isRadio, onQualityClick)
         Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
@@ -269,20 +287,29 @@ fun FullScreenPlayer(
                 }
         )
 
-        if (isLandscape) {
+        if (isLandscape) BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+        ) {
+            // As tall as the screen, but never more than 42% of its width: on a low wide unit (800 × 480) the
+            // title, its buttons and the controls keep their room beside it
+            val coverSide = minOf(maxHeight, maxWidth * LANDSCAPE_COVER_SHARE)
             Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .systemBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(28.dp)
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                cover(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true))
-                Column(Modifier.weight(1f).fillMaxHeight().widthIn(max = 560.dp)) {
-                    header()
-                    Spacer(Modifier.weight(1f))
-                    details(true)
+                val controls = @Composable {
+                    Column(Modifier.weight(1f).fillMaxHeight().widthIn(max = 560.dp)) {
+                        header()
+                        Spacer(Modifier.weight(1f))
+                        details(true)
+                    }
                 }
+                val coverBox = @Composable { cover(Modifier.size(coverSide)) }
+                if (coverOnRight) { controls(); coverBox() } else { coverBox(); controls() }
             }
         } else {
             Column(
@@ -321,6 +348,9 @@ fun FullScreenPlayer(
         )
     }
 }
+
+/** Lying down, the cover takes at most this share of the width. */
+private const val LANDSCAPE_COVER_SHARE = 0.42f
 
 /** Which way the track changed (see [PlayerGesture.direction]); remembered between compositions, not state. */
 @Composable

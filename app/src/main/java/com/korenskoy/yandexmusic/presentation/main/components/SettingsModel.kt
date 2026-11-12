@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import android.net.Uri
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager
@@ -45,6 +46,7 @@ data class SettingsUiState(
     val steeringWheelOnLeft: Boolean = true,
     val carClock: Boolean = true,
     val carUnderCover: CarUnderCover = CarUnderCover.QUEUE,
+    val miniOnWave: MiniOnWave = MiniOnWave.LANDSCAPE,
     val uiScaleAuto: Boolean = true,
     val uiScaleManual: Float = 1f,
     val animationMode: AnimationMode = AnimationMode.AUTO
@@ -83,6 +85,7 @@ data class SettingsActions(
     val onSteeringWheelChange: (Boolean) -> Unit = {},
     val onCarClockChange: (Boolean) -> Unit = {},
     val onCarUnderCoverChange: (CarUnderCover) -> Unit = {},
+    val onMiniOnWaveChange: (MiniOnWave) -> Unit = {},
     val onStoragePlaceChange: (TrackDownloadManager.Place) -> Unit = {},
     val onUsbFolderChosen: (Uri) -> Unit = {},
     val onUiScaleAutoChange: (Boolean) -> Unit = {},

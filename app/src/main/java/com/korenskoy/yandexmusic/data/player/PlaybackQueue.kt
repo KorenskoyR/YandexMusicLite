@@ -34,6 +34,26 @@ sealed interface NextAction {
 }
 
 object PlaybackQueue {
+    /**
+     * "Перемешать": the current track stays and plays on, every other track follows it in a random order.
+     * Without [currentId] in [queue] the queue is shuffled whole.
+     */
+    fun <T> shuffledAround(queue: List<T>, currentId: String, id: (T) -> String, random: kotlin.random.Random = kotlin.random.Random): List<T> {
+        val current = queue.firstOrNull { id(it) == currentId } ?: return queue.shuffled(random)
+        return listOf(current) + queue.filter { id(it) != currentId }.shuffled(random)
+    }
+
+    /**
+     * Back to the order before "Перемешать": the tracks still in [queue], in [original]'s order; tracks added
+     * since (not in [original]) go at the end, in the order they have.
+     */
+    fun <T> restored(queue: List<T>, original: List<T>, id: (T) -> String): List<T> {
+        val present = queue.mapTo(HashSet(), id)
+        val known = original.filter { id(it) in present }
+        val knownIds = known.mapTo(HashSet(), id)
+        return known + queue.filter { id(it) !in knownIds }
+    }
+
     /** Apple Music behaviour: "previous" after this much playback restarts the current track. */
     const val RESTART_ON_PREV_THRESHOLD_MS = 3_000L
     /** Queue window persisted around the current track to keep the session file small. */

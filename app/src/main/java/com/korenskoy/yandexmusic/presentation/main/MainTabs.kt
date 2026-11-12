@@ -330,6 +330,7 @@ internal fun CarTab(
     val skipAi by viewModel.skipAi.collectAsStateWithLifecycle()
     val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
     val deviceMusic by viewModel.carDeviceMusic.collectAsStateWithLifecycle()
+    val shuffled by viewModel.shuffled.collectAsStateWithLifecycle()
     // Said in the car, played at once: no list to pick from while driving
     val voice = rememberVoiceInput { phrase -> viewModel.playByVoice(phrase) }
     val track = now.track
@@ -373,6 +374,8 @@ internal fun CarTab(
         onWaveTuningChange = viewModel::setWaveTuning,
         onTrackWave = viewModel::startTrackWave,
         onBackToMyWave = viewModel::returnToMyWave,
+        shuffled = shuffled,
+        onToggleShuffle = viewModel::toggleShuffle,
         onOpenSettings = { showSettings = true },
         deviceMusic = deviceMusic,
         onPlayDevice = { key -> viewModel.playDevice(key) },
@@ -442,6 +445,7 @@ internal fun settingsHost(
             onSteeringWheelChange = settingsVm::setSteeringWheelOnLeft,
             onCarClockChange = settingsVm::setCarClock,
             onCarUnderCoverChange = settingsVm::setCarUnderCover,
+            onMiniOnWaveChange = settingsVm::setMiniOnWave,
             onStoragePlaceChange = settingsVm::setStoragePlace,
             onUsbFolderChosen = settingsVm::useUsbFolder,
             onUiScaleAutoChange = settingsVm::setUiScaleAuto,

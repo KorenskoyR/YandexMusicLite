@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.SkipPrevious
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
@@ -103,6 +104,8 @@ fun MiniPlayer(
     onClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    /** "Назад" before "Пуск/Пауза"; null hides it. */
+    onPrevClick: (() -> Unit)? = null,
     swipeToDismiss: Boolean = true,
     coverModifier: Modifier = Modifier
 ) {
@@ -247,6 +250,22 @@ fun MiniPlayer(
                 }
             }
             Spacer(Modifier.width(8.dp))
+            if (onPrevClick != null) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button, onClick = onPrevClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.SkipPrevious,
+                        contentDescription = stringResource(if (track.isRadio) R.string.cd_prev_station else R.string.cd_predyduschiy_trek),
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
             HiFiKnob(
                 onClick = onPlayPauseClick,
                 contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza),

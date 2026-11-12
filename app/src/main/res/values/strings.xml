@@ -615,4 +615,19 @@
     <string name="settings_skip_ai">Пропускать музыку, созданную ИИ</string>
     <string name="settings_skip_ai_hint">Пропуск треков, которые Яндекс отметил как созданные с использованием ИИ</string>
     <string name="settings_skip_ai_note">Такие треки игнорируются — в «Моей волне», в плейлистах, в машине. Трек, который вы выбрали сами, играет. Метка «ИИ» у «ИИ» треков отображается всегда.</string>
+    <string name="lyrics_show">Текст песни</string>
+    <string name="lyrics_hide">Скрыть текст</string>
+    <string name="lyrics_short">Текст</string>
+    <string name="lyrics_source">Текст: Яндекс Музыка</string>
+    <string name="lyrics_none">У Яндекса нет текста этой песни</string>
+    <string name="lyrics_failed">Текст не загрузился. Коснитесь, чтобы повторить</string>
+    <string name="settings_mini_on_wave">Мини-плеер на «Моей волне»</string>
+    <string name="settings_mini_always">Всегда</string>
+    <string name="settings_mini_portrait">Вертикально</string>
+    <string name="settings_mini_landscape">Горизонтально</string>
+    <string name="settings_mini_on_wave_hint">Там, где мини-плеер показан, кнопка «Плеер ›» не нужна и скрыта.</string>
+    <string name="settings_steering_hint">Управление — со стороны водителя. Лёжа полный плеер ставит обложку со стороны пассажира.</string>
+    <string name="car_shuffle">Перемешать</string>
+    <string name="car_shuffled">Перемешано</string>
+    <string name="car_liked_shuffled">Любимое · перемешано</string>
 </resources>

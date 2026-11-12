@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.util.Log
 import android.content.Intent
@@ -54,7 +55,7 @@ class SettingsViewModel @Inject constructor(
 
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
     private val equalizerFound = MutableStateFlow(false)
-    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE)
+    private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE, val mini: MiniOnWave = MiniOnWave.LANDSCAPE)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(
         val reserveMb: Int,
@@ -74,8 +75,9 @@ class SettingsViewModel @Inject constructor(
 
     private val look: Flow<Look> = combine(
         combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
-        settings.carUnderCover
-    ) { look, under -> look.copy(under = under) }
+        settings.carUnderCover,
+        settings.miniOnWave
+    ) { look, under, mini -> look.copy(under = under, mini = mini) }
 
     private val scale: Flow<Scale> = combine(settings.uiScaleAuto, settings.uiScaleManual, settings.animationMode, ::Scale)
 
@@ -110,6 +112,7 @@ class SettingsViewModel @Inject constructor(
             steeringWheelOnLeft = l.left,
             carClock = l.clock,
             carUnderCover = l.under,
+            miniOnWave = l.mini,
             uiScaleAuto = sc.auto,
             uiScaleManual = sc.manual,
             animationMode = sc.animations
@@ -179,6 +182,7 @@ class SettingsViewModel @Inject constructor(
     fun setSteeringWheelOnLeft(onLeft: Boolean) = save { setSteeringWheelOnLeft(onLeft) }
     fun setCarClock(enabled: Boolean) = save { setCarClock(enabled) }
     fun setCarUnderCover(value: CarUnderCover) = save { setCarUnderCover(value) }
+    fun setMiniOnWave(value: MiniOnWave) = save { setMiniOnWave(value) }
     fun setUiScaleAuto(enabled: Boolean) = save { setUiScaleAuto(enabled) }
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }

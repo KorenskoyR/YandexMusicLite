@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.domain.model.MiniOnWave
+import com.korenskoy.yandexmusic.presentation.hifi.LyricsUi
+import com.korenskoy.yandexmusic.data.lyrics.Lyrics
 import android.content.res.Resources
 import kotlinx.serialization.SerializationException
 import retrofit2.HttpException
@@ -91,7 +94,8 @@ class MainViewModel @Inject constructor(
     private val voiceSearch: VoiceSearch,
     albums: LikedAlbumsRepository,
     private val localMusic: LocalMusicRepository,
-    private val ai: AiMarks
+    private val ai: AiMarks,
+    lyrics: Lyrics
 ) : ViewModel() {
 
     val isAuthorized = authRepository.isAuthorized()
@@ -487,6 +491,9 @@ class MainViewModel @Inject constructor(
 
     /** Tracks Yandex marks as made with AI: id → its words. Shown always; passed over when [skipAi] is on. */
     val aiMarks: StateFlow<Map<String, String>> = ai.marks
+
+    /** The words of tracks for the player and the car. */
+    val lyricsUi = LyricsUi(known = lyrics::known, load = lyrics::of)
     val skipAi: StateFlow<Boolean> = settingsRepository.skipAi
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun wantAiMark(trackId: String) = ai.want(trackId)
@@ -504,6 +511,8 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, CarUnderCover.QUEUE)
     val animationMode: StateFlow<AnimationMode?> = settingsRepository.animationMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val miniOnWave: StateFlow<MiniOnWave> = settingsRepository.miniOnWave
+        .stateIn(viewModelScope, SharingStarted.Eagerly, MiniOnWave.LANDSCAPE)
 
     /** The tab the app opens on; null until the setting has been read, so no other tab flashes first. */
     val startTab: StateFlow<MainTab?> = combine(settingsRepository.startPage, settingsRepository.lastTab) { page, last ->
@@ -543,6 +552,10 @@ class MainViewModel @Inject constructor(
     fun playNext() = playbackController.playNext()
 
     fun playPrev() = playbackController.playPrev()
+
+    /** "Перемешано" in the car's "Любимое". */
+    val shuffled: StateFlow<Boolean> = playbackController.shuffled
+    fun toggleShuffle() = playbackController.toggleShuffle()
 
     fun togglePlayPause() = playbackController.togglePlayPause()
 

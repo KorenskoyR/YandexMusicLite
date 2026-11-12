@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.foundation.layout.fillMaxSize
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint
 import android.os.Build
@@ -329,34 +330,41 @@ fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> 
             .fillMaxWidth()
             .height(44.dp)
             .hifiRecessed(22.dp)
-            .padding(3.dp)
     ) {
-        val segment = maxWidth / options.size
+        val inset = 3.dp
+        val segment = (maxWidth - inset * 2) / options.size
         val offset by animateDpAsState(segment * selectedIndex, HiFiMotion.spring(), label = "segment")
         Box(
             modifier = Modifier
+                .padding(inset)
                 .offset { IntOffset(offset.roundToPx(), 0) }
                 .width(segment)
                 .fillMaxHeight()
                 .hifiAnodized(RoundedCornerShape(19.dp))
         )
-        Row(Modifier.fillMaxWidth().fillMaxHeight()) {
+        // Each option is touched over the whole height of the track, not only over the piece inside it
+        Row(Modifier.fillMaxSize().padding(horizontal = inset)) {
             options.forEachIndexed { index, label ->
                 val selected = index == selectedIndex
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(19.dp))
-                        .selectable(selected = selected, role = Role.RadioButton) { onSelect(index) },
+                        .clip(RoundedCornerShape(22.dp))
+                        .selectable(selected = selected, role = Role.RadioButton) { onSelect(index) }
+                        .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                    // A long word on a narrow screen shrinks a little rather than being cut
+                    BasicText(
                         label,
-                        color = if (selected) Color.White else Color.White.copy(alpha = 0.70f),
-                        fontSize = fontSize,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                        maxLines = 1
+                        style = TextStyle(
+                            color = if (selected) Color.White else Color.White.copy(alpha = 0.70f),
+                            fontSize = fontSize,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
+                        ),
+                        maxLines = 1,
+                        autoSize = TextAutoSize.StepBased(minFontSize = fontSize * 0.75f, maxFontSize = fontSize, stepSize = 0.5.sp)
                     )
                 }
             }
@@ -370,25 +378,32 @@ fun HiFiSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: M
     val track by animateColorAsState(if (checked) HiFi.Accent else Color.Black.copy(alpha = 0.5f), HiFiMotion.quick(), label = "switch_track")
     val thumbX by animateDpAsState(if (checked) 24.dp else 2.dp, HiFiMotion.spring(), label = "switch_thumb")
     val view = LocalView.current
+    // Touched over 48 dp of height; the track itself stays 54 × 32
     Box(
         modifier = modifier
-            .size(width = 54.dp, height = 32.dp)
-            .clip(CircleShape)
-            .background(track)
-            .border(1.dp, Color.White.copy(alpha = if (checked) 0.0f else 0.10f), CircleShape)
+            .size(width = 54.dp, height = 48.dp)
             .toggleable(value = checked, role = Role.Switch, interactionSource = remember { MutableInteractionSource() }, indication = null) {
                 view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                 onCheckedChange(it)
-            }
+            },
+        contentAlignment = Alignment.Center
     ) {
         Box(
-            modifier = Modifier
-                .offset { IntOffset(thumbX.roundToPx(), 2.dp.roundToPx()) }
-                .size(28.dp)
-                .shadow(4.dp, CircleShape)
+            Modifier
+                .size(width = 54.dp, height = 32.dp)
                 .clip(CircleShape)
-                .background(Brush.sweepGradient(HiFi.BrightMetalSweep))
-        )
+                .background(track)
+                .border(1.dp, Color.White.copy(alpha = if (checked) 0.0f else 0.10f), CircleShape)
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(thumbX.roundToPx(), 2.dp.roundToPx()) }
+                    .size(28.dp)
+                    .shadow(4.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(Brush.sweepGradient(HiFi.BrightMetalSweep))
+            )
+        }
     }
 }
 

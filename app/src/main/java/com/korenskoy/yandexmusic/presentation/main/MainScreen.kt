@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.hifi.LocalLyrics
 import kotlinx.coroutines.flow.map
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.compose.animation.ContentTransform
@@ -216,8 +217,11 @@ fun MainScreen(
     val contentBottom = if (isLandscape) DockClearance else if (currentTrack != null) 168.dp else 100.dp
     // On a side a notch or a three-button bar sits next to the page, and the pages run edge to edge
     val sideInsets = WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal)
-    // The mini-player stays out of the way on the wave page, which already shows the playing wave
-    val showMini = currentTrack != null && currentTab != MainTab.CAR && !(currentTab == MainTab.HOME && now.waveActive)
+    // On the wave page the mini-player shows in the orientations chosen in the settings; elsewhere the page
+    // already shows the playing wave. Where it shows, the page's own "Плеер ›" is not needed
+    val miniOnWave by viewModel.miniOnWave.collectAsStateWithLifecycle()
+    val showMini = currentTrack != null && currentTab != MainTab.CAR &&
+        !(currentTab == MainTab.HOME && now.waveActive && !miniOnWave.shows(isLandscape))
     val snackbar = remember { SnackbarHostState() }
     val openPlayer = { isPlayerExpanded = true }
     val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
@@ -228,6 +232,7 @@ fun MainScreen(
         LocalLinkState provides linkState,
         LocalTrackMenu provides trackMenuLauncher,
         LocalAiMarks provides aiMarksUi,
+        LocalLyrics provides viewModel.lyricsUi,
         LocalHiFiLite provides lite,
         LocalArtworkTint provides appTint
     ) {
@@ -279,7 +284,7 @@ fun MainScreen(
                         } else when (tab) {
                             MainTab.HOME -> HomeTab(
                                 viewModel, now, progress, isLandscape, contentBottom,
-                                onOpenPlayer = if (currentTrack != null) openPlayer else null
+                                onOpenPlayer = if (currentTrack != null && !showMini) openPlayer else null
                             )
                             MainTab.SEARCH -> SearchTab(viewModel, searchVm, catalogVm, now)
                             MainTab.LIBRARY -> LibraryTab(
@@ -318,6 +323,7 @@ fun MainScreen(
                                     progress = progress,
                                     onPlayPauseClick = { viewModel.togglePlayPause() },
                                     onNextClick = { viewModel.playNext() },
+                                    onPrevClick = { viewModel.playPrev() },
                                     onClick = openPlayer,
                                     onDismiss = { viewModel.stopAndClearPlayer() },
                                     swipeToDismiss = swipeToClose,
@@ -488,9 +494,11 @@ private fun PlayerHost(
     val isFetchingMoreQueue by viewModel.isFetchingMoreQueue.collectAsStateWithLifecycle()
     val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
     val offline by viewModel.currentTrackOffline.collectAsStateWithLifecycle()
+    val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
     val stationId = track.idString.removePrefix("radio_")
     FullScreenPlayer(
         track = track,
+        coverOnRight = steeringWheelOnLeft,
         isPlaying = now.isPlaying,
         isLiked = if (track.isRadio) stationId in favoriteStationIds else track.idString in now.likedTrackIds,
         progress = progress,

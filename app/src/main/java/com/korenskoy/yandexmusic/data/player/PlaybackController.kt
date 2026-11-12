@@ -101,6 +101,11 @@ class PlaybackController @Inject constructor(
     private val _currentPlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
     val currentPlaylist: StateFlow<List<TrackDetailsDto>> = _currentPlaylist.asStateFlow()
 
+    /** "Перемешано": the queue after the current track is in a random order; [orderBeforeShuffle] is the way back. */
+    private val _shuffled = MutableStateFlow(false)
+    val shuffled: StateFlow<Boolean> = _shuffled.asStateFlow()
+    private var orderBeforeShuffle: List<TrackDetailsDto>? = null
+
     private val _currentTrack = MutableStateFlow<TrackDetailsDto?>(null)
     val currentTrack: StateFlow<TrackDetailsDto?> = _currentTrack.asStateFlow()
 
@@ -380,6 +385,8 @@ class PlaybackController @Inject constructor(
         source?.let {
             _currentSource.value = it
             returnPoint = null
+            _shuffled.value = false
+            orderBeforeShuffle = null
         }
         _currentPlaylist.value = playlist
         _currentTrack.value = track
@@ -453,7 +460,32 @@ class PlaybackController @Inject constructor(
 
     fun playAllLikedTracks(shuffle: Boolean = false) {
         val playlist = if (shuffle) libraryTracks.shuffled() else libraryTracks
-        if (playlist.isNotEmpty()) playTrack(playlist.first().idString, playlist, PlaylistSource.LIBRARY)
+        if (playlist.isEmpty()) return
+        playTrack(playlist.first().idString, playlist, PlaylistSource.LIBRARY)
+        // Shuffled from the start: "Перемешано" is on, and turning it off gives the list's own order
+        if (shuffle) {
+            orderBeforeShuffle = libraryTracks
+            _shuffled.value = true
+        }
+    }
+
+    /**
+     * "Перемешать" / back to the order: the current track plays on, what follows it is shuffled — or put back in
+     * the order it had, with the current track at its own place there.
+     */
+    fun toggleShuffle() {
+        val currentId = _currentTrack.value?.takeIf { !it.isRadio }?.idString ?: return
+        if (_shuffled.value) {
+            val original = orderBeforeShuffle
+            if (original != null) updateQueueKeepingStandby { queue -> PlaybackQueue.restored(queue, original) { it.idString } }
+            orderBeforeShuffle = null
+            _shuffled.value = false
+        } else {
+            orderBeforeShuffle = _currentPlaylist.value
+            updateQueueKeepingStandby { queue -> PlaybackQueue.shuffledAround(queue, currentId, { it.idString }) }
+            _shuffled.value = true
+        }
+        scope.launch { persistSession() }
     }
 
     fun playHits(hits: List<TrackDetailsDto>, shuffle: Boolean = true) {
@@ -633,6 +665,8 @@ class PlaybackController @Inject constructor(
         playerRepository.stop()
         _currentTrack.value = null
         _currentPlaylist.value = emptyList()
+        _shuffled.value = false
+        orderBeforeShuffle = null
         _currentSource.value = PlaylistSource.NONE
         restoredPositionMs.value = 0L
         waitingForConnection = false

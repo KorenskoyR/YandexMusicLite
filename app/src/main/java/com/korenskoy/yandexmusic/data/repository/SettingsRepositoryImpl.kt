@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
@@ -158,6 +159,10 @@ class SettingsRepositoryImpl @Inject constructor(
     private val animationPref = choice("animation_mode", AnimationMode.AUTO)
     override val animationMode = animationPref.first
     override suspend fun setAnimationMode(value: AnimationMode) = animationPref.second(value)
+
+    private val miniOnWavePref = choice("mini_on_wave", MiniOnWave.LANDSCAPE)
+    override val miniOnWave = miniOnWavePref.first
+    override suspend fun setMiniOnWave(value: MiniOnWave) = miniOnWavePref.second(value)
 
     private val normalizePref = bool("normalize_volume", false)
     override val normalizeVolume = normalizePref.first
