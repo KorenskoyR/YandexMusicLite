@@ -1,11 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiQrCode
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.text.TextStyle
 import java.util.Locale
 import androidx.compose.foundation.layout.fillMaxHeight
 import android.os.SystemClock
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -59,9 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.auth.DeviceSignIn
 import com.korenskoy.yandexmusic.presentation.hifi.GlassPillButton
@@ -334,37 +330,10 @@ private fun CodeBoxes(userCode: String?, width: Dp, m: SignInMetrics) {
     }
 }
 
-/** A QR code to the page where the code is entered; drawn from the matrix, white plate with a quiet zone. */
+/** A QR code to the page where the code is entered. */
 @Composable
 private fun QrCode(url: String, size: Dp, dimmed: Boolean) {
-    val matrix = remember(url) {
-        runCatching {
-            QRCodeWriter().encode(url, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.MARGIN to 0))
-        }.getOrNull()
-    }
-    val description = stringResource(R.string.auth_phone_qr_cd, url)
-    Box(
-        Modifier
-            .size(size)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFF4F6FA).copy(alpha = if (dimmed) 0.35f else 1f))
-            .padding(size * 0.08f)
-            .semantics { contentDescription = description }
-    ) {
-        if (matrix != null) {
-            Canvas(Modifier.fillMaxSize()) {
-                val cell = this.size.minDimension / matrix.width
-                for (y in 0 until matrix.height) {
-                    for (x in 0 until matrix.width) {
-                        if (matrix[x, y]) {
-                            // A hair wider than the cell, so no seams show between neighbours
-                            drawRect(Color(0xFF0A0B0F), Offset(x * cell, y * cell), Size(cell + 0.5f, cell + 0.5f))
-                        }
-                    }
-                }
-            }
-        }
-    }
+    HiFiQrCode(url, size, stringResource(R.string.auth_phone_qr_cd, url), dimmed = dimmed)
 }
 
 @Composable

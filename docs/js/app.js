@@ -1,5 +1,5 @@
 /**
- * Yandex Music Lite — Official Promo Website Logic
+ * Yandex Music Lite — Project Website Logic
  * Modern, ultra-lightweight Vanilla ES6+ without external frameworks
  */
 
@@ -227,8 +227,39 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  // 6. Copy the wallet address: the button says so for a moment
+  const initCopyButtons = () => {
+    document.querySelectorAll('.js-copy').forEach((btn) => {
+      const label = btn.querySelector('.js-copy-label');
+      const original = label ? label.textContent : '';
+      btn.addEventListener('click', async () => {
+        const text = btn.dataset.copy || '';
+        let copied = false;
+        try {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        } catch {
+          // An older browser: the address is selectable on the page
+          const address = btn.closest('.support-card')?.querySelector('.support-address');
+          if (address) {
+            const range = document.createRange();
+            range.selectNodeContents(address);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }
+        if (label) {
+          label.textContent = copied ? 'Адрес скопирован' : 'Выделен — скопируйте';
+          setTimeout(() => { label.textContent = original; }, 2500);
+        }
+      });
+    });
+  };
+
   // Run modules
   initReleaseInfo();
+  initCopyButtons();
   initScreenshotSwitcher();
   initFaqAccordion();
   initQrModal();

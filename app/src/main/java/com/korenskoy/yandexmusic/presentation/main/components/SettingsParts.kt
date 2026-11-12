@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -127,7 +129,12 @@ internal fun SettingsRow(
         }
         if (value != null) {
             Spacer(Modifier.width(8.dp))
-            Text(value, color = HiFi.TextTertiary, fontSize = 15.sp, maxLines = 1)
+            // Never wider than this: a long name beside it keeps its words whole («Журнал воспроизведения»),
+            // a short value leaves the name all the room it needs
+            Text(
+                value, color = HiFi.TextTertiary, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 2, textAlign = TextAlign.End,
+                modifier = Modifier.widthIn(max = 150.dp)
+            )
         }
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))

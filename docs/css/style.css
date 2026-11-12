@@ -1,5 +1,5 @@
 /* ===================================================================
-   Yandex Music Lite — Official Promo Website
+   Yandex Music Lite — Project Website
    Theme: Hi-Fi — graphite, brushed metal, frosted glass, one blue accent
    =================================================================== */
 
@@ -1145,6 +1145,149 @@ h1, h2, h3, h4 {
 }
 
 /* ===================================================================
+   Support the developer
+   =================================================================== */
+.section-support {
+  padding: 80px 0;
+}
+
+.support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.support-card {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.support-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.support-mark {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 800;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.support-name {
+  font-size: 1.25rem;
+}
+
+.support-sub {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.support-body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.support-qr {
+  width: 176px;
+  height: 176px;
+  flex-shrink: 0;
+  padding: 12px;
+  border-radius: 20px;
+  background: #F4F6FA;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  display: block;
+}
+
+.support-qr img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+a.support-qr:hover {
+  transform: translateY(-2px);
+}
+
+.support-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.support-hint {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.support-btn {
+  padding: 12px 20px;
+  font-size: 0.9375rem;
+}
+
+.support-address {
+  display: block;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.support-warning,
+.support-note {
+  font-size: 0.8125rem;
+  color: #FFB547;
+}
+
+.support-note {
+  color: var(--text-muted);
+}
+
+.support-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  user-select: auto;
+}
+
+.support-link:hover {
+  color: var(--accent-soft);
+}
+
+.support-btn {
+  white-space: nowrap;
+}
+
+.support-disclaimer {
+  max-width: 760px;
+  margin: 28px auto 0;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ===================================================================
    Responsive Media Queries
    =================================================================== */
 @media (max-width: 1024px) {
@@ -1202,6 +1345,10 @@ h1, h2, h3, h4 {
     grid-template-columns: 1fr;
   }
 
+  .support-grid {
+    grid-template-columns: 1fr;
+  }
+
   .section-title {
     font-size: 2.125rem;
   }
@@ -1215,6 +1362,23 @@ h1, h2, h3, h4 {
 @media (max-width: 480px) {
   .hero-title {
     font-size: 2.5rem;
+  }
+
+  .support-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .support-qr {
+    margin: 0 auto;
+  }
+
+  .support-card {
+    padding: 20px;
+  }
+
+  .support-address {
+    font-size: 0.875rem;
   }
 
   .btn {

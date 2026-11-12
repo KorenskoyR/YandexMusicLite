@@ -242,6 +242,27 @@ class Screenshots1144Test {
 
     @Test
     @Config(qualifiers = TALL)
+    fun aboutWithSupport() {
+        show { SettingsSheet(state = SettingsUiState(), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.ABOUT) }
+        snap("v1145_about")
+    }
+
+    @Test
+    @Config(qualifiers = TALL)
+    fun supportOnAPhone() {
+        show { SettingsSheet(state = SettingsUiState(), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.SUPPORT) }
+        snap("v1145_support")
+    }
+
+    @Test
+    @Config(qualifiers = CAR)
+    fun supportOnAHeadUnit() {
+        show { SettingsSheet(state = SettingsUiState(), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.SUPPORT) }
+        snap("v1145_support_wide")
+    }
+
+    @Test
+    @Config(qualifiers = TALL)
     fun noFlashDriveShownToTheApp() {
         show { SettingsSheet(state = SettingsUiState(storage = StorageStatus(pickerAvailable = false)), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK) }
         scrollTo("Указать путь")

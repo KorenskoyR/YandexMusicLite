@@ -13,7 +13,15 @@ import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.StartPage
 
 /** The pages of the settings: a short root list and one page per section. */
-enum class SettingsPage { ACCOUNT, PLAYBACK, INTERFACE, ABOUT }
+enum class SettingsPage {
+    ACCOUNT, PLAYBACK, INTERFACE, ABOUT,
+
+    /** «Поддержать разработчика», opened from [ABOUT]: Back leads there. */
+    SUPPORT;
+
+    /** The page a sub-page returns to; null — the root list. */
+    val parent: SettingsPage? get() = if (this == SUPPORT) ABOUT else null
+}
 
 /** Everything the settings show, in one value: the sheet draws it and calls [SettingsActions]. */
 @Immutable

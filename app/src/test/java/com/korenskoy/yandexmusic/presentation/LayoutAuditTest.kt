@@ -329,6 +329,12 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
                 )
                 SettingsSheet(state = SettingsUiState(storage = storage), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
             }
+            "settings_about" -> show {
+                SettingsSheet(state = SettingsUiState(), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.ABOUT)
+            }
+            "settings_support" -> show {
+                SettingsSheet(state = SettingsUiState(), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.SUPPORT)
+            }
             "settings_no_drive" -> show {
                 SettingsSheet(state = SettingsUiState(storage = StorageStatus(pickerAvailable = false)), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
             }
@@ -364,7 +370,8 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "wave_paused", "wave_playing", "wave_mini", "wave_tune", "player", "player_lyrics", "track_menu", "mini_player",
             "settings_interface", "settings_playback", "library", "search", "radio",
             "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations",
-            "car_playlists", "car_three", "auth_strip", "auth_code", "settings_drives", "settings_no_drive"
+            "car_playlists", "car_three", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
+            "settings_about", "settings_support"
         )
 
         /** Phones, standing units (the Geely's 960×1280), flat units (the Monjaro's 1280×480, 1920×720), old 800×480. */

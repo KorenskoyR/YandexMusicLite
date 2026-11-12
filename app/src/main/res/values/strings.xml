@@ -680,4 +680,21 @@
     <string name="settings_storage_drive_note">%1$s: свободно %2$s. Треки зашифрованы и играют только в этом приложении.</string>
     <string name="settings_storage_drive_note_app">%1$s: свободно %2$s. Треки зашифрованы и играют только в этом приложении; папка приложения на накопителе удаляется вместе с ним.</string>
     <string name="settings_storage_no_drive">Окна выбора папки на этом устройстве нет, а флешку система приложениям не показывает. Укажите путь вручную — приложение проверит, можно ли туда писать. Если нет, скачивайте в память.</string>
+    <string name="support_title">Поддержать разработчика</string>
+    <string name="support_row_hint">ЮMoney или USDT · по QR-коду</string>
+    <string name="support_intro">Приложение бесплатное и без рекламы. Если оно вам полезно, разработку можно поддержать — по желанию. Наведите камеру телефона на код или нажмите на него.</string>
+    <string name="support_yoomoney">ЮMoney</string>
+    <string name="support_yoomoney_sub">Картой, через СБП или кошельком</string>
+    <string name="support_yoomoney_hint">Страница сбора откроется в браузере</string>
+    <string name="support_yoomoney_qr_cd">QR-код сбора на ЮMoney. Нажмите, чтобы открыть страницу</string>
+    <string name="support_no_browser">Браузера на этом устройстве нет — наведите камеру телефона на код</string>
+    <string name="support_open">Открыть</string>
+    <string name="support_usdt">USDT</string>
+    <string name="support_usdt_sub">Сеть TRON (TRC20)</string>
+    <string name="support_usdt_hint">Отсканируйте код в кошельке или скопируйте адрес</string>
+    <string name="support_usdt_qr_cd">QR-код адреса USDT в сети TRON</string>
+    <string name="support_copy">Скопировать</string>
+    <string name="support_copied">Адрес скопирован</string>
+    <string name="support_usdt_network">Только сеть TRON (TRC20). Перевод в другой сети не дойдёт.</string>
+    <string name="support_disclaimer">Неофициальный клиент. Не связан с ООО «Яндекс». Все права на контент и товарные знаки принадлежат правообладателям. Поддержка разработчика носит исключительно добровольный и безвозмездный характер.</string>
 </resources>

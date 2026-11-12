@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Usb
 import com.korenskoy.yandexmusic.data.download.RemovableDrives
 import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
@@ -172,7 +175,9 @@ fun SettingsSheet(
 
     AppDialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // Inside the dialog's window: Back there first steps out of a page to the root list, then closes
-        BackHandler(enabled = !isLandscape && page != null) { pageName = null }
+        BackHandler(enabled = !isLandscape && page != null) { pageName = page?.parent?.name }
+        // Lying, a sub-page steps back to its page in the pane
+        BackHandler(enabled = isLandscape && page?.parent != null) { pageName = page?.parent?.name }
         Box(Modifier.fillMaxSize()) {
             AnimatedVisibility(visibleState = visible, enter = fadeIn(HiFiMotion.standard()), exit = fadeOut(HiFiMotion.standard())) {
                 Box(
@@ -229,16 +234,18 @@ fun SettingsSheet(
                         ) {
                             val sub = page.takeIf { !isLandscape }
                             if (sub != null) {
-                                GlassCircleButton(onClick = { pageName = null }, contentDescription = stringResource(R.string.cd_nazad)) {
+                                GlassCircleButton(onClick = { pageName = sub.parent?.name }, contentDescription = stringResource(R.string.cd_nazad)) {
                                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                                 }
                                 Spacer(Modifier.width(12.dp))
                             }
-                            Text(
+                            // A long title («Поддержать разработчика») gets smaller on a narrow phone, never cut
+                            BasicText(
                                 text = sub?.let { stringResource(it.titleRes) } ?: stringResource(R.string.settings_title),
-                                style = HiFiType.LargeTitle.copy(fontSize = if (sub != null) 24.sp else 28.sp, lineHeight = 34.sp),
+                                style = HiFiType.LargeTitle.copy(fontSize = if (sub != null) 24.sp else 28.sp, lineHeight = 34.sp, color = Color.White),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                autoSize = TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = if (sub != null) 24.sp else 28.sp, stepSize = 1.sp),
                                 modifier = Modifier.weight(1f)
                             )
                             GlassCircleButton(onClick = close, contentDescription = stringResource(R.string.cd_zakryt)) {
@@ -261,7 +268,7 @@ fun SettingsSheet(
                                 SectionNavItem(SettingsPage.ACCOUNT, state.accountName.ifEmpty { stringResource(R.string.settings_group_account) }, accountSummary(state), open == SettingsPage.ACCOUNT) { pageName = it.name }
                                 SectionNavItem(SettingsPage.PLAYBACK, stringResource(R.string.settings_section_playback), playbackSummary(state), open == SettingsPage.PLAYBACK) { pageName = it.name }
                                 SectionNavItem(SettingsPage.INTERFACE, stringResource(R.string.settings_section_interface), interfaceSummary(state), open == SettingsPage.INTERFACE) { pageName = it.name }
-                                SectionNavItem(SettingsPage.ABOUT, stringResource(R.string.settings_group_about), aboutSummary(), open == SettingsPage.ABOUT) { pageName = it.name }
+                                SectionNavItem(SettingsPage.ABOUT, stringResource(R.string.settings_group_about), aboutSummary(), open == SettingsPage.ABOUT || open.parent == SettingsPage.ABOUT) { pageName = it.name }
                             }
                             Spacer(Modifier.width(16.dp))
                             AnimatedContent(
@@ -276,7 +283,11 @@ fun SettingsSheet(
                                         .verticalScroll(rememberScrollState())
                                         .navigationBarsPadding()
                                         .padding(bottom = 20.dp)
-                                ) { SettingsPageContent(shown, state, pageActions) }
+                                ) {
+                                    // A sub-page in the pane has its own way back
+                                    shown.parent?.let { parent -> SubPageHeader(shown) { pageName = parent.name } }
+                                    SettingsPageContent(shown, state, pageActions) { pageName = it.name }
+                                }
                             }
                         }
                     } else {
@@ -299,7 +310,7 @@ fun SettingsSheet(
                                     .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
                             ) {
                                 if (shown == null) RootPage(state) { pageName = it.name }
-                                else SettingsPageContent(shown, state, pageActions)
+                                else SettingsPageContent(shown, state, pageActions) { pageName = it.name }
                             }
                         }
                     }
@@ -341,6 +352,7 @@ private val SettingsPage.titleRes: Int
         SettingsPage.PLAYBACK -> R.string.settings_section_playback
         SettingsPage.INTERFACE -> R.string.settings_section_interface
         SettingsPage.ABOUT -> R.string.settings_group_about
+        SettingsPage.SUPPORT -> R.string.support_title
     }
 
 private val SettingsPage.icon: ImageVector
@@ -349,6 +361,7 @@ private val SettingsPage.icon: ImageVector
         SettingsPage.PLAYBACK -> Icons.Rounded.PlayArrow
         SettingsPage.INTERFACE -> Icons.Rounded.Dashboard
         SettingsPage.ABOUT -> Icons.Rounded.Info
+        SettingsPage.SUPPORT -> Icons.Rounded.FavoriteBorder
     }
 
 /** The actions a page uses, with the ones that need the sheet (confirmations, closing) wired to it. */
@@ -464,12 +477,25 @@ private fun SectionNavItem(page: SettingsPage, title: String, summary: String, s
 }
 
 @Composable
-private fun ColumnScope.SettingsPageContent(page: SettingsPage, state: SettingsUiState, actions: SettingsActions) {
+private fun ColumnScope.SettingsPageContent(page: SettingsPage, state: SettingsUiState, actions: SettingsActions, onOpen: (SettingsPage) -> Unit) {
     when (page) {
         SettingsPage.ACCOUNT -> AccountPage(state, actions)
         SettingsPage.PLAYBACK -> PlaybackPage(state, actions)
         SettingsPage.INTERFACE -> InterfacePage(state, actions)
-        SettingsPage.ABOUT -> AboutPage(state, actions)
+        SettingsPage.ABOUT -> AboutPage(state, actions, onSupport = { onOpen(SettingsPage.SUPPORT) })
+        SettingsPage.SUPPORT -> SupportPage()
+    }
+}
+
+/** Lying, a sub-page's title in the pane with the way back to its page. */
+@Composable
+private fun SubPageHeader(page: SettingsPage, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(stringResource(page.titleRes), style = HiFiType.LargeTitle.copy(fontSize = 22.sp, lineHeight = 30.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -688,8 +714,9 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
 }
 
 @Composable
-private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActions) {
+private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActions, onSupport: () -> Unit = {}) {
     val uri = LocalUriHandler.current
+    SupportEntryRow(onSupport)
     SettingsGroup(stringResource(R.string.settings_g_version)) {
         SettingsRow(
             icon = Icons.Rounded.Info,
@@ -720,6 +747,7 @@ private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActio
         SettingsRow(icon = Icons.Rounded.Code, title = stringResource(R.string.settings_source_code), subtitle = "github.com/KorenskoyR/YandexMusicLite", onClick = { runCatching { uri.openUri(SOURCE_URL) } })
         SettingsRow(icon = Icons.Rounded.Description, title = stringResource(R.string.settings_license), value = "GPL-3.0", onClick = { runCatching { uri.openUri(LICENSE_URL) } })
     }
+    SupportDisclaimer(Modifier.padding(top = 18.dp))
 }
 
 @Composable
