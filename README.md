@@ -104,7 +104,7 @@
 >
 > 💡 **Полезно знать:** Канал с кратким описанием обновлений: https://t.me/YandexMusicLite
 >
-> 💡 **Полезно знать:** Чат https://t.me/+mxTNiyHpzPplZmEy
+> 💡 **Полезно знать:** Чат: https://t.me/+mxTNiyHpzPplZmEy
 ---
 
 ## 🛠 Сборка из исходников
