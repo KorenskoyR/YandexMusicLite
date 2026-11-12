@@ -129,6 +129,22 @@ class SyncedLyricsTest {
         assertEquals("no extra network calls on disk cache hit", 1, networkCalls)
     }
 
+    // --- Main-Safety ---
+
+    @Test
+    fun ofIsMainSafeAndExecutesFetchOnIoDispatcher() = runBlocking {
+        val lines = listOf(LyricLine(1_000L, "IO thread line"))
+        var fetchThread = ""
+        val lyrics = Lyrics(fetch = {
+            fetchThread = Thread.currentThread().name
+            LyricsAnswer.Synced(lines)
+        })
+
+        val answer = lyrics.of("999")
+        assertEquals(LyricsAnswer.Synced(lines), answer)
+        assertTrue("fetch must execute on Dispatchers.IO worker thread: $fetchThread", fetchThread.contains("DefaultDispatcher") || fetchThread.contains("IO"))
+    }
+
     // --- CanHave rules ---
 
     @Test

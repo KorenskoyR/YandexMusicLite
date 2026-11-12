@@ -9,6 +9,9 @@ import com.korenskoy.yandexmusic.data.network.LosslessSigner
 import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.di.UpdateClient
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
@@ -128,13 +131,13 @@ class Lyrics internal constructor(
     }
 
     /** The words of [trackId]; a failed answer is not kept, so the next look asks again. */
-    suspend fun of(trackId: String): LyricsAnswer {
+    suspend fun of(trackId: String): LyricsAnswer = withContext(Dispatchers.IO) {
         val cleanId = trackId.substringBefore(':').trim()
-        synchronized(known) { known[cleanId] }?.let { return it }
+        synchronized(known) { known[cleanId] }?.let { return@withContext it }
 
         readDisk(cleanId)?.let { diskAnswer ->
             synchronized(known) { known[cleanId] = diskAnswer }
-            return diskAnswer
+            return@withContext diskAnswer
         }
 
         val answer = fetch(cleanId)
@@ -142,7 +145,7 @@ class Lyrics internal constructor(
             synchronized(known) { known[cleanId] = answer }
             writeDisk(cleanId, answer)
         }
-        return answer
+        answer
     }
 
     /** Already known, without asking: the player opens with the words at once. */
@@ -204,29 +207,29 @@ class Lyrics internal constructor(
             api: YandexMusicApi,
             downloadClient: OkHttpClient,
             id: String
-        ): LyricsAnswer {
+        ): LyricsAnswer = withContext(Dispatchers.IO) {
             val cleanId = id.substringBefore(':').trim()
             var hadNetworkError = false
 
             when (val lrc = fetchSigned(api, downloadClient, cleanId, "LRC")) {
-                is FetchOutcome.Success -> return lrc.answer
+                is FetchOutcome.Success -> return@withContext lrc.answer
                 FetchOutcome.NetworkError -> hadNetworkError = true
                 FetchOutcome.Missing -> Unit
             }
 
             when (val text = fetchSigned(api, downloadClient, cleanId, "TEXT")) {
-                is FetchOutcome.Success -> return text.answer
+                is FetchOutcome.Success -> return@withContext text.answer
                 FetchOutcome.NetworkError -> hadNetworkError = true
                 FetchOutcome.Missing -> Unit
             }
 
             when (val supp = fetchSupplement(api, cleanId)) {
-                is FetchOutcome.Success -> return supp.answer
+                is FetchOutcome.Success -> return@withContext supp.answer
                 FetchOutcome.NetworkError -> hadNetworkError = true
                 FetchOutcome.Missing -> Unit
             }
 
-            return if (hadNetworkError) LyricsAnswer.Failed else LyricsAnswer.None
+            if (hadNetworkError) LyricsAnswer.Failed else LyricsAnswer.None
         }
 
         private suspend fun fetchSigned(
@@ -277,12 +280,19 @@ class Lyrics internal constructor(
             FetchOutcome.Missing
         }
 
-        private fun downloadFile(client: OkHttpClient, url: String): String? {
-            val httpUrl = url.toHttpUrlOrNull() ?: return null
+        private suspend fun downloadFile(client: OkHttpClient, url: String): String? = withContext(Dispatchers.IO) {
+            val httpUrl = url.toHttpUrlOrNull() ?: return@withContext null
             val request = Request.Builder().url(httpUrl).build()
-            return client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                response.body.string()
+            val call = client.newCall(request)
+            val job = coroutineContext[Job]
+            val handle = job?.invokeOnCompletion { call.cancel() }
+            try {
+                call.execute().use { response ->
+                    if (!response.isSuccessful) return@withContext null
+                    response.body.string()
+                }
+            } finally {
+                handle?.dispose()
             }
         }
     }
