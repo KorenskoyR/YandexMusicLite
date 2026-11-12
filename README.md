@@ -157,7 +157,7 @@ cd YandexMusicLite
 | ЮMoney — картой, через СБП или кошельком | USDT — сеть TRON (TRC20) |
 | :---: | :---: |
 | <a href="https://yoomoney.ru/fundraise/1LGNB9FPDB3.261112"><img src="docs/assets/support-yoomoney.svg" width="200" alt="QR-код сбора на ЮMoney" /></a> | <img src="docs/assets/support-usdt.svg" width="200" alt="QR-код адреса USDT в сети TRON" /> |
-| [Открыть страницу сбора](https://yoomoney.ru/fundraise/1LGNB9FPDB3.261112) | Адрес ниже — скопируйте его кнопкой справа |
+| [Открыть страницу сбора](https://yoomoney.ru/fundraise/1LGNB9FPDB3.261112) | Адрес ниже |
 
 </div>
 
