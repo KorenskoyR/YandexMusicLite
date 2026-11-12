@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.data.repository.RadioRules
 import android.os.SystemClock
 import com.korenskoy.yandexmusic.data.network.NetworkMonitor
 import com.korenskoy.yandexmusic.data.repository.PlayerRepositoryImpl
@@ -97,6 +98,10 @@ class PlaybackController @Inject constructor(
 
     private val _currentSource = MutableStateFlow(PlaylistSource.NONE)
     val currentSource: StateFlow<PlaylistSource> = _currentSource.asStateFlow()
+
+    /** The favourite stations: "next" and "previous" on the radio go round them (see [RadioRules.step]). */
+    private val favouriteStations: StateFlow<Set<String>> =
+        radioRepository.favoriteStationIds.stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     private val _currentPlaylist = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
     val currentPlaylist: StateFlow<List<TrackDetailsDto>> = _currentPlaylist.asStateFlow()
@@ -504,6 +509,7 @@ class PlaybackController @Inject constructor(
     fun playRadioStation(station: RadioStation) {
         val radioTrack = radioTrackFor(station)
         playTrack(radioTrack.idString, listOf(radioTrack), PlaylistSource.RADIO)
+        scope.launch { radioRepository.setLastStation(station.id) }
     }
 
     fun togglePlayPause() {
@@ -1546,10 +1552,7 @@ class PlaybackController @Inject constructor(
 
     private fun stepRadioStation(current: TrackDetailsDto, step: Int) {
         val stations = radioRepository.getBuiltinStations()
-        if (stations.isEmpty()) return
-        val index = stations.indexOfFirst { "radio_${it.id}" == current.idString }
-        if (index == -1) return
-        playRadioStation(stations[(index + step + stations.size) % stations.size])
+        RadioRules.step(stations, favouriteStations.value, current.idString.removePrefix("radio_"), step)?.let(::playRadioStation)
     }
 
     private fun stationFor(trackId: String): RadioStation? =

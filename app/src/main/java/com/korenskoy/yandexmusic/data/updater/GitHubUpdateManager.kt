@@ -138,16 +138,28 @@ class GitHubUpdateManager @Inject constructor(
     /**
      * Checks if the app is allowed to request package installations.
      */
-    fun canRequestPackageInstalls(): Boolean = context.packageManager.canRequestPackageInstalls()
+    fun canRequestPackageInstalls(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            // Android 7.1: one switch for all apps, "Неизвестные источники"
+            @Suppress("DEPRECATION")
+            Settings.Secure.getInt(context.contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS, 0) == 1
+        }
 
     /**
      * Opens Android system settings for allowing installation of unknown apps for this package.
      */
     fun openInstallPermissionSettings() {
         try {
-            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                data = "package:${context.packageName}".toUri()
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val settingsIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = "package:${context.packageName}".toUri()
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            } else {
+                // Android 7.1: the switch is in "Безопасность"
+                Intent(Settings.ACTION_SECURITY_SETTINGS).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
             }
             context.startActivity(settingsIntent)
         } catch (e: Exception) {
@@ -396,7 +408,7 @@ class GitHubUpdateManager @Inject constructor(
                 return Result.failure(Exception(context.getString(R.string.update_err_apk_missing)))
             }
 
-            // On Android 8.0+ check if installing from unknown sources is permitted
+            // Installing from this app must be allowed (Android 8+: for this app; 7.1: "Неизвестные источники")
             if (!canRequestPackageInstalls()) {
                 openInstallPermissionSettings()
                 return Result.failure(SecurityException(context.getString(R.string.update_err_allow_install)))

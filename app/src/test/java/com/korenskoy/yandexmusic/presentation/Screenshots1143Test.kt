@@ -39,6 +39,7 @@ import com.korenskoy.yandexmusic.presentation.main.components.TrackContextMenu
 import com.korenskoy.yandexmusic.presentation.main.components.WaveTuneSheet
 import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
 import com.korenskoy.yandexmusic.ui.theme.YandexMusicTheme
+import coil3.request.crossfade
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Before
 import org.junit.Rule
@@ -71,6 +72,16 @@ class Screenshots1143Test {
 
     @Before
     fun setUp() {
+        // Station logos (bundled) load at once and without the crossfade: the frozen frames always have them
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        coil3.SingletonImageLoader.setUnsafe(
+            coil3.ImageLoader.Builder(context)
+                .coroutineContext(kotlinx.coroutines.Dispatchers.Unconfined)
+                .components {
+                    add(coil3.intercept.Interceptor { chain -> chain.withRequest(chain.request.newBuilder().crossfade(false).build()).proceed() })
+                }
+                .build()
+        )
         TimeZone.setDefault(TimeZone.getTimeZone("Europe/Moscow"))
     }
 
@@ -203,6 +214,51 @@ class Screenshots1143Test {
     fun lovedShuffledInTheCar() {
         car(source = PlaylistSource.LIBRARY, shuffled = true)
         snap("v1143_car_liked_shuffled")
+    }
+
+    private fun carRadio(open: Boolean, portrait: Boolean = false) = show {
+        val stations = com.korenskoy.yandexmusic.data.repository.RadioRepository(androidx.test.core.app.ApplicationProvider.getApplicationContext()).getBuiltinStations()
+        val radio = com.korenskoy.yandexmusic.presentation.car.CarRadio(
+            stations, setOf(stations[0].id, stations[3].id, stations[8].id, stations[16].id, stations[20].id), onAir = stations[0].id, onPlay = {}, onToggleFavourite = {}
+        )
+        val station = TrackDetailsDto(
+            id = JsonPrimitive("radio_${stations[0].id}"), title = stations[0].name,
+            artists = listOf(ArtistDto(name = "Прямой эфир • ${stations[0].frequency}")), durationMs = 0, isRadio = true
+        )
+        CarScreen(
+            currentTrack = station, isPlaying = true, likedTrackIds = emptySet(), onPlayPauseClick = {}, onNextClick = {},
+            onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
+            onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = !portrait, source = PlaylistSource.RADIO,
+            isLiked = true, radio = radio, initialStationsOpen = open, onOpenSettings = {}, onVoiceSearch = {}
+        )
+    }
+
+    @Test
+    @Config(qualifiers = CAR)
+    fun theCarStationsFavourites() {
+        carRadio(open = true)
+        snap("v1144_car_stations")
+    }
+
+    @Test
+    @Config(qualifiers = CAR)
+    fun aFavouriteStationOnAir() {
+        carRadio(open = false)
+        snap("v1144_car_radio")
+    }
+
+    @Test
+    @Config(qualifiers = "w1920dp-h720dp-land-mdpi")
+    fun theFavouritesBesideTheRadioOnAFlatUnit() {
+        carRadio(open = false)
+        snap("v1144_car_radio_flat")
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h1280dp-port-mdpi")
+    fun theCarStationsStanding() {
+        carRadio(open = true, portrait = true)
+        snap("v1144_car_stations_standing")
     }
 
     @Test

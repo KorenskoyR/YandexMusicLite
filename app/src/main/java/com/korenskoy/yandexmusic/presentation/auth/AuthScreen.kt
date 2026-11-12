@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.auth
 
+import androidx.compose.ui.platform.LocalContext
 import com.korenskoy.yandexmusic.presentation.crash.CrashLogDialog
 import com.korenskoy.yandexmusic.presentation.crash.CrashLogViewModel
 import androidx.compose.foundation.layout.padding
@@ -46,7 +47,10 @@ fun AuthScreen(
     var isUrlLoaded by remember { mutableStateOf(false) }
     val isNetworkAvailable by viewModel.isNetworkAvailable.collectAsStateWithLifecycle()
     // Without WebView the login page cannot open (the Geely Galaxy L7 closed here): sign in by a code instead
-    var webViewAvailable by remember { mutableStateOf(WebViewSupport.isAvailable()) }
+    val context = LocalContext.current
+    var webView by remember { mutableStateOf(WebViewSupport.state(context)) }
+    val webViewAvailable = webView == WebViewSupport.State.Ready
+    val outdated = (webView as? WebViewSupport.State.Outdated)?.version
     var webViewStillMissing by remember { mutableStateOf(false) }
     val phoneState by viewModel.phone.collectAsStateWithLifecycle()
     val signedIn by viewModel.signedIn.collectAsStateWithLifecycle()
@@ -74,17 +78,18 @@ fun AuthScreen(
     } else if (!webViewAvailable) {
         if (viewModel.phoneSignInAvailable && phoneState != PhoneSignInState.Misconfigured) {
             LaunchedEffect(Unit) { viewModel.startPhoneSignIn() }
-            PhoneSignInScreen(phoneState, onNewCode = viewModel::newPhoneCode)
+            PhoneSignInScreen(phoneState, onNewCode = viewModel::newPhoneCode, outdatedWebView = outdated)
         } else {
             NoWebViewScreen(
+                outdatedWebView = outdated,
                 note = when {
                     webViewStillMissing -> stringResource(R.string.auth_webview_still_missing)
                     phoneState == PhoneSignInState.Misconfigured -> stringResource(R.string.auth_phone_misconfigured)
                     else -> null
                 },
                 onRetry = {
-                    webViewAvailable = WebViewSupport.isAvailable()
-                    webViewStillMissing = !webViewAvailable
+                    webView = WebViewSupport.state(context)
+                    webViewStillMissing = webView != WebViewSupport.State.Ready
                 }
             )
         }

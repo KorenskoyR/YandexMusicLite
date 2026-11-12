@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.os.Build
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.os.Bundle
@@ -107,7 +108,8 @@ class MusicService : MediaLibraryService() {
         AppPresence.playerServiceRunning = true
         audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
 
-        run {
+        // Channels exist from Android 8; on 7.1 the notification simply has none
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 PLAYBACK_CHANNEL_ID,
                 "Yandex Music Lite",
@@ -162,7 +164,16 @@ class MusicService : MediaLibraryService() {
 
     /** Returns true when playback may proceed (focus granted now or delayed). */
     private fun requestSystemAudioFocus(): Boolean {
-        val result = try {
+        val result = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            // Android 7.1: the request without attributes, the same listener (no delayed gain there)
+            try {
+                @Suppress("DEPRECATION")
+                audioManager?.requestAudioFocus(audioFocusChangeListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+            } catch (e: SecurityException) {
+                Log.e("MusicService", "Audio focus request failed", e)
+                null
+            }
+        } else try {
             val playbackAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -198,7 +209,12 @@ class MusicService : MediaLibraryService() {
     private fun abandonSystemAudioFocus() {
         hasAudioFocus = false
         try {
-            focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                @Suppress("DEPRECATION")
+                audioManager?.abandonAudioFocus(audioFocusChangeListener)
+            } else {
+                focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+            }
         } catch (e: Exception) {
             Log.e("MusicService", "Unexpected error", e)
         }

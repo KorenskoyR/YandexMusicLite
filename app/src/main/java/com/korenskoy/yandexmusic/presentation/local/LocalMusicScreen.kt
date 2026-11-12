@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.local
 
+import androidx.compose.runtime.mutableIntStateOf
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -266,7 +267,7 @@ fun LocalMusicPage(
     }
 
     var sourceName by rememberSaveable { mutableStateOf<String?>(null) }
-    var viewIndex by rememberSaveable { mutableStateOf(initialView.coerceIn(0, LocalView.entries.size - 1)) }
+    var viewIndex by rememberSaveable { mutableIntStateOf(initialView.coerceIn(0, LocalView.entries.size - 1)) }
     var sortName by rememberSaveable { mutableStateOf(LocalSort.RECENT.name) }
     var openedFolder by rememberSaveable { mutableStateOf<String?>(null) }
     var openedArtist by rememberSaveable { mutableStateOf<String?>(null) }

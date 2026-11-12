@@ -2,9 +2,20 @@
 <!--
    HTTPS only. The exceptions are radio stations that broadcast exclusively over plain HTTP
    (see RadioRepository); keep this list in sync when stations change.
+
+   Trusted: the system's certificates and, besides them, Let's Encrypt's two roots (ISRG Root X1, X2), which
+   Android 7.1.0 does not have (X1 came in 7.1.1, X2 only in 14): radio streams, station logos and other
+   sites on Let's Encrypt open on the oldest supported head units too. Files from letsencrypt.org/certs;
+   SHA-256: X1 96:BC:EC:06…:08:C6, X2 69:72:9B:8E…:14:70. The domain-config below inherits these anchors.
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+        </trust-anchors>
+    </base-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">hostingradio.ru</domain>
         <domain includeSubdomains="true">cdnvideo.ru</domain>

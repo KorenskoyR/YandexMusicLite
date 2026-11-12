@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic
 
+import androidx.test.platform.app.InstrumentationRegistry
+import android.content.res.Configuration
+import android.os.SystemClock
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,11 +80,15 @@ class StepBackNavigationInstrumentedTest {
         compose.onNodeWithText("Аккаунты").assertDoesNotExist()
         compose.onNodeWithText("Профиль при запуске").assertExists()
 
-        // Back steps out of the page to the root list, then closes the settings
+        // Standing, Back steps out of the page to the root list. Lying down the list stands beside the page
+        // (two panes): there is no step back to it, and Back closes the settings
         Espresso.pressBack()
         compose.waitForIdle()
         compose.onNodeWithText("Профиль при запуске").assertDoesNotExist()
-        compose.onNodeWithText("Воспроизведение").assertExists()
+        val lying = InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration.orientation ==
+            Configuration.ORIENTATION_LANDSCAPE
+        if (lying) compose.onNodeWithText("Воспроизведение").assertDoesNotExist()
+        else compose.onNodeWithText("Воспроизведение").assertExists()
     }
 
     @Test
@@ -109,7 +117,9 @@ class StepBackNavigationInstrumentedTest {
         compose.onNodeWithText("В дорогу").assertExists()
         assertEquals(0, dismissed)
 
-        // Back from the picker: the track's actions again, the menu stays
+        // Back from the picker: the track's actions again, the menu stays. Android 7.1 gives the sheet its focus
+        // back a moment (under 150 ms) after the closed dialog, and a Back pressed at once goes past it
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) SystemClock.sleep(500)
         Espresso.pressBack()
         compose.waitForIdle()
         compose.onNodeWithText("В дорогу").assertDoesNotExist()

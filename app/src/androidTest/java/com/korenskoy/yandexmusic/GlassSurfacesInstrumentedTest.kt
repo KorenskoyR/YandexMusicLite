@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic
 
+import androidx.test.filters.SdkSuppress
+import android.os.Build
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
@@ -47,6 +49,8 @@ import kotlin.math.abs
  * along the bottom edge. Each surface sits on a flat background here, so inside the shape there must be
  * exactly the glass fill composited over that background, at the top edge as well as at the bottom.
  */
+// Compose captures a node through PixelCopy, which Android 7.1 does not have
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 @RunWith(AndroidJUnit4::class)
 class GlassSurfacesInstrumentedTest {
 

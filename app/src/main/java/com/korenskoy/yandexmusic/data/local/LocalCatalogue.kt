@@ -46,7 +46,7 @@ internal class LocalCatalogue(private val context: Context) {
                 add(MediaStore.Audio.Media.VOLUME_NAME)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) add(MediaStore.Audio.Media.BITRATE)
-            // A path: the folder on Android 8–9, the folder's picture where Android still lets read it
+            // A path: the folder on Android 7.1–9, the folder's picture where Android still lets read it
             @Suppress("DEPRECATION")
             add(MediaStore.Audio.Media.DATA)
         }.toTypedArray()
@@ -139,7 +139,7 @@ internal class LocalCatalogue(private val context: Context) {
             }
         }
 
-        /** The volume of a file on Android 8–9: "primary", or the card's id ("1234-abcd"). */
+        /** The volume of a file on Android 7.1–9: "primary", or the card's id ("1234-abcd"). */
         fun volumeOfPath(path: String?): String? {
             val root = rootOf(path) ?: return null
             return if (root == roots.first().first) "primary" else root.substringAfterLast('/').lowercase()

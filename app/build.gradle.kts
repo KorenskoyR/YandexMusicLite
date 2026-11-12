@@ -56,7 +56,7 @@ android {
 
     defaultConfig {
         applicationId = "YandexMusicLite.KorenskoyR"
-        minSdk = 26
+        minSdk = 25
         targetSdk = 36
         versionCode = 54
         versionName = "1.14.4"

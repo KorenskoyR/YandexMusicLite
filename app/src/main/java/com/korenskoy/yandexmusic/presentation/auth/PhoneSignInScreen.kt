@@ -207,7 +207,7 @@ private fun Step(m: SignInMetrics, number: Int, title: String, hint: String?) {
 
 /** "Вход с телефона": the code to enter at ya.ru/device, a QR code to the page, and the wait. */
 @Composable
-fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit) {
+fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit, outdatedWebView: Int? = null) {
     val code = (state as? PhoneSignInState.Waiting)?.code
     val page = code?.verificationUrl ?: "https://ya.ru/device"
     // The address never breaks across lines: word joiners after its dots and slashes
@@ -215,7 +215,7 @@ fun PhoneSignInScreen(state: PhoneSignInState, onNewCode: () -> Unit) {
     val minutes = ((code?.expiresInSeconds ?: 300) + 59) / 60
     SignInPage(
         title = stringResource(R.string.auth_phone_title),
-        why = stringResource(R.string.auth_phone_why),
+        why = if (outdatedWebView != null) stringResource(R.string.auth_phone_why_old, outdatedWebView) else stringResource(R.string.auth_phone_why),
         steps = { m ->
             Step(m, 1, stringResource(R.string.auth_phone_step1, shownPage), stringResource(R.string.auth_phone_step1_hint_qr))
             Spacer(Modifier.height(m.stepGap))
@@ -397,14 +397,17 @@ private fun SignInStatus(state: PhoneSignInState, m: SignInMetrics) {
  * look again once it is.
  */
 @Composable
-fun NoWebViewScreen(note: String?, onRetry: () -> Unit) {
+fun NoWebViewScreen(note: String?, onRetry: () -> Unit, outdatedWebView: Int? = null) {
     SignInPage(
         title = stringResource(R.string.auth_webview_title),
-        why = stringResource(R.string.auth_webview_why),
+        why = if (outdatedWebView != null) stringResource(R.string.auth_webview_why_old, outdatedWebView) else stringResource(R.string.auth_webview_why),
         steps = { m ->
             Step(m, 1, stringResource(R.string.auth_webview_step1), stringResource(R.string.auth_webview_step1_hint))
             Spacer(Modifier.height(m.stepGap))
-            Step(m, 2, stringResource(R.string.auth_webview_step2), stringResource(R.string.auth_webview_step2_hint))
+            Step(
+                m, 2, stringResource(R.string.auth_webview_step2),
+                stringResource(if (outdatedWebView != null) R.string.auth_webview_step2_hint_old else R.string.auth_webview_step2_hint)
+            )
             Spacer(Modifier.height(m.stepGap))
             Step(m, 3, stringResource(R.string.auth_webview_step3), stringResource(R.string.auth_webview_step3_hint))
         },

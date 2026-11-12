@@ -43,6 +43,8 @@ local.properties
 release.keystore
 *.key
 *.pem
+# Public root certificates the app trusts (no keys)
+!app/src/main/res/raw/isrg_root_x*.pem
 
 # Backups
 backups/

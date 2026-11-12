@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.download
 
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.NotificationChannelCompat
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -68,8 +70,10 @@ class CollectionDownloadWorker(
 
     private fun foregroundInfo(title: String, done: Int, total: Int): ForegroundInfo {
         val context = applicationContext
-        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, context.getString(R.string.download_channel_name), NotificationManager.IMPORTANCE_LOW)
+        NotificationManagerCompat.from(context).createNotificationChannel(
+            NotificationChannelCompat.Builder(CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_LOW)
+                .setName(context.getString(R.string.download_channel_name))
+                .build()
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)

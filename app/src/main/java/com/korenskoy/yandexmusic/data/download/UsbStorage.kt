@@ -68,7 +68,7 @@ class UsbStorage(
         val tree = folder.value ?: return null
         return runCatching {
             val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-            resolver.query(doc, arrayOf(Document.COLUMN_DOCUMENT_ID), null as android.os.Bundle?, null)?.use { if (it.moveToFirst()) doc else null }
+            queryDocuments(doc, arrayOf(Document.COLUMN_DOCUMENT_ID))?.use { if (it.moveToFirst()) doc else null }
         }.getOrNull()
     }
 
@@ -84,7 +84,7 @@ class UsbStorage(
     fun label(): String? {
         val doc = folderDocument() ?: return null
         val name = runCatching {
-            resolver.query(doc, arrayOf(Document.COLUMN_DISPLAY_NAME), null as android.os.Bundle?, null)?.use {
+            queryDocuments(doc, arrayOf(Document.COLUMN_DISPLAY_NAME))?.use {
                 if (it.moveToFirst()) it.getString(it.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)) else null
             }
         }.getOrNull()
@@ -120,7 +120,7 @@ class UsbStorage(
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getDocumentId(parent))
         val found = mutableMapOf<String, Entry>()
         runCatching {
-            resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE), null as android.os.Bundle?, null)?.use { c ->
+            queryDocuments(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE))?.use { c ->
                 // By name: a provider may give the columns in its own order
                 val idColumn = c.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
                 val nameColumn = c.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
@@ -176,7 +176,7 @@ class UsbStorage(
         val tree = folder.value ?: return null
         val treeId = runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull() ?: return null
         return runCatching {
-            resolver.query(DocumentsContract.buildRootsUri(tree.authority), arrayOf(Root.COLUMN_DOCUMENT_ID, column), null as android.os.Bundle?, null)?.use { c ->
+            queryDocuments(DocumentsContract.buildRootsUri(tree.authority), arrayOf(Root.COLUMN_DOCUMENT_ID, column))?.use { c ->
                 val docColumn = c.getColumnIndexOrThrow(Root.COLUMN_DOCUMENT_ID)
                 val wanted = c.getColumnIndex(column).takeIf { it >= 0 } ?: return@use null
                 while (c.moveToNext()) {
@@ -194,8 +194,15 @@ class UsbStorage(
         }.getOrNull()
     }
 
+    /**
+     * A documents provider's rows. From Android 8 in the Bundle form, as the providers expect it; Android 7.1 has
+     * only the old form, which its providers take.
+     */
+    private fun queryDocuments(uri: Uri, projection: Array<String>): Cursor? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) resolver.query(uri, projection, null as android.os.Bundle?, null)
+        else resolver.query(uri, projection, null, null, null)
+
     companion object {
-        // Queries go in the Bundle form (Android 8+): documents providers refuse the old one
         private const val TAG = "UsbStorage"
         private const val MIME = "application/octet-stream"
         private const val PART = ".part"

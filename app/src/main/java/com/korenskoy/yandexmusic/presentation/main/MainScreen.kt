@@ -284,7 +284,8 @@ fun MainScreen(
                         } else when (tab) {
                             MainTab.HOME -> HomeTab(
                                 viewModel, now, progress, isLandscape, contentBottom,
-                                onOpenPlayer = if (currentTrack != null && !showMini) openPlayer else null
+                                onOpenPlayer = if (currentTrack != null && !showMini) openPlayer else null,
+                                miniShown = showMini
                             )
                             MainTab.SEARCH -> SearchTab(viewModel, searchVm, catalogVm, now)
                             MainTab.LIBRARY -> LibraryTab(

@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic
 
+import android.content.res.Configuration
+import org.junit.Assume.assumeTrue
+import org.junit.Before
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.performTouchInput
 import androidx.activity.ComponentActivity
@@ -31,6 +34,13 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class FullPlayerInstrumentedTest {
+
+    /** The player standing: the "Далее" plate under the controls and room for a long pull are there only so. */
+    @Before
+    fun standing() {
+        val configuration = InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration
+        assumeTrue("the standing player", configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
+    }
 
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()

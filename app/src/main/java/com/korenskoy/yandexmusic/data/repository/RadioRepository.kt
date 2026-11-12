@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -25,6 +26,16 @@ class RadioRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val FAVORITES_KEY = stringSetPreferencesKey("favorite_station_ids")
+    private val LAST_KEY = stringPreferencesKey("last_station_id")
+
+    /** The station that played last: «Радио» in the car starts it again. */
+    val lastStationId: Flow<String?> = context.radioDataStore.data
+        .catch { exception -> if (exception is IOException) emit(emptyPreferences()) else throw exception }
+        .map { prefs -> prefs[LAST_KEY] }
+
+    suspend fun setLastStation(stationId: String) {
+        context.radioDataStore.edit { prefs -> prefs[LAST_KEY] = stationId }
+    }
 
     val favoriteStationIds: Flow<Set<String>> = context.radioDataStore.data
         .catch { exception ->
@@ -81,7 +92,7 @@ class RadioRepository @Inject constructor(
             RadioStation("monte_carlo", "Радио Monte Carlo", "102.1 FM", "https://montecarlo.hostingradio.ru/montecarlo96.aacp", "https://upload.wikimedia.org/wikipedia/ru/c/ca/Monte_Carlo_logo.png", RadioCategory.RELAX, iconRes = R.drawable.radio_monte_carlo, brandColorStart = 0xFF334155, brandColorEnd = 0xFF94A3B8),
             RadioStation("radio_jazz", "Радио Jazz", "89.1 FM", "http://nashe.streamr.ru/jazz-128.mp3", "", RadioCategory.RELAX, iconRes = R.drawable.radio_radio_jazz, brandColorStart = 0xFF451A03, brandColorEnd = 0xFFD97706),
             RadioStation("radio_kultura", "Радио Культура", "91.6 FM", "http://icecast-vgtrk.cdnvideo.ru/kulturafm_mp3_192kbps", "", RadioCategory.RELAX, iconRes = R.drawable.radio_radio_kultura, brandColorStart = 0xFF581C87, brandColorEnd = 0xFF9333EA),
-            
+
             // TALK
             RadioStation("comedy_radio", "Comedy Radio", "102.5 FM", "http://23.105.238.4/gpm-comedyradio495.aacp", "https://upload.wikimedia.org/wikipedia/ru/f/f6/Comedy_Radio_logo.png", RadioCategory.TALK, iconRes = R.drawable.radio_comedy_radio, brandColorStart = 0xFF991B1B, brandColorEnd = 0xFFEAB308),
             RadioStation("vesti_fm", "Вести FM", "97.6 FM", "https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_192kbps", "", RadioCategory.TALK, iconRes = R.drawable.radio_vesti_fm, brandColorStart = 0xFF1E3A8A, brandColorEnd = 0xFF3B82F6),

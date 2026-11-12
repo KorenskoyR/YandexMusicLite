@@ -207,7 +207,10 @@ fun CarScreen(
     initialLyricsOpen: Boolean = false,
     /** "Любимое" plays shuffled; [onToggleShuffle] turns it on and off. */
     shuffled: Boolean = false,
-    onToggleShuffle: () -> Unit = {}
+    onToggleShuffle: () -> Unit = {},
+    /** The stations, the favourites, and what a tap on them does; null — no «Станции». */
+    radio: CarRadio? = null,
+    initialStationsOpen: Boolean = false
 ) {
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
@@ -220,8 +223,10 @@ fun CarScreen(
     var lyricsOpen by rememberSaveable(currentTrack?.idString) { mutableStateOf(initialLyricsOpen) }
     LaunchedEffect(lyrics?.offered) { if (lyrics?.offered != true) lyricsOpen = false }
     BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
+    var stationsOpen by rememberSaveable { mutableStateOf(initialStationsOpen) }
+    BackHandler(enabled = stationsOpen) { stationsOpen = false }
     // A panel over the cover column: the column fades away under it
-    val panelOpen = tuneOpen || queueOpen || downloadsOpen || lyricsOpen
+    val panelOpen = tuneOpen || queueOpen || downloadsOpen || lyricsOpen || stationsOpen
     // The music left the device (the drive was taken out): the choice goes with it
     LaunchedEffect(deviceMusic?.opensPanel) { if (deviceMusic?.opensPanel != true) downloadsOpen = false }
     BackHandler(onBack = onExit)
@@ -239,6 +244,9 @@ fun CarScreen(
     val withQueue = underCover == CarUnderCover.QUEUE
     // A station has no queue: the panel never stays open over one
     LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
+    // A station leaves «Станции» open only while the radio plays
+    LaunchedEffect(isRadio) { if (!isRadio) stationsOpen = false }
+    val openStations = { tuneOpen = false; queueOpen = false; downloadsOpen = false; lyricsOpen = false; stationsOpen = true }
     val openQueue = { tuneOpen = false; downloadsOpen = false; lyricsOpen = false; queueOpen = true }
     val openTune = { queueOpen = false; downloadsOpen = false; lyricsOpen = false; tuneOpen = true }
     val active = carSourceOf(source, isRadio)
@@ -253,7 +261,8 @@ fun CarScreen(
     } ?: when (active) {
         CarSource.WAVE -> stringResource(R.string.car_source_wave)
         CarSource.LIKED -> if (shuffled) stringResource(R.string.car_liked_shuffled) else stringResource(R.string.library_liked)
-        CarSource.RADIO -> stringResource(R.string.car_source_radio)
+        CarSource.RADIO -> if (radio?.onAir != null && radio.onAir in radio.favourites) stringResource(R.string.car_source_radio_favourites)
+        else stringResource(R.string.car_source_radio)
         CarSource.HITS -> stringResource(R.string.car_source_hits)
         CarSource.DOWNLOADED -> stringResource(R.string.local_title)
         else -> ""
@@ -472,7 +481,9 @@ fun CarScreen(
                     }
                     val middle: @Composable () -> Unit = {
                         Column(Modifier.width(u(wide.middle)).fillMaxHeight()) {
-                            if (isRadio) {
+                            if (isRadio && radio != null) {
+                                CarStationsList(u, radio, Modifier.weight(1f).fillMaxWidth())
+                            } else if (isRadio) {
                                 Spacer(Modifier.weight(1f))
                             } else {
                                 CarNextList(
@@ -510,7 +521,22 @@ fun CarScreen(
                         // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
                         val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
                         Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
-                            if (isRadio) {
+                            if (isRadio && radio != null) {
+                                Column(
+                                    Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(u(18f), Alignment.CenterVertically)
+                                ) {
+                                    CarCover(
+                                        u, currentTrack,
+                                        Modifier
+                                            .weight(1f, fill = false)
+                                            .sizeIn(maxWidth = u(500f), maxHeight = u(500f))
+                                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                                    )
+                                    StationsPill(u, radio.favourites.size, onClick = openStations)
+                                }
+                            } else if (isRadio) {
                                 CarCover(u, currentTrack, Modifier.size(u(500f)))
                             } else if (withQueue) {
                                 Column(
@@ -564,6 +590,7 @@ fun CarScreen(
                             queueOpen -> 2
                             downloadsOpen -> 3
                             lyricsOpen -> 4
+                            stationsOpen -> 5
                             else -> 0
                         },
                         modifier = Modifier.widthIn(max = u(640f)).fillMaxWidth(),
@@ -576,6 +603,7 @@ fun CarScreen(
                                 // Taller than the queue: two big rows and the folders under them
                                 3 -> downloadsPanel(Modifier.fillMaxWidth().height(u(470f)))
                                 4 -> lyricsPanel(Modifier.fillMaxWidth().height(u(400f)))
+                                5 -> radio?.let { CarStationsPanel(u, it, Modifier.fillMaxWidth().height(u(470f)), onClose = { stationsOpen = false }) }
                                 else -> CarCover(u, currentTrack, Modifier.size(u(if (isRadio || withQueue) 400f else 310f)))
                             }
                         }
@@ -592,6 +620,7 @@ fun CarScreen(
                         modifier = Modifier.widthIn(max = u(560f)).fillMaxWidth().weight(1f),
                         compactDock = true,
                         beforeDock = when {
+                            isRadio && radio != null && !stationsOpen -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { StationsPill(u, radio.favourites.size, onClick = openStations) } } }
                             isRadio || tuneOpen || downloadsOpen -> null
                             withQueue -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { QueuePill(u, queueCount, onClick = openQueue) } } }
                             else -> { { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick, onCaptionClick = openQueue) } }
@@ -633,6 +662,26 @@ fun CarScreen(
                         .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
                         .width(panelWidth)
                         .fillMaxHeight()
+                )
+            }
+        }
+        // «Станции» lying down: over the cover column, the whole height of it
+        if (stationsOpen && isLandscape && radio != null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { stationsOpen = false }
+            )
+            BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+                val panelWidth = androidx.compose.ui.unit.min(u(500f), maxWidth - u(780f)).coerceAtLeast(u(400f))
+                CarStationsPanel(
+                    u, radio,
+                    Modifier
+                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                        .padding(top = u(96f), start = u(48f), end = u(40f), bottom = u(28f))
+                        .width(panelWidth)
+                        .fillMaxHeight(),
+                    onClose = { stationsOpen = false }
                 )
             }
         }

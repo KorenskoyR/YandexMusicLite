@@ -630,4 +630,19 @@
     <string name="car_shuffle">Перемешать</string>
     <string name="car_shuffled">Перемешано</string>
     <string name="car_liked_shuffled">Любимое · перемешано</string>
+    <string name="auth_phone_why_old">Компонент Android System WebView на этом устройстве устарел (версия %1$d), и окно входа Яндекса в нём не работает. Подтвердите вход на телефоне — это займёт минуту.</string>
+    <string name="auth_webview_why_old">Окно входа Яндекса открывается через системный компонент Android System WebView, а на этом устройстве он устарел (версия %1$d) и страницу входа не показывает.</string>
+    <string name="auth_webview_step2_hint_old">Обновите его из магазина приложений или установите новую версию</string>
+    <string name="car_stations">Станции</string>
+    <string name="car_stations_fav_one">%d избранная</string>
+    <string name="car_stations_fav_few">%d избранных</string>
+    <string name="car_stations_fav_many">%d избранных</string>
+    <string name="car_stations_favourites">Избранные · %1$d</string>
+    <string name="car_stations_all">Все · %1$d</string>
+    <string name="car_stations_none">Нажмите ♡ у станции — и она будет здесь</string>
+    <string name="car_station_play_cd">Включить %1$s</string>
+    <string name="car_station_on_air">В ЭФИРЕ</string>
+    <string name="car_station_favourite_cd">В избранное: %1$s</string>
+    <string name="car_station_unfavourite_cd">Убрать из избранного: %1$s</string>
+    <string name="car_source_radio_favourites">Радио · избранные</string>
 </resources>

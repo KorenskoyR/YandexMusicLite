@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.car.CarRadio
 import com.korenskoy.yandexmusic.presentation.local.LocalMusicUi
 import com.korenskoy.yandexmusic.data.player.VoicePhrase
 import com.korenskoy.yandexmusic.presentation.voice.rememberVoiceInput
@@ -58,6 +59,15 @@ fun upcomingOf(queue: List<TrackDetailsDto>, currentId: String?, limit: Int = 10
     return if (index < 0) emptyList() else queue.drop(index + 1).filterNot(passOver).take(limit)
 }
 
+/**
+ * The room the wave page leaves at the bottom. Standing, the playing wave without the mini-player needs only the
+ * tab bar's; with the mini-player (the setting) it needs the room every page leaves for both. Pure; unit-tested.
+ */
+fun waveContentBottom(waveActive: Boolean, isLandscape: Boolean, miniShown: Boolean, contentBottom: Dp): Dp =
+    if (waveActive && !isLandscape && !miniShown) WAVE_ALONE_BOTTOM else contentBottom
+
+private val WAVE_ALONE_BOTTOM = 100.dp
+
 @Composable
 internal fun HomeTab(
     viewModel: MainViewModel,
@@ -65,7 +75,9 @@ internal fun HomeTab(
     progress: () -> Long,
     isLandscape: Boolean,
     contentBottom: Dp,
-    onOpenPlayer: (() -> Unit)?
+    onOpenPlayer: (() -> Unit)?,
+    /** The mini-player shows over this page (the "Мини-плеер на «Моей волне»" setting). */
+    miniShown: Boolean = false
 ) {
     val queue by viewModel.currentPlaylist.collectAsStateWithLifecycle()
     val wavePreview by viewModel.wavePreview.collectAsStateWithLifecycle()
@@ -99,7 +111,7 @@ internal fun HomeTab(
             if (waveActive) viewModel.playTrack(it.idString, queue, PlaylistSource.VIBE)
             else viewModel.playWaveFrom(it.idString)
         },
-        contentBottom = if (waveActive && !isLandscape) 100.dp else contentBottom,
+        contentBottom = waveContentBottom(waveActive, isLandscape, miniShown, contentBottom),
         tuning = tuning,
         trackWaveSeed = seed?.takeIf { waveActive },
         onTune = { tuneOpen = true },
@@ -331,6 +343,12 @@ internal fun CarTab(
     val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
     val deviceMusic by viewModel.carDeviceMusic.collectAsStateWithLifecycle()
     val shuffled by viewModel.shuffled.collectAsStateWithLifecycle()
+    val stations by radioVm.stations.collectAsStateWithLifecycle()
+    val favouriteStations by radioVm.favoriteStationIds.collectAsStateWithLifecycle()
+    val onAir = now.track?.takeIf { it.isRadio }?.idString?.removePrefix("radio_")
+    val radio = remember(stations, favouriteStations, onAir) {
+        CarRadio(stations, favouriteStations, onAir, onPlay = radioVm::play, onToggleFavourite = radioVm::toggleFavorite)
+    }
     // Said in the car, played at once: no list to pick from while driving
     val voice = rememberVoiceInput { phrase -> viewModel.playByVoice(phrase) }
     val track = now.track
@@ -376,6 +394,9 @@ internal fun CarTab(
         onBackToMyWave = viewModel::returnToMyWave,
         shuffled = shuffled,
         onToggleShuffle = viewModel::toggleShuffle,
+        radio = radio,
+        // A station's heart is its place among the favourites, not a like
+        isLiked = if (onAir != null) onAir in favouriteStations else now.trackId?.let { it in now.likedTrackIds } == true,
         onOpenSettings = { showSettings = true },
         deviceMusic = deviceMusic,
         onPlayDevice = { key -> viewModel.playDevice(key) },

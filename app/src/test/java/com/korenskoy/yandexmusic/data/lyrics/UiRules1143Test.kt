@@ -114,6 +114,15 @@ class UiRules1143Test {
         assertTrue(MiniOnWave.LANDSCAPE.shows(true) && !MiniOnWave.LANDSCAPE.shows(false))
     }
 
+    @Test
+    fun theWavePageLeavesRoomForTheMiniPlayerWhenItShows() {
+        val all = 168.dp
+        assertEquals("standing, the wave alone: only the tab bar", 100.dp, com.korenskoy.yandexmusic.presentation.main.waveContentBottom(true, false, false, all))
+        assertEquals("standing with the mini-player («Всегда», «Вертикально»)", all, com.korenskoy.yandexmusic.presentation.main.waveContentBottom(true, false, true, all))
+        assertEquals("lying: the dock's room", all, com.korenskoy.yandexmusic.presentation.main.waveContentBottom(true, true, false, all))
+        assertEquals("another source plays: as every page", all, com.korenskoy.yandexmusic.presentation.main.waveContentBottom(false, false, true, all))
+    }
+
     // --- Side panels ---
 
     @Test

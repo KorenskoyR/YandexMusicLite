@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
+import kotlinx.coroutines.flow.first
+import com.korenskoy.yandexmusic.data.repository.RadioRules
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.player.PlaybackController
@@ -28,9 +30,12 @@ class RadioViewModel @Inject constructor(
 
     fun play(station: RadioStation) = playbackController.playRadioStation(station)
 
-    /** "Радио" in the car: the first station of the list. */
+    /** "Радио" in the car: the station that played last, else the first favourite, else the first of the list. */
     fun playFirst() {
-        stations.value.firstOrNull()?.let { play(it) }
+        viewModelScope.launch {
+            val start = RadioRules.start(stations.value, radioRepository.favoriteStationIds.first(), radioRepository.lastStationId.first())
+            start?.let { play(it) }
+        }
     }
 
     fun toggleFavorite(stationId: String) {

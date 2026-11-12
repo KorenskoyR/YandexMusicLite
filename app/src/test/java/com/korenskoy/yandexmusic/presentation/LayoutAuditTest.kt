@@ -1,9 +1,16 @@
 package com.korenskoy.yandexmusic.presentation
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
+import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBottomBar
+import com.korenskoy.yandexmusic.presentation.main.waveContentBottom
 import android.app.Application
 import android.os.Looper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -29,6 +36,7 @@ import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
 import com.korenskoy.yandexmusic.domain.model.RadioCategory
 import com.korenskoy.yandexmusic.domain.model.WaveTuning
+import com.korenskoy.yandexmusic.presentation.car.CarRadio
 import com.korenskoy.yandexmusic.presentation.car.CarScreen
 import com.korenskoy.yandexmusic.presentation.car.LocalCarClock
 import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
@@ -169,15 +177,24 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         tune: Boolean = false,
         queue: Boolean = false,
         lyricsOpen: Boolean = false,
-        shuffled: Boolean = false
+        shuffled: Boolean = false,
+        onRadio: Boolean = false,
+        stationsOpen: Boolean = false
     ) = show {
+        val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
+        val radio = CarRadio(stations, setOf(stations[0].id, stations[3].id, stations[9].id, stations[14].id), onAir = stations[0].id, onPlay = {}, onToggleFavourite = {})
+        val station = TrackDetailsDto(
+            id = JsonPrimitive("radio_${stations[0].id}"), title = stations[0].name,
+            artists = listOf(ArtistDto(name = "Прямой эфир • ${stations[0].frequency}")), durationMs = 0, isRadio = true
+        )
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         CarScreen(
-            currentTrack = tracks[1], isPlaying = true, likedTrackIds = emptySet(), onPlayPauseClick = {}, onNextClick = {},
+            currentTrack = if (onRadio) station else tracks[1], isPlaying = true, likedTrackIds = emptySet(), onPlayPauseClick = {}, onNextClick = {},
             onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
             onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = landscape, progress = { 82_000L }, durationMs = 215_000,
             upcoming = tracks.drop(2), source = source, initialTuneOpen = tune, initialQueueOpen = queue, initialLyricsOpen = lyricsOpen,
-            shuffled = shuffled, onOpenSettings = {}, onVoiceSearch = {}, waveTuning = WaveTuning()
+            shuffled = shuffled, onOpenSettings = {}, onVoiceSearch = {}, waveTuning = WaveTuning(),
+            radio = radio, initialStationsOpen = stationsOpen, isLiked = onRadio
         )
     }
 
@@ -187,6 +204,29 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "wave_paused" -> wave(playing = false)
             "wave_playing" -> wave(playing = true)
             "wave_tune" -> show { WaveTuneSheet(WaveTuning(), onChange = {}, onDismiss = {}) }
+            // The playing wave with the mini-player shown over it ("Всегда"), laid out as MainScreen does standing
+            "wave_mini" -> show {
+                val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                Box(Modifier.fillMaxSize()) {
+                    HomeScreen(
+                        waveTrack = tracks[0], isPlaying = true, isLoading = false, isLiked = true, progress = { 70_000L },
+                        shelf = waveShelfOf(true, tracks.drop(1), emptyList()), shimmer = false,
+                        onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = null, onShelfClick = {},
+                        contentBottom = waveContentBottom(waveActive = true, isLandscape = landscape, miniShown = true,
+                            contentBottom = if (landscape) DockClearance else 168.dp)
+                    )
+                    if (!landscape) {
+                        androidx.compose.foundation.layout.Column(
+                            Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 8.dp).fillMaxWidth(),
+                            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                        ) {
+                            MiniPlayer(track = tracks[1], isPlaying = true, progress = { 61_000L }, onPlayPauseClick = {}, onNextClick = {}, onClick = {}, onDismiss = {}, onPrevClick = {})
+                            androidx.compose.foundation.layout.Spacer(Modifier.height(10.dp))
+                            FloatingGlassBottomBar(currentRoute = "home", onNavigate = {})
+                        }
+                    }
+                }
+            }
             "player" -> player(lyricsOpen = false)
             "player_lyrics" -> player(lyricsOpen = true)
             "track_menu" -> show {
@@ -239,6 +279,8 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "car_queue" -> car(queue = true)
             "car_lyrics" -> car(lyricsOpen = true)
             "car_liked" -> car(source = PlaylistSource.LIBRARY, shuffled = true)
+            "car_radio" -> car(source = PlaylistSource.RADIO, onRadio = true)
+            "car_stations" -> car(source = PlaylistSource.RADIO, onRadio = true, stationsOpen = true)
             else -> error(screen)
         }
         keepPictures()
@@ -268,9 +310,9 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         private const val FIXED_TIME = 1_792_567_800_000L
 
         private val SCREENS = listOf(
-            "wave_paused", "wave_playing", "wave_tune", "player", "player_lyrics", "track_menu", "mini_player",
+            "wave_paused", "wave_playing", "wave_mini", "wave_tune", "player", "player_lyrics", "track_menu", "mini_player",
             "settings_interface", "settings_playback", "library", "search", "radio",
-            "car", "car_tune", "car_queue", "car_lyrics", "car_liked"
+            "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations"
         )
 
         /** Phones, standing units (the Geely's 960×1280), flat units (the Monjaro's 1280×480, 1920×720), old 800×480. */

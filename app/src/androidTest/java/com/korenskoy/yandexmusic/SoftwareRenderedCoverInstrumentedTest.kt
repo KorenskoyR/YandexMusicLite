@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic
 
+import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -35,7 +36,8 @@ class SoftwareRenderedCoverInstrumentedTest {
         val result = SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(file).build())
         assertTrue("The cover did not load", result is SuccessResult)
         val bitmap = (result as SuccessResult).image.toBitmap()
-        assertNotEquals(Bitmap.Config.HARDWARE, bitmap.config)
+        // Hardware bitmaps exist from Android 8; on 7.1 every bitmap is a plain one
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) assertNotEquals(Bitmap.Config.HARDWARE, bitmap.config)
 
         // What ViewRootImpl.drawSoftware does with it: throws for a hardware bitmap
         val target = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)

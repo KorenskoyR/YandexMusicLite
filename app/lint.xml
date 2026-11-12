@@ -6,7 +6,7 @@
     <issue id="GradleDependency" severity="ignore" />
     <issue id="NewerVersionAvailable" severity="ignore" />
     <issue id="AndroidGradlePluginVersion" severity="ignore" />
-    <!-- minSdk 26: the launcher icon's -v26 folder is now redundant, but merging it would make lint want the PNG icons gone too. -->
+    <!-- Android 7.1 (minSdk 25) draws the PNG launcher icons; the adaptive one in -v26 is for Android 8 and newer. -->
     <issue id="ObsoleteSdkInt">
         <ignore path="src/main/res/mipmap-anydpi-v26" />
     </issue>
