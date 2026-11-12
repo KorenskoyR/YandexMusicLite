@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.presentation.hifi.lyricsClose
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.animation.fadeOut
@@ -198,7 +200,9 @@ fun FullScreenPlayer(
     }
     // The words of the track take the cover's place while asked for; a new track shows its cover again
     val lyrics = rememberLyrics(track)
-    var lyricsOpen by remember(track.idString) { mutableStateOf(initialLyricsOpen) }
+    // Open words stay open on the next track and show its words; a track without any closes them
+    var lyricsOpen by remember { mutableStateOf(initialLyricsOpen) }
+    LaunchedEffect(lyrics == null, lyrics?.answer) { if (lyricsClose(lyrics)) lyricsOpen = false }
     val cover = @Composable { modifier: Modifier ->
         PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier) {
             AnimatedVisibility(visible = lyricsOpen && lyrics != null, enter = fadeIn(HiFiMotion.quick()), exit = fadeOut(HiFiMotion.quick())) {

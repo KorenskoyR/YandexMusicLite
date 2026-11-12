@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -75,20 +77,29 @@ fun rememberLyrics(track: TrackDetailsDto?): TrackLyrics? {
     val ui = LocalLyrics.current
     val id = track?.takeIf { LyricsRules.canHave(it) }?.idString ?: return null
     var attempt by remember(id) { mutableIntStateOf(0) }
-    val answer by produceState(ui.known(id), id, attempt) {
-        if (value != null && value != LyricsAnswer.Failed) return@produceState
-        value = null
+    // One state per track: a new track starts from what is known about it in the same frame, never from the last one's words
+    val state = remember(id) { mutableStateOf(ui.known(id)) }
+    LaunchedEffect(id, attempt) {
+        if (state.value != null && state.value != LyricsAnswer.Failed) return@LaunchedEffect
+        state.value = null
         // No connection for a moment: asked again a little later, a few times, while the track is shown
         for (n in 1..LOAD_TRIES) {
             val got = ui.load(id)
-            value = got
+            state.value = got
             if (got != LyricsAnswer.Failed) break
             if (n < LOAD_TRIES) delay(RETRY_MS * n)
         }
     }
+    val answer = state.value
     val offered = answer is LyricsAnswer.Text
     return TrackLyrics(answer, offered) { attempt++ }
 }
+
+/**
+ * Whether open words close: the track cannot have any (a station, a file of the user's own) or Yandex has none for
+ * it. While the next track's words are asked for, or the asking failed for a moment, they stay open.
+ */
+fun lyricsClose(lyrics: TrackLyrics?): Boolean = lyrics == null || lyrics.answer == LyricsAnswer.None
 
 /** Asking for the words: this many times at most, the pauses growing from [RETRY_MS]. */
 private const val LOAD_TRIES = 3

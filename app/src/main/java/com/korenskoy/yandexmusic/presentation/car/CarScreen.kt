@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.korenskoy.yandexmusic.presentation.hifi.lyricsClose
 import androidx.compose.runtime.SideEffect
 import com.korenskoy.yandexmusic.domain.model.CarLayout
 import androidx.compose.material.icons.rounded.Shuffle
@@ -227,8 +230,9 @@ fun CarScreen(
     BackHandler(enabled = downloadsOpen) { downloadsOpen = false }
     // The words of the track, over the cover column; a new track closes them
     val lyrics = rememberLyrics(currentTrack)
-    var lyricsOpen by rememberSaveable(currentTrack?.idString) { mutableStateOf(initialLyricsOpen) }
-    LaunchedEffect(lyrics?.offered) { if (lyrics?.offered != true) lyricsOpen = false }
+    // Open words stay open on the next track and show its words; a track without any closes them
+    var lyricsOpen by rememberSaveable { mutableStateOf(initialLyricsOpen) }
+    LaunchedEffect(lyrics == null, lyrics?.answer) { if (lyricsClose(lyrics)) lyricsOpen = false }
     BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
     var stationsOpen by rememberSaveable { mutableStateOf(initialStationsOpen) }
     BackHandler(enabled = stationsOpen) { stationsOpen = false }
@@ -529,7 +533,8 @@ fun CarScreen(
                     }
                     val cover: @Composable () -> Unit = {
                         val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen && !queueOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far_wide")
-                        CarCover(u, currentTrack, Modifier.size(u(wide.cover)).graphicsLayer { alpha = farAlpha })
+                        // Faded under a panel: out of reach for touch and for the screen reader too
+                        CarCover(u, currentTrack, Modifier.size(u(wide.cover)).graphicsLayer { alpha = farAlpha }.hiddenUnder(panelOpen && !queueOpen))
                     }
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(u(CarWide.GAP))) {
                         if (steeringWheelOnLeft) { driver(); middle(); cover() } else { cover(); middle(); driver() }
@@ -553,7 +558,8 @@ fun CarScreen(
                     val far: @Composable () -> Unit = {
                         // "Настроить волну" opens over this column: it fades away, so nothing peeks from under the panel
                         val farAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen) 0f else 1f, HiFiMotion.standard(), label = "car_far")
-                        Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }, contentAlignment = Alignment.Center) {
+                        // Faded under a panel: its «Очередь» or «Станции» out of reach for touch and the screen reader
+                        Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = farAlpha }.hiddenUnder(panelOpen), contentAlignment = Alignment.Center) {
                             if (isRadio && radio != null) {
                                 Column(
                                     Modifier.fillMaxSize(),
@@ -669,11 +675,6 @@ fun CarScreen(
         }
         // "Очередь" lying down: over the cover column too, the whole height of it
         if (queueOpen && isLandscape) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { queueOpen = false }
-            )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 queuePanel(
@@ -687,11 +688,6 @@ fun CarScreen(
         }
         // "Скачанные" lying down: over the cover column too, the whole height of it
         if (downloadsOpen && isLandscape) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { downloadsOpen = false }
-            )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 downloadsPanel(
@@ -706,11 +702,6 @@ fun CarScreen(
         // «В плейлист» lying down: over the cover column, the whole height of it
         val lyingPlaylists = playlists?.takeIf { playlistsOpen && isLandscape }
         if (lyingPlaylists != null && currentTrack != null) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { playlistsOpen = false }
-            )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 CarPlaylistsPanel(
@@ -726,11 +717,6 @@ fun CarScreen(
         }
         // «Станции» lying down: over the cover column, the whole height of it
         if (stationsOpen && isLandscape && radio != null) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { stationsOpen = false }
-            )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 CarStationsPanel(
@@ -746,11 +732,6 @@ fun CarScreen(
         }
         // The words lying down: over the cover column too, the whole height of it
         if (lyricsOpen && isLandscape) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { lyricsOpen = false }
-            )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 lyricsPanel(
@@ -764,11 +745,6 @@ fun CarScreen(
         }
         // "Настроить волну" lying down: over the cover column, so the controls and the sources stay free
         if (tuneOpen && isLandscape) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { tuneOpen = false }
-            )
             BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
             // Over the cover column only: never wider than what the driver's panel leaves (it is u(652) wide
             // with u(48) + u(40) + u(40) around it), so the controls and the sources stay uncovered
@@ -800,6 +776,11 @@ fun carWidePossible(width: Dp, height: Dp): Boolean {
 /** Lying: 48 + 40 at the sides; the header (22 + 58 + 10) and 28 at the bottom. */
 private const val CAR_SIDE_MARGINS = 88f
 private const val CAR_HEADER_AND_BOTTOM = 118f
+
+/** The cover column under an open panel: no semantics, no touches (the panel lies over it, faded out). */
+private fun Modifier.hiddenUnder(panel: Boolean): Modifier =
+    if (panel) clearAndSetSemantics { }.pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } } }
+    else this
 
 /** What the screen showed last, wide or not: «Авто» holds it near the edge ([CarWide.HOLD]). */
 private class WideShown(var wide: Boolean? = null)
