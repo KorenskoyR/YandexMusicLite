@@ -12,14 +12,29 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
  * The player's own buttons in the notification shade, on the lock screen and in the car: "Не нравится"
  * left of the transport controls and the heart right of them, as in the app's player. A station gets
  * only the heart (its favourite).
+ *
+ * The heart is two commands, [LIKE] while not liked and [LIKED] once liked, both doing the same as the app's
+ * heart. As one command with only its picture changed, the shade of some phones and the music widgets of head
+ * units took it for the same button and kept drawing the empty heart after a like: a new command is a new button
+ * to them, drawn anew. The liked heart is red, as in the app, where the picture is drawn as it is.
  */
 @UnstableApi
 internal object SessionButtons {
     // Built on first use: the choice of buttons below stays plain Kotlin (and unit-testable)
-    val LIKE: SessionCommand by lazy { SessionCommand("com.korenskoy.yandexmusic.LIKE", Bundle.EMPTY) }
+    val LIKE: SessionCommand by lazy { SessionCommand(LIKE_ACTION, Bundle.EMPTY) }
+    val LIKED: SessionCommand by lazy { SessionCommand(LIKED_ACTION, Bundle.EMPTY) }
     val DISLIKE: SessionCommand by lazy { SessionCommand("com.korenskoy.yandexmusic.DISLIKE", Bundle.EMPTY) }
 
     enum class Kind { DISLIKE, LIKE, UNLIKE }
+
+    /** The command of the heart in each state: never the same for "liked" and "not liked". Pure; unit-tested. */
+    fun heartActionOf(kind: Kind): String = if (kind == Kind.UNLIKE) LIKED_ACTION else LIKE_ACTION
+
+    /** A press of the heart, whichever of its two commands: the same as the app's heart. */
+    fun isHeart(action: String): Boolean = action == LIKE_ACTION || action == LIKED_ACTION
+
+    const val LIKE_ACTION = "com.korenskoy.yandexmusic.LIKE"
+    const val LIKED_ACTION = "com.korenskoy.yandexmusic.LIKED"
 
     /** Which buttons to show, left to right. Pure; unit-tested. */
     fun kindsFor(track: TrackDetailsDto?, liked: Boolean): List<Kind> = when {
@@ -53,7 +68,7 @@ internal object SessionButtons {
                             }
                         )
                     )
-                    .setSessionCommand(LIKE)
+                    .setSessionCommand(if (kind == Kind.UNLIKE) LIKED else LIKE)
                     .setSlots(CommandButton.SLOT_FORWARD_SECONDARY, CommandButton.SLOT_OVERFLOW)
                     .build()
             }

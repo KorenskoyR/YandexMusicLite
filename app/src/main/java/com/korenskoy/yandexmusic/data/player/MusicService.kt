@@ -238,6 +238,7 @@ class MusicService : MediaLibraryService() {
                     // Everything, plus the heart and "Не нравится" of the notification and the car
                     val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                         .add(SessionButtons.LIKE)
+                        .add(SessionButtons.LIKED)
                         .add(SessionButtons.DISLIKE)
                         .build()
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
@@ -326,9 +327,11 @@ class MusicService : MediaLibraryService() {
             ): ListenableFuture<SessionResult> {
                 val track = playbackController.currentTrack.value
                     ?: return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
-                when (customCommand.customAction) {
-                    SessionButtons.LIKE.customAction -> reactions.toggleLike(track)
-                    SessionButtons.DISLIKE.customAction -> reactions.dislike(track)
+                val action = customCommand.customAction
+                when {
+                    // The heart, liked or not: the same as the app's heart
+                    SessionButtons.isHeart(action) -> reactions.toggleLike(track)
+                    action == SessionButtons.DISLIKE.customAction -> reactions.dislike(track)
                     else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
                 }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))

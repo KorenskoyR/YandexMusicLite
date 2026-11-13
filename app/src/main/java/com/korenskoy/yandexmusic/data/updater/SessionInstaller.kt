@@ -114,8 +114,9 @@ class SessionInstaller @Inject constructor(@ApplicationContext private val conte
     }
 
     /**
-     * Confirmed but nothing came back in time: the session is given up, so the system's window waiting for it is
-     * told "not installed" and closes (on most firmware), and the app says so.
+     * Confirmed but nothing came back in time: the session is given up and the app says so. A system window still
+     * open stays (Android does not close it, checked on 7.1 and 15), but it can no longer install the given-up
+     * session over a new try.
      */
     fun noAnswer() {
         if (!busy) return

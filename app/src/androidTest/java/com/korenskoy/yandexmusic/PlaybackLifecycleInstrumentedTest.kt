@@ -68,7 +68,7 @@ class PlaybackLifecycleInstrumentedTest {
         fun heart(): androidx.media3.session.CommandButton? {
             var button: androidx.media3.session.CommandButton? = null
             instrumentation.runOnMainSync {
-                button = controller.mediaButtonPreferences.firstOrNull { it.sessionCommand?.customAction?.endsWith(".LIKE") == true }
+                button = controller.mediaButtonPreferences.firstOrNull { it.sessionCommand?.customAction?.let(com.korenskoy.yandexmusic.data.player.SessionButtons::isHeart) == true }
             }
             return button
         }
