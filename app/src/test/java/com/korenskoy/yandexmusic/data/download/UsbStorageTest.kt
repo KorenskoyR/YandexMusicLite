@@ -78,7 +78,11 @@ class UsbStorageTest {
     }
 
     private fun usb(wanted: Boolean = true) = UsbStorage(context, flowOf(wanted), flowOf(tree.toString())).also {
-        runBlocking { it.folder.first { uri -> uri != null } }
+        // Both settings arrive on their own: a download started before "wanted" lands would go to the phone
+        runBlocking {
+            it.folder.first { uri -> uri != null }
+            it.wanted.first { on -> on == wanted }
+        }
     }
 
     private fun card() = testCard(context, cardRoot, key, wanted = false)
