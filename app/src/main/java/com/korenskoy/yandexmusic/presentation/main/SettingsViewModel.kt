@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.data.player.PlaybackEnvironment
 import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -143,7 +144,9 @@ class SettingsViewModel @Inject constructor(
 
     /** The journal as text, to a messenger or mail of the user's choice. */
     fun shareJournal(text: String) {
-        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+        // With the phone and its settings: battery saving and background limits explain many stops
+        val full = text + "\n\n" + runCatching { PlaybackEnvironment.describe(context) }.getOrDefault("")
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, full.trimEnd())
         runCatching {
             context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }.onFailure { Log.w("SettingsViewModel", "Journal not shared", it) }

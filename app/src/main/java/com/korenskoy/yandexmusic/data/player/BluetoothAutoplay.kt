@@ -33,6 +33,9 @@ object AppPresence {
 /**
  * "Bluetooth of the car": the music starts when a Bluetooth audio output appears (the phone connected to
  * the car). Outputs already connected when the app starts do not count, nor does anything while music plays.
+ *
+ * Whatever the setting, headphones or a Bluetooth output back within seconds of going away (a car's Bluetooth
+ * that drops for a moment) bring back the music their going away paused.
  */
 @Singleton
 class BluetoothAutoplay @Inject constructor(
@@ -46,15 +49,16 @@ class BluetoothAutoplay @Inject constructor(
 
     private val callback = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
-            val bluetooth = addedDevices.filter { it.isSink && it.type in BLUETOOTH_OUTPUTS }.map { it.id }.toSet()
+            val outputs = addedDevices.filter { it.isSink && it.type in PERSONAL_OUTPUTS }
             // The first call lists what is already connected; only what appears later is a new connection
             val known = baseline
             if (known == null) {
-                baseline = bluetooth
+                baseline = outputs.map { it.id }.toSet()
                 return
             }
-            baseline = known + bluetooth
-            if ((bluetooth - known).isNotEmpty()) onConnected()
+            baseline = known + outputs.map { it.id }
+            val fresh = outputs.filter { it.id !in known }
+            if (fresh.isNotEmpty()) onConnected(bluetooth = fresh.any { it.type in BLUETOOTH_OUTPUTS })
         }
 
         override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
@@ -68,10 +72,15 @@ class BluetoothAutoplay @Inject constructor(
             .onFailure { Log.w(TAG, "Audio devices are not observable here", it) }
     }
 
-    private fun onConnected() {
+    private fun onConnected(bluetooth: Boolean) {
         scope.launch {
-            if (!settings.bluetoothAutoplay.first()) return@launch
             if (auth.getToken().isNullOrEmpty() || playback.isPlaying.value) return@launch
+            // Back within seconds of going away: the music it paused plays on
+            if (AppPresence.canStartPlayback && playback.resumeAfterOutputBlip()) {
+                Log.i(TAG, "The output came back at once: the music plays on")
+                return@launch
+            }
+            if (!bluetooth || !settings.bluetoothAutoplay.first()) return@launch
             if (!AppPresence.canStartPlayback) {
                 Log.i(TAG, "Car connected while the app is in the background: Android does not let it start the music")
                 return@launch
@@ -88,6 +97,13 @@ class BluetoothAutoplay @Inject constructor(
             AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
             26, // TYPE_BLE_HEADSET (Android 12)
             27 // TYPE_BLE_SPEAKER (Android 12)
+        )
+
+        /** Headphones of any kind and Bluetooth: what going away pauses the music. */
+        val PERSONAL_OUTPUTS = BLUETOOTH_OUTPUTS + setOf(
+            AudioDeviceInfo.TYPE_WIRED_HEADSET,
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+            22 // TYPE_USB_HEADSET (Android 8)
         )
     }
 }

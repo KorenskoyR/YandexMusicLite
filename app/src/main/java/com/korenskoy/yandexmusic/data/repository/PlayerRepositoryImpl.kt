@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import com.korenskoy.yandexmusic.data.player.StopCause
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.common.util.UnstableApi
+import androidx.annotation.OptIn
 import com.korenskoy.yandexmusic.data.local.LocalArtProvider
 import androidx.media3.common.PlaybackException
 import com.korenskoy.yandexmusic.data.player.PlaybackJournal
@@ -141,6 +145,10 @@ class PlayerRepositoryImpl(
     private var crossfadeDurationMs = CROSSFADE_DURATION_MS
 
     private var lastSeekTimestamp = 0L
+
+    /** Asked to go to another second, and not ready there yet: a wait the listener asked for, not a stop. */
+    private var waitingAfterSeek = false
+    override val waitsAfterSeek: Boolean get() = waitingAfterSeek
     private var pendingSeekPosition = -1L
     private var hasEmittedPrepareForCurrent = false
     private var hasEmittedTrackEndedForCurrent = false
@@ -209,7 +217,14 @@ class PlayerRepositoryImpl(
         }
     }
 
+    @OptIn(UnstableApi::class)
     private fun setupPlayerListener(player: ExoPlayer, playerIdx: Int) {
+        // The device did not keep up with the sound (a busy processor, not the link)
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
+                if (player === activePlayer || player === outgoingPlayer) journal.recordUnderrun(player.mediaMetadata.title?.toString())
+            }
+        })
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // A new track brings its own normalization
@@ -218,6 +233,8 @@ class PlayerRepositoryImpl(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 refreshPlaybackState()
+                // The music sounds (again): a pause it did not ask for is over, and the journal tells how long
+                if (isPlaying && playerIdx == activePlayerIndex) journal.onPlaying(player.mediaMetadata.title?.toString())
                 if (isPlaying && playerIdx == activePlayerIndex && outgoingPlayer == null) {
                     wakeLockHelper.releaseTransitionLock()
                 }
@@ -225,9 +242,20 @@ class PlayerRepositoryImpl(
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 refreshPlaybackState()
+                // Every pause of the playing track goes to the journal with its cause; the silent wait of a
+                // crossfade's next track is not a pause
+                val paused = !playWhenReady && playerIdx == activePlayerIndex && !awaitingIncoming && player.mediaItemCount > 0 &&
+                    player.playbackState != Player.STATE_IDLE && player.playbackState != Player.STATE_ENDED
+                if (paused) {
+                    journal.onPaused(
+                        player.mediaMetadata.title?.toString(),
+                        outputGone = reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY
+                    )
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY && playerIdx == activePlayerIndex) waitingAfterSeek = false
                 refreshPlaybackState()
                 if (playbackState == Player.STATE_ENDED && playerIdx == activePlayerIndex && outgoingPlayer == null) {
                     Log.d(TAG, "Player[$playerIdx] reached STATE_ENDED, crossfadeRequested=$hasEmittedTrackEndedForCurrent")
@@ -288,6 +316,8 @@ class PlayerRepositoryImpl(
             p.mediaItemCount > 0 &&
             p.playbackState != Player.STATE_ENDED
         _isPlaying.value = wantsToPlay
+        // Kept on the device: the app closed while this is on was closed by Android
+        journal.setPlaying(wantsToPlay)
         // Only a real STATE_BUFFERING counts as loading: a paused-but-wants-to-play limbo (focus loss) is not a
         // spinner, otherwise the indicator sticks when playback is interrupted mid-start.
         val outgoing = outgoingPlayer
@@ -315,6 +345,7 @@ class PlayerRepositoryImpl(
         return if (trackId.startsWith("radio_")) null else preloadManager.getOrFetchUrl(trackId)
     }
 
+    @OptIn(UnstableApi::class)
     private suspend fun buildMediaItem(trackId: String, uri: String, title: String?, artist: String?, coverUrl: String?): MediaItem {
         val metadata = MediaMetadata.Builder()
             .setTitle(title ?: "Unknown Track")
@@ -330,6 +361,8 @@ class PlayerRepositoryImpl(
         val mediaMetadata = metadata.build()
         return MediaItem.Builder()
             .setMediaId(trackId)
+            // The key of its downloads: a link that runs out mid-track is renewed for this track (LinkRenewal)
+            .setCustomCacheKey(trackId)
             .setUri(uri)
             .setMediaMetadata(mediaMetadata)
             .build()
@@ -399,6 +432,7 @@ class PlayerRepositoryImpl(
         hasEmittedTrackEndedForCurrent = false
         pendingSeekPosition = -1L
         lastSeekTimestamp = 0L
+        waitingAfterSeek = false
         _currentTrackId.value = trackId
         _progress.value = startPositionMs
         // Nothing of the new track is in hand yet: the cache waits until it has its own buffer
@@ -663,6 +697,7 @@ class PlayerRepositoryImpl(
                 setVolume(player, start * (1f - step.toFloat() / steps))
                 delay(FADE_STEP_MS)
             }
+            journal.expectPause(StopCause.SLEEP_TIMER)
             player.pause()
             setVolume(player, 1f)
             refreshPlaybackState()
@@ -719,6 +754,7 @@ class PlayerRepositoryImpl(
         val p = activePlayer
         lastSeekTimestamp = SystemClock.elapsedRealtime()
         pendingSeekPosition = position
+        waitingAfterSeek = true
         _progress.value = position
         p.seekTo(position)
         // Seeking back out of the crossfade window must allow the triggers to fire again.

@@ -57,9 +57,15 @@ object PlaybackBuffering {
     /** 1, 2, 3, 4, 5, 5, … seconds. Pure. */
     fun retryDelayMs(errorCount: Int): Long = (errorCount.coerceAtLeast(1) * 1_000L).coerceAtMost(5_000L)
 
-    /** The server answered and said no: another try with the same link cannot help. */
+    /**
+     * The server answered and said no: another try with the same link cannot help. "Busy, later" (429) and "too
+     * slow" (408) are not a no: they are tried again (a station's relay that is busy hands over to another).
+     */
     fun refusedByServer(error: Throwable?): Boolean {
         val response = generateSequence(error) { it.cause }.filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()
-        return response != null && response.responseCode in 400..499
+        return response != null && response.responseCode in 400..499 && response.responseCode !in TRY_LATER
     }
+
+    /** Answers that ask to come back later. */
+    private val TRY_LATER = setOf(408, 429)
 }

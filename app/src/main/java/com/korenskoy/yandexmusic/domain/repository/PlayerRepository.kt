@@ -48,6 +48,9 @@ interface PlayerRepository {
     /** Music in hand ahead of the playing position; as good as unlimited when unknown. */
     val bufferedAheadMs: Long get() = Long.MAX_VALUE
 
+    /** Waiting after a seek: the listener asked for it, it is no stop of the music. */
+    val waitsAfterSeek: Boolean get() = false
+
     /** A track change (a crossfade, its wait) or a source switch is under way: the line belongs to it. */
     val inTransition: Boolean get() = false
     /** Volume multipliers by track id (1 = unchanged), for normalization; a track not listed plays as is. */

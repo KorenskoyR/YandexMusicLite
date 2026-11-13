@@ -166,6 +166,9 @@ class PlaybackController @Inject constructor(
     /** The track that has been heard: only its stops count, not the wait before a track starts. */
     private var soundedTrackId: String? = null
     private var stallLastedJob: Job? = null
+
+    /** A track of the network waiting to start sounding: since when, and its title. */
+    private var startWait: Pair<Long, String?>? = null
     /** Light streams already asked for while the link is uneven, so a prepared track is not asked twice. */
     private val lightStreams = mutableMapOf<String, Pair<TrackPreloadManager.ResolvedStream, Long>>()
 
@@ -204,7 +207,12 @@ class PlaybackController @Inject constructor(
         // No Plus: what plays stops and the queue goes; a Play from a headset, the car or a widget finds nothing
         plusMissing.onEach { if (it) stopAndClear() }.launchIn(scope)
         combine(plusMissing, playerRepository.isPlaying) { missing, playing -> missing && playing }
-            .onEach { if (it) playerRepository.pause() }
+            .onEach {
+                if (it) {
+                    journal.expectPause(StopCause.NO_PLUS)
+                    playerRepository.pause()
+                }
+            }
             .launchIn(scope)
         // Volume normalization: the gains of the queued tracks, applied as each one plays
         combine(_currentPlaylist, settingsRepository.normalizeVolume) { queue, on ->
@@ -361,6 +369,7 @@ class PlaybackController @Inject constructor(
             .launchIn(scope)
 
         watchTheSteadiness()
+        tellOfAClosedApp()
         watchAiMarks()
         keepWaveShelfFilled()
         watchTheLink()
@@ -564,7 +573,10 @@ class PlaybackController @Inject constructor(
         resolveAndPlay(current, crossfade = false, startPositionMs = restoredPositionMs.value)
     }
 
-    fun pause() {
+    /** Pauses for [cause]: the listener in the app, unless said otherwise; the journal keeps it with [detail]. */
+    fun pause(cause: StopCause = StopCause.USER_APP, detail: String? = null) {
+        journal.expectPause(cause, detail)
+        if (cause.byListener) _listenerPauses.tryEmit(Unit)
         waitingForConnection = false
         if (_isStarting.value) {
             // Cancel a start that hasn't produced sound yet.
@@ -574,6 +586,22 @@ class PlaybackController @Inject constructor(
         }
         playerRepository.pause()
         scope.launch { persistSession() }
+    }
+
+    private val _listenerPauses = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** The listener paused: after a call the music stays paused. */
+    val listenerPauses: SharedFlow<Unit> = _listenerPauses
+
+    /**
+     * The headphones or the Bluetooth came back within [PlaybackJournal.OUTPUT_BLIP_MS] of going away and pausing the music (a
+     * car's Bluetooth drops for a second): it plays on. @return true if it does.
+     */
+    fun resumeAfterOutputBlip(): Boolean {
+        if (journal.lastPause()?.isOutputBlip(System.currentTimeMillis()) != true) return false
+        if (isPlaying.value || _currentTrack.value == null) return false
+        play()
+        return true
     }
 
     fun seekTo(positionMs: Long) {
@@ -1155,6 +1183,21 @@ class PlaybackController @Inject constructor(
         playerRepository.playTrack(trackId, file.toUri().toString(), track.title, track.artists.firstOrNull()?.name, coverUrlFor(track), crossfade, startPositionMs)
     }
 
+    /**
+     * Android closed the app while the music played (found at this start), and the phone is set to do it again:
+     * once the screen is up, the listener is told how to let the app work in the background.
+     */
+    private fun tellOfAClosedApp() {
+        val killed = journal.takeKillNotice() ?: return
+        if (!ProcessExits.closedByThePhone(killed.detail)) return
+        scope.launch {
+            if (!withContext(Dispatchers.IO) { BackgroundWork.restricted(context) }) return@launch
+            _messages.subscriptionCount.first { it > 0 }
+            delay(KILL_NOTICE_DELAY_MS)
+            _messages.tryEmit(context.getString(R.string.msg_closed_in_background))
+        }
+    }
+
     /** The music has stood still long enough to matter: go on from the copy if there is one, and find out why. */
     private fun onStreamStalled(track: TrackDetailsDto) {
         // In its own job: the music coming back ends the watchdog, and the music must not wait for the check
@@ -1177,9 +1220,18 @@ class PlaybackController @Inject constructor(
             val trackId = playerRepository.currentTrackId.value
             val track = _currentTrack.value
             if (buffering) {
+                // Going to another second: the listener asked for this wait
+                if (playerRepository.waitsAfterSeek) {
+                    startWait = null
+                    return@onEach
+                }
                 // A slow flash drive is not a bad link
                 val midTrack = trackId != null && trackId == soundedTrackId && track?.idString == trackId && track.isStreamed
-                if (!midTrack) return@onEach
+                if (!midTrack) {
+                    startWait = if (track?.isStreamed == true && track.idString == trackId) SystemClock.elapsedRealtime() to track.title else null
+                    return@onEach
+                }
+                startWait = null
                 if (steadiness.onStall()) onLinkUneven()
                 stallLastedJob = scope.launch {
                     delay(LinkSteadiness.LONG_STALL_MS)
@@ -1187,6 +1239,11 @@ class PlaybackController @Inject constructor(
                 }
             } else {
                 steadiness.onStallOver()?.let { journal.record(PlaybackJournal.Kind.STALL, track?.title, it) }
+                startWait?.let { (since, title) ->
+                    val waited = SystemClock.elapsedRealtime() - since
+                    if (waited >= SLOW_START_MS) journal.record(PlaybackJournal.Kind.SLOW_START, title, waited)
+                }
+                startWait = null
             }
         }.launchIn(scope)
         scope.launch {
@@ -1348,6 +1405,7 @@ class PlaybackController @Inject constructor(
             hasCopy = !copyFailed && reserve.has(failure.trackId),
             weakLink = _linkState.value == LinkState.WEAK
         )
+        journal.record(PlaybackJournal.Kind.ERROR, current.title, failure.positionMs, action.ordinal, failure.reason)
         when (action) {
             Recovery.RESUME_FROM_COPY -> {
                 retriedTrackId = null
@@ -1388,6 +1446,7 @@ class PlaybackController @Inject constructor(
      */
     private fun onLocalFailure(current: TrackDetailsDto, failure: PlaybackFailure) {
         Log.w(TAG, "Local file ${failure.trackId} failed: ${failure.reason}")
+        journal.record(PlaybackJournal.Kind.ERROR, current.title, failure.positionMs, ERROR_OF_A_FILE, failure.reason)
         retriedTrackId = null
         consecutiveFailedTracks++
         if (consecutiveFailedTracks >= PlaybackQueue.MAX_FAILED_TRACKS) {
@@ -1458,6 +1517,7 @@ class PlaybackController @Inject constructor(
         if (mix.isEmpty()) {
             _isStarting.value = false
             waitingForConnection = true
+            journal.expectPause(StopCause.OFFLINE)
             playerRepository.pause()
             showMessage(context.getString(R.string.msg_offline_no_downloads))
             return
@@ -1702,11 +1762,18 @@ class PlaybackController @Inject constructor(
         private const val RECENT_LIMIT = 300
         private const val URL_RETRY_DELAY_MS = 700L
         private const val SNAPSHOT_INTERVAL_MS = 15_000L
+        private const val KILL_NOTICE_DELAY_MS = 1_500L
         private const val RESUMPTION_START_TIMEOUT_MS = 4_000L
         /** Longest a stream may keep buffering before we treat the stall as a failure and recover. */
         private const val BUFFERING_TIMEOUT_MS = 15_000L
         /** The player's buffer is empty and the music stands: the moment to look at the link. */
         private const val LINK_STALL_MS = 6_000L
+
+        /** A start of a track this long is worth a line of the journal. */
+        const val SLOW_START_MS = 2_000L
+
+        /** [PlaybackJournal.Kind.ERROR] of a file of the device (no [Recovery]). */
+        const val ERROR_OF_A_FILE = -1
         /** The cache fills only while the playing track has this much in hand. */
         const val RESERVE_HEADROOM_MS = 20_000L
         /** How many tracks ahead the AI marks are asked for. */

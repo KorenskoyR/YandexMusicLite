@@ -383,10 +383,10 @@ class LayoutSafetyTest {
             manifestFile.contains("application/vnd.android.package-archive"))
 
         val buildGradle = File("build.gradle.kts").readText()
-        assertTrue("build.gradle.kts must be versionCode 56",
-            buildGradle.contains("versionCode = 56"))
-        assertTrue("build.gradle.kts must be versionName 1.14.6",
-            buildGradle.contains("versionName = \"1.14.6\""))
+        assertTrue("build.gradle.kts must be versionCode 57",
+            buildGradle.contains("versionCode = 57"))
+        assertTrue("build.gradle.kts must be versionName 1.14.7",
+            buildGradle.contains("versionName = \"1.14.7\""))
     }
 
     @Test
@@ -412,10 +412,14 @@ class LayoutSafetyTest {
             preloadManager.contains("Deferred<String?>"))
 
         val musicService = File(sourceDir, "data/player/MusicService.kt").readText()
-        assertTrue("MusicService must track transient loss",
-            musicService.contains("wasPlayingBeforeTransientLoss"))
-        assertTrue("MusicService must resume on AUDIOFOCUS_GAIN",
-            musicService.contains("AUDIOFOCUS_GAIN"))
+        val focusPolicy = File(sourceDir, "data/player/FocusPolicy.kt").readText()
+        // The rules themselves are checked in FocusPolicyTest; here, that the service hands Android's focus to them
+        assertTrue("MusicService must hand focus changes to FocusPolicy",
+            musicService.contains("focus.onFocusChange(focusChange)"))
+        assertTrue("FocusPolicy must track transient loss",
+            focusPolicy.contains("resumeOnGain = true"))
+        assertTrue("FocusPolicy must resume on AUDIOFOCUS_GAIN",
+            focusPolicy.substringAfter("AudioManager.AUDIOFOCUS_GAIN ->").contains("actions.resume()"))
 
         val controller = File(sourceDir, "data/player/PlaybackController.kt").readText()
         assertTrue("PlaybackController must observe prepareNextTrackEvent",
@@ -507,9 +511,10 @@ class LayoutSafetyTest {
             musicService.contains("abandonSystemAudioFocus()"))
         assertTrue("Notification transport commands must go through PlaybackController",
             musicService.contains("playbackController.playNext()") && musicService.contains("playbackController.playPrev()"))
+        val focusPolicy = File(sourceDir, "data/player/FocusPolicy.kt").readText()
         assertTrue("Ducking must lower volume instead of pausing",
-            musicService.substringAfter("AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK ->").substringBefore("AudioManager.AUDIOFOCUS_GAIN")
-                .contains("setDucked(true)"))
+            focusPolicy.substringAfter("AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK ->").substringBefore("AudioManager.AUDIOFOCUS_GAIN")
+                .contains("actions.duck(true)") && musicService.contains("override fun duck(on: Boolean) = playerRepository.setDucked(on)"))
 
         val playerRepo = File(sourceDir, "domain/repository/PlayerRepository.kt").readText()
         assertTrue("PlayerRepository interface must declare release()",

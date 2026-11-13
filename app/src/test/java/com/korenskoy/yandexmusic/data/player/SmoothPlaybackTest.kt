@@ -119,7 +119,7 @@ class SmoothPlaybackTest {
     @Test
     fun theJournalKeepsTheLastHour() {
         var now = 0L
-        val journal = PlaybackJournal { now }
+        val journal = PlaybackJournal(now = { now })
         journal.addPlayed(60_000)
         journal.record(PlaybackJournal.Kind.STALL, "Хочешь?", 2_000)
         journal.record(PlaybackJournal.Kind.CROSSFADE)

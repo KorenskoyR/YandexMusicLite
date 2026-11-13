@@ -107,7 +107,7 @@ class WaveRepeatsTest {
     @Test
     fun theJournalCountsWhatTheWaveOfferedAndRepeated() {
         var now = 1_000L
-        val journal = PlaybackJournal { now }
+        val journal = PlaybackJournal(now = { now })
         assertFalse(journal.state.value.summary.waveUsed)
         journal.record(PlaybackJournal.Kind.WAVE_BATCH, valueMs = 10, count = 2)
         journal.record(PlaybackJournal.Kind.WAVE_BATCH, valueMs = 5, count = 0)

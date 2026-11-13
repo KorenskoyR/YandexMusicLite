@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import kotlinx.coroutines.delay
 import android.os.Build
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -67,40 +68,39 @@ class MusicService : MediaLibraryService() {
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
-    private var hasAudioFocus = false
-    private var wasPlayingBeforeTransientLoss = false
+    @Inject
+    lateinit var journal: PlaybackJournal
+
+    /** The sound shared with other apps: the rules are in [FocusPolicy], Android's side is here. */
+    private val focus = FocusPolicy(object : FocusPolicy.Actions {
+        override fun request(): Int = requestSystemAudioFocus()
+        override fun abandon() = abandonSystemAudioFocus()
+        override fun wantsToPlay(): Boolean = playerRepository.isPlaying.value || playbackController.isStarting.value
+        override fun pause(cause: StopCause) {
+            if (cause == StopCause.FOCUS_LOST) {
+                playbackController.pause(cause)
+            } else {
+                // For a while: the track stays loaded and goes on from the same place
+                journal.expectPause(cause)
+                playerRepository.pause()
+            }
+            // Who took the sound shows a moment later, when it plays
+            serviceScope.launch {
+                delay(SOUND_TAKER_DELAY_MS)
+                journal.amendLastPause(soundTakenBy())
+            }
+        }
+        override fun resume() = playbackController.play()
+        override fun duck(on: Boolean) = playerRepository.setDucked(on)
+    })
 
     /** Item picked in a car/browser; started by the play command that follows the selection. */
     private var pendingStart: (() -> Unit)? = null
 
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_LOSS -> {
-                hasAudioFocus = false
-                wasPlayingBeforeTransientLoss = false
-                playerRepository.setDucked(false)
-                playbackController.pause()
-            }
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                // Phone call, voice assistant: pause and resume afterwards
-                wasPlayingBeforeTransientLoss = playerRepository.isPlaying.value
-                playerRepository.pause()
-            }
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // Navigation prompt, notification sound: keep playing quieter, like Apple Music
-                playerRepository.setDucked(true)
-            }
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                hasAudioFocus = true
-                playerRepository.setDucked(false)
-                // The alert or the call is over: an equalizer that lost the session gets it back now
-                equalizer.announce()
-                if (wasPlayingBeforeTransientLoss) {
-                    wasPlayingBeforeTransientLoss = false
-                    playbackController.play()
-                }
-            }
-        }
+        focus.onFocusChange(focusChange)
+        // The alert or the call is over: an equalizer that lost the session gets it back now
+        if (focusChange == AudioManager.AUDIOFOCUS_GAIN) equalizer.announce()
     }
 
     override fun onCreate() {
@@ -109,6 +109,8 @@ class MusicService : MediaLibraryService() {
         audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
 
         // Channels exist from Android 8; on 7.1 the notification simply has none
+        serviceScope.launch { playbackController.listenerPauses.collect { focus.onListenerPause() } }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 PLAYBACK_CHANNEL_ID,
@@ -134,16 +136,7 @@ class MusicService : MediaLibraryService() {
 
         // Track isPlaying via StateFlow to request/abandon system audio focus without dropping it during player swaps
         serviceScope.launch {
-            playerRepository.isPlaying.collect { isPlaying ->
-                if (isPlaying) {
-                    if (!hasAudioFocus && !requestSystemAudioFocus()) {
-                        // Focus denied (e.g. an active phone call): don't play over it
-                        playerRepository.pause()
-                    }
-                } else if (!wasPlayingBeforeTransientLoss) {
-                    abandonSystemAudioFocus()
-                }
-            }
+            playerRepository.isPlaying.collect { isPlaying -> focus.onWantsToPlay(isPlaying) }
         }
 
         // Equalizer apps hear about the session when the sound starts and after a real pause, never per track
@@ -162,8 +155,8 @@ class MusicService : MediaLibraryService() {
         }
     }
 
-    /** Returns true when playback may proceed (focus granted now or delayed). */
-    private fun requestSystemAudioFocus(): Boolean {
+    /** Android's answer: one of AUDIOFOCUS_REQUEST_*, or [FocusPolicy.UNAVAILABLE] without an AudioManager. */
+    private fun requestSystemAudioFocus(): Int {
         val result = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             // Android 7.1: the request without attributes, the same listener (no delayed gain there)
             try {
@@ -191,23 +184,24 @@ class MusicService : MediaLibraryService() {
             Log.e("MusicService", "Unexpected error", e)
             null
         }
-        return when (result) {
-            AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
-                hasAudioFocus = true
-                true
-            }
-            AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
-                // Resumes on AUDIOFOCUS_GAIN
-                wasPlayingBeforeTransientLoss = true
-                false
-            }
-            AudioManager.AUDIOFOCUS_REQUEST_FAILED -> false
-            else -> true // AudioManager unavailable: don't block playback
-        }
+        return result ?: FocusPolicy.UNAVAILABLE
+    }
+
+    /**
+     * What took the sound, as far as Android tells another app: a call, a voice chat, a navigator, an assistant,
+     * a notification or an alarm, a game; otherwise some other app with sound.
+     */
+    private fun soundTakenBy(): String {
+        val am = audioManager ?: return SoundTaker.APP
+        val mode = am.mode
+        if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_RINGTONE) return SoundTaker.CALL
+        if (mode == AudioManager.MODE_IN_COMMUNICATION) return SoundTaker.VOICE_CHAT
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return SoundTaker.APP
+        val usages = runCatching { am.activePlaybackConfigurations.map { it.audioAttributes.usage } }.getOrDefault(emptyList())
+        return SoundTaker.byUsages(usages)
     }
 
     private fun abandonSystemAudioFocus() {
-        hasAudioFocus = false
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                 @Suppress("DEPRECATION")
@@ -423,7 +417,8 @@ class MusicService : MediaLibraryService() {
             }
             override fun pause() {
                 pendingStart = null
-                playbackController.pause()
+                // From outside the app: the notification, the lock screen, a headset, a car; who it was is kept
+                playbackController.pause(StopCause.USER_DEVICE, mediaLibrarySession?.controllerForCurrentRequest?.packageName)
             }
             override fun setPlayWhenReady(playWhenReady: Boolean) {
                 if (playWhenReady) startPendingOrPlay() else pause()
@@ -487,7 +482,7 @@ class MusicService : MediaLibraryService() {
     override fun onDestroy() {
         AppPresence.playerServiceRunning = false
         serviceScope.cancel()
-        abandonSystemAudioFocus()
+        focus.abandon()
         equalizer.close()
         mediaLibrarySession?.run {
             removeSession(this)
@@ -502,5 +497,7 @@ class MusicService : MediaLibraryService() {
 
         /** Android Auto and the Automotive OS media center: allowed to browse and pick what to play. */
         private val CAR_HOSTS = setOf("com.google.android.projection.gearhead", "com.android.car.media")
+
+        private const val SOUND_TAKER_DELAY_MS = 700L
     }
 }

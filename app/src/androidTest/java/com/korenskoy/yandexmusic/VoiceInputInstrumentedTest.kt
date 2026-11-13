@@ -36,7 +36,7 @@ class VoiceInputInstrumentedTest {
 
     @Test
     fun whatWasSaidReachesTheApp() {
-        assumeTrue("No voice input on this device", VoiceInput.isAvailable(context))
+        assumeTrue("No voice input on this device", VoiceInput.hasSystemWindow(context))
         var asked: Intent? = null
         val registry = object : ActivityResultRegistry() {
             override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
@@ -72,7 +72,7 @@ class VoiceInputInstrumentedTest {
 
     @Test
     fun nothingSaidDoesNothing() {
-        assumeTrue("No voice input on this device", VoiceInput.isAvailable(context))
+        assumeTrue("No voice input on this device", VoiceInput.hasSystemWindow(context))
         val registry = object : ActivityResultRegistry() {
             override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
                 dispatchResult(requestCode, Activity.RESULT_CANCELED, null)

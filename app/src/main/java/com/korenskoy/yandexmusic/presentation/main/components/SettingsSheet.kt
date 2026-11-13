@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.data.player.BackgroundWork
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -694,6 +697,8 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
             }
         }
     }
+    // Beside the car: the microphone of "В авто" is where it is asked for most
+    VoiceSearchGroup()
     SettingsGroup(stringResource(R.string.settings_g_look)) {
         UiScaleRow(state.uiScaleAuto, actions.onUiScaleAutoChange, state.uiScaleManual, actions.onUiScaleManualChange)
         SegmentedRow(Icons.Rounded.Animation, stringResource(R.string.settings_animations)) {
@@ -736,12 +741,30 @@ private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActio
         SettingsRow(
             icon = Icons.Rounded.Timeline,
             title = stringResource(R.string.journal_title),
-            value = state.journal.summary.stalls.let { if (it == 0) stringResource(R.string.journal_none) else stringResource(R.string.journal_stops_row, it) },
+            value = state.journal.summary.stops.let { if (it == 0) stringResource(R.string.journal_none) else stringResource(R.string.journal_stops_row, it) },
             onClick = { journalOpen = true }
         )
     }
     if (journalOpen) {
-        PlaybackJournalDialog(state.journal, onShare = actions.onShareJournal, onClear = actions.onClearJournal, onDismiss = { journalOpen = false })
+        val context = LocalContext.current
+        // Asked again on coming back from the system's screen: the hint goes once it is allowed
+        var restricted by remember { mutableStateOf(BackgroundWork.restricted(context)) }
+        LifecycleResumeEffect(Unit) {
+            restricted = BackgroundWork.restricted(context)
+            onPauseOrDispose { }
+        }
+        PlaybackJournalDialog(
+            state.journal,
+            onShare = actions.onShareJournal,
+            onClear = actions.onClearJournal,
+            onDismiss = { journalOpen = false },
+            backgroundRestricted = restricted,
+            onAllowBackground = {
+                runCatching { context.startActivity(BackgroundWork.settingsIntent(context)) }
+                    .recoverCatching { context.startActivity(BackgroundWork.appDetailsIntent(context)) }
+                    .onFailure { Log.w("SettingsSheet", "No settings screen for background work", it) }
+            }
+        )
     }
     SettingsGroup(stringResource(R.string.settings_g_project)) {
         SettingsRow(icon = Icons.Rounded.Code, title = stringResource(R.string.settings_source_code), subtitle = "github.com/KorenskoyR/YandexMusicLite", onClick = { runCatching { uri.openUri(SOURCE_URL) } })
