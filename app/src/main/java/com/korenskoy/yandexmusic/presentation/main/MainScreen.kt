@@ -192,7 +192,6 @@ fun MainScreen(
     }
     // Another tab: the catalog pages belong to where they were opened
     LaunchedEffect(currentTab) { catalogVm.closeAll() }
-    InstallDownloadedUpdateOnResume(updateVm)
     PrefetchCovers(viewModel, currentTrack)
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -559,20 +558,5 @@ private fun PrefetchCovers(viewModel: MainViewModel, track: TrackDetailsDto?) {
     }
     LaunchedEffect(wavePreview) {
         com.korenskoy.yandexmusic.utils.prefetchCovers(context, wavePreview.take(5), listOf(CoverSize.Medium))
-    }
-}
-
-/** Back from the system installer's permission screen: continue the update that was waiting for it. */
-@Composable
-private fun InstallDownloadedUpdateOnResume(updateVm: UpdateViewModel) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && updateVm.downloadProgress.value >= 2f && updateVm.canRequestPackageInstalls) {
-                updateVm.installDownloaded()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }

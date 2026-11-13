@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import com.korenskoy.yandexmusic.data.updater.InstallGate
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import androidx.core.content.edit
@@ -68,8 +69,11 @@ class UpdateViewModel @Inject constructor(
             delay(5000L)
             checkForUpdates(silent = true)
         }
-        // Leftover update files from an earlier session
-        viewModelScope.launch(Dispatchers.IO) { updateManager.cleanupUpdateFiles() }
+        // Leftover update files and install sessions from an earlier run
+        viewModelScope.launch(Dispatchers.IO) {
+            updateManager.cleanupUpdateFiles()
+            if (!installer.busy) installer.abandonLeftovers()
+        }
         // A refused install is remembered too: next time the file is offered at once
         installer.state.onEach { state ->
             val version = (_checkResult.value as? UpdateCheckResult.UpdateAvailable)?.versionName
@@ -134,6 +138,8 @@ class UpdateViewModel @Inject constructor(
 
     fun installDownloaded(forceSystemInstall: Boolean = false) {
         val file = downloadedApkFile ?: return
+        // One update, one install: a second press or event while one is under way starts nothing
+        if (installer.busy) return
 
         // A broken, foreign or older package is never installed; forceSystemInstall only lets the
         // system installer handle a signing-key change (it will ask the user to reinstall)
@@ -154,7 +160,7 @@ class UpdateViewModel @Inject constructor(
             return
         }
         if (!updateManager.canRequestPackageInstalls()) {
-            updateManager.openInstallPermissionSettings()
+            openInstallPermissionSettings()
             _statusMessage.value = context.getString(R.string.update_err_allow_install)
             return
         }
@@ -183,7 +189,15 @@ class UpdateViewModel @Inject constructor(
      */
     fun onAppResumed() {
         if (installer.state.value == InstallState.Confirming) startWatchdog()
+        // Back from the permission screen the app sent the user to: the install goes on, once
+        if (InstallGate.installOnReturn(awaitingPermission, _downloadProgress.value >= 2f, updateManager.canRequestPackageInstalls(), installer.busy)) {
+            awaitingPermission = false
+            installDownloaded()
+        }
     }
+
+    /** The app sent the user to "allow installs from this source": only that return continues the install. */
+    private var awaitingPermission = false
 
     private fun startWatchdog() {
         if (watchdog?.isActive == true) return
@@ -224,6 +238,7 @@ class UpdateViewModel @Inject constructor(
         get() = updateManager.canRequestPackageInstalls()
 
     fun openInstallPermissionSettings() {
+        awaitingPermission = true
         updateManager.openInstallPermissionSettings()
     }
 
@@ -237,6 +252,7 @@ class UpdateViewModel @Inject constructor(
 
     fun dismiss() {
         // Closing the window stops a download in flight: it used to run on to the end unseen
+        awaitingPermission = false
         watchdog?.cancel()
         installer.reset()
         downloadJob?.cancel()

@@ -49,9 +49,29 @@ class SessionInstaller @Inject constructor(@ApplicationContext private val conte
     private val _state = MutableStateFlow<InstallState?>(null)
     val state: StateFlow<InstallState?> = _state.asStateFlow()
 
-    /** Writes [apk] into a new session and commits it. A failure here (some units refuse sessions) is returned. */
+    /** The one session of this update; -1 when none. */
+    @Volatile
+    private var activeSessionId = -1
+
+    /** The sessions whose "install?" window was already opened: the system's answer repeated opens no second one. */
+    private val confirmed = mutableSetOf<Int>()
+
+    /** An install is under way (handed to the system, waiting for the confirmation, or installing). */
+    val busy: Boolean get() = InstallGate.busy(_state.value)
+
+    /**
+     * Writes [apk] into a new session and commits it: one update, one session. While one is under way nothing new
+     * is started (every return to the app used to start another, each with its own "install?" window, and several
+     * installs of the same file at once hung the system's installer on «Обновление…»). Sessions left from earlier
+     * tries are closed first. A failure here (some units refuse sessions) is returned.
+     */
     suspend fun install(apk: File): Result<Unit> = withContext(Dispatchers.IO) {
+        if (busy) {
+            Log.i(TAG, "An install is under way: no second session")
+            return@withContext Result.success(Unit)
+        }
         val installer = context.packageManager.packageInstaller
+        abandonLeftovers()
         var sessionId = -1
         try {
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -68,6 +88,7 @@ class SessionInstaller @Inject constructor(@ApplicationContext private val conte
                 val callback = Intent(context, UpdateInstallReceiver::class.java).setAction(ACTION_STATUS)
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
                 val sender = PendingIntent.getBroadcast(context, sessionId, callback, flags).intentSender
+                activeSessionId = sessionId
                 _state.value = InstallState.Started
                 session.commit(sender)
             }
@@ -92,19 +113,42 @@ class SessionInstaller @Inject constructor(@ApplicationContext private val conte
         }
     }
 
-    /** Confirmed but nothing came back in time. */
+    /**
+     * Confirmed but nothing came back in time: the session is given up, so the system's window waiting for it is
+     * told "not installed" and closes (on most firmware), and the app says so.
+     */
     fun noAnswer() {
-        if (_state.value == InstallState.Started || _state.value == InstallState.Confirming) _state.value = InstallState.NoAnswer
+        if (!busy) return
+        val id = activeSessionId
+        if (id >= 0) abandon(context.packageManager.packageInstaller, id)
+        activeSessionId = -1
+        _state.value = InstallState.NoAnswer
     }
 
     fun reset() {
+        activeSessionId = -1
         _state.value = null
     }
 
+    /** Sessions of this app left from earlier tries or runs: closed, so no old "install?" window comes back. */
+    fun abandonLeftovers() {
+        val installer = context.packageManager.packageInstaller
+        runCatching { installer.mySessions }.getOrDefault(emptyList())
+            .filter { it.sessionId != activeSessionId }
+            .forEach { abandon(installer, it.sessionId) }
+    }
+
     internal fun onStatus(intent: Intent) {
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+        // An answer about a session given up or left from before: not this update's
+        if (!InstallGate.isCurrent(sessionId, activeSessionId)) {
+            Log.i(TAG, "Answer for session $sessionId, not the current $activeSessionId: ignored")
+            return
+        }
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                // The system's own "install?" window: shown on top of everything
+                // The system's own "install?" window: once per session
+                if (!InstallGate.firstConfirmation(confirmed, sessionId)) return
                 val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
                 if (confirm == null) {
                     _state.value = InstallState.Failed(null)
@@ -119,8 +163,9 @@ class SessionInstaller @Inject constructor(@ApplicationContext private val conte
                 }
             }
             // On success the app is replaced and restarts: this is rarely seen
-            PackageInstaller.STATUS_SUCCESS -> _state.value = null
+            PackageInstaller.STATUS_SUCCESS -> reset()
             else -> {
+                activeSessionId = -1
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                 Log.w(TAG, "Install failed: $status $message")
                 _state.value = if (status == PackageInstaller.STATUS_FAILURE_ABORTED) null else InstallState.Failed(message)
