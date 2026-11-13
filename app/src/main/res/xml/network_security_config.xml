@@ -20,8 +20,6 @@
         <domain includeSubdomains="true">hostingradio.ru</domain>
         <domain includeSubdomains="true">cdnvideo.ru</domain>
         <domain includeSubdomains="true">streamr.ru</domain>
-        <domain includeSubdomains="true">loveradio.ru</domain>
-        <domain includeSubdomains="true">radiodacha.ru</domain>
         <domain includeSubdomains="false">23.105.238.4</domain>
     </domain-config>
 </network-security-config>

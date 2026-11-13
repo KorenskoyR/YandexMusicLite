@@ -223,7 +223,8 @@ private fun StationRow(u: Scale, station: RadioStation, onAir: Boolean, favourit
                         )
                     }
                     Text(
-                        "${station.frequency} · ${station.category.title}", color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f),
+                        // On air the mark takes the room of the genre: the frequency and the stream's format stay whole
+                        listOfNotNull(station.frequency, station.format, station.category.title.takeIf { !onAir }).joinToString(" · "), color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f),
                         lineHeight = u.sp(20f), maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }

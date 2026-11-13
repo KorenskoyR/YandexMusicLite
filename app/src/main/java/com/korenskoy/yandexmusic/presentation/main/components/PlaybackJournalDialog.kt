@@ -81,7 +81,8 @@ fun PlaybackJournalDialog(
 private const val SHOWN = 30
 
 private fun eventColor(kind: PlaybackJournal.Kind): Color = when (kind) {
-    PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE -> HiFi.Warning
+    PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE,
+    PlaybackJournal.Kind.WAVE_REPEAT -> HiFi.Warning
     PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY, PlaybackJournal.Kind.LINK_BACK -> HiFi.Success
     else -> Color.White.copy(alpha = 0.82f)
 }
@@ -96,6 +97,10 @@ internal fun summaryLines(r: Resources, s: PlaybackJournal.Summary): List<Pair<S
     r.getString(R.string.journal_copies) to s.copySwitches.toString(),
     r.getString(R.string.journal_light) to s.lightTracks.toString(),
     r.getString(R.string.journal_crossfades) to r.getString(R.string.journal_crossfades_value, s.crossfades - s.crossfadesLate, s.crossfades)
+) + if (!s.waveUsed) emptyList() else listOf(
+    // Whether the service offers the same tracks again, and whether the app let any through
+    r.getString(R.string.journal_wave_offered_heard) to r.getString(R.string.journal_crossfades_value, s.waveOfferedHeard, s.waveOffered),
+    r.getString(R.string.journal_wave_repeats) to s.waveRepeats.toString()
 )
 
 internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
@@ -111,6 +116,8 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.LINK_WEAK -> r.getString(R.string.journal_event_link_weak, reason(r, e.valueMs))
         PlaybackJournal.Kind.LINK_NONE -> r.getString(R.string.journal_event_link_none, reason(r, e.valueMs))
         PlaybackJournal.Kind.LINK_BACK -> r.getString(R.string.journal_event_link_back, reason(r, e.valueMs))
+        PlaybackJournal.Kind.WAVE_BATCH -> r.getString(R.string.journal_event_wave_batch, e.valueMs.toInt(), e.count)
+        PlaybackJournal.Kind.WAVE_REPEAT -> r.getString(R.string.journal_event_wave_repeat, title).trim()
     }
 }
 

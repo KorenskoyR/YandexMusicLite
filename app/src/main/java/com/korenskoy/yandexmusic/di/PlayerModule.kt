@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.di
 
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.core.net.toUri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
@@ -32,6 +33,15 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object PlayerModule {
+
+    /**
+     * A station on HLS (Like FM, Авторадио) offers 128, 64 and 32 kbit/s: always the best, never the thin 32.
+     * A new one for each player: a selector belongs to one player.
+     */
+    internal fun bestVariantSelector(context: Context) = DefaultTrackSelector(
+        context,
+        DefaultTrackSelector.Parameters.Builder(context).setForceHighestSupportedBitrate(true).build()
+    )
 
     private fun createConfiguredExoPlayer(context: Context, audioSessionId: Int, card: CardStorage): ExoPlayer =
         createConfiguredExoPlayer(context, card).apply { if (audioSessionId > 0) setAudioSessionId(audioSessionId) }
@@ -69,6 +79,7 @@ object PlayerModule {
 
         return try {
             ExoPlayer.Builder(context, renderersFactory)
+                .setTrackSelector(bestVariantSelector(context))
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setLoadControl(PlaybackBuffering.loadControl())
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
@@ -77,6 +88,7 @@ object PlayerModule {
                 .build()
         } catch (e: Exception) {
             ExoPlayer.Builder(context, renderersFactory)
+                .setTrackSelector(bestVariantSelector(context))
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setLoadControl(PlaybackBuffering.loadControl())
                 .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)

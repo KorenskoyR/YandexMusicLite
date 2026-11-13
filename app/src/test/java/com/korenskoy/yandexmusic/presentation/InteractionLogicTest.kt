@@ -7,7 +7,6 @@ import com.korenskoy.yandexmusic.data.updater.GitHubUpdateManager
 import com.korenskoy.yandexmusic.presentation.update.UpdatePolicy
 import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.utils.toCoverUrl
-import com.korenskoy.yandexmusic.data.player.WaveQueue
 import com.korenskoy.yandexmusic.presentation.hifi.LoadState
 import com.korenskoy.yandexmusic.presentation.main.components.MiniGesture
 import com.korenskoy.yandexmusic.presentation.main.upcomingOf
@@ -78,16 +77,6 @@ class InteractionLogicTest {
         assertEquals(listOf("3", "4"), upcomingOf(q, "2", limit = 2).map { it.idString })
         assertTrue("current unknown", upcomingOf(q, "9").isEmpty())
         assertTrue("last track", upcomingOf(q, "5").isEmpty())
-    }
-
-    @Test
-    fun waveTakesTracksNotQueuedAndNotHeardLately() {
-        val batch = listOf(track("1"), track("2"), track("3"), track("4"))
-        val fresh = WaveQueue.freshOf(batch, queued = setOf("1")) { it == "2" }
-        assertEquals(listOf("3", "4"), fresh.map { it.idString })
-        val allHeard = WaveQueue.freshOf(batch, queued = setOf("1")) { true }
-        assertEquals("everything heard lately: still the ones not queued", listOf("2", "3", "4"), allHeard.map { it.idString })
-        assertTrue("all queued already", WaveQueue.freshOf(batch, queued = setOf("1", "2", "3", "4")) { false }.isEmpty())
     }
 
     @Test

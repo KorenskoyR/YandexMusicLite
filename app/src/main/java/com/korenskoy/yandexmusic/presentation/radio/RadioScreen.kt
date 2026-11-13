@@ -379,8 +379,9 @@ private fun OnAirCard(
     }
 }
 
+/** "Рок · 101.7 FM · MP3 256": the stream's real format too. */
 private fun stationSubtitle(station: RadioStation): String =
-    listOfNotNull(station.category.title, RadioDial.parseMhz(station.frequency)?.let { "$it FM" }).joinToString(" · ")
+    listOfNotNull(station.category.title, RadioDial.parseMhz(station.frequency)?.let { "$it FM" }, station.format).joinToString(" · ")
 
 /**
  * The receiver window: the FM scale with the favourite-station marks and a lit needle. Dragging moves the

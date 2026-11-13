@@ -223,7 +223,7 @@ class AccountSessionManager @Inject constructor(
 
     private suspend fun reloadAfterCacheClear() {
         resetUserData()
-        playbackController.clearWaveAndHistory()
+        playbackController.clearWaveKeepHistory()
         scope.launch { syncLikes() }
     }
 

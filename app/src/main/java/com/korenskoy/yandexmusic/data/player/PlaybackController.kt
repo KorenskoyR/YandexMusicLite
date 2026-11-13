@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import kotlinx.coroutines.channels.Channel
 import com.korenskoy.yandexmusic.data.repository.RadioRules
 import android.os.SystemClock
 import com.korenskoy.yandexmusic.data.network.NetworkMonitor
@@ -221,6 +222,7 @@ class PlaybackController @Inject constructor(
         isOffline = ::isOffline,
         userFolder = { activeUserFolder },
         keep = { !(skipExplicit.value && it.isExplicit) && !(skipAi.value && aiMarks.isAi(it.idString)) },
+        onGathered = { offered, heard -> if (offered > 0) journal.record(PlaybackJournal.Kind.WAVE_BATCH, valueMs = offered.toLong(), count = heard) },
         // Appended to the queue as it is now: tracks the user removed or moved stay that way
         onFresh = { fresh ->
             if (_currentSource.value == PlaylistSource.VIBE) {
@@ -229,6 +231,15 @@ class PlaybackController @Inject constructor(
         }
     )
     val isFetchingMoreQueue: StateFlow<Boolean> get() = wave.isFetching
+
+    /** The wave's feedback, sent one after another in the order it happened ("started" before "finished"). */
+    private val rotorFeedback = Channel<RotorFeedback>(Channel.UNLIMITED)
+
+    init {
+        scope.launch(Dispatchers.IO) {
+            for (item in rotorFeedback) deliverFeedback(item)
+        }
+    }
 
     /** What the wave will play when it is started; shown on the wave page while the wave is not playing. */
     val wavePreview: StateFlow<List<TrackDetailsDto>> get() = wave.preview
@@ -389,6 +400,8 @@ class PlaybackController @Inject constructor(
     ) {
         if (blocked()) return
         val track = playlist.find { it.idString == trackId } ?: return
+        // Reached by the wave though heard lately (not the same track started again): counted in the journal
+        val heardAgain = !chosen && _currentTrack.value?.idString != trackId && trackId in recentPlayedTrackIds
         if (!chosen && skippedOnTheWay(track)) {
             // Reached by the queue though it is to be passed over (its mark came late): the next that is not
             val index = playlist.indexOf(track)
@@ -412,6 +425,10 @@ class PlaybackController @Inject constructor(
         _currentTrack.value = track
         restoredPositionMs.value = startPositionMs
 
+        if (_currentSource.value != PlaylistSource.VIBE) wave.leave()
+        if (heardAgain && _currentSource.value == PlaylistSource.VIBE && track.isStreamed) {
+            journal.record(PlaybackJournal.Kind.WAVE_REPEAT, track.title)
+        }
         if (!track.isLocal) {
             recordTrackPlayed(trackId)
             reserve.markPlayed(trackId)
@@ -427,8 +444,8 @@ class PlaybackController @Inject constructor(
         if (_currentSource.value == PlaylistSource.VIBE && playlist.size - currentIndex <= 20) {
             wave.fetchMore()
         }
-        if (_currentSource.value == PlaylistSource.VIBE && !track.isRadio) {
-            sendRotorFeedback("trackStarted", trackId)
+        if (_currentSource.value == PlaylistSource.VIBE && track.isStreamed) {
+            sendRotorFeedback(RotorFeedback.TRACK_STARTED, track)
         }
 
         resolveAndPlay(track, crossfade, startPositionMs)
@@ -583,7 +600,7 @@ class PlaybackController @Inject constructor(
         val currentId = current.idString
         if (_currentSource.value == PlaylistSource.VIBE && sendFeedback) {
             val playedSeconds = progress.value / 1000.0
-            sendRotorFeedback(if (isAuto) "trackFinished" else "skip", currentId, playedSeconds)
+            sendRotorFeedback(if (isAuto) RotorFeedback.TRACK_FINISHED else RotorFeedback.SKIP, current, playedSeconds)
         }
 
         val playlist = _currentPlaylist.value
@@ -711,9 +728,16 @@ class PlaybackController @Inject constructor(
         if (userFolder != null) scope.launch { loadUserState(userFolder, restoreSession = false) }
     }
 
-    fun clearWaveAndHistory() {
+    /**
+     * After «Очистить кэш»: the wave's saved list goes, what was heard lately stays (the cache took its saved copy
+     * along, it is written again): a cleared cache must not bring the same tracks back.
+     */
+    fun clearWaveKeepHistory() {
         wave.clear()
-        recentPlayedTrackIds.clear()
+        wave.leave()
+        val heard = recentPlayedTrackIds.snapshot()
+        val folder = activeUserFolder
+        if (heard.isNotEmpty()) scope.launch { cacheManager.saveRecentTrackIds(folder, heard) }
     }
 
     /** Silent My Wave refresh on launch: append fresh unplayed tracks and warm their URLs. */
@@ -1557,16 +1581,28 @@ class PlaybackController @Inject constructor(
         scope.launch { cacheManager.saveRecentTrackIds(folder, snapshot) }
     }
 
-    private fun sendRotorFeedback(type: String, trackId: String, playedSeconds: Double? = null) {
+    /**
+     * Tells the wave's station what happened to [track]: the first track of a start of the station also tells it the
+     * station started. Each goes with the batch the track came in (unknown for a saved list: none).
+     */
+    private fun sendRotorFeedback(type: String, track: TrackDetailsDto, playedSeconds: Double? = null) {
+        if (authRepository.getToken().isNullOrEmpty()) return
         val station = wave.station
-        scope.launch(Dispatchers.IO) {
-            try {
-                api.sendStationFeedback(station, type, trackId, from = WaveQueue.feedbackFrom(station), totalPlayedSeconds = playedSeconds)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending rotor feedback $type", e)
-            }
+        val batchId = wave.batchOf(track.idString)
+        val now = System.currentTimeMillis()
+        if (type == RotorFeedback.TRACK_STARTED && wave.takeStart()) {
+            rotorFeedback.trySend(RotorFeedback(station, RotorFeedback.RADIO_STARTED, now, batchId = batchId))
+        }
+        rotorFeedback.trySend(RotorFeedback(station, type, now, track.idString, track.albumId, batchId, playedSeconds))
+    }
+
+    private suspend fun deliverFeedback(item: RotorFeedback) {
+        try {
+            api.sendStationFeedback(item.station, item.body(), item.batchId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Rotor feedback ${item.type} not sent", e)
         }
     }
 
@@ -1581,7 +1617,7 @@ class PlaybackController @Inject constructor(
     private fun radioTrackFor(station: RadioStation) = TrackDetailsDto(
         id = JsonPrimitive("radio_${station.id}"),
         title = station.name,
-        artists = listOf(ArtistDto(id = JsonPrimitive("0"), name = context.getString(R.string.radio_live_frequency, station.frequency))),
+        artists = listOf(ArtistDto(id = JsonPrimitive("0"), name = listOfNotNull(context.getString(R.string.radio_live_frequency, station.frequency), station.format).joinToString(" • "))),
         coverUri = station.iconRes?.let { "android.resource://${BuildConfig.APPLICATION_ID}/$it" } ?: station.logoUrl.ifEmpty { null },
         durationMs = 0,
         isRadio = true
@@ -1662,7 +1698,8 @@ class PlaybackController @Inject constructor(
         const val WAVE_RETRY_START_MS = 2_000L
         const val WAVE_RETRY_MAX_MS = 60_000L
         private const val TAG = "PlaybackController"
-        private const val RECENT_LIMIT = 100
+        /** About a day of listening: the wave does not bring these back. */
+        private const val RECENT_LIMIT = 300
         private const val URL_RETRY_DELAY_MS = 700L
         private const val SNAPSHOT_INTERVAL_MS = 15_000L
         private const val RESUMPTION_START_TIMEOUT_MS = 4_000L

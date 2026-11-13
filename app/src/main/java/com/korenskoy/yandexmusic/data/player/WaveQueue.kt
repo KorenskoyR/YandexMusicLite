@@ -7,9 +7,7 @@ import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
 import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +16,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 
 /** The tracks heard lately (most recent last), so the wave and the hits do not repeat them. */
@@ -27,13 +24,22 @@ internal class RecentlyPlayed(private val limit: Int) {
 
     operator fun contains(id: String): Boolean = id in ids
 
-    /** Records [id]; returns the new list to save, or null when nothing changed (radio, already there). */
+    /**
+     * Records [id] as the one heard last (heard before, it moves to the end: it is fresh again); returns the new
+     * list to save, or null when nothing changed (radio, the last one already).
+     */
     fun record(id: String): List<String>? {
-        if (id.isEmpty() || id.startsWith("radio_") || id in ids) return null
+        if (id.isEmpty() || id.startsWith("radio_") || ids.lastOrNull() == id) return null
+        ids.remove(id)
         ids.addLast(id)
         if (ids.size > limit) ids.removeFirst()
         return ids.toList()
     }
+
+    /** How long ago [id] was heard, in tracks (0 — the last one); null — not lately. */
+    fun age(id: String): Int? = ids.lastIndexOf(id).takeIf { it >= 0 }?.let { ids.size - 1 - it }
+
+    fun snapshot(): List<String> = ids.toList()
 
     fun restore(saved: List<String>) {
         ids.clear()
@@ -59,6 +65,8 @@ internal class WaveQueue(
     private val userFolder: () -> String,
     /** Tracks the user does not want in the wave (explicit, when asked) never join it. */
     private val keep: (TrackDetailsDto) -> Boolean = { true },
+    /** After a fetch: how many tracks the station offered and how many of them were heard lately (the journal). */
+    private val onGathered: (offered: Int, heard: Int) -> Unit = { _, _ -> },
     private val onFresh: (List<TrackDetailsDto>) -> Unit
 ) {
     private val _tracks = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
@@ -96,6 +104,28 @@ internal class WaveQueue(
     /** The generation a running fetch belongs to; a fetch for an older one does not hold back a new one. */
     private var fetchingGeneration = -1
 
+    /** The station's answer each track came in: its feedback names it. The latest few hundred are kept. */
+    private val batches = object : LinkedHashMap<String, String>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > BATCHES_KEPT
+    }
+
+    fun batchOf(trackId: String): String? = batches[trackId]
+
+    /** The generation the service was told the station started for. */
+    private var startedGeneration = -1
+
+    /** True once for each start of the station: the first track the wave plays tells the service it started. */
+    fun takeStart(): Boolean {
+        if (startedGeneration == generation) return false
+        startedGeneration = generation
+        return true
+    }
+
+    /** The music went elsewhere: coming back to the wave starts the station again. */
+    fun leave() {
+        startedGeneration = -1
+    }
+
     /** The first track not heard lately (or simply the first one). */
     fun firstUnplayed(): TrackDetailsDto? = _tracks.value.firstOrNull { it.idString !in recent } ?: _tracks.value.firstOrNull()
 
@@ -128,10 +158,16 @@ internal class WaveQueue(
         scope.launch {
             var hasNew = false
             try {
-                val batch = withContext(Dispatchers.IO) { fetchBatch() }.filter(keep)
+                val from = station
+                val queued = _tracks.value.map { it.idString }.toSet()
+                val gathered = gather(_tracks.value.lastOrNull()?.idString, queued, recent::age) { queue -> ask(from, queue) }
                 // The station changed meanwhile: these tracks belong to the old one
                 if (fetchingFor != generation) return@launch
-                val fresh = freshOf(batch, _tracks.value.map { it.idString }.toSet()) { it in recent }
+                batches.putAll(gathered.batches)
+                onGathered(gathered.offered, gathered.heard)
+                // Tracks that came in meanwhile (a restore) are not added twice
+                val now = _tracks.value.map { it.idString }.toSet()
+                val fresh = gathered.tracks.filter { it.idString !in now }
                 if (fresh.isNotEmpty()) {
                     _tracks.value = _tracks.value + fresh
                     hasNew = true
@@ -161,24 +197,23 @@ internal class WaveQueue(
         fetchMore { added -> if (cont.isActive) cont.resumeWith(Result.success(added)) }
     }
 
-    private suspend fun fetchBatch(): List<TrackDetailsDto> = supervisorScope {
-        // One request continues from the last queued track, the other adds variety
-        val lastQueued = _tracks.value.lastOrNull()?.idString
-        val from = station
-        val continued = async { api.getStationTracks(from, queue = lastQueued).result?.sequence?.mapNotNull { it.track } }
-        val fresh = async { api.getStationTracks(from).result?.sequence?.mapNotNull { it.track } }
-        (continued.awaitOrEmpty() + fresh.awaitOrEmpty()).distinctBy { it.idString }
-    }
-
-    /** One of the two requests failing leaves the other; cancellation is never swallowed. */
-    private suspend fun Deferred<List<TrackDetailsDto>?>.awaitOrEmpty(): List<TrackDetailsDto> = try {
-        await().orEmpty()
+    /** One request to [from] (a null [queue]: from the station's start); a failure is null, cancellation is not swallowed. */
+    private suspend fun ask(from: String, queue: String?): Answer? = try {
+        withContext(Dispatchers.IO) { api.getStationTracks(from, queue = queue) }.result?.let { answer ->
+            Answer(answer.sequence.mapNotNull { it.track }.filter(keep), answer.batchId)
+        }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         Log.w(TAG, "Wave request failed", e)
-        emptyList()
+        null
     }
+
+    /** One answer of the station: its tracks (the unwanted ones left out) and the batch they came in. */
+    internal data class Answer(val tracks: List<TrackDetailsDto>, val batchId: String?)
+
+    /** What a fetch brought: the tracks to add, the batch each offered track came in, the offered and heard counts. */
+    internal data class Gathered(val tracks: List<TrackDetailsDto>, val batches: Map<String, String>, val offered: Int, val heard: Int)
 
     companion object {
         private const val TAG = "WaveQueue"
@@ -190,12 +225,54 @@ internal class WaveQueue(
         fun feedbackFrom(station: String) = "radio-" + station.replace(':', '-')
         const val PREVIEW_SIZE = 10
 
+        /** At most this many requests make one fetch. */
+        const val MAX_ASKS = 3
+
+        /** Only tracks heard lately on offer: this many of them, the ones heard longest ago, so the wave goes on. */
+        const val FALLBACK_TAKE = 3
+
+        private const val BATCHES_KEPT = 500
+
         /**
-         * Which tracks of a fetched [batch] to add: not queued yet and not heard lately; if every one was heard
-         * lately, still the ones not queued. Pure; unit-tested.
+         * One fetch, apart from the network ([ask] is one request; a null queue asks from the station's start).
+         * It goes on from [lastQueued]; when all it offers is queued or was heard lately, it goes on once more from
+         * the end of that answer, then asks from the start. Only when every answer is made of such tracks do the ones
+         * heard longest ago come, a few. ([heardAge]: how long ago a track was heard, in tracks; null — not lately.)
+         * Pure; unit-tested.
          */
-        fun freshOf(batch: List<TrackDetailsDto>, queued: Set<String>, heardLately: (String) -> Boolean): List<TrackDetailsDto> =
-            batch.filter { it.idString !in queued && !heardLately(it.idString) }
-                .ifEmpty { batch.filter { it.idString !in queued } }
+        suspend fun gather(
+            lastQueued: String?,
+            queued: Set<String>,
+            heardAge: (String) -> Int?,
+            ask: suspend (queue: String?) -> Answer?
+        ): Gathered {
+            val offered = LinkedHashMap<String, TrackDetailsDto>()
+            val batches = HashMap<String, String>()
+            var next = lastQueued
+            var askedFromStart = false
+            var fresh = emptyList<TrackDetailsDto>()
+            var step = 0
+            // Asking from the start twice would bring the same answer
+            fun canAsk() = step < MAX_ASKS && (next != null || !askedFromStart)
+            while (fresh.isEmpty() && canAsk()) {
+                val queue = next
+                if (queue == null) askedFromStart = true
+                val answer = ask(queue)
+                answer?.tracks?.forEach { track ->
+                    offered.putIfAbsent(track.idString, track)
+                    answer.batchId?.let { batches.putIfAbsent(track.idString, it) }
+                }
+                fresh = answer?.tracks.orEmpty().filter { it.idString !in queued && heardAge(it.idString) == null }.distinctBy { it.idString }
+                // Once more from the end of this answer, then from the station's start
+                next = if (step == 0) answer?.tracks?.lastOrNull()?.idString else null
+                step++
+            }
+            val tracks = fresh.ifEmpty {
+                offered.values.filter { it.idString !in queued }
+                    .sortedByDescending { heardAge(it.idString) ?: Int.MAX_VALUE }
+                    .take(FALLBACK_TAKE)
+            }
+            return Gathered(tracks, batches, offered.size, offered.keys.count { heardAge(it) != null })
+        }
     }
 }

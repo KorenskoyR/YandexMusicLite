@@ -219,18 +219,17 @@ interface YandexMusicApi {
     @GET("rotor/station/{station}/tracks")
     suspend fun getStationTracks(
         @Path("station", encoded = true) station: String,
-        @retrofit2.http.Query("queue") queue: String? = null
+        @retrofit2.http.Query("queue") queue: String? = null,
+        /** The station's settings (character, mood, language) apply to what it offers. */
+        @retrofit2.http.Query("settings2") settings2: Boolean = true
     ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.RotorStationTracksResponseDto>
 
+    /** What was heard: a JSON body (see RotorFeedback), the batch the track came in as a parameter. */
     @retrofit2.http.POST("rotor/station/{station}/feedback")
-    @retrofit2.http.FormUrlEncoded
     suspend fun sendStationFeedback(
         @Path("station", encoded = true) station: String,
-        @retrofit2.http.Field("type") type: String,
-        @retrofit2.http.Field("trackId") trackId: String,
-        @retrofit2.http.Field("albumId") albumId: String? = null,
-        @retrofit2.http.Field("from") from: String,
-        @retrofit2.http.Field("totalPlayedSeconds") totalPlayedSeconds: Double? = null
+        @retrofit2.http.Body feedback: kotlinx.serialization.json.JsonObject,
+        @retrofit2.http.Query("batch-id") batchId: String? = null
     ): ResponseWrapper<kotlinx.serialization.json.JsonElement>
 
     /** The station and the user's settings for it (character, mood, language). */

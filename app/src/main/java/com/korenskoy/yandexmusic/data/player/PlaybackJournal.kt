@@ -36,10 +36,14 @@ class PlaybackJournal(private val now: () -> Long) {
         /** "Нет связи"; [Event.valueMs] is the [LinkReason]'s ordinal. */
         LINK_NONE,
         /** The link is good again; [Event.valueMs] is the [LinkReason]'s ordinal. */
-        LINK_BACK
+        LINK_BACK,
+        /** The wave fetched more: [Event.valueMs] tracks offered, [Event.count] of them heard lately. */
+        WAVE_BATCH,
+        /** The wave played a track heard lately. */
+        WAVE_REPEAT
     }
 
-    data class Event(val atMs: Long, val kind: Kind, val title: String? = null, val valueMs: Long = 0L) {
+    data class Event(val atMs: Long, val kind: Kind, val title: String? = null, val valueMs: Long = 0L, val count: Int = 0) {
         /** Worth a line in the list; ordinary crossfades are only counted. */
         val notable: Boolean get() = kind != Kind.CROSSFADE
     }
@@ -51,8 +55,15 @@ class PlaybackJournal(private val now: () -> Long) {
         val copySwitches: Int = 0,
         val lightTracks: Int = 0,
         val crossfades: Int = 0,
-        val crossfadesLate: Int = 0
-    )
+        val crossfadesLate: Int = 0,
+        /** Tracks the wave's station offered, and how many of them were heard lately. */
+        val waveOffered: Int = 0,
+        val waveOfferedHeard: Int = 0,
+        val waveRepeats: Int = 0
+    ) {
+        /** The wave played in this hour: its lines are shown. */
+        val waveUsed: Boolean get() = waveOffered > 0 || waveRepeats > 0
+    }
 
     data class Snapshot(val summary: Summary = Summary(), val events: List<Event> = emptyList())
 
@@ -62,8 +73,8 @@ class PlaybackJournal(private val now: () -> Long) {
     val state: StateFlow<Snapshot> = _state.asStateFlow()
 
     @Synchronized
-    fun record(kind: Kind, title: String? = null, valueMs: Long = 0L) {
-        events.addLast(Event(now(), kind, title, valueMs))
+    fun record(kind: Kind, title: String? = null, valueMs: Long = 0L, count: Int = 0) {
+        events.addLast(Event(now(), kind, title, valueMs, count))
         publish()
     }
 
@@ -87,6 +98,7 @@ class PlaybackJournal(private val now: () -> Long) {
         while (events.isNotEmpty() && events.first().atMs < since) events.removeFirst()
         while (played.isNotEmpty() && played.first().first < since) played.removeFirst()
         val stalls = events.filter { it.kind == Kind.STALL }
+        val batches = events.filter { it.kind == Kind.WAVE_BATCH }
         _state.value = Snapshot(
             Summary(
                 playedMs = played.sumOf { it.second },
@@ -95,7 +107,10 @@ class PlaybackJournal(private val now: () -> Long) {
                 copySwitches = events.count { it.kind == Kind.COPY },
                 lightTracks = events.count { it.kind == Kind.LIGHT },
                 crossfades = events.count { it.kind == Kind.CROSSFADE || it.kind == Kind.CROSSFADE_LATE },
-                crossfadesLate = events.count { it.kind == Kind.CROSSFADE_LATE }
+                crossfadesLate = events.count { it.kind == Kind.CROSSFADE_LATE },
+                waveOffered = batches.sumOf { it.valueMs.toInt() },
+                waveOfferedHeard = batches.sumOf { it.count },
+                waveRepeats = events.count { it.kind == Kind.WAVE_REPEAT }
             ),
             events.filter { it.notable }.takeLast(MAX_SHOWN)
         )

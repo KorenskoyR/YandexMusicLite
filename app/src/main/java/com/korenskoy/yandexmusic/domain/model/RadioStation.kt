@@ -9,7 +9,8 @@ data class RadioStation(
     val streamUrl: String,
     val logoUrl: String,
     val category: RadioCategory,
-    val bitRate: Int = 192,
+    /** What the stream really is ("MP3 256", "AAC 96"), measured from the stream itself, not from its address. */
+    val format: String? = null,
     val isFavorite: Boolean = false,
     @DrawableRes val iconRes: Int? = null,
     val brandColorStart: Long = 0xFF33333C,

@@ -722,4 +722,8 @@
     <string name="update_done_channel">Обновления приложения</string>
     <string name="update_done_title">Yandex Music Lite обновлён до %1$s</string>
     <string name="update_done_text">Нажмите, чтобы открыть</string>
+    <string name="journal_wave_offered_heard">Волна: уже звучавших в подгрузках</string>
+    <string name="journal_wave_repeats">Волна: сыграно повторов</string>
+    <string name="journal_event_wave_batch">Волна подгружена: треков %1$d, из них уже звучали %2$d</string>
+    <string name="journal_event_wave_repeat">%1$s — повтор в волне</string>
 </resources>
