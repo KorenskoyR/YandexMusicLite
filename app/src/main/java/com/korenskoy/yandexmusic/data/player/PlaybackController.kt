@@ -165,7 +165,7 @@ class PlaybackController @Inject constructor(
     /** Whether the link is uneven: the music waited for data mid-track. */
     private val steadiness = LinkSteadiness(SystemClock::elapsedRealtime)
     /** The track that has been heard: only its stops count, not the wait before a track starts. */
-    private var soundedTrackId: String? = null
+    private val heard = HeardTrack()
     private var stallLastedJob: Job? = null
 
     /** A track of the network waiting to start sounding: since when, and its title. */
@@ -319,6 +319,9 @@ class PlaybackController @Inject constructor(
             .onEach { playerRepository.setCrossfadeDuration(it * 1000L) }
             .launchIn(scope)
 
+        // Another track in the player: not heard yet, whichever way it started (a crossfade, a source of its own)
+        playerRepository.currentTrackId.onEach { heard.onStart() }.launchIn(scope)
+
         // A track that actually renders audio resets error recovery.
         combine(playerRepository.soundingTrackId, playerRepository.isBuffering, playerRepository.currentTrackId) { sounding, buffering, current ->
             sounding != null && sounding == current && !buffering
@@ -329,7 +332,7 @@ class PlaybackController @Inject constructor(
                     _isStarting.value = false
                     consecutiveFailedTracks = 0
                     retriedTrackId = null
-                    soundedTrackId = playerRepository.currentTrackId.value
+                    heard.onAudible(playerRepository.currentTrackId.value)
                     if (streamingTrackId != null && streamingTrackId == _currentTrack.value?.idString) {
                         blockedStreamHost = null
                         updateLink(LinkReason.STREAM_SOUNDS) { onStreamAudible() }
@@ -991,6 +994,8 @@ class PlaybackController @Inject constructor(
     private fun resolveAndPlay(track: TrackDetailsDto, crossfade: Boolean, startPositionMs: Long) {
         if (blocked()) return
         currentPlayJob?.cancel()
+        // Its first wait for data is its start, not a stop mid-track
+        heard.onStart()
         val trackId = track.idString
         val title = track.title
         val artist = track.artists.firstOrNull()?.name
@@ -1240,7 +1245,7 @@ class PlaybackController @Inject constructor(
                     return@onEach
                 }
                 // A slow flash drive is not a bad link
-                val midTrack = trackId != null && trackId == soundedTrackId && track?.idString == trackId && track.isStreamed
+                val midTrack = heard.isMidTrack(trackId) && track != null && track.idString == trackId && track.isStreamed
                 if (!midTrack) {
                     startWait = if (track?.isStreamed == true && track.idString == trackId) SystemClock.elapsedRealtime() to track.title else null
                     return@onEach

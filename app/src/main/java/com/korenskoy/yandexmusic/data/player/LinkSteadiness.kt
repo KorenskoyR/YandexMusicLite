@@ -69,6 +69,29 @@ internal class LinkSteadiness(private val now: () -> Long) {
     }
 }
 
+/**
+ * Which track has been heard since it started: only its waits for data are stops in the middle of a track. A track
+ * that starts (another one, or the same one again) has not been heard yet. Kept from the last heard track, the
+ * start of a track the listener came back to counted as a stop mid-track: two of them, and the link was "uneven" with
+ * a perfect Wi-Fi — the light stream for five minutes on every track (1.14.9 report). Pure; unit-tested.
+ */
+internal class HeardTrack {
+    private var id: String? = null
+
+    /** A track starts: from the top, from a picked second, or again. */
+    fun onStart() {
+        id = null
+    }
+
+    /** The track sounds. */
+    fun onAudible(trackId: String?) {
+        id = trackId
+    }
+
+    /** Waiting for data now is a stop in the middle of this track. */
+    fun isMidTrack(trackId: String?): Boolean = trackId != null && trackId == id
+}
+
 /** Where a track that is not downloaded comes from while the link is uneven. */
 enum class SmoothOrigin { COPY, LIGHT_STREAM, CHOSEN_STREAM }
 
