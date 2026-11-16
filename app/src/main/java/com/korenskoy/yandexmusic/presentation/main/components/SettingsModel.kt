@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.data.player.AppEqualizer
 import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
 import com.korenskoy.yandexmusic.data.player.PlaybackJournal
@@ -17,10 +18,18 @@ enum class SettingsPage {
     ACCOUNT, PLAYBACK, INTERFACE, ABOUT,
 
     /** «Поддержать разработчика», opened from [ABOUT]: Back leads there. */
-    SUPPORT;
+    SUPPORT,
+
+    /** The app's own equalizer, opened from [PLAYBACK]: Back leads there. */
+    EQUALIZER;
 
     /** The page a sub-page returns to; null — the root list. */
-    val parent: SettingsPage? get() = if (this == SUPPORT) ABOUT else null
+    val parent: SettingsPage?
+        get() = when (this) {
+            SUPPORT -> ABOUT
+            EQUALIZER -> PLAYBACK
+            else -> null
+        }
 }
 
 /** Everything the settings show, in one value: the sheet draws it and calls [SettingsActions]. */
@@ -40,6 +49,10 @@ data class SettingsUiState(
     val crossfadeSeconds: Int = 3,
     val normalizeVolume: Boolean = false,
     val equalizerAvailable: Boolean = false,
+    /** The device's equalizer is an app of its own (a head unit's): its name. */
+    val equalizerApp: String? = null,
+    /** The app's own equalizer, for a device with none to open. */
+    val appEqualizer: AppEqualizer.State = AppEqualizer.State(),
     val startMusic: StartMusic = StartMusic.OFF,
     val bluetoothAutoplay: Boolean = false,
     val skipExplicit: Boolean = false,
@@ -76,6 +89,8 @@ data class SettingsActions(
     val onCrossfadeChange: (Int) -> Unit = {},
     val onNormalizeVolumeChange: (Boolean) -> Unit = {},
     val onOpenEqualizer: () -> Unit = {},
+    /** The app's own equalizer. */
+    val equalizer: EqualizerActions = EqualizerActions(),
     /** The sound settings opened: look for an equalizer again. */
     val onRefreshEqualizer: () -> Unit = {},
     val onStartMusicChange: (StartMusic) -> Unit = {},

@@ -6,7 +6,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /** Playback failure of the active track; [positionMs] lets the controller retry from the same place. */
-data class PlaybackFailure(val trackId: String, val positionMs: Long, val reason: String)
+data class PlaybackFailure(
+    val trackId: String,
+    val positionMs: Long,
+    val reason: String,
+    /** The server the failed stream came from (null for a file or a copy): checked when the service still answers. */
+    val streamHost: String? = null
+)
 
 interface PlayerRepository {
     val currentTrackId: StateFlow<String?>
@@ -47,6 +53,9 @@ interface PlayerRepository {
 
     /** Music in hand ahead of the playing position; as good as unlimited when unknown. */
     val bufferedAheadMs: Long get() = Long.MAX_VALUE
+
+    /** The server the playing track streams from; null for a file, a copy or nothing. */
+    val currentStreamHost: String? get() = null
 
     /** Waiting after a seek: the listener asked for it, it is no stop of the music. */
     val waitsAfterSeek: Boolean get() = false

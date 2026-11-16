@@ -43,6 +43,21 @@ class RadioStreamsTest {
         }
     }
 
+    /**
+     * The report: louder after switching from the wave to the radio. Every station has its loudness measured from its
+     * stream; with "Выравнивание громкости" a loud one is brought down to the music's -14 LUFS as a track is.
+     */
+    @Test
+    fun aLoudStationIsBroughtDownToTheMusicLikeALoudTrack() {
+        val loudness = Regex("""RadioStation\("([^"]+)"[^\n]*?loudness = (-?\d+\.\d)""").findAll(repository)
+            .associate { it.groupValues[1] to it.groupValues[2].toDouble() }
+        assertTrue("measured: ${loudness.size}", loudness.size >= stations.size - 1)
+        loudness.forEach { (id, lufs) -> assertTrue("$id: $lufs LUFS", lufs in -30.0..-5.0) }
+        val record = com.korenskoy.yandexmusic.data.player.Loudness.gainFor(loudness.getValue("record"))
+        assertEquals("Radio Record at -7.8 LUFS: 6.2 dB down", 0.49f, record, 0.01f)
+        assertEquals("a quiet talk station is not raised", 1f, com.korenskoy.yandexmusic.data.player.Loudness.gainFor(loudness.getValue("vesti_fm")), 0.0001f)
+    }
+
     @Test
     fun theStreamsThatGotBetterStayBetter() {
         val byId = stations.associate { it.first to it.third }

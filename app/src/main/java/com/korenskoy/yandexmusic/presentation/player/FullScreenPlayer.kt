@@ -33,7 +33,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -299,7 +299,7 @@ fun FullScreenPlayer(
         if (isLandscape) BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .systemBarsPadding()
+                .safeDrawingPadding()
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
             // As tall as the screen, but never more than 42% of its width: on a low wide unit (800 × 480) the
@@ -324,9 +324,10 @@ fun FullScreenPlayer(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .widthIn(max = 560.dp)
+                    // A phone's width on a phone; wider on a tablet, so the cover grows with the screen
+                    .widthIn(max = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.standingColumn(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp))
                     .align(Alignment.TopCenter)
-                    .systemBarsPadding()
+                    .safeDrawingPadding()
                     .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp)
             ) {
                 header()

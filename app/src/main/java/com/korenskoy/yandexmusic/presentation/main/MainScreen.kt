@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.safeDrawing
 import com.korenskoy.yandexmusic.presentation.hifi.LocalLyrics
 import kotlinx.coroutines.flow.map
 import androidx.lifecycle.compose.LifecycleStartEffect
@@ -214,8 +215,9 @@ fun MainScreen(
     val appTint = rememberArtworkTint(coverForTint, stationTint)
     val tabStates = rememberSaveableStateHolder()
     val contentBottom = if (isLandscape) DockClearance else if (currentTrack != null) 168.dp else 100.dp
-    // On a side a notch or a three-button bar sits next to the page, and the pages run edge to edge
-    val sideInsets = WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal)
+    // A notch, a three-button bar or a car's own panel can sit on either side, standing or lying: the pages keep
+    // clear of all of them, their backgrounds run edge to edge
+    val sideInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
     // On the wave page the mini-player shows in the orientations chosen in the settings; elsewhere the page
     // already shows the playing wave. Where it shows, the page's own "Плеер ›" is not needed
     val miniOnWave by viewModel.miniOnWave.collectAsStateWithLifecycle()
@@ -261,7 +263,7 @@ fun MainScreen(
                             contentKey = { (_, page) -> page?.page },
                             transitionSpec = { catalogTransition(forward = targetState.first > initialState.first, lite = lite) },
                             label = "catalog_page",
-                            modifier = if (isLandscape && tab != MainTab.CAR) Modifier.windowInsetsPadding(sideInsets) else Modifier
+                            modifier = if (tab != MainTab.CAR) Modifier.windowInsetsPadding(sideInsets) else Modifier
                         ) { (_, catalogTop) ->
                         if (catalogTop != null) {
                             val albumId = (catalogTop.page as? CatalogPage.Album)?.id
@@ -417,11 +419,14 @@ fun MainScreen(
                     }
                 }
                 // In the car the message sits right above the big source dock, never over it
-                val bars = WindowInsets.systemBars.asPaddingValues()
+                val bars = WindowInsets.safeDrawing.asPaddingValues()
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                 val snackBottom = when {
                     currentTab == MainTab.CAR -> com.korenskoy.yandexmusic.presentation.car.carDockClearance(
-                        maxWidth, maxHeight, maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(), isLandscape
+                        maxWidth - bars.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) -
+                            bars.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                        maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(),
+                        isLandscape
                     )
                     isLandscape -> DockClearance
                     currentTrack != null -> 160.dp

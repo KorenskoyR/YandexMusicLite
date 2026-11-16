@@ -1,6 +1,5 @@
 package com.korenskoy.yandexmusic.presentation
 
-import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -187,10 +186,11 @@ class LandscapeDockTest {
 
     @Test
     fun aWiderScreenTakesMoreCoversNotBiggerOnes() {
-        assertEquals(4, landscapeColumns(800))
-        assertEquals(4, landscapeColumns(1024))
-        assertEquals(6, landscapeColumns(1280))
-        assertEquals(6, landscapeColumns(1920))
+        // The content's width (the window less 2 × 20 dp): a phone on its side, head units, a 1280 tablet, 1920
+        assertEquals(4, com.korenskoy.yandexmusic.presentation.hifi.Adaptive.gridColumns(875))
+        assertEquals(4, com.korenskoy.yandexmusic.presentation.hifi.Adaptive.gridColumns(760))
+        assertEquals(6, com.korenskoy.yandexmusic.presentation.hifi.Adaptive.gridColumns(1240))
+        assertEquals(8, com.korenskoy.yandexmusic.presentation.hifi.Adaptive.gridColumns(1880))
     }
 
     @Test

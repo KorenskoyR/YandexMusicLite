@@ -91,6 +91,11 @@ class NetworkMonitor @Inject constructor(
         answers(probeClient, PROBE_URL, timeoutMs)
     }
 
+    /** Any answer from [url] (a server of streams): with no data to speak of, nothing of the account sent. */
+    suspend fun isReachable(url: String, timeoutMs: Int = 1500): Boolean = withContext(Dispatchers.IO) {
+        answers(probeClient, url, timeoutMs)
+    }
+
     companion object {
         private const val PROBE_URL = "https://api.music.yandex.net/"
 

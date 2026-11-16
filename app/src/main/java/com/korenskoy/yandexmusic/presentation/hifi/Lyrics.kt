@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -127,6 +128,9 @@ private const val LEAD_MS = 250L
 /** Manual scrolling pauses automatic lyric following for this long. */
 private const val USER_SCROLL_PAUSE_MS = 3_500L
 
+/** A jump of more lines than this (a seek, a long pause) is made at once, not animated through every line. */
+private const val FAR_LINES = 3
+
 /**
  * The words over a cover: darkened background, smooth scrolling, softly faded edges.
  * For synced lyrics, lines highlight dynamically in rhythm with [progress], and tapping a line calls [onSeek].
@@ -225,16 +229,32 @@ private fun SyncedLyricsView(
     padding: Dp,
     modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
     val listState = rememberLazyListState()
     val currentLineIndex by remember(lines) {
         derivedStateOf { LyricsRules.currentIndex(lines, progress() + LEAD_MS) }
     }
+    // Following pauses only for the user's own finger: the list's own animated scroll is a scroll in progress too, and
+    // counting it as the user's paused following after every line — the current line ran off the bottom (1.14.8)
     var userScrolledUntilMs by remember { mutableLongStateOf(0L) }
-
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            userScrolledUntilMs = SystemClock.elapsedRealtime() + USER_SCROLL_PAUSE_MS
+    var dragging by remember { mutableStateOf(false) }
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is DragInteraction.Start -> dragging = true
+                is DragInteraction.Stop, is DragInteraction.Cancel -> {
+                    dragging = false
+                    userScrolledUntilMs = SystemClock.elapsedRealtime() + USER_SCROLL_PAUSE_MS
+                }
+            }
+        }
+    }
+    // When the pause runs out the words come back to the current line by themselves, not at the next line only
+    var resumed by remember { mutableIntStateOf(0) }
+    LaunchedEffect(userScrolledUntilMs) {
+        val wait = userScrolledUntilMs - SystemClock.elapsedRealtime()
+        if (wait > 0) {
+            delay(wait)
+            resumed++
         }
     }
 
@@ -246,24 +266,15 @@ private fun SyncedLyricsView(
     }
 
     BoxWithConstraints(modifier = modifier) {
-        val viewportHeightPx = with(density) { maxHeight.toPx() }
-        val targetOffsetPx = -(viewportHeightPx * 0.28f).toInt()
-
-        LaunchedEffect(currentLineIndex, userScrolledUntilMs) {
-            val now = SystemClock.elapsedRealtime()
-            if (now < userScrolledUntilMs) return@LaunchedEffect
+        LaunchedEffect(currentLineIndex, resumed, dragging) {
+            if (dragging || SystemClock.elapsedRealtime() < userScrolledUntilMs) return@LaunchedEffect
             if (currentLineIndex < 0) return@LaunchedEffect
-
             val target = currentLineIndex.coerceIn(0, lines.lastIndex)
-            val diff = abs(target - lastScrolledIndex)
-            val wasInitial = lastScrolledIndex == -1
+            val far = lastScrolledIndex == -1 || abs(target - lastScrolledIndex) > FAR_LINES ||
+                listState.layoutInfo.visibleItemsInfo.none { it.index == target }
             lastScrolledIndex = target
-
-            if (diff > 3 || wasInitial) {
-                listState.scrollToItem(target, targetOffsetPx)
-            } else if (diff > 0) {
-                listState.animateScrollToItem(target, targetOffsetPx)
-            }
+            // The current line at the top padding: about a third down the panel, the next lines in view under it
+            if (far) listState.scrollToItem(target) else listState.animateScrollToItem(target)
         }
 
         LazyColumn(

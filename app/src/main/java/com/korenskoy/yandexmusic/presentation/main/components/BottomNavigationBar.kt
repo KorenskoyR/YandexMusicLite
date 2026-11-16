@@ -166,8 +166,6 @@ internal fun dockTabsWidth(windowWidthDp: Int): Int = when {
     else -> minOf(330, (windowWidthDp * 0.52f).toInt())
 }
 
-/** Rows of covers on a side: the wider the screen, the more of them, so a cover stays a cover and not a poster. */
-internal fun landscapeColumns(windowWidthDp: Int): Int = (windowWidthDp / 210).coerceIn(4, 6)
 
 val DockHeight = 62.dp
 val DockBottomGap = 10.dp

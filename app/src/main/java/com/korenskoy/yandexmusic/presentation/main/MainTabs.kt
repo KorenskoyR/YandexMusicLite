@@ -456,6 +456,7 @@ internal fun settingsHost(
             onCrossfadeChange = settingsVm::setCrossfade,
             onNormalizeVolumeChange = settingsVm::setNormalizeVolume,
             onOpenEqualizer = settingsVm::openEqualizer,
+            equalizer = settingsVm.equalizerActions,
             onRefreshEqualizer = settingsVm::refreshEqualizer,
             onSmoothPlaybackChange = settingsVm::setSmoothPlayback,
             onShareJournal = settingsVm::shareJournal,

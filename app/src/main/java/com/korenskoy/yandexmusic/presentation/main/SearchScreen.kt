@@ -3,7 +3,6 @@ package com.korenskoy.yandexmusic.presentation.main
 import androidx.compose.material.icons.rounded.Mic
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
-import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
 import kotlin.math.roundToInt
@@ -172,7 +171,7 @@ fun SearchScreen(
                     trendTracks = trendTracks,
                     contentStart = contentStart,
                     contentBottom = contentBottom,
-                    columns = if (isLandscape) landscapeColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp) else 2,
+                    columns = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.gridColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp - 40),
                     onTrackClick = onTrackClick,
                     onLoadMoreHits = onLoadMoreHits,
                     onLoadMoreTrends = onLoadMoreTrends

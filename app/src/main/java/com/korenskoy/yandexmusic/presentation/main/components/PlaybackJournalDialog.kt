@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.data.player.PlaybackController
 import com.korenskoy.yandexmusic.presentation.hifi.hifiGlass
 import com.korenskoy.yandexmusic.data.player.StopCause
 import com.korenskoy.yandexmusic.data.player.SoundTaker
@@ -67,7 +68,7 @@ fun PlaybackJournalDialog(
         content = {
             Column {
                 Text(stringResource(R.string.journal_hint), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
-                if (backgroundRestricted && closedByThePhone(snapshot)) {
+                if (backgroundRestricted && (closedByThePhone(snapshot) || snapshot.summary.stalls >= STALLS_WORTH_THE_HINT)) {
                     Spacer(Modifier.height(12.dp))
                     BackgroundHint(onAllowBackground)
                 }
@@ -99,6 +100,12 @@ fun PlaybackJournalDialog(
 
 private const val SHOWN = 30
 
+/**
+ * Stops in an hour that, with the background work limited, are worth the hint too: a Xiaomi with it limited stopped
+ * for 0.1 s about every minute (46 in an hour), with it allowed ten times less often.
+ */
+private const val STALLS_WORTH_THE_HINT = 5
+
 /** The phone closed the app while the music played, in this hour. */
 internal fun closedByThePhone(snapshot: PlaybackJournal.Snapshot): Boolean =
     snapshot.events.any { it.kind == PlaybackJournal.Kind.KILLED && ProcessExits.closedByThePhone(it.detail) }
@@ -127,7 +134,8 @@ private fun BackgroundHint(onAllow: () -> Unit) {
 private fun eventColor(event: PlaybackJournal.Event): Color = when (event.kind) {
     PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE,
     PlaybackJournal.Kind.WAVE_REPEAT, PlaybackJournal.Kind.ERROR, PlaybackJournal.Kind.KILLED, PlaybackJournal.Kind.UNDERRUN,
-    PlaybackJournal.Kind.SLOW_START -> HiFi.Warning
+    PlaybackJournal.Kind.SLOW_START, PlaybackJournal.Kind.WAVE_STUCK, PlaybackJournal.Kind.OUTPUT_STALL,
+    PlaybackJournal.Kind.POSITION_BACK -> HiFi.Warning
     PlaybackJournal.Kind.PAUSED -> if (event.cause?.byListener == true) Color.White.copy(alpha = 0.82f) else HiFi.Warning
     PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY, PlaybackJournal.Kind.LINK_BACK, PlaybackJournal.Kind.RESUMED,
     PlaybackJournal.Kind.LINK_RENEWED -> HiFi.Success
@@ -151,7 +159,10 @@ internal fun summaryLines(r: Resources, s: PlaybackJournal.Summary): List<Pair<S
     (r.getString(R.string.journal_kills) to s.kills.toString()).takeIf { s.kills > 0 },
     (r.getString(R.string.journal_slow_starts) to s.slowStarts.toString()).takeIf { s.slowStarts > 0 },
     (r.getString(R.string.journal_underruns) to s.underruns.toString()).takeIf { s.underruns > 0 },
-    (r.getString(R.string.journal_renewed) to s.renewedLinks.toString()).takeIf { s.renewedLinks > 0 }
+    (r.getString(R.string.journal_renewed) to s.renewedLinks.toString()).takeIf { s.renewedLinks > 0 },
+    (r.getString(R.string.journal_output_stalls) to r.getString(R.string.journal_stalls_value, s.outputStalls, seconds(s.outputStalledMs)))
+        .takeIf { s.outputStalls > 0 },
+    (r.getString(R.string.journal_position_jumps) to s.positionJumps.toString()).takeIf { s.positionJumps > 0 }
 ) + if (!s.waveUsed) emptyList() else listOf(
     // Whether the service offers the same tracks again, and whether the app let any through
     r.getString(R.string.journal_wave_offered_heard) to r.getString(R.string.journal_crossfades_value, s.waveOfferedHeard, s.waveOffered),
@@ -175,11 +186,28 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.WAVE_REPEAT -> r.getString(R.string.journal_event_wave_repeat, title).trim()
         PlaybackJournal.Kind.PAUSED -> r.getString(R.string.journal_event_paused, title, causeText(r, e.cause, e.detail)).removePrefix(" — ").trim()
         PlaybackJournal.Kind.RESUMED -> r.getString(R.string.journal_event_resumed, seconds(e.valueMs), causeText(r, e.cause, null))
-        PlaybackJournal.Kind.ERROR -> r.getString(R.string.journal_event_error, title, e.detail.orEmpty(), recoveryText(r, e.count)).removePrefix(" — ").trim()
+        PlaybackJournal.Kind.ERROR -> if (e.detail == PlaybackController.TRACK_UNAVAILABLE) {
+            r.getString(R.string.journal_event_unavailable, title, recoveryText(r, e.count)).removePrefix(" — ").trim()
+        } else {
+            r.getString(R.string.journal_event_error, title, e.detail.orEmpty(), recoveryText(r, e.count)).removePrefix(" — ").trim()
+        }
         PlaybackJournal.Kind.LINK_RENEWED -> r.getString(R.string.journal_event_link_renewed)
         PlaybackJournal.Kind.UNDERRUN -> r.getString(R.string.journal_event_underrun, title, e.count).removePrefix(" — ").trim()
         PlaybackJournal.Kind.KILLED -> r.getString(R.string.journal_event_killed, exitText(r, e.detail))
         PlaybackJournal.Kind.SLOW_START -> r.getString(R.string.journal_event_slow_start, title, seconds(e.valueMs)).removePrefix(" — ").trim()
+        PlaybackJournal.Kind.WAVE_STUCK -> r.getString(
+            R.string.journal_event_wave_stuck,
+            r.getString(
+                when (e.detail) {
+                    PlaybackController.WAVE_STUCK_OFFLINE -> R.string.journal_wave_stuck_offline
+                    PlaybackController.WAVE_STUCK_BLOCKED -> R.string.journal_wave_stuck_blocked
+                    else -> R.string.journal_wave_stuck_nothing
+                }
+            )
+        )
+        PlaybackJournal.Kind.OUTPUT_STALL -> r.getString(R.string.journal_event_output_stall, title, seconds(e.valueMs), e.detail.orEmpty()).removePrefix(" — ").trim()
+        PlaybackJournal.Kind.POSITION_BACK -> r.getString(R.string.journal_event_position_back, title, seconds(e.valueMs), e.detail.orEmpty()).removePrefix(" — ").trim()
+        PlaybackJournal.Kind.OUTPUT_CHANGED -> r.getString(R.string.journal_event_output_changed, e.detail.orEmpty())
     }
 }
 
@@ -253,6 +281,8 @@ private fun reason(r: Resources, ordinal: Long): String = r.getString(
         LinkReason.NETWORK_GONE -> R.string.journal_why_network_gone
         LinkReason.NETWORK_BACK -> R.string.journal_why_network_back
         LinkReason.STREAM_SOUNDS -> R.string.journal_why_sounds
+        LinkReason.STREAMS_BLOCKED -> R.string.journal_why_streams_blocked
+        LinkReason.STREAM_FAILED -> R.string.journal_why_stream_failed
         LinkReason.SERVER_ANSWERED, null -> R.string.journal_why_server_answered
     }
 )

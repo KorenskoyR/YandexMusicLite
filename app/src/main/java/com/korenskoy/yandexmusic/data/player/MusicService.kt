@@ -1,5 +1,15 @@
 package com.korenskoy.yandexmusic.data.player
 
+import android.media.AudioDeviceInfo
+import android.media.AudioDeviceCallback
+import android.annotation.SuppressLint
+
+import androidx.core.app.ServiceCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.NotificationCompat
+import android.content.pm.ServiceInfo
+import android.os.Looper
+import android.os.Handler
 import kotlinx.coroutines.delay
 import android.os.Build
 import android.media.AudioAttributes
@@ -64,6 +74,8 @@ class MusicService : MediaLibraryService() {
     @Inject
     lateinit var equalizer: SystemEqualizer
 
+
+
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var audioManager: AudioManager? = null
@@ -97,6 +109,12 @@ class MusicService : MediaLibraryService() {
     /** Item picked in a car/browser; started by the play command that follows the selection. */
     private var pendingStart: (() -> Unit)? = null
 
+    /** The saved session is being prepared for a Play from outside (headset, a head unit at power-on). */
+    @Volatile
+    private var resumptionPending = false
+
+    private val startGuard = Handler(Looper.getMainLooper())
+
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         focus.onFocusChange(focusChange)
         // The alert or the call is over: an equalizer that lost the session gets it back now
@@ -107,6 +125,8 @@ class MusicService : MediaLibraryService() {
         super.onCreate()
         AppPresence.playerServiceRunning = true
         audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
+        // Headphones, a speaker or a car coming and going while the music plays: the journal tells when
+        runCatching { audioManager?.registerAudioDeviceCallback(outputChanges, Handler(Looper.getMainLooper())) }
 
         // Channels exist from Android 8; on 7.1 the notification simply has none
         serviceScope.launch { playbackController.listenerPauses.collect { focus.onListenerPause() } }
@@ -141,6 +161,7 @@ class MusicService : MediaLibraryService() {
 
         // Equalizer apps hear about the session when the sound starts and after a real pause, never per track
         equalizer.keepAnnounced(serviceScope, playerRepository.isPlaying)
+
 
         // Dynamically update MediaLibrarySession when active player swaps
         serviceScope.launch {
@@ -344,8 +365,13 @@ class MusicService : MediaLibraryService() {
                 isForPlayback: Boolean
             ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
                 val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+                resumptionPending = true
                 serviceScope.launch {
-                    val resumable = playbackController.prepareResumption(startPlayback = isForPlayback)
+                    val resumable = try {
+                        playbackController.prepareResumption(startPlayback = isForPlayback)
+                    } finally {
+                        resumptionPending = false
+                    }
                     if (resumable == null) {
                         future.setException(UnsupportedOperationException("No saved session to resume"))
                     } else {
@@ -466,7 +492,51 @@ class MusicService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        // Started for a media button (a head unit sends Play at power-on): Android wants the service in the
+        // foreground within seconds, and with nothing to resume the player's notification never comes —
+        // "did not then call Service.startForeground()" (Teyes CC3, 1.14.0)
+        if (intent?.action == Intent.ACTION_MEDIA_BUTTON && !isPlaybackOngoing) {
+            startGuard.removeCallbacksAndMessages(null)
+            startGuard.postDelayed(::keepTheForegroundPromise, FOREGROUND_PROMISE_MS)
+        }
         return START_NOT_STICKY
+    }
+
+    /**
+     * The music did not start in time: the service goes to the foreground with a quiet note of its own, so Android
+     * does not end the app. Nothing to resume — it leaves at once; still preparing — the note stays until the
+     * player's own notification takes over.
+     */
+    // ServiceCompat passes the type only where Android has it (10+); before that it is ignored
+    @SuppressLint("InlinedApi")
+    private fun keepTheForegroundPromise() {
+        if (isPlaybackOngoing) return
+        val note = NotificationCompat.Builder(this, PLAYBACK_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(getString(R.string.notification_preparing))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .build()
+        val inForeground = runCatching {
+            ServiceCompat.startForeground(this, PROMISE_NOTIFICATION_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        }.onFailure { Log.w(TAG, "Could not keep the foreground promise", it) }.isSuccess
+        if (inForeground) watchThePromise(PROMISE_WATCH_MS)
+        else stopSelf()
+    }
+
+    /** Leaves the foreground of the quiet note: to the player's notification, or out when nothing plays. */
+    private fun watchThePromise(leftMs: Long) {
+        val playerTookOver = isPlaybackOngoing
+        val nothingComing = !resumptionPending && !playerRepository.isPlaying.value
+        if (playerTookOver || nothingComing || leftMs <= 0) {
+            if (playerTookOver) NotificationManagerCompat.from(this).cancel(PROMISE_NOTIFICATION_ID)
+            else {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+            return
+        }
+        startGuard.postDelayed({ watchThePromise(leftMs - PROMISE_STEP_MS) }, PROMISE_STEP_MS)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -482,7 +552,29 @@ class MusicService : MediaLibraryService() {
         return mediaLibrarySession
     }
 
+    /** The first call lists what is already there: only later changes are news. */
+    private var outputsKnown = false
+
+    private val outputChanges = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            if (!outputsKnown) {
+                outputsKnown = true
+                return
+            }
+            addedDevices.filter(::isPersonalOutput).forEach { journal.record(PlaybackJournal.Kind.OUTPUT_CHANGED, detail = "подключён " + AudioOutputs.describe(it)) }
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            removedDevices.filter(::isPersonalOutput).forEach { journal.record(PlaybackJournal.Kind.OUTPUT_CHANGED, detail = "отключён " + AudioOutputs.describe(it)) }
+        }
+    }
+
+    /** Headphones, a speaker, a car: not the call channel of the same Bluetooth device. */
+    private fun isPersonalOutput(device: AudioDeviceInfo) = AudioOutputs.isExternal(device) && device.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+
     override fun onDestroy() {
+        runCatching { audioManager?.unregisterAudioDeviceCallback(outputChanges) }
+        startGuard.removeCallbacksAndMessages(null)
         AppPresence.playerServiceRunning = false
         serviceScope.cancel()
         focus.abandon()
@@ -502,5 +594,13 @@ class MusicService : MediaLibraryService() {
         private val CAR_HOSTS = setOf("com.google.android.projection.gearhead", "com.android.car.media")
 
         private const val SOUND_TAKER_DELAY_MS = 700L
+
+        /** Android ends a service started for the foreground that is not there in 5–10 s: well before that. */
+        private const val FOREGROUND_PROMISE_MS = 3_000L
+        private const val PROMISE_STEP_MS = 1_000L
+        /** A resumption still not done after this is not coming. */
+        private const val PROMISE_WATCH_MS = 30_000L
+        private const val PROMISE_NOTIFICATION_ID = 7_301
+        private const val TAG = "MusicService"
     }
 }

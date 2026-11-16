@@ -347,6 +347,16 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
                     installState = InstallState.NoAnswer, onRetry = {}, onSaveFile = {}
                 )
             }
+            "equalizer" -> show {
+                val rock = com.korenskoy.yandexmusic.data.player.AppEqualizer.BUILT_IN.first { it.id == "rock" }
+                val eq = com.korenskoy.yandexmusic.data.player.AppEqualizer.State(
+                    settings = com.korenskoy.yandexmusic.data.player.eq.EqSettings(enabled = true, gains = rock.gains, bass = 3f, treble = 2f),
+                    presetId = rock.id,
+                    presets = com.korenskoy.yandexmusic.data.player.AppEqualizer.BUILT_IN +
+                        com.korenskoy.yandexmusic.data.player.AppEqualizer.Preset("custom_1", "Моя в машине", rock.gains, custom = true)
+                )
+                SettingsSheet(state = SettingsUiState(appEqualizer = eq, equalizerAvailable = true), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.EQUALIZER)
+            }
             "settings_no_drive" -> show {
                 SettingsSheet(state = SettingsUiState(storage = StorageStatus(pickerAvailable = false)), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
             }
@@ -383,7 +393,7 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "settings_interface", "settings_playback", "library", "search", "radio",
             "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations",
             "car_playlists", "car_three", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
-            "settings_about", "settings_support", "no_plus", "update_failed"
+            "settings_about", "settings_support", "no_plus", "update_failed", "equalizer"
         )
 
         /** Phones, standing units (the Geely's 960×1280), flat units (the Monjaro's 1280×480, 1920×720), old 800×480. */
@@ -402,7 +412,15 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "w1280dp-h480dp-land-mdpi" to 1.2f,
             "w1920dp-h720dp-land-mdpi" to 0.8f,
             "w412dp-h915dp-port-xxhdpi" to 1.2f,
-            "w1024dp-h600dp-land-mdpi" to 0.8f
+            "w1024dp-h600dp-land-mdpi" to 0.8f,
+            // Tablets: 10" standing and lying (the Galaxy Tab S5e's 800×1280), 12" lying, half of a tablet in split
+            // screen, a foldable's inner screen, a small old phone
+            "w800dp-h1280dp-port-xhdpi" to 1f,
+            "w1280dp-h800dp-land-xhdpi" to 1f,
+            "w1366dp-h1024dp-land-xhdpi" to 1f,
+            "w636dp-h752dp-port-xhdpi" to 1f,
+            "w673dp-h841dp-port-xxhdpi" to 1f,
+            "w320dp-h568dp-port-hdpi" to 1f
         )
 
         @JvmStatic
@@ -431,6 +449,9 @@ internal object LayoutAudit {
                 if (!contains(window, whole)) problems += "$name sticks out of the screen: ${rectDp(whole, density)}"
                 else if (area(node.boundsInRoot) < 0.97f * area(whole)) problems += "$name is cut by its container: ${rectDp(node.boundsInRoot, density)} of ${rectDp(whole, density)}"
             }
+            // Scrolled out of view (a panel that scrolls on a short screen): its touch area is not known here, it is
+            // checked where it is in view
+            if (scrolls(node) && area(node.boundsInRoot) < 0.97f * area(whole)) continue
             val grow = node.touchBoundsInRoot.let { max(0f, it.width - node.boundsInRoot.width) to max(0f, it.height - node.boundsInRoot.height) }
             val w = (whole.width + grow.first) / density
             val h = (whole.height + grow.second) / density

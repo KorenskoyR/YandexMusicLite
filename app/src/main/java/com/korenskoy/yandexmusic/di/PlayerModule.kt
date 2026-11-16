@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.di
 
+import android.os.SystemClock
+import com.korenskoy.yandexmusic.data.player.AudioOutputs
+import com.korenskoy.yandexmusic.data.player.AudioFlow
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.AudioSink
+import com.korenskoy.yandexmusic.data.player.eq.EqualizerProcessor
+import com.korenskoy.yandexmusic.data.player.eq.EqSettings
+import com.korenskoy.yandexmusic.data.player.AppEqualizer
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.runBlocking
 import com.korenskoy.yandexmusic.data.player.LinkRenewal
@@ -47,13 +55,13 @@ object PlayerModule {
         DefaultTrackSelector.Parameters.Builder(context).setForceHighestSupportedBitrate(true).build()
     )
 
-    private fun createConfiguredExoPlayer(context: Context, audioSessionId: Int, card: CardStorage, renewal: Renewal): ExoPlayer =
-        createConfiguredExoPlayer(context, card, renewal).apply { if (audioSessionId > 0) setAudioSessionId(audioSessionId) }
+    private fun createConfiguredExoPlayer(context: Context, audioSessionId: Int, card: CardStorage, renewal: Renewal, eq: () -> EqSettings, flow: AudioFlow): ExoPlayer =
+        createConfiguredExoPlayer(context, card, renewal, eq, flow).apply { if (audioSessionId > 0) setAudioSessionId(audioSessionId) }
 
     /** How a link that ran out mid-track is renewed, and who is told. */
     private class Renewal(val renew: (String) -> Uri?, val onRenewed: (String) -> Unit)
 
-    private fun createConfiguredExoPlayer(context: Context, card: CardStorage, renewal: Renewal): ExoPlayer {
+    private fun createConfiguredExoPlayer(context: Context, card: CardStorage, renewal: Renewal, eq: () -> EqSettings, flow: AudioFlow): ExoPlayer {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -72,7 +80,15 @@ object PlayerModule {
             }
         }
 
-        val renderersFactory = DefaultRenderersFactory(context)
+        // The app's own equalizer sits in the audio path of each player: every source, the crossfade too
+        val renderersFactory = object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                    .setAudioProcessors(arrayOf(EqualizerProcessor(eq) { flow.fed(SystemClock.elapsedRealtime()) }))
+                    .build()
+        }
             .setMediaCodecSelector(audioSoftwareCodecSelector)
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
@@ -132,6 +148,7 @@ object PlayerModule {
         preloadManager: TrackPreloadManager,
         wakeLockHelper: PlaybackWakeLockHelper,
         equalizer: SystemEqualizer,
+        appEqualizer: AppEqualizer,
         card: CardStorage,
         journal: PlaybackJournal
     ): PlayerRepository {
@@ -139,12 +156,16 @@ object PlayerModule {
             renew = { trackId -> renewedLink(preloadManager, trackId) },
             onRenewed = { journal.record(PlaybackJournal.Kind.LINK_RENEWED) }
         )
-        val playerA = createConfiguredExoPlayer(context, equalizer.audioSessionId, card, renewal)
-        val playerB = createConfiguredExoPlayer(context, equalizer.audioSessionId, card, renewal)
+        val eq = { appEqualizer.current }
+        val flows = listOf(AudioFlow(), AudioFlow())
+        val playerA = createConfiguredExoPlayer(context, equalizer.audioSessionId, card, renewal, eq, flows[0])
+        val playerB = createConfiguredExoPlayer(context, equalizer.audioSessionId, card, renewal, eq, flows[1])
         equalizer.announce()
         return PlayerRepositoryImpl(
             playerA, playerB, downloadManager, preloadManager, wakeLockHelper, journal,
-            readArtwork = { uri -> context.contentResolver.openInputStream(uri.toUri())?.use { it.readBytes() } }
+            readArtwork = { uri -> context.contentResolver.openInputStream(uri.toUri())?.use { it.readBytes() } },
+            flows = flows,
+            outputRoute = { AudioOutputs.current(context) }
         )
     }
 

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.data.dto.R128Dto
 import kotlinx.coroutines.channels.Channel
 import com.korenskoy.yandexmusic.data.repository.RadioRules
 import android.os.SystemClock
@@ -254,6 +255,7 @@ class PlaybackController @Inject constructor(
     private var libraryTracks: List<TrackDetailsDto> = emptyList()
 
     private val link = LinkTracker(SystemClock::elapsedRealtime)
+    private val unresolved = UnresolvedTracks(SystemClock::elapsedRealtime)
     private val _linkState = MutableStateFlow(LinkState.GOOD)
     /** How the music gets through right now: the "Слабая связь" and "Нет связи" labels. */
     val linkState: StateFlow<LinkState> = _linkState.asStateFlow()
@@ -329,6 +331,7 @@ class PlaybackController @Inject constructor(
                     retriedTrackId = null
                     soundedTrackId = playerRepository.currentTrackId.value
                     if (streamingTrackId != null && streamingTrackId == _currentTrack.value?.idString) {
+                        blockedStreamHost = null
                         updateLink(LinkReason.STREAM_SOUNDS) { onStreamAudible() }
                     }
                 }
@@ -496,12 +499,15 @@ class PlaybackController @Inject constructor(
         _isStarting.value = true
         wave.fetchMore { _ ->
             if (request != startRequestId) return@fetchMore
-            val list = wave.tracks.value
-            if (list.isNotEmpty()) {
-                playTrack(list.first().idString, list, PlaylistSource.VIBE, chosen = false)
-            } else {
-                _isStarting.value = false
-                showMessage(context.getString(R.string.msg_wave_load_failed))
+            val next = wave.firstUnplayed()
+            when {
+                next != null -> playTrack(next.idString, wave.tracks.value, PlaylistSource.VIBE, chosen = false)
+                // Tracks there, all heard lately, and nothing new came: not the same ones again
+                wave.tracks.value.isNotEmpty() -> onWaveStuck()
+                else -> {
+                    _isStarting.value = false
+                    showMessage(context.getString(R.string.msg_wave_load_failed))
+                }
             }
         }
     }
@@ -648,10 +654,11 @@ class PlaybackController @Inject constructor(
                     val newIndex = updated.indexOfFirst { it.idString == currentId }
                     val following = PlaybackQueue.nextMatching(updated, newIndex) { !skippedOnTheWay(it) }
                         ?: (newIndex + 1).takeIf { newIndex != -1 && it < updated.size }
-                    when {
-                        following != null -> playTrack(updated[following].idString, updated, chosen = false)
-                        updated.isNotEmpty() -> playTrack(updated.first().idString, updated, chosen = false)
-                        else -> playAllLikedTracks()
+                    // Nothing new came: the wave does not start over from its first track
+                    when (val next = PlaybackQueue.afterWaveFetch(following, updated.size)) {
+                        is PlaybackQueue.AfterWaveFetch.Play -> playTrack(updated[next.index].idString, updated, chosen = false)
+                        PlaybackQueue.AfterWaveFetch.Stuck -> onWaveStuck()
+                        PlaybackQueue.AfterWaveFetch.Nothing -> playAllLikedTracks()
                     }
                 }
             }
@@ -1116,13 +1123,19 @@ class PlaybackController @Inject constructor(
                     preloadManager.getOrFetchUrl(trackId)
                 }
             if (url != null) {
+                unresolved.onResolved()
                 updateLink(LinkReason.SERVER_ANSWERED) { onServerReachable() }
                 playStreamOrEqualCopy(track, url, crossfade, startPositionMs)
             } else {
                 Log.e(TAG, "Failed to resolve mp3 URL for track $trackId")
-                reportTrouble(LinkReason.REQUEST_FAILED)
-                if (_currentTrack.value?.idString != trackId) return@launch
-                onPlaybackFailure(PlaybackFailure(trackId, startPositionMs, "URL_RESOLVE"))
+                // The server answers and only this track has no link: the track's trouble, the link stays as it is
+                val markedUnavailable = track.available == false
+                val verdict = unresolved.onFailed(trackId, serverAnswersNow(), markedUnavailable)
+                if (verdict == UnresolvedTracks.Verdict.LINK) reportTrouble(LinkReason.REQUEST_FAILED)
+                // Moved on, or the track already plays from its copy: this answer is late and changes nothing
+                if (_currentTrack.value?.idString != trackId || playingCopyId == trackId) return@launch
+                val reason = if (verdict == UnresolvedTracks.Verdict.TRACK && markedUnavailable) TRACK_UNAVAILABLE else "URL_RESOLVE"
+                onPlaybackFailure(PlaybackFailure(trackId, startPositionMs, reason))
             }
         }
     }
@@ -1201,7 +1214,8 @@ class PlaybackController @Inject constructor(
     /** The music has stood still long enough to matter: go on from the copy if there is one, and find out why. */
     private fun onStreamStalled(track: TrackDetailsDto) {
         // In its own job: the music coming back ends the watchdog, and the music must not wait for the check
-        scope.launch { reportTrouble(LinkReason.STREAM_STALLED) }
+        val streamHost = playerRepository.currentStreamHost
+        scope.launch { reportTrouble(LinkReason.STREAM_STALLED, streamHost) }
         val trackId = track.idString
         if (!reserve.has(trackId)) return
         val position = if (playerRepository.currentTrackId.value == trackId) progress.value else restoredPositionMs.value
@@ -1309,12 +1323,40 @@ class PlaybackController @Inject constructor(
     private fun smoothOrigin(trackId: String): SmoothOrigin = SmoothPlan.originFor(steadiness.uneven, smoothOn.value, reserve.has(trackId))
 
     /** Is the server there at all? A short check, with no data to speak of: it tells a weak link from no link. */
-    private suspend fun reportTrouble(why: LinkReason) {
+    private suspend fun reportTrouble(why: LinkReason, streamHost: String? = null) {
         // A second try: on a very slow, busy link one connection can fail with the server still there
         val reachable = networkMonitor.isCurrentlyConnected() &&
             (networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS) || networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS))
-        updateLink(if (reachable) why else LinkReason.SERVER_SILENT) { onTrouble(reachable) }
+        // The service answers, but the server of the stream does not: a network that lets only some addresses
+        // through ("белые списки"). The music goes on from what is on the device, not track after failing track
+        val streamsBlocked = reachable && streamHost != null && !streamServerAnswers(streamHost)
+        blockedStreamHost = if (streamsBlocked) streamHost else null
+        val reason = when {
+            streamsBlocked -> LinkReason.STREAMS_BLOCKED
+            reachable -> why
+            else -> LinkReason.SERVER_SILENT
+        }
+        updateLink(reason) { onTrouble(reachable && !streamsBlocked) }
     }
+
+    /** The server the streams come from answers at all (twice, as for the service). */
+    /** The link is back: connected, Yandex answers, and the stream server that was blocked answers too. */
+    private suspend fun serverAnswersAgain(): Boolean {
+        val blocked = blockedStreamHost
+        return networkMonitor.isCurrentlyConnected() && networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS) &&
+            (blocked == null || streamServerAnswers(blocked))
+    }
+
+    private suspend fun streamServerAnswers(host: String): Boolean =
+        networkMonitor.isReachable("https://$host/", SERVER_CHECK_TIMEOUT_MS) || networkMonitor.isReachable("https://$host/", SERVER_CHECK_TIMEOUT_MS)
+
+    /** Connected, and the service answers (twice: one connection can fail on a busy link). */
+    private suspend fun serverAnswersNow(): Boolean = networkMonitor.isCurrentlyConnected() &&
+        (networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS) || networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS))
+
+    /** The server of streams found not answering while the service did; null while streams get through. */
+    @Volatile
+    private var blockedStreamHost: String? = null
 
     /** Changes the link's state; a change is written to the journal with [why], so a report can be read later. */
     private fun updateLink(why: LinkReason? = null, change: LinkTracker.() -> Unit) {
@@ -1348,7 +1390,8 @@ class PlaybackController @Inject constructor(
                 while (state == LinkState.NONE) {
                     delay(pause)
                     pause = SERVER_CHECK_INTERVAL_MS
-                    if (networkMonitor.isCurrentlyConnected() && networkMonitor.isYandexReachable(SERVER_CHECK_TIMEOUT_MS)) {
+                    if (serverAnswersAgain()) {
+                        blockedStreamHost = null
                         updateLink(LinkReason.SERVER_ANSWERED) { onServerReachable() }
                     }
                 }
@@ -1360,11 +1403,17 @@ class PlaybackController @Inject constructor(
     private fun returnFromOfflineMix(): Boolean {
         val point = returnPoint ?: return false
         if (currentLink() != LinkState.GOOD) return false
-        returnPoint = null
         if (point.source == PlaylistSource.VIBE) {
+            // Back to the wave only with something new in it; otherwise it is asked again and the mix plays on
+            if (wave.firstUnplayed() == null) {
+                wave.fetchMore()
+                return false
+            }
+            returnPoint = null
             playMyVibe()
             return true
         }
+        returnPoint = null
         val index = point.queue.indexOfFirst { it.idString == point.leftTrackId }
         val next = point.queue.getOrNull(index + 1) ?: point.queue.firstOrNull() ?: return false
         playTrack(next.idString, point.queue, point.source, chosen = false)
@@ -1390,8 +1439,9 @@ class PlaybackController @Inject constructor(
         }
 
         preloadManager.evictUrl(failure.trackId)
-        // A copy that does not play is no use to anyone
-        val copyFailed = playingCopyId == failure.trackId
+        // A copy that does not play is no use to anyone. No link for the stream is never the copy's fault: taking the
+        // copy away for it skipped a track that was playing from its copy
+        val copyFailed = playingCopyId == failure.trackId && failure.reason != "URL_RESOLVE" && failure.reason != TRACK_UNAVAILABLE
         if (copyFailed) {
             playingCopyId = null
             scope.launch { reserve.remove(failure.trackId) }
@@ -1400,12 +1450,16 @@ class PlaybackController @Inject constructor(
             offline = isOffline(),
             isRadio = current.isRadio,
             isDownloaded = preloadManager.hasPlayableCopy(current.idString),
-            alreadyRetried = retriedTrackId == failure.trackId,
+            // A track the service marks unavailable gets no link a second time either
+            alreadyRetried = retriedTrackId == failure.trackId || failure.reason == TRACK_UNAVAILABLE,
             failedTracksInARow = consecutiveFailedTracks + 1,
             hasCopy = !copyFailed && reserve.has(failure.trackId),
             weakLink = _linkState.value == LinkState.WEAK
         )
         journal.record(PlaybackJournal.Kind.ERROR, current.title, failure.positionMs, action.ordinal, failure.reason)
+        if (PlaybackQueue.isNetworkFailure(failure.reason) && failure.streamHost != null) {
+            scope.launch { reportTrouble(LinkReason.STREAM_FAILED, failure.streamHost) }
+        }
         when (action) {
             Recovery.RESUME_FROM_COPY -> {
                 retriedTrackId = null
@@ -1506,7 +1560,7 @@ class PlaybackController @Inject constructor(
      * No connection and the queue has nothing more on the device: the rest of the reserve (what has not
      * been heard first), then the downloads, shuffled. With nothing at all the music waits for the connection.
      */
-    private fun playOfflineMix(leaving: ReturnPoint) {
+    private fun playOfflineMix(leaving: ReturnPoint, emptyMessage: Int = R.string.msg_offline_no_downloads, playingMessage: Int? = null) {
         val reserved = ReservePolicy.playOrder(reserve.entries.value.values) { it in recentPlayedTrackIds }
             .map { it.track }
             .filterNot { preloadManager.hasPlayableCopy(it.idString) }
@@ -1519,13 +1573,34 @@ class PlaybackController @Inject constructor(
             waitingForConnection = true
             journal.expectPause(StopCause.OFFLINE)
             playerRepository.pause()
-            showMessage(context.getString(R.string.msg_offline_no_downloads))
+            showMessage(context.getString(emptyMessage))
             return
         }
+        playingMessage?.let { showMessage(context.getString(it)) }
         // Coming from a mix already, the place to go back to stays what it was
         val point = returnPoint ?: leaving
         playTrack(mix.first().idString, mix, PlaylistSource.LIBRARY, chosen = false)
         returnPoint = point
+    }
+
+    /**
+     * The wave got nothing new to play (no connection, streams blocked, or the station gave only what was just
+     * heard): it does not start over. What is on the device plays meanwhile, and the wave comes back once it has
+     * unheard tracks; the journal says why.
+     */
+    private fun onWaveStuck() {
+        _isStarting.value = false
+        val why = when {
+            blockedStreamHost != null -> WAVE_STUCK_BLOCKED
+            isOffline() -> WAVE_STUCK_OFFLINE
+            else -> WAVE_STUCK_NOTHING_NEW
+        }
+        journal.record(PlaybackJournal.Kind.WAVE_STUCK, detail = why)
+        playOfflineMix(
+            ReturnPoint(PlaylistSource.VIBE, emptyList(), null),
+            emptyMessage = R.string.msg_wave_stuck_nothing,
+            playingMessage = R.string.msg_wave_stuck_saved
+        )
     }
 
     /** The next track after [from] that is on the device, otherwise the mix of what is. */
@@ -1680,7 +1755,9 @@ class PlaybackController @Inject constructor(
         artists = listOf(ArtistDto(id = JsonPrimitive("0"), name = listOfNotNull(context.getString(R.string.radio_live_frequency, station.frequency), station.format).joinToString(" • "))),
         coverUri = station.iconRes?.let { "android.resource://${BuildConfig.APPLICATION_ID}/$it" } ?: station.logoUrl.ifEmpty { null },
         durationMs = 0,
-        isRadio = true
+        isRadio = true,
+        // The station's own loudness: normalized like a track (louder than the wave after it before)
+        r128 = station.loudness?.let { R128Dto(integrated = it) }
     )
 
     private suspend fun persistSession() {
@@ -1774,6 +1851,13 @@ class PlaybackController @Inject constructor(
 
         /** [PlaybackJournal.Kind.ERROR] of a file of the device (no [Recovery]). */
         const val ERROR_OF_A_FILE = -1
+
+        /** [PlaybackJournal.Kind.WAVE_STUCK]'s detail: why the wave got nothing new. */
+        /** A track the service took out of its catalogue: skipped, the link is not to blame. */
+        const val TRACK_UNAVAILABLE = "TRACK_UNAVAILABLE"
+        const val WAVE_STUCK_OFFLINE = "offline"
+        const val WAVE_STUCK_BLOCKED = "streams_blocked"
+        const val WAVE_STUCK_NOTHING_NEW = "nothing_new"
         /** The cache fills only while the playing track has this much in hand. */
         const val RESERVE_HEADROOM_MS = 20_000L
         /** How many tracks ahead the AI marks are asked for. */

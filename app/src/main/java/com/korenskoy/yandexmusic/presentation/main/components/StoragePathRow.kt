@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -57,10 +60,25 @@ internal fun StoragePathRow(check: PathCheck?, noDrive: Boolean, onCheck: (Strin
     var path by rememberSaveable { mutableStateOf("") }
     // The answer belongs to the path it was given for: typing on hides it
     var checkedFor by rememberSaveable { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    // The system lets the app read and write a drive by its path only with the storage permission: asked for here,
+    // once, instead of the commands over adb the Monjaro's owners had to type
+    var storageDenied by rememberSaveable { mutableStateOf(false) }
+    val askStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        storageDenied = granted.values.any { !it }
+        checkedFor = path
+        onCheck(path)
+    }
     val submit = {
         if (path.isNotBlank()) {
-            checkedFor = path
-            onCheck(path)
+            val missing = StoragePermission.missing(context)
+            if (missing.isNotEmpty()) {
+                askStorage.launch(missing.toTypedArray())
+            } else {
+                storageDenied = false
+                checkedFor = path
+                onCheck(path)
+            }
         }
     }
     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 14.dp)) {
@@ -130,7 +148,9 @@ internal fun StoragePathRow(check: PathCheck?, noDrive: Boolean, onCheck: (Strin
                     when (shown) {
                         is PathCheck.Ok -> stringResource(R.string.settings_storage_path_ok, formatSize(shown.freeBytes))
                         PathCheck.NotFound -> stringResource(R.string.settings_storage_path_not_found)
-                        PathCheck.NotWritable -> stringResource(R.string.settings_storage_path_not_writable)
+                        PathCheck.NotWritable -> stringResource(
+                            if (storageDenied) R.string.settings_storage_path_no_permission else R.string.settings_storage_path_not_writable
+                        )
                     },
                     color = if (ok) HiFi.Success else HiFi.Warning, fontSize = 14.sp, lineHeight = 19.sp
                 )

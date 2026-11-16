@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic
 
+import android.os.StrictMode
 import com.korenskoy.yandexmusic.data.crash.CrashLog
 import com.korenskoy.yandexmusic.data.player.BluetoothAutoplay
 import coil3.request.allowHardware
@@ -56,6 +57,12 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
     override fun onCreate() {
         // Before anything else, so a crash during start-up is recorded too
         CrashLog.install(this)
+        // The debug build tells of disk and network work on the main thread and of leaks in its log ("StrictMode"):
+        // a run of the tests shows where the app could stutter or freeze (the 1.14.5 crash was such a call)
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder().detectDiskReads().detectDiskWrites().detectNetwork().detectCustomSlowCalls().penaltyLog().build())
+            StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().detectActivityLeaks().penaltyLog().build())
+        }
         super.onCreate()
         widgetUpdater.start()
         bluetoothAutoplay.start()

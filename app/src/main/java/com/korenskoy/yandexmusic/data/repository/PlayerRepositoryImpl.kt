@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.data.repository
 
+import androidx.media3.exoplayer.audio.AudioSink
+import com.korenskoy.yandexmusic.data.player.OutputWatch
+import com.korenskoy.yandexmusic.data.player.AudioFlow
 import com.korenskoy.yandexmusic.data.player.StopCause
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.common.util.UnstableApi
@@ -54,8 +57,18 @@ class PlayerRepositoryImpl(
     private val wakeLockHelper: PlaybackWakeLockHelper,
     private val journal: PlaybackJournal = PlaybackJournal(),
     /** Reads a cover of the user's own music (this app's own address) as a picture. */
-    private val readArtwork: (String) -> ByteArray? = { null }
+    private val readArtwork: (String) -> ByteArray? = { null },
+    /** When each player last handed sound on to the output (A, B); empty — not watched. */
+    private val flows: List<AudioFlow> = emptyList(),
+    /** Where the sound goes now, for the journal. */
+    private val outputRoute: () -> String = { "" }
 ) : PlayerRepository {
+
+    // The output that stops taking sound and the position that jumps back: what the journal could not see
+    private val outputWatch = OutputWatch()
+    private var watchedPlayer: ExoPlayer? = null
+    /** When the standby player opened its own audio output, preparing the next track. */
+    private var standbyOutputOpenedAt = 0L
 
     private val _currentTrackId = MutableStateFlow<String?>(null)
     override val currentTrackId: StateFlow<String?> = _currentTrackId.asStateFlow()
@@ -167,11 +180,40 @@ class PlayerRepositoryImpl(
                     journal.addPlayed(PROGRESS_INTERVAL_MS)
                     updateProgress(currentP)
                     checkTransitionTriggers(currentP)
+                    watchOutput(currentP)
                     delay(PROGRESS_INTERVAL_MS)
                 } else {
+                    outputWatch.reset()
                     delay(IDLE_INTERVAL_MS)
                 }
             }
+        }
+    }
+
+    /**
+     * The playing track's output, checked as it plays (a crossfade and the last seconds of a track, which drain what
+     * the output already holds, are left out): silence while the timer counts on, and a jump back, go to the journal
+     * with the route of the sound and how long after the next track opened its own output.
+     */
+    private fun watchOutput(player: ExoPlayer) {
+        val flow = flows.getOrNull(indexOf(player)) ?: return
+        if (player !== watchedPlayer || outgoingPlayer != null || awaitingIncoming) {
+            watchedPlayer = player
+            outputWatch.reset()
+            return
+        }
+        val nearEnd = player.duration > 0 && player.duration - player.currentPosition < END_DRAIN_MS
+        val playing = player.isPlaying && player.playbackState == Player.STATE_READY && !nearEnd
+        val finding = outputWatch.tick(SystemClock.elapsedRealtime(), playing, flow.lastFedAtMs, player.currentPosition) ?: return
+        val title = player.mediaMetadata.title?.toString()
+        val route = runCatching(outputRoute).getOrDefault("")
+        when (finding) {
+            is OutputWatch.Finding.OutputStall -> {
+                val sinceNext = finding.startedAtMs - standbyOutputOpenedAt
+                val detail = if (standbyOutputOpenedAt > 0 && sinceNext in 0..NEXT_TRACK_NEAR_MS) "$route · ${sinceNext / 100 / 10.0} с после подготовки следующего трека" else route
+                journal.record(PlaybackJournal.Kind.OUTPUT_STALL, title, valueMs = finding.durationMs, detail = detail)
+            }
+            is OutputWatch.Finding.PositionBack -> journal.record(PlaybackJournal.Kind.POSITION_BACK, title, valueMs = finding.byMs, detail = route)
         }
     }
 
@@ -182,6 +224,14 @@ class PlayerRepositoryImpl(
     }
 
     override val inTransition: Boolean get() = outgoingPlayer != null || awaitingIncoming || switchingSource
+
+    override val currentStreamHost: String? get() = streamHostOf(activePlayer)
+
+    /** The network server of what [player] plays; null for a file or a copy on the device. */
+    private fun streamHostOf(player: ExoPlayer): String? {
+        val uri = player.currentMediaItem?.localConfiguration?.uri ?: return null
+        return uri.host?.takeIf { uri.scheme == "http" || uri.scheme == "https" }
+    }
 
     private fun updateProgress(player: ExoPlayer) {
         val position = player.currentPosition
@@ -223,6 +273,11 @@ class PlayerRepositoryImpl(
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
                 if (player === activePlayer || player === outgoingPlayer) journal.recordUnderrun(player.mediaMetadata.title?.toString())
+            }
+
+            // The next track, prepared ahead, opens an output of its own while the current one plays
+            override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
+                if (player === standbyPlayer && player !== outgoingPlayer) standbyOutputOpenedAt = SystemClock.elapsedRealtime()
             }
         })
         player.addListener(object : Player.Listener {
@@ -283,7 +338,7 @@ class PlayerRepositoryImpl(
                         val failedId = _currentTrackId.value ?: player.currentMediaItem?.mediaId ?: return
                         wakeLockHelper.releaseTransitionLock()
                         _playbackErrorEvent.tryEmit(
-                            PlaybackFailure(failedId, player.currentPosition.coerceAtLeast(0L), error.errorCodeName)
+                            PlaybackFailure(failedId, player.currentPosition.coerceAtLeast(0L), error.errorCodeName, streamHostOf(player))
                         )
                     }
                     else -> {
@@ -301,6 +356,8 @@ class PlayerRepositoryImpl(
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
+                // A seek or a new track: the position jumps on purpose
+                if (playerIdx == activePlayerIndex) outputWatch.reset()
                 if (reason == Player.DISCONTINUITY_REASON_SEEK && playerIdx == activePlayerIndex) {
                     pendingSeekPosition = -1L
                     _progress.value = newPosition.positionMs
@@ -806,6 +863,10 @@ class PlayerRepositoryImpl(
         private const val FADE_STEP_MS = 50L
         private const val QUICK_FADE_STEPS = 6
         private const val PROGRESS_INTERVAL_MS = 100L
+        /** The last seconds of a track: the output plays what it holds, nothing new is handed to it. */
+        private const val END_DRAIN_MS = 2_000L
+        /** A silence this soon after the next track opened its output is told with it. */
+        private const val NEXT_TRACK_NEAR_MS = 10_000L
         private const val IDLE_INTERVAL_MS = 500L
         private const val EVENT_BUFFER = 16
     }

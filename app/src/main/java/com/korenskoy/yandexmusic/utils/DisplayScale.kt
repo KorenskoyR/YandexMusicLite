@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.utils
 
+import kotlin.math.hypot
+import kotlin.math.floor
 import android.util.DisplayMetrics
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import kotlin.math.abs
@@ -11,8 +13,23 @@ data class DisplayScaleInfo(
     val heightPx: Int,
     val reportedDpi: Int,
     val physicalDpi: Int,
-    val autoScale: Float
+    val autoScale: Float,
+    val reason: AutoScaleReason = AutoScaleReason.TRUSTED,
+    /** The screen's diagonal by the reported physical density, inches (0 when unknown). */
+    val impliedDiagonalIn: Float = 0f
 )
+
+/** Why "Авто" chose its scale: said in the settings beside it. */
+enum class AutoScaleReason {
+    /** The system's density matches the screen: 100%. */
+    TRUSTED,
+    /** The screen is denser (or looser) than the system says: scaled to match. */
+    SCALED,
+    /** The physical density the screen reports makes it smaller than any such device: not believed, 100%. */
+    IMPLAUSIBLE,
+    /** Scaled, but no further than the screens of the app still fit whole. */
+    LIMITED
+}
 
 /**
  * Works out a UI-scale multiplier for screens whose reported density does not match their real pixel
@@ -24,17 +41,51 @@ object DisplayScale {
     /** Below this relative mismatch the reported density is trusted and the scale stays at 1.0. */
     private const val MISMATCH_THRESHOLD = 0.15f
 
-    fun analyze(metrics: DisplayMetrics): DisplayScaleInfo {
-        val reportedDpi = metrics.densityDpi
-        val physicalDpi = physicalDpi(metrics)
-        return DisplayScaleInfo(
-            widthPx = metrics.widthPixels,
-            heightPx = metrics.heightPixels,
-            reportedDpi = reportedDpi,
-            physicalDpi = physicalDpi,
-            autoScale = autoScale(reportedDpi, physicalDpi)
-        )
+    fun analyze(metrics: DisplayMetrics): DisplayScaleInfo =
+        decide(metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, physicalDpi(metrics))
+
+    /**
+     * "Авто" for a screen of [widthPx]×[heightPx]: the ratio of the physical density to the system's, unless the
+     * physical one cannot be true, and never so large that the app's screens stop fitting. Pure; unit-tested.
+     *
+     * The Geely Monjaro reports 321 dpi on a 12.3″ 1760×720 panel (really about 155 dpi): believed, it gave 200%
+     * and left the app 880×360 dp, the car screen cut at the bottom.
+     */
+    fun decide(widthPx: Int, heightPx: Int, reportedDpi: Int, physicalDpi: Int): DisplayScaleInfo {
+        val diagonal = if (physicalDpi > 0) hypot(widthPx / physicalDpi.toFloat(), heightPx / physicalDpi.toFloat()) else 0f
+        fun info(scale: Float, reason: AutoScaleReason) = DisplayScaleInfo(widthPx, heightPx, reportedDpi, physicalDpi, scale, reason, diagonal)
+        val raw = autoScale(reportedDpi, physicalDpi)
+        if (raw == SettingsRepository.DEFAULT_UI_SCALE) return info(raw, AutoScaleReason.TRUSTED)
+        if (!plausible(reportedDpi, diagonal)) return info(SettingsRepository.DEFAULT_UI_SCALE, AutoScaleReason.IMPLAUSIBLE)
+        val limit = largestFitting(widthPx, heightPx, reportedDpi)
+        return if (raw > limit) info(limit, AutoScaleReason.LIMITED) else info(raw, AutoScaleReason.SCALED)
     }
+
+    /**
+     * A system density of a large screen (head units, tablets: up to hdpi) with a physical density that makes the
+     * screen smaller than [MIN_LARGE_DIAGONAL_IN] is the panel misreporting itself. Phones (higher system densities)
+     * are not judged by size.
+     */
+    internal fun plausible(reportedDpi: Int, diagonalIn: Float): Boolean =
+        reportedDpi > LARGE_SCREEN_MAX_DPI || diagonalIn >= MIN_LARGE_DIAGONAL_IN
+
+    /**
+     * The largest scale that still leaves the app [MIN_SHORT_SIDE_LANDSCAPE_DP] on the short side lying down
+     * ([MIN_SHORT_SIDE_PORTRAIT_DP] standing): the car screen, the settings and the windows fit whole. Never
+     * below 100% by this rule. Rounded down to 5%.
+     */
+    internal fun largestFitting(widthPx: Int, heightPx: Int, reportedDpi: Int): Float {
+        val density = reportedDpi / BASE_DPI
+        val minShort = if (widthPx >= heightPx) MIN_SHORT_SIDE_LANDSCAPE_DP else MIN_SHORT_SIDE_PORTRAIT_DP
+        val fit = minOf(widthPx, heightPx) / (density * minShort)
+        return (floor(fit * 20f) / 20f).coerceAtLeast(SettingsRepository.DEFAULT_UI_SCALE)
+    }
+
+    private const val BASE_DPI = 160f
+    private const val LARGE_SCREEN_MAX_DPI = 240
+    private const val MIN_LARGE_DIAGONAL_IN = 7f
+    private const val MIN_SHORT_SIDE_LANDSCAPE_DP = 480f
+    private const val MIN_SHORT_SIDE_PORTRAIT_DP = 360f
 
     /** Average of the panel's physical x/y dpi, or 0 when the device does not report a usable value. */
     private fun physicalDpi(metrics: DisplayMetrics): Int {

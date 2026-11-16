@@ -129,6 +129,8 @@ data class TrackDetailsDto(
     @SerialName("albums") val albums: List<TrackAlbumDto> = emptyList(),
     @SerialName("r128") val r128: R128Dto? = null,
     @SerialName("contentWarning") val contentWarning: String? = null,
+    /** False: the service has no stream of this track (taken out of the catalogue); null when it did not say. */
+    @SerialName("available") val available: Boolean? = null,
     /** A file of the user's own music (content://); kept with the session, so it plays again after a restart. */
     @SerialName("localUri") val localUri: String? = null,
     /** Whether the open "supplement" method has the words of the track; null when the server did not say. */

@@ -22,6 +22,10 @@ object CrashLog {
 
     data class Report(val file: File, val time: Date, val summary: String)
 
+    /** The last events of the playback journal, set by the journal itself: what the player did just before. */
+    @Volatile
+    var recentPlayback: () -> String? = { null }
+
     /** Call first thing in Application.onCreate; keeps the system handler (the "app stopped" dialog). */
     fun install(context: Context) {
         val appContext = context.applicationContext
@@ -40,12 +44,37 @@ object CrashLog {
             appendLine("Версия: " + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")")
             appendLine("Устройство: " + Build.MANUFACTURER + " " + Build.MODEL + ", Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")")
             appendLine("Поток: " + thread.name)
+            runCatching { memoryLine(context) }.getOrNull()?.let { appendLine(it) }
+            runCatching { webViewLine() }.getOrNull()?.let { appendLine(it) }
+            runCatching { "Вывод звука: " + com.korenskoy.yandexmusic.data.player.AudioOutputs.current(context) }.getOrNull()?.let { appendLine(it) }
             appendLine()
             append(stack)
+            runCatching { recentPlayback() }.getOrNull()?.takeIf { it.isNotBlank() }?.let {
+                appendLine()
+                appendLine("Последние события воспроизведения:")
+                append(it)
+            }
         }
         File(dir, "crash_" + now.time + ".txt").writeText(redact(text))
         // The oldest reports go first
         dir.listFiles()?.sortedByDescending { it.name }?.drop(MAX_REPORTS)?.forEach { it.delete() }
+    }
+
+    /** "Память: свободно 812 МБ из 3 712, мало: нет; приложение 143 из 512 МБ". */
+    private fun memoryLine(context: Context): String {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val info = android.app.ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+        val rt = Runtime.getRuntime()
+        val mb = 1024 * 1024
+        return "Память: свободно ${info.availMem / mb} МБ из ${info.totalMem / mb}, мало: ${if (info.lowMemory) "да" else "нет"}; " +
+            "приложение ${(rt.totalMemory() - rt.freeMemory()) / mb} из ${rt.maxMemory() / mb} МБ"
+    }
+
+    /** The WebView of the device (the sign-in page): an old one crashes on some. */
+    private fun webViewLine(): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+        val p = android.webkit.WebView.getCurrentWebViewPackage() ?: return "WebView: нет"
+        return "WebView: " + p.packageName + " " + p.versionName
     }
 
     /** Newest first. */

@@ -13,7 +13,6 @@ import com.korenskoy.yandexmusic.data.download.OfflineState
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
-import com.korenskoy.yandexmusic.presentation.main.components.landscapeColumns
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
 import com.korenskoy.yandexmusic.presentation.hifi.rememberHeaderCollapse
@@ -203,7 +202,8 @@ fun LibraryScreen(
     val contentStart = 20.dp
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
-    val columns = if (isLandscape) landscapeColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp) else 2
+    // One rule for phones, tablets and head units: as many columns as the width holds cards of a readable size
+    val columns = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.gridColumns(com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp - 2 * contentStart.value.toInt())
     val downloaded = downloadedTracks ?: remember(tracks, downloadedTrackIds) { tracks.filter { downloadedTrackIds.contains(it.idString) } }
     val keptKeys = remember(offlineCollections) { offlineCollections.mapTo(mutableSetOf()) { it.key } }
     LaunchedEffect(section) { if (section != null) onSectionShown() }

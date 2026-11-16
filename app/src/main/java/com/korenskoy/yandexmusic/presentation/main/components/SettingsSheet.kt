@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.data.player.BackgroundWork
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
@@ -199,8 +204,15 @@ fun SettingsSheet(
                 val sheetShape = if (isLandscape) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
                 Column(
                     modifier = Modifier
+                        // Clear of every system bar on any side (a car's own panel on the left, a camera cutout), in
+                        // landscape at the bottom too; standing, the pages keep clear of the bottom bar themselves
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                if (isLandscape) WindowInsetsSides.Horizontal + WindowInsetsSides.Vertical
+                                else WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                            )
+                        )
                         .then(if (isLandscape) Modifier.widthIn(max = 980.dp).fillMaxWidth(0.94f).fillMaxHeight(0.94f) else Modifier.fillMaxWidth().fillMaxHeight())
-                        .statusBarsPadding()
                         .padding(top = if (isLandscape) 0.dp else 24.dp)
                         .offset { IntOffset(0, dragOffset.value.roundToInt()) }
                         .clip(sheetShape)
@@ -269,7 +281,7 @@ fun SettingsSheet(
                                     .selectableGroup()
                             ) {
                                 SectionNavItem(SettingsPage.ACCOUNT, state.accountName.ifEmpty { stringResource(R.string.settings_group_account) }, accountSummary(state), open == SettingsPage.ACCOUNT) { pageName = it.name }
-                                SectionNavItem(SettingsPage.PLAYBACK, stringResource(R.string.settings_section_playback), playbackSummary(state), open == SettingsPage.PLAYBACK) { pageName = it.name }
+                                SectionNavItem(SettingsPage.PLAYBACK, stringResource(R.string.settings_section_playback), playbackSummary(state), open == SettingsPage.PLAYBACK || open.parent == SettingsPage.PLAYBACK) { pageName = it.name }
                                 SectionNavItem(SettingsPage.INTERFACE, stringResource(R.string.settings_section_interface), interfaceSummary(state), open == SettingsPage.INTERFACE) { pageName = it.name }
                                 SectionNavItem(SettingsPage.ABOUT, stringResource(R.string.settings_group_about), aboutSummary(), open == SettingsPage.ABOUT || open.parent == SettingsPage.ABOUT) { pageName = it.name }
                             }
@@ -356,6 +368,7 @@ private val SettingsPage.titleRes: Int
         SettingsPage.INTERFACE -> R.string.settings_section_interface
         SettingsPage.ABOUT -> R.string.settings_group_about
         SettingsPage.SUPPORT -> R.string.support_title
+        SettingsPage.EQUALIZER -> R.string.settings_equalizer
     }
 
 private val SettingsPage.icon: ImageVector
@@ -365,6 +378,7 @@ private val SettingsPage.icon: ImageVector
         SettingsPage.INTERFACE -> Icons.Rounded.Dashboard
         SettingsPage.ABOUT -> Icons.Rounded.Info
         SettingsPage.SUPPORT -> Icons.Rounded.FavoriteBorder
+        SettingsPage.EQUALIZER -> Icons.Rounded.Equalizer
     }
 
 /** The actions a page uses, with the ones that need the sheet (confirmations, closing) wired to it. */
@@ -483,10 +497,14 @@ private fun SectionNavItem(page: SettingsPage, title: String, summary: String, s
 private fun ColumnScope.SettingsPageContent(page: SettingsPage, state: SettingsUiState, actions: SettingsActions, onOpen: (SettingsPage) -> Unit) {
     when (page) {
         SettingsPage.ACCOUNT -> AccountPage(state, actions)
-        SettingsPage.PLAYBACK -> PlaybackPage(state, actions)
+        SettingsPage.PLAYBACK -> PlaybackPage(state, actions, onEqualizer = { onOpen(SettingsPage.EQUALIZER) })
         SettingsPage.INTERFACE -> InterfacePage(state, actions)
         SettingsPage.ABOUT -> AboutPage(state, actions, onSupport = { onOpen(SettingsPage.SUPPORT) })
         SettingsPage.SUPPORT -> SupportPage()
+        SettingsPage.EQUALIZER -> EqualizerPage(
+            state.appEqualizer.copy(systemAvailable = state.equalizerAvailable, systemName = state.equalizerApp),
+            actions.equalizer
+        )
     }
 }
 
@@ -521,20 +539,25 @@ private fun ColumnScope.AccountPage(state: SettingsUiState, actions: SettingsAct
 }
 
 @Composable
-private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsActions) {
+private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsActions, onEqualizer: () -> Unit = {}) {
     SettingsGroup(stringResource(R.string.settings_g_sound)) {
         SoundQualityRow(state.compatibleSound, actions.onCompatibleSoundChange)
         CrossfadeRow(state.crossfadeSeconds, actions.onCrossfadeChange)
         SwitchRow(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.settings_normalize), stringResource(R.string.settings_normalize_hint), state.normalizeVolume, actions.onNormalizeVolumeChange)
         // Always in its place, so it is never "gone": without an equalizer on the device it says so
         LaunchedEffect(Unit) { actions.onRefreshEqualizer() }
-        if (state.equalizerAvailable) {
-            SettingsRow(icon = Icons.Rounded.Equalizer, title = stringResource(R.string.settings_equalizer), subtitle = stringResource(R.string.settings_equalizer_hint), onClick = actions.onOpenEqualizer)
-        } else {
-            Box(Modifier.alpha(0.55f)) {
-                SettingsRow(icon = Icons.Rounded.Equalizer, title = stringResource(R.string.settings_equalizer), subtitle = stringResource(R.string.settings_equalizer_missing), onClick = null, chevron = false)
-            }
-        }
+        // The app's own equalizer first, on every device; the device's own (when there is one) inside it, second
+        val eq = state.appEqualizer
+        SettingsRow(
+            icon = Icons.Rounded.Equalizer,
+            title = stringResource(R.string.settings_equalizer),
+            subtitle = if (eq.settings.enabled) {
+                stringResource(R.string.settings_equalizer_on, eq.preset?.name ?: stringResource(R.string.equalizer_own_curve_short))
+            } else {
+                stringResource(R.string.settings_equalizer_off)
+            },
+            onClick = onEqualizer
+        )
     }
     SettingsGroup(stringResource(R.string.settings_g_start)) {
         SegmentedRow(Icons.Rounded.PowerSettingsNew, stringResource(R.string.settings_start_music)) {

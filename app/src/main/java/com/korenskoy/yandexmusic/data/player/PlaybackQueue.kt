@@ -101,6 +101,26 @@ object PlaybackQueue {
         return result
     }
 
+    /** After the wave fetched more at the end of its queue: what plays next. */
+    sealed interface AfterWaveFetch {
+        data class Play(val index: Int) : AfterWaveFetch
+        /** Nothing new: the wave does not start over (what is on the device plays meanwhile). */
+        data object Stuck : AfterWaveFetch
+        /** No wave at all: the liked tracks. */
+        data object Nothing : AfterWaveFetch
+    }
+
+    /** [following] — the next track to play after the fetch, if any. Never the queue's first track again. Pure. */
+    fun afterWaveFetch(following: Int?, queueSize: Int): AfterWaveFetch = when {
+        following != null -> AfterWaveFetch.Play(following)
+        queueSize > 0 -> AfterWaveFetch.Stuck
+        else -> AfterWaveFetch.Nothing
+    }
+
+    /** A failure of the link, not of the track: the player's network and timeout errors. Pure. */
+    fun isNetworkFailure(reason: String): Boolean =
+        "NETWORK" in reason || "TIMEOUT" in reason || reason == "ERROR_CODE_IO_UNSPECIFIED"
+
     /** Index of the previous track, or null when "previous" should restart the current one. */
     fun previousIndex(currentIndex: Int, progressMs: Long): Int? =
         if (progressMs > RESTART_ON_PREV_THRESHOLD_MS || currentIndex <= 0) null else currentIndex - 1

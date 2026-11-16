@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.utils.AutoScaleReason
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -363,6 +364,12 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
+            // Why not what the screen says: a density that cannot be true, or a limit so that everything fits
+            when (info.reason) {
+                AutoScaleReason.IMPLAUSIBLE -> stringResource(R.string.settings_ui_scale_implausible, String.format(java.util.Locale.US, "%.1f", info.impliedDiagonalIn))
+                AutoScaleReason.LIMITED -> stringResource(R.string.settings_ui_scale_limited)
+                else -> null
+            }?.let { Text(it, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
         } else {
             var value by remember(manualScale) { mutableFloatStateOf(manualScale) }
             Text(

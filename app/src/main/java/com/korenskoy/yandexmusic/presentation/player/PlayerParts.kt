@@ -318,7 +318,9 @@ internal fun PlayerCover(
     val next by rememberUpdatedState(onNext)
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        val side = min(min(maxWidth, maxHeight), 440.dp)
+        // As big as its place: the standing column and the lying share already size it to the screen (a phone's
+        // 440 was a ceiling on a tablet too)
+        val side = min(min(maxWidth, maxHeight), 720.dp)
         Box(
             Modifier
                 .size(side)

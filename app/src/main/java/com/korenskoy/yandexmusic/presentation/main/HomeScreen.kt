@@ -150,7 +150,7 @@ fun HomeScreen(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val minDim = minOf(windowSize.widthDp, windowSize.heightDp).toFloat()
-    val preferredKnob = (minDim * if (isLandscape) 0.34f else 0.41f).dp.coerceIn(120.dp, 210.dp)
+    val preferredKnob = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.waveKnob(minDim, isLandscape)
 
     val duration = (waveTrack?.durationMs ?: 0L).coerceAtLeast(0L)
     val progressFraction = { if (duration > 0) progress().toFloat() / duration else 0f }
@@ -193,7 +193,7 @@ fun HomeScreen(
                 if (!chipsOverKnob) chips(Modifier.padding(top = 10.dp))
                 Spacer(Modifier.weight(1f))
                 WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
-                WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = if (windowSize.heightDp < 480) 84.dp else 112.dp)
+                WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.lyingShelfCard(windowSize.heightDp))
             }
         }
     } else {

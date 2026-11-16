@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The app's own equalizer on its audio session (devices with none of their own) -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Voice search where there is no voice input window: the app listens itself, asked on the first tap -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- The system's own question "let the app work in the background?": a music app closed with the screen off is the fault -->
@@ -19,6 +21,11 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- A flash drive by its path on head units without the folder window (Geely Monjaro): the system lets the app
+         write there only with this, asked for in the app when the path is checked; what goes there is encrypted -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <!-- Android 11+ package visibility: lets the in-app updater find the system package installer -->
     <queries>
@@ -29,6 +36,12 @@
         <!-- The phone's or head unit's own equalizer, opened from the settings -->
         <intent>
             <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
+        </intent>
+        <!-- A head unit's equalizer is often an app of its own that does not answer the request above: found among
+             the apps on the launcher by its name -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <!-- The system's folder window (a flash drive's folder): some head units have none -->
         <intent>

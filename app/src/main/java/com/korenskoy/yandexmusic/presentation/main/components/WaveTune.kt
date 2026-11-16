@@ -1,5 +1,15 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.BasicText
@@ -233,15 +243,30 @@ fun WaveTuneChoices(
     groups.forEach { (title, options, choice) ->
         val (selected, select) = choice
         Text(title.uppercase(), style = HiFiType.SectionCaps.copy(fontSize = captionSize), modifier = Modifier.padding(top = gap, bottom = 10.dp))
-        if (segments) {
-            TuneStrip(options, selected, select, optionHeight, fontSize, title)
-        } else {
-            FlowRow(
-                Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                options.forEachIndexed { index, option -> TuneChip(option, index == selected, optionHeight, fontSize) { select(index) } }
+        // One strip when every word fits it whole (ticked and bold, as when picked); otherwise the options wrap
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val words = remember(options, fontSize, density) {
+            options.map { option ->
+                val text = measurer.measure(option, TextStyle(fontSize = fontSize, fontWeight = FontWeight.ExtraBold), maxLines = 1).size.width
+                with(density) { text.toDp() + TUNE_OPTION_PADDING * 2 }
+            }
+        }
+        // Only the picked one carries the tick
+        val tick = with(density) { fontSize.toDp() } + 2.dp + 4.dp
+        val needed = words.mapIndexed { i, w -> if (i == selected) w + tick else w }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val fitsStrip = needed.fold(8.dp) { sum, w -> sum + w + 2.dp } <= maxWidth
+            if (segments && fitsStrip) {
+                TuneStrip(options, selected, select, optionHeight, fontSize, title, needed)
+            } else {
+                FlowRow(
+                    Modifier.fillMaxWidth().selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    options.forEachIndexed { index, option -> TuneChip(option, index == selected, optionHeight, fontSize) { select(index) } }
+                }
             }
         }
     }
@@ -266,9 +291,9 @@ private fun TuneChip(text: String, selected: Boolean, height: Dp, fontSize: Text
     }
 }
 
-/** One strip; each option takes room by the length of its word, so long ones are not squeezed. */
+/** One strip; each option takes room by the width of its word (bold and ticked, as when picked): none is cut. */
 @Composable
-private fun TuneStrip(options: List<String>, selected: Int, onSelect: (Int) -> Unit, height: Dp, fontSize: TextUnit, label: String) {
+private fun TuneStrip(options: List<String>, selected: Int, onSelect: (Int) -> Unit, height: Dp, fontSize: TextUnit, label: String, widths: List<Dp>) {
     val inner = height - 8.dp
     Row(
         Modifier
@@ -286,7 +311,7 @@ private fun TuneStrip(options: List<String>, selected: Int, onSelect: (Int) -> U
             Box(
                 Modifier
                     // Room for the tick, so a picked word is not cut
-                    .weight(option.length + 4.5f)
+                    .weight(widths.getOrElse(index) { option.length.dp }.value)
                     .fillMaxHeight()
                     .clip(shape)
                     .then(if (on) Modifier.background(PickedFill).border(1.dp, HiFi.OnMetal, shape) else Modifier)
@@ -325,6 +350,9 @@ private fun TuneLabel(text: String, picked: Boolean, fontSize: TextUnit, color: 
     }
 }
 
+/** Room around a word of an option, each side: the words of a strip fit whole with it. */
+private val TUNE_OPTION_PADDING = 8.dp
+
 /** The side panel's width on a screen [screenWidth] wide: 45% of it, at least 360 and at most 520 dp. Pure; unit-tested. */
 fun sidePanelWidth(screenWidth: Dp): Dp = (screenWidth * 0.45f).coerceIn(360.dp, 520.dp).coerceAtMost(screenWidth)
 
@@ -361,7 +389,11 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                 val sideWidth = sidePanelWidth(currentWindowSizeDp().widthDp.dp)
                 Column(
                     Modifier
-                        .then(if (isLandscape) Modifier.width(sideWidth).fillMaxHeight().statusBarsPadding().navigationBarsPadding().padding(12.dp) else Modifier.widthIn(max = 640.dp).fillMaxWidth())
+                        // Clear of every system bar on any side and of a camera cutout
+                        .then(
+                            if (isLandscape) Modifier.windowInsetsPadding(WindowInsets.safeDrawing).width(sideWidth).fillMaxHeight().padding(12.dp)
+                            else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)).widthIn(max = 640.dp).fillMaxWidth()
+                        )
                         .clip(shape)
                         .background(HiFi.SheetFill)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }

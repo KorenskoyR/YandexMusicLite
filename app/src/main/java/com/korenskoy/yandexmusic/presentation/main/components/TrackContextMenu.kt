@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.foundation.layout.height
@@ -337,8 +342,8 @@ fun TrackContextMenu(
                         .align(Alignment.CenterEnd)
                         .width(sidePanelWidth(window.widthDp.dp).coerceAtMost(SIDE_PANEL_MAX))
                         .fillMaxHeight()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
+                        // Clear of every system bar on any side and of a camera cutout
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
                         .padding(12.dp)
                         .clip(RoundedCornerShape(28.dp))
                         .background(HiFiDialogDefaults.Container)

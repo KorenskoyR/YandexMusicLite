@@ -11,7 +11,7 @@ import com.korenskoy.yandexmusic.R
 /** The phone and its settings that bear on stops of the music: added to the journal when it is shared. */
 object PlaybackEnvironment {
 
-    fun describe(context: Context): String {
+    fun describe(context: Context, sound: List<String> = emptyList()): String {
         val r = context.resources
         fun onOff(on: Boolean) = r.getString(if (on) R.string.journal_env_on else R.string.journal_env_off)
         val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -32,7 +32,9 @@ object PlaybackEnvironment {
             r.getString(R.string.journal_env_network, network),
             r.getString(R.string.journal_env_power_save, onOff(power?.isPowerSaveMode == true)),
             r.getString(R.string.journal_env_background, background),
-            r.getString(R.string.journal_env_data_saver, onOff(dataSaver))
-        ).joinToString("\n")
+            r.getString(R.string.journal_env_data_saver, onOff(dataSaver)),
+            r.getString(R.string.journal_env_output, AudioOutputs.current(context)),
+            AudioOutputs.format(context)?.let { r.getString(R.string.journal_env_output_format, it) }
+        ).filterNotNull().plus(sound).joinToString("\n")
     }
 }

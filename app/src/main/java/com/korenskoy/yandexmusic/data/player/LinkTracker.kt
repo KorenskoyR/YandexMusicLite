@@ -68,7 +68,43 @@ internal class LinkTracker(private val now: () -> Long) {
 
 /** Why the link's state changed: written to the playback journal. */
 enum class LinkReason {
-    STREAM_STALLED, REQUEST_FAILED, SERVER_SILENT, NETWORK_GONE, NETWORK_BACK, STREAM_SOUNDS, SERVER_ANSWERED
+    STREAM_STALLED, REQUEST_FAILED, SERVER_SILENT, NETWORK_GONE, NETWORK_BACK, STREAM_SOUNDS, SERVER_ANSWERED,
+    /** The service answers, the server of the streams does not (a network letting only some addresses through). */
+    STREAMS_BLOCKED,
+    /** A stream broke off with a network error. */
+    STREAM_FAILED
+}
+
+/**
+ * The server gave no link to a track: the track, or the link? A track taken out of the catalogue made the link
+ * "weak" for five minutes (1.14.8 reports: one such track in a playlist, and the music went to the copies with the
+ * internet in order). Now it is the track's trouble while the server answers, unless several different tracks
+ * in a row get no link: that is the link after all. Pure; unit-tested.
+ */
+internal class UnresolvedTracks(private val now: () -> Long) {
+    enum class Verdict { TRACK, LINK }
+
+    private val failed = LinkedHashMap<String, Long>()
+
+    fun onFailed(trackId: String, serverAnswers: Boolean, markedUnavailable: Boolean): Verdict {
+        val t = now()
+        failed.entries.removeAll { t - it.value > WINDOW_MS }
+        failed[trackId] = t
+        return when {
+            !serverAnswers -> Verdict.LINK
+            markedUnavailable -> Verdict.TRACK
+            failed.size >= TRACKS_FOR_THE_LINK -> Verdict.LINK
+            else -> Verdict.TRACK
+        }
+    }
+
+    /** A link was given: whatever failed before was not the link. */
+    fun onResolved() = failed.clear()
+
+    companion object {
+        const val WINDOW_MS = 2 * 60 * 1000L
+        const val TRACKS_FOR_THE_LINK = 3
+    }
 }
 
 /** Where a track that is not downloaded should come from. */

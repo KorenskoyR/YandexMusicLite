@@ -43,12 +43,41 @@ class SystemEqualizer(
         .putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
         .putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
 
+    /** Where the device's own equalizer is. */
+    sealed interface Target {
+        /** Android's standard equalizer panel for this session (Samsung SoundAlive, Wavelet, Poweramp Equalizer…). */
+        data object Panel : Target
+
+        /** An equalizer app of its own that does not answer the standard request (head units: Teyes, FYT; some phones). */
+        data class App(val packageName: String, val label: String) : Target
+    }
+
     /**
-     * Something on the device can show an equalizer for this session. Asked each time: an equalizer app
-     * installed, removed or switched off while the app runs counts at once.
+     * The device's own equalizer: the standard panel, else an equalizer app found by its name. Users wrote "the app
+     * does not see the system equalizer": head units keep theirs in an app of their own that never answers the
+     * standard request. Asked each time: an equalizer installed, removed or switched off counts at once.
      */
-    fun isAvailable(): Boolean =
-        audioSessionId > 0 && runCatching { panelIntent().resolveActivity(context.packageManager) != null }.getOrDefault(false)
+    fun find(): Target? {
+        if (audioSessionId > 0 && runCatching { panelIntent().resolveActivity(context.packageManager) != null }.getOrDefault(false)) {
+            return Target.Panel
+        }
+        return runCatching { equalizerApp() }.getOrNull()
+    }
+
+    fun isAvailable(): Boolean = find() != null
+
+    private fun equalizerApp(): Target.App? {
+        val pm = context.packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        return pm.queryIntentActivities(launcher, 0)
+            .asSequence()
+            .map { it.activityInfo }
+            .filter { it.packageName != context.packageName }
+            .map { Target.App(it.packageName, it.loadLabel(pm).toString()) }
+            .filter { EqualizerNames.looksLikeOne(it.label, it.packageName) }
+            .sortedByDescending { EqualizerNames.strength(it.label, it.packageName) }
+            .firstOrNull()
+    }
 
     private var lastAnnounced: Long? = null
 
@@ -120,13 +149,41 @@ class SystemEqualizer(
     }
 
     fun open() {
-        if (!isAvailable()) return
+        val target = find() ?: return
+        val intent = when (target) {
+            Target.Panel -> panelIntent()
+            is Target.App -> context.packageManager.getLaunchIntentForPackage(target.packageName) ?: return
+        }
         try {
-            context.startActivity(panelIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: ActivityNotFoundException) {
             Log.w(TAG, "No equalizer to open", e)
         } catch (e: SecurityException) {
             Log.w(TAG, "Equalizer refused to open", e)
+        }
+    }
+
+    /** Tells an equalizer app by its name or package. Pure; unit-tested. */
+    internal object EqualizerNames {
+        /** Words only an equalizer or a sound-effects app has. */
+        private val STRONG = listOf(
+            "эквалайз", "equaliz", "equalis", "звуковые эффекты", "аудиоэффект", "sound effect", "audio effect",
+            "soundalive", "misound", "dolby", "dirac", "viper4", "viperfx", "wavelet", "jamesdsp", "boom3d"
+        )
+        private val WORD = Regex("(^|[^a-zа-я])(eq|dsp)([^a-zа-я]|$)")
+        private val PACKAGE = Regex("(^|\\.)(eq|equalizer|equaliser|dsp|audiofx|soundfx|musicfx)(\\.|$)")
+
+        fun looksLikeOne(label: String, packageName: String): Boolean = strength(label, packageName) > 0
+
+        fun strength(label: String, packageName: String): Int {
+            val l = label.lowercase()
+            val p = packageName.lowercase()
+            return when {
+                STRONG.any { it in l } -> 3
+                WORD.containsMatchIn(l) -> 2
+                PACKAGE.containsMatchIn(p) || STRONG.any { it.replace(" ", "") in p } -> 1
+                else -> 0
+            }
         }
     }
 

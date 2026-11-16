@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.main.components.EqualizerActions
+import com.korenskoy.yandexmusic.data.player.AppEqualizer
 import com.korenskoy.yandexmusic.data.player.PlaybackEnvironment
 import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.MiniOnWave
@@ -49,14 +51,25 @@ class SettingsViewModel @Inject constructor(
     private val downloadScheduler: DownloadScheduler,
     private val storage: DownloadStorage,
     private val equalizer: SystemEqualizer,
+    private val appEqualizer: AppEqualizer,
     private val journal: PlaybackJournal,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private data class Sound(val compatible: Boolean, val crossfade: Int, val normalize: Boolean, val startMusic: StartMusic, val bluetooth: Boolean, val explicit: Boolean, val equalizer: Boolean, val ai: Boolean = false)
+    private data class Sound(
+        val compatible: Boolean,
+        val crossfade: Int,
+        val normalize: Boolean,
+        val startMusic: StartMusic,
+        val bluetooth: Boolean,
+        val explicit: Boolean,
+        val equalizer: SystemEqualizer.Target?,
+        val ai: Boolean = false,
+        val appEqualizer: AppEqualizer.State = AppEqualizer.State()
+    )
 
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
-    private val equalizerFound = MutableStateFlow(false)
+    private val equalizerFound = MutableStateFlow<SystemEqualizer.Target?>(null)
     private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE, val mini: MiniOnWave = MiniOnWave.LANDSCAPE, val carLayout: CarLayout = CarLayout.AUTO)
     private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
     private data class Library(
@@ -72,8 +85,11 @@ class SettingsViewModel @Inject constructor(
         combine(soundMode.compatible, settings.crossfadeSeconds, settings.normalizeVolume, ::Triple),
         combine(settings.startMusic, settings.bluetoothAutoplay, settings.skipExplicit, ::Triple),
         equalizerFound,
-        settings.skipAi
-    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq, ai -> Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq, ai) }
+        settings.skipAi,
+        appEqualizer.state
+    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq, ai, appEq ->
+        Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq, ai, appEq)
+    }
 
     private val look: Flow<Look> = combine(
         combine(settings.startPage, settings.expandPlayerOnPlay, settings.swipeToCloseMiniPlayer, settings.steeringWheelOnLeft, settings.carClock, ::Look),
@@ -97,7 +113,9 @@ class SettingsViewModel @Inject constructor(
             compatibleSound = s.compatible,
             crossfadeSeconds = s.crossfade,
             normalizeVolume = s.normalize,
-            equalizerAvailable = s.equalizer,
+            equalizerAvailable = s.equalizer != null,
+            equalizerApp = (s.equalizer as? SystemEqualizer.Target.App)?.label,
+            appEqualizer = s.appEqualizer,
             startMusic = s.startMusic,
             bluetoothAutoplay = s.bluetooth,
             skipExplicit = s.explicit,
@@ -138,6 +156,26 @@ class SettingsViewModel @Inject constructor(
     fun setNormalizeVolume(enabled: Boolean) = save { setNormalizeVolume(enabled) }
     fun openEqualizer() = equalizer.open()
 
+    /**
+     * The app's own equalizer: each change goes straight to it, in the order made (a drag sends many; on a pool of
+     * threads they could arrive out of order). The work is a few numbers and a write in the background.
+     */
+    val equalizerActions = EqualizerActions(
+        onEnabled = appEqualizer::setEnabled,
+        onGain = appEqualizer::setGain,
+        onBass = appEqualizer::setBass,
+        onTreble = appEqualizer::setTreble,
+        onPreamp = appEqualizer::setPreamp,
+        onNoClipping = appEqualizer::setNoClipping,
+        onPreset = appEqualizer::usePreset,
+        onSaveCustom = appEqualizer::saveCustom,
+        onRenameCustom = appEqualizer::renameCustom,
+        onDeleteCustom = appEqualizer::deleteCustom,
+        onReset = appEqualizer::reset,
+        onComparing = appEqualizer::setComparing,
+        onOpenSystem = { openEqualizer() }
+    )
+
     fun setSmoothPlayback(enabled: Boolean) = save { setSmoothPlayback(enabled) }
 
     fun clearJournal() = journal.clear()
@@ -145,7 +183,15 @@ class SettingsViewModel @Inject constructor(
     /** The journal as text, to a messenger or mail of the user's choice. */
     fun shareJournal(text: String) {
         // With the phone and its settings: battery saving and background limits explain many stops
-        val full = text + "\n\n" + runCatching { PlaybackEnvironment.describe(context) }.getOrDefault("")
+        val s = state.value
+        val eq = s.appEqualizer
+        val sound = listOf(
+            "Эквалайзер: " + if (eq.settings.enabled) "включён (" + (eq.preset?.name ?: "своя настройка") + ")" else "выключен",
+            "Кроссфейд: " + if (s.crossfadeSeconds == 0) "выкл" else "${s.crossfadeSeconds} с",
+            "Выравнивание громкости: " + if (s.normalizeVolume) "вкл" else "выкл",
+            "Качество: " + if (s.compatibleSound) "совместимое" else "максимальное"
+        )
+        val full = text + "\n\n" + runCatching { PlaybackEnvironment.describe(context, sound) }.getOrDefault("")
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, full.trimEnd())
         runCatching {
             context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -153,7 +199,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshEqualizer() {
-        viewModelScope.launch(Dispatchers.Default) { equalizerFound.value = equalizer.isAvailable() }
+        viewModelScope.launch(Dispatchers.Default) {
+            equalizerFound.value = equalizer.find()
+        }
     }
 
     init {

@@ -27,7 +27,10 @@ class PlaybackJournal(
         System::currentTimeMillis,
         FileJournalStore(File(context.filesDir, FILE_NAME)),
         ProcessExits(context)::lastSince
-    )
+    ) {
+        // A crash report tells what the player did just before
+        com.korenskoy.yandexmusic.data.crash.CrashLog.recentPlayback = ::recentForCrash
+    }
 
     enum class Kind {
         /** The music ran dry mid-track; [Event.valueMs] is how long. */
@@ -67,7 +70,15 @@ class PlaybackJournal(
         /** Android closed the app while the music played: [Event.detail] its [ProcessExit.reason], [Event.valueMs] when. */
         KILLED,
         /** A track took [Event.valueMs] to start sounding. */
-        SLOW_START
+        SLOW_START,
+        /** The wave got nothing new to play and did not start over: [Event.detail] why. */
+        WAVE_STUCK,
+        /** The output took no sound for [Event.valueMs] while the track played: [Event.detail] where the sound went. */
+        OUTPUT_STALL,
+        /** The position went back by [Event.valueMs] without a seek: [Event.detail] where the sound went. */
+        POSITION_BACK,
+        /** An output came or went while the music played (headphones, a speaker, a car): [Event.detail] which. */
+        OUTPUT_CHANGED
     }
 
     data class Event(
@@ -102,7 +113,12 @@ class PlaybackJournal(
         val kills: Int = 0,
         val underruns: Int = 0,
         val renewedLinks: Int = 0,
-        val slowStarts: Int = 0
+        val slowStarts: Int = 0,
+        /** The output stopped taking sound while the track played, and how long in all. */
+        val outputStalls: Int = 0,
+        val outputStalledMs: Long = 0L,
+        /** The track's time went back without a seek. */
+        val positionJumps: Int = 0
     ) {
         /** The wave played in this hour: its lines are shown. */
         val waveUsed: Boolean get() = waveOffered > 0 || waveRepeats > 0
@@ -256,11 +272,24 @@ class PlaybackJournal(
                 kills = count(Kind.KILLED),
                 underruns = events.filter { it.kind == Kind.UNDERRUN }.sumOf { it.count },
                 renewedLinks = count(Kind.LINK_RENEWED),
-                slowStarts = count(Kind.SLOW_START)
+                slowStarts = count(Kind.SLOW_START),
+                outputStalls = count(Kind.OUTPUT_STALL),
+                outputStalledMs = events.filter { it.kind == Kind.OUTPUT_STALL }.sumOf { it.valueMs },
+                positionJumps = count(Kind.POSITION_BACK)
             ),
             events.filter { it.notable }.takeLast(MAX_SHOWN)
         )
         if (save) store?.requestSave(urgent = false, ::encode)
+    }
+
+    /** The last events, plainly, for a crash report: what the player did just before. */
+    @Synchronized
+    internal fun recentForCrash(): String {
+        val format = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+        return events.takeLast(CRASH_EVENTS).joinToString("\n") { e ->
+            listOfNotNull(format.format(java.util.Date(e.atMs)), e.kind.name, e.title?.let { "«$it»" }, e.detail, e.valueMs.takeIf { it != 0L }?.let { "$it мс" })
+                .joinToString(" ")
+        }
     }
 
     /** The journal as lines of text, for the device. */
@@ -316,6 +345,8 @@ class PlaybackJournal(
     companion object {
         const val WINDOW_MS = 60 * 60_000L
         private const val MAX_SHOWN = 100
+        /** Events a crash report carries. */
+        private const val CRASH_EVENTS = 15
         private const val MAX_KEPT = 1_000
         private const val PLAYED_STEP_MS = 10_000L
         /** A pause said this long before the player paused is still the one meant. */

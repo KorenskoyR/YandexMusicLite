@@ -13,24 +13,24 @@ class CarLayoutTest {
 
     @Test
     fun theDesignSizesScaleToOne() {
-        assertEquals(1f, carScaleOf(1280.dp, 720.dp, 720.dp, isLandscape = true), 0.0001f)
-        assertEquals(1f, carScaleOf(600.dp, 1200.dp, 1200.dp, isLandscape = false), 0.0001f)
+        assertEquals(1f, carScaleOf(1280.dp, 720.dp, isLandscape = true), 0.0001f)
+        assertEquals(1f, carScaleOf(600.dp, 1200.dp, isLandscape = false), 0.0001f)
     }
 
     @Test
     fun standingTheHeightLeftByTheBarsDecides() {
         // The Geely: 960 × 1280 dp, 24 + 48 of system bars
-        val s = carScaleOf(960.dp, 1280.dp, 1208.dp, isLandscape = false)
+        val s = carScaleOf(960.dp, 1208.dp, isLandscape = false)
         assertEquals(1208f / 1200f, s, 0.0001f)
     }
 
     @Test
     fun aMessageSitsAboveTheSources() {
-        assertEquals(136f, carDockClearance(1280.dp, 720.dp, 720.dp, isLandscape = true).value, 0.01f)
-        assertEquals(124f, carDockClearance(600.dp, 1200.dp, 1200.dp, isLandscape = false).value, 0.01f)
+        assertEquals(136f, carDockClearance(1280.dp, 720.dp, isLandscape = true).value, 0.01f)
+        assertEquals(124f, carDockClearance(600.dp, 1200.dp, isLandscape = false).value, 0.01f)
         // Always more than the dock itself (88 standing, 96 lying, plus its bottom margin)
-        val phone = carDockClearance(411.dp, 914.dp, 866.dp, isLandscape = false)
-        assertTrue(phone.value > (88f + 24f) * carScaleOf(411.dp, 914.dp, 866.dp, false))
+        val phone = carDockClearance(411.dp, 866.dp, isLandscape = false)
+        assertTrue(phone.value > (88f + 24f) * carScaleOf(411.dp, 866.dp, false))
     }
 
     @Test

@@ -126,8 +126,12 @@ internal class WaveQueue(
         startedGeneration = -1
     }
 
-    /** The first track not heard lately (or simply the first one). */
-    fun firstUnplayed(): TrackDetailsDto? = _tracks.value.firstOrNull { it.idString !in recent } ?: _tracks.value.firstOrNull()
+    /**
+     * The first track not heard lately; null when every track of the wave was heard. The wave never starts over
+     * from its first track: that played the same few tracks in a circle when no more came (a network that lets the
+     * service's address through but not its streams).
+     */
+    fun firstUnplayed(): TrackDetailsDto? = firstUnheard(_tracks.value) { it in recent }
 
     fun remove(trackId: String) {
         _tracks.value = _tracks.value.filterNot { it.idString == trackId }
@@ -216,6 +220,10 @@ internal class WaveQueue(
     internal data class Gathered(val tracks: List<TrackDetailsDto>, val batches: Map<String, String>, val offered: Int, val heard: Int)
 
     companion object {
+        /** The first of [tracks] not [heard] lately; null when all were: never the first one again. Pure. */
+        internal fun firstUnheard(tracks: List<TrackDetailsDto>, heard: (String) -> Boolean): TrackDetailsDto? =
+            tracks.firstOrNull { !heard(it.idString) }
+
         private const val TAG = "WaveQueue"
         const val MY_WAVE = "user:onyourwave"
 
