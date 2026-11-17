@@ -117,7 +117,8 @@ class MainActivity : ComponentActivity() {
                 DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
             }
             CompositionLocalProvider(
-                LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale)
+                LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale),
+                com.korenskoy.yandexmusic.presentation.car.LocalManualUiScale provides if (uiScaleAuto) 1f else uiScaleManual
             ) {
                 YandexMusicTheme {
                     Surface(

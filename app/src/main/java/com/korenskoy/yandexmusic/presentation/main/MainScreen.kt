@@ -477,7 +477,8 @@ fun MainScreen(
                         maxWidth - bars.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) -
                             bars.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
                         maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(),
-                        isLandscape
+                        isLandscape,
+                        com.korenskoy.yandexmusic.presentation.car.LocalManualUiScale.current
                     )
                     isLandscape -> DockClearance
                     currentTrack != null -> 160.dp

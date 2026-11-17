@@ -359,7 +359,7 @@ fun CarScreen(
         val usableHeight = maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding()
         val layoutDirection = LocalLayoutDirection.current
         val usableWidth = maxWidth - bars.calculateLeftPadding(layoutDirection) - bars.calculateRightPadding(layoutDirection)
-        val u = Scale(carScaleOf(usableWidth, usableHeight, isLandscape))
+        val u = Scale(carScaleOf(usableWidth, usableHeight, isLandscape, LocalManualUiScale.current))
         // Standing on a screen too short for the design even at the smallest scale (a small phone): the cover and
         // the panels give up the missing height, the controls and the sources keep their size
         val standingShort = if (isLandscape) 0f else carStandingShortfall(usableHeight, u.factor)
@@ -811,17 +811,24 @@ private class WideShown {
  * every side ([usableWidth] and [usableHeight]). Lying, it used the whole height: a head unit's own status bar above
  * the app left the design short, and the source dock at the bottom got squeezed. Pure; unit-tested.
  */
-internal fun carScaleOf(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean): Float {
+internal fun carScaleOf(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean, manual: Float = 1f): Float {
     val s = if (isLandscape) minOf(usableWidth / 1280.dp, usableHeight / 720.dp) else minOf(usableWidth / 600.dp, usableHeight / 1200.dp)
-    return s.coerceIn(0.55f, 2f)
+    // «Масштаб интерфейса: Вручную» grows and shrinks «В авто» as well, as before 1.14.9 (Carlinkit Ultra2 in a 40%
+    // window: the buttons stayed small whatever the scale); never wider than the window, the height gives way
+    val widthFit = if (isLandscape) usableWidth / 1280.dp else usableWidth / 600.dp
+    val chosen = if (manual > 1f) minOf(s * manual, widthFit).coerceAtLeast(s) else s * manual
+    return chosen.coerceIn(0.55f, 2f)
 }
+
+/** The manual interface scale (1 with «Авто»): «В авто» follows it on top of fitting its window. */
+val LocalManualUiScale = androidx.compose.runtime.staticCompositionLocalOf { 1f }
 
 /**
  * How high the source dock reaches from the bottom of the car screen above the navigation bar, plus a gap:
  * a message placed over this never covers the sources. Lying: 28 + 96 + 12; standing: 24 + 88 + 12.
  */
-fun carDockClearance(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean): Dp {
-    val s = carScaleOf(usableWidth, usableHeight, isLandscape)
+fun carDockClearance(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean, manual: Float = 1f): Dp {
+    val s = carScaleOf(usableWidth, usableHeight, isLandscape, manual)
     return ((if (isLandscape) 136f else 124f) * s).dp
 }
 
