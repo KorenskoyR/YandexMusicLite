@@ -571,6 +571,10 @@ class MainViewModel @Inject constructor(
             if (mode == StartMusic.OFF) return@launch
             playbackController.awaitRestoredSession()
             if (playbackController.isPlaying.value) return@launch
+            // The music the settings start counts as the user's own: «Разворачивать плеер» opens the player for it
+            // too (not in «В авто», where the car screen is the player) — it stayed folded (1.14.11 feedback)
+            // The tab may not be chosen yet at this moment: «Открывать: В авто» is asked directly
+            if (settingsRepository.startPage.first() != StartPage.CAR) playRequests.userStarted()
             when (mode) {
                 StartMusic.CONTINUE -> playbackController.play()
                 StartMusic.WAVE -> if (playbackController.currentSource.value == PlaylistSource.VIBE && playbackController.currentTrack.value != null) {

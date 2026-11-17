@@ -229,9 +229,15 @@ class PlaybackController @Inject constructor(
             }
             .launchIn(scope)
         // Volume normalization: the gains of the queued tracks, applied as each one plays
+        var previousGains = emptyMap<String, Float>()
         combine(_currentPlaylist, settingsRepository.normalizeVolume) { queue, on ->
             if (!on) emptyMap() else queue.mapNotNull { track -> track.r128?.integrated?.let { track.idString to Loudness.gainFor(it) } }.toMap()
-        }.distinctUntilChanged().onEach { playerRepository.setTrackGains(it) }.launchIn(scope)
+        }.distinctUntilChanged().onEach { gains ->
+            // The previous queue's gains stay one more turn: the track fading out over a crossfade into another
+            // queue (the wave into the radio) lost its gain and grew louder for the fade (1.14.11 feedback)
+            playerRepository.setTrackGains(if (gains.isEmpty()) gains else previousGains + gains)
+            previousGains = gains
+        }.launchIn(scope)
     }
 
     /** "Моя волна": its own list, preview and fetching; new tracks join the queue while the wave plays. */
