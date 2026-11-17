@@ -1,8 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
-import android.content.res.Configuration
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.ui.text.font.FontWeight
@@ -197,8 +195,7 @@ fun LibraryScreen(
         sectionName = if (section == LibrarySection.LOCAL) LibrarySection.DOWNLOADED.name else null
     }
 
-    val isLandscape = LocalConfiguration.current.orientation ==
-        Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val contentStart = 20.dp
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)

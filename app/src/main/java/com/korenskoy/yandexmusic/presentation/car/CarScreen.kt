@@ -513,8 +513,21 @@ fun CarScreen(
                     .fillMaxSize()
                     .padding(start = u(48f), end = u(40f), bottom = u(28f))
             ) {
-                val wide = CarWide.layout(maxWidth.value / u.factor, maxHeight.value / u.factor, layout, wideShown.wide)
-                SideEffect { wideShown.wide = wide != null }
+                val roomWidth = maxWidth.value / u.factor
+                val roomHeight = maxHeight.value / u.factor
+                // The layout is chosen for a room that held for a moment. Another app coming over and going, a bar
+                // showing for an instant, left a room just too small for an instant: the screen switched to two
+                // columns and stayed so (1.14.10, a head unit with a panel on the left)
+                LaunchedEffect(roomWidth, roomHeight, layout) {
+                    if (wideShown.wide != null) delay(CarWide.SETTLE_MS)
+                    wideShown.wide = CarWide.layout(roomWidth, roomHeight, layout, wideShown.wide) != null
+                }
+                val wide = when (wideShown.wide) {
+                    null -> CarWide.layout(roomWidth, roomHeight, layout, null)
+                    // Three columns while a new room settles: as the room allows, squeezed if need be
+                    true -> CarWide.layout(roomWidth, roomHeight, layout, true) ?: CarWide.layout(roomWidth, roomHeight, CarLayout.THREE)
+                    false -> null
+                }
                 val coverColumn = wide?.let { u(it.cover) }
                 SideEffect { wideCover = coverColumn }
                 if (wide != null) {
@@ -788,7 +801,10 @@ private fun Modifier.hiddenUnder(panel: Boolean): Modifier =
     else this
 
 /** What the screen showed last, wide or not: «Авто» holds it near the edge ([CarWide.HOLD]). */
-private class WideShown(var wide: Boolean? = null)
+/** Whether three columns are on screen (null before the first choice): changed only for a room that held. */
+private class WideShown {
+    var wide by mutableStateOf<Boolean?>(null)
+}
 
 /**
  * The scale of the 1280×720 (lying) or 600×1200 (standing) design on this screen: by what the system bars leave on

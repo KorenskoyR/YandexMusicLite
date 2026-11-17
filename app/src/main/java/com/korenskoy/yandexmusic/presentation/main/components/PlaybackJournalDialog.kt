@@ -143,6 +143,7 @@ private fun eventColor(event: PlaybackJournal.Event): Color = when (event.kind) 
 }
 
 private fun seconds(ms: Long): String = String.format(Locale.US, "%.1f", ms / 1000f).removeSuffix(".0")
+private fun minutes(ms: Long): String = (ms / 60_000L).toString()
 
 private fun clock(ms: Long): String = "%d:%02d".format(ms / 60_000, ms / 1000 % 60)
 
@@ -188,6 +189,8 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.RESUMED -> r.getString(R.string.journal_event_resumed, seconds(e.valueMs), causeText(r, e.cause, null))
         PlaybackJournal.Kind.ERROR -> if (e.detail == PlaybackController.TRACK_UNAVAILABLE) {
             r.getString(R.string.journal_event_unavailable, title, recoveryText(r, e.count)).removePrefix(" — ").trim()
+        } else if (e.detail == PlaybackController.STUCK_OUTPUT) {
+            r.getString(R.string.journal_event_stuck_output, title, recoveryText(r, e.count)).removePrefix(" — ").trim()
         } else {
             r.getString(R.string.journal_event_error, title, e.detail.orEmpty(), recoveryText(r, e.count)).removePrefix(" — ").trim()
         }
@@ -208,6 +211,7 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.OUTPUT_STALL -> r.getString(R.string.journal_event_output_stall, title, seconds(e.valueMs), e.detail.orEmpty()).removePrefix(" — ").trim()
         PlaybackJournal.Kind.POSITION_BACK -> r.getString(R.string.journal_event_position_back, title, seconds(e.valueMs), e.detail.orEmpty()).removePrefix(" — ").trim()
         PlaybackJournal.Kind.OUTPUT_CHANGED -> r.getString(R.string.journal_event_output_changed, e.detail.orEmpty())
+        PlaybackJournal.Kind.REOPENED_AFTER_REST -> r.getString(R.string.journal_event_reopened, e.title.orEmpty(), minutes(e.valueMs))
     }
 }
 

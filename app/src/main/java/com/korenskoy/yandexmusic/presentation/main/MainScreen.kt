@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.safeDrawing
 import com.korenskoy.yandexmusic.presentation.hifi.LocalLyrics
 import kotlinx.coroutines.flow.map
@@ -27,7 +28,6 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.presentation.hifi.LocalLinkState
 import com.korenskoy.yandexmusic.utils.CoverSize
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
@@ -64,7 +64,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -118,6 +117,8 @@ fun MainScreen(
     viewModel: MainViewModel,
     onNavigateToAuth: () -> Unit = {},
     openPlayerSignal: Int = 0,
+    /** The steering wheel's voice button: each new value listens once, whatever tab is open. */
+    voiceSignal: Int = 0,
     accountVm: AccountViewModel = hiltViewModel(),
     searchVm: SearchViewModel = hiltViewModel(),
     playlistsVm: PlaylistsViewModel = hiltViewModel(),
@@ -164,6 +165,21 @@ fun MainScreen(
     LaunchedEffect(openPlayerSignal) {
         if (openPlayerSignal > 0 && viewModel.currentTrack.value != null) isPlayerExpanded = true
     }
+    // The steering wheel's voice button: the same listening as the car's microphone, what is heard plays. Only once
+    // the screen is in front (the voice window cannot open over another app); no words — the window closes, and the
+    // microphone is let go either way
+    val wheelVoice = com.korenskoy.yandexmusic.presentation.voice.rememberVoiceInput(closeWhenUnheard = true) { phrase -> viewModel.playByVoice(phrase) }
+    val wheelRoute = com.korenskoy.yandexmusic.presentation.voice.rememberVoiceRoute()
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val activity = androidx.activity.compose.LocalActivity.current
+    LaunchedEffect(voiceSignal) {
+        if (voiceSignal == 0) return@LaunchedEffect
+        lifecycle.currentStateFlow.first { it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
+        // The system's window from the activity (closed when nothing is said); the app's own window closes itself
+        val main = activity as? com.korenskoy.yandexmusic.MainActivity
+        if (wheelRoute == com.korenskoy.yandexmusic.presentation.voice.VoiceRoute.SYSTEM_WINDOW && main != null) main.listenFromWheel()
+        else wheelVoice?.invoke()
+    }
     // "Open the player when the music starts": only for music the user started, never in the car
     LaunchedEffect(Unit) {
         viewModel.openPlayerRequests.collect { if (currentTabState.value != MainTab.CAR) isPlayerExpanded = true }
@@ -195,7 +211,7 @@ fun MainScreen(
     LaunchedEffect(currentTab) { catalogVm.closeAll() }
     PrefetchCovers(viewModel, currentTrack)
 
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
 
     // One tint for the whole app: the playing cover, or the station's brand colours on air
     val autoLite = rememberHiFiLite()
@@ -228,7 +244,42 @@ fun MainScreen(
     val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
     val aiMarksUi = remember(aiMarks) { com.korenskoy.yandexmusic.presentation.hifi.AiMarksUi(aiMarks, viewModel::wantAiMark, viewModel::unwantAiMark) }
 
+    // From a playing track to its artist's or album's page (the player, the wave): the player closes, the page opens;
+    // a track of several artists asks which one first
+    var artistChoice by remember { mutableStateOf<TrackDetailsDto?>(null) }
+    val openArtist = { id: String, name: String ->
+        isPlayerExpanded = false
+        catalogVm.openArtist(id, name)
+    }
+    val trackLinks = remember(catalogVm) {
+        com.korenskoy.yandexmusic.presentation.hifi.TrackLinks(
+            onArtist = { track ->
+                val withPages = track.artists.filter { it.idString != null }
+                if (withPages.size == 1) openArtist(withPages[0].idString!!, withPages[0].name.orEmpty()) else artistChoice = track
+            },
+            onAlbum = { track ->
+                val album = track.albums.firstOrNull()
+                val id = (album?.id as? kotlinx.serialization.json.JsonPrimitive)?.content
+                if (album != null && id != null) {
+                    isPlayerExpanded = false
+                    catalogVm.openAlbum(id, album.title.orEmpty())
+                }
+            }
+        )
+    }
+    artistChoice?.let { track ->
+        com.korenskoy.yandexmusic.presentation.hifi.ArtistChoiceDialog(
+            track,
+            onPick = { id, name ->
+                artistChoice = null
+                openArtist(id, name)
+            },
+            onDismiss = { artistChoice = null }
+        )
+    }
+
     CompositionLocalProvider(
+        com.korenskoy.yandexmusic.presentation.hifi.LocalTrackLinks provides trackLinks,
         LocalStreamQuality provides streamQuality,
         LocalLinkState provides linkState,
         LocalTrackMenu provides trackMenuLauncher,

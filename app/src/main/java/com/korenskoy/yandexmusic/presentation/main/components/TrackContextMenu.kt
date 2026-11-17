@@ -17,8 +17,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.platform.LocalConfiguration
-import android.content.res.Configuration
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
 import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.material.icons.rounded.DownloadDone
@@ -153,11 +151,10 @@ fun TrackContextMenu(
     // A tap outside or a swipe down closes the menu; Back goes one step back (handled below, because the
     // sheet's own Back would hide it first)
     val appDensity = LocalDensity.current
-    val configuration = LocalConfiguration.current
     // A low screen on its side (a flat head unit): a panel at the side, the whole height of it, so every item
     // can be reached; anywhere else the sheet from the bottom. Both scroll when the items do not fit
     val window = currentWindowSizeDp()
-    val asSidePanel = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && window.heightDp < SIDE_PANEL_BELOW_DP
+    val asSidePanel = com.korenskoy.yandexmusic.utils.isLandscapeWindow() && window.heightDp < SIDE_PANEL_BELOW_DP
     val menuScroll = rememberScrollState()
     val close: () -> Unit = {
         if (asSidePanel) onDismiss() else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }

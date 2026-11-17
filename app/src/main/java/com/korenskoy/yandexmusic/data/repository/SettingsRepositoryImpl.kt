@@ -177,6 +177,14 @@ class SettingsRepositoryImpl @Inject constructor(
     override val bluetoothAutoplay = bluetoothPref.first
     override suspend fun setBluetoothAutoplay(enabled: Boolean) = bluetoothPref.second(enabled)
 
+    private val reserveOnDrivePref = bool("road_reserve_on_drive", false)
+    override val roadReserveOnDrive = reserveOnDrivePref.first
+    override suspend fun setRoadReserveOnDrive(onDrive: Boolean) = reserveOnDrivePref.second(onDrive)
+
+    private val autoStartPref = bool("auto_start_with_device", false)
+    override val autoStartWithDevice = autoStartPref.first
+    override suspend fun setAutoStartWithDevice(enabled: Boolean) = autoStartPref.second(enabled)
+
     private val explicitPref = bool("skip_explicit", false)
     override val skipExplicit = explicitPref.first
     override suspend fun setSkipExplicit(enabled: Boolean) = explicitPref.second(enabled)

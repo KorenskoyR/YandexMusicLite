@@ -38,11 +38,14 @@ internal class OutputWatch {
 
     private var stallFrom: Long? = null
     private var lastPosition: Long? = null
+    /** When the watch began on this playing: a stall is never counted from before it. */
+    private var watchingSince: Long? = null
 
     /** A seek, a new track, another player: the position may jump and the output starts afresh. */
     fun reset() {
         stallFrom = null
         lastPosition = null
+        watchingSince = null
     }
 
     fun tick(nowMs: Long, playing: Boolean, lastFedAtMs: Long, positionMs: Long): Finding? {
@@ -50,10 +53,12 @@ internal class OutputWatch {
             reset()
             return null
         }
+        val since = watchingSince ?: nowMs.also { watchingSince = it }
         var finding: Finding? = null
         val from = stallFrom
         if (nowMs - lastFedAtMs >= STALL_MS) {
-            if (from == null) stallFrom = lastFedAtMs
+            // The last sound handed on may be from a play long ago (1.14.10: "4891 s"): never before this watch began
+            if (from == null) stallFrom = maxOf(lastFedAtMs, since)
         } else if (from != null) {
             stallFrom = null
             val duration = lastFedAtMs - from

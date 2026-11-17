@@ -31,6 +31,9 @@ internal object CarWide {
      */
     const val HOLD = 0.08f
 
+    /** A new room must hold this long before the layout changes for it (the room of an instant does not count). */
+    const val SETTLE_MS = 600L
+
     /** "Три колонки" chosen in the settings: the player and the cover give up to this much to keep them. */
     const val SQUEEZE = 0.15f
 

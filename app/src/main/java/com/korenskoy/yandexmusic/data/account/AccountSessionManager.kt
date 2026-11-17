@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.account
 
+import com.korenskoy.yandexmusic.data.download.AutoDownloadBaseline
 import com.korenskoy.yandexmusic.data.download.OfflineDownloads
 import com.korenskoy.yandexmusic.data.download.OfflineSync
 import kotlinx.coroutines.CancellationException
@@ -49,6 +50,7 @@ class AccountSessionManager @Inject constructor(
     private val downloadScheduler: DownloadScheduler,
     private val offline: OfflineDownloads,
     private val offlineSync: OfflineSync,
+    private val autoDownloadBaseline: AutoDownloadBaseline,
     private val httpClient: dagger.Lazy<okhttp3.OkHttpClient>
 ) {
     /** Syncs outlive any screen. */
@@ -121,7 +123,13 @@ class AccountSessionManager @Inject constructor(
     suspend fun syncLikes() {
         libraryRepository.loadCached()
         val changed = libraryRepository.syncLikes()
-        if (changed && settingsRepository.autoDownloadLikedTracks.first()) downloadScheduler.downloadAllLiked()
+        if (!settingsRepository.autoDownloadLikedTracks.first()) return
+        val liked = libraryRepository.likedTracks.value
+        when {
+            // On since before "only the new likes": what is liked now is the start, nothing is fetched now
+            autoDownloadBaseline.get() == null -> if (liked.isNotEmpty()) autoDownloadBaseline.set(liked.map { it.idString })
+            changed -> downloadScheduler.downloadNewLikes()
+        }
     }
 
     /** Refreshes account subscription status (hasPlus) and profile info from the server. */
@@ -236,6 +244,8 @@ class AccountSessionManager @Inject constructor(
         // Also closes an opened playlist: it is no longer in the list
         playlistsRepository.resetForAccountChange()
         albumsRepository.resetForAccountChange()
+        // "Only the new likes" counts from the likes of this account: another account's whole collection is not new
+        autoDownloadBaseline.clear()
         // A sync of the account just left must not stand in for the new one's
         libraryJob?.cancel()
         libraryJob = null

@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import android.provider.Settings
+import com.korenskoy.yandexmusic.data.start.DeviceStartReceiver
+import com.korenskoy.yandexmusic.data.repository.LibraryRepository
+import com.korenskoy.yandexmusic.data.download.AutoDownloadBaseline
 import com.korenskoy.yandexmusic.presentation.main.components.EqualizerActions
 import com.korenskoy.yandexmusic.data.player.AppEqualizer
 import com.korenskoy.yandexmusic.data.player.PlaybackEnvironment
@@ -13,6 +17,7 @@ import com.korenskoy.yandexmusic.data.player.PlaybackJournal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import android.net.Uri
+import androidx.core.net.toUri
 import com.korenskoy.yandexmusic.data.download.DownloadStorage
 import com.korenskoy.yandexmusic.data.player.SystemEqualizer
 import com.korenskoy.yandexmusic.domain.model.CarUnderCover
@@ -53,6 +58,8 @@ class SettingsViewModel @Inject constructor(
     private val equalizer: SystemEqualizer,
     private val appEqualizer: AppEqualizer,
     private val journal: PlaybackJournal,
+    private val libraryRepository: LibraryRepository,
+    private val autoDownloadBaseline: AutoDownloadBaseline,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -65,7 +72,8 @@ class SettingsViewModel @Inject constructor(
         val explicit: Boolean,
         val equalizer: SystemEqualizer.Target?,
         val ai: Boolean = false,
-        val appEqualizer: AppEqualizer.State = AppEqualizer.State()
+        val appEqualizer: AppEqualizer.State = AppEqualizer.State(),
+        val autoStart: Boolean = false
     )
 
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
@@ -78,17 +86,18 @@ class SettingsViewModel @Inject constructor(
         val autoDownload: Boolean,
         val cacheBytes: Long,
         val smooth: Boolean = true,
-        val journal: PlaybackJournal.Snapshot = PlaybackJournal.Snapshot()
+        val journal: PlaybackJournal.Snapshot = PlaybackJournal.Snapshot(),
+        val reserveOnDrive: Boolean = false
     )
 
     private val sound: Flow<Sound> = combine(
         combine(soundMode.compatible, settings.crossfadeSeconds, settings.normalizeVolume, ::Triple),
         combine(settings.startMusic, settings.bluetoothAutoplay, settings.skipExplicit, ::Triple),
         equalizerFound,
-        settings.skipAi,
+        combine(settings.skipAi, settings.autoStartWithDevice, ::Pair),
         appEqualizer.state
-    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq, ai, appEq ->
-        Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq, ai, appEq)
+    ) { (compatible, crossfade, normalize), (start, bluetooth, explicit), eq, (ai, autoStart), appEq ->
+        Sound(compatible, crossfade, normalize, start, bluetooth, explicit, eq, ai, appEq, autoStart)
     }
 
     private val look: Flow<Look> = combine(
@@ -104,9 +113,9 @@ class SettingsViewModel @Inject constructor(
         combine(settings.roadReserveMb, roadReserve.usedBytes, settings.autoDownloadLikedTracks, downloadManager.cacheSizeBytes) { mb, used, auto, cache ->
             Library(mb, used, auto, cache)
         },
-        settings.smoothPlayback,
+        combine(settings.smoothPlayback, settings.roadReserveOnDrive, ::Pair),
         journal.state
-    ) { lib, smooth, journalState -> lib.copy(smooth = smooth, journal = journalState) }
+    ) { lib, (smooth, onDrive), journalState -> lib.copy(smooth = smooth, journal = journalState, reserveOnDrive = onDrive) }
 
     val state: StateFlow<SettingsUiState> = combine(sound, look, scale, library, storage.state) { s, l, sc, lib, card ->
         SettingsUiState(
@@ -118,10 +127,12 @@ class SettingsViewModel @Inject constructor(
             appEqualizer = s.appEqualizer,
             startMusic = s.startMusic,
             bluetoothAutoplay = s.bluetooth,
+            autoStart = s.autoStart,
             skipExplicit = s.explicit,
             skipAi = s.ai,
             reserveMb = lib.reserveMb,
             reserveUsedBytes = lib.reserveUsed,
+            reserveOnDrive = lib.reserveOnDrive,
             autoDownload = lib.autoDownload,
             cacheSizeBytes = lib.cacheBytes,
             smoothPlayback = lib.smooth,
@@ -209,17 +220,50 @@ class SettingsViewModel @Inject constructor(
     }
     fun setStartMusic(value: StartMusic) = save { setStartMusic(value) }
     fun setBluetoothAutoplay(enabled: Boolean) = save { setBluetoothAutoplay(enabled) }
+
+    /**
+     * «Запуск с устройством». From Android 10 the app may open itself only with «Поверх других приложений»:
+     * switching it on shows that system screen when it is not allowed yet (without it — a notification at start).
+     */
+    fun setAutoStart(enabled: Boolean) {
+        save { setAutoStartWithDevice(enabled) }
+        if (enabled && !DeviceStartReceiver.mayOpenItself(context)) askToOpenItself()
+    }
+
+    private fun askToOpenItself() {
+        val ours = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, ("package:" + context.packageName).toUri())
+        val any = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+        // Some head units have no such screen at all: then the notification at start stays the way
+        for (intent in listOf(ours, any)) {
+            try {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            } catch (e: android.content.ActivityNotFoundException) {
+                Log.w("SettingsViewModel", "No screen for «Поверх других приложений»", e)
+            }
+        }
+    }
     fun setSkipExplicit(enabled: Boolean) = save { setSkipExplicit(enabled) }
     fun setSkipAi(enabled: Boolean) = save { setSkipAi(enabled) }
     fun setReserveMb(megabytes: Int) = save { setRoadReserveMb(megabytes) }
+
+    /** The cache moves between the phone's memory and the drive: it fills afresh at the new place. */
+    fun setReserveOnDrive(onDrive: Boolean) = save { setRoadReserveOnDrive(onDrive) }
     fun clearReserve() {
         viewModelScope.launch { roadReserve.clear() }
     }
 
     fun setAutoDownload(enabled: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            // From now on: the likes made from here are downloaded; the collection so far — «Скачать всю коллекцию»
+            if (enabled) {
+                libraryRepository.loadCached()
+                val liked = libraryRepository.likedTracks.value
+                if (liked.isNotEmpty()) autoDownloadBaseline.set(liked.map { it.idString }) else autoDownloadBaseline.clear()
+            } else {
+                autoDownloadBaseline.clear()
+            }
             settings.setAutoDownloadLikedTracks(enabled)
-            if (enabled) downloadScheduler.downloadAllLiked()
         }
     }
 

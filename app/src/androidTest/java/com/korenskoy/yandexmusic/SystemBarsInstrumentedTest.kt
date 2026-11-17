@@ -173,9 +173,24 @@ class SystemBarsInstrumentedTest {
     @Test
     fun seedForTheCheckFromTheComputer() {
         org.junit.Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("seed") == "true")
-        ActivityScenario.launch(MainActivity::class.java).use { first ->
-            first.onActivity { ViewModelProvider(it)[AuthViewModel::class.java].saveToken("y0_instrumentation_fake_token") }
+        // Not through ActivityScenario: it waits for the screen to settle, and the sign-in by code (an old WebView,
+        // Android 9) keeps a spinner turning — the seed then never ends
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val start = android.content.Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.targetContext.startActivity(start)
+        var activity: MainActivity? = null
+        val deadline = android.os.SystemClock.uptimeMillis() + 30_000
+        while (activity == null && android.os.SystemClock.uptimeMillis() < deadline) {
+            instrumentation.runOnMainSync {
+                activity = androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).filterIsInstance<MainActivity>().firstOrNull()
+            }
+            if (activity == null) Thread.sleep(200)
         }
+        val shown = checkNotNull(activity) { "The app did not open" }
+        instrumentation.runOnMainSync { ViewModelProvider(shown)[AuthViewModel::class.java].saveToken("y0_instrumentation_fake_token") }
+        instrumentation.runOnMainSync { shown.finish() }
         seeded = true
     }
 

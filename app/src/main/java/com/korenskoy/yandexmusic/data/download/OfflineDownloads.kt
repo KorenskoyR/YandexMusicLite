@@ -37,7 +37,8 @@ class OfflineDownloads @Inject constructor(
     private val collections: OfflineCollections,
     private val downloads: TrackDownloadManager,
     private val library: LibraryRepository,
-    private val settings: SettingsRepository
+    private val settings: SettingsRepository,
+    private val autoDownloadBaseline: AutoDownloadBaseline
 ) {
     private val workManager get() = WorkManager.getInstance(context)
 
@@ -132,7 +133,9 @@ class OfflineDownloads @Inject constructor(
         }
         val outcome = OfflineRules.removeOutcome(
             inKeptCollection = trackId in collections.keptTrackIds(),
-            liked = library.likedTracks.value.any { it.idString == trackId },
+            // A like from before auto-download was on is not fetched again: it may go
+            liked = library.likedTracks.value.any { it.idString == trackId } &&
+                autoDownloadBaseline.get()?.contains(trackId) != true,
             autoDownloadLiked = settings.autoDownloadLikedTracks.first()
         )
         if (outcome == RemoveOutcome.REMOVED) {

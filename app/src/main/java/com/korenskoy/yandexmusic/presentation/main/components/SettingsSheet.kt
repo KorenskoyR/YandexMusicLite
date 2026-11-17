@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -27,7 +28,6 @@ import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.data.download.StorageStatus
 import com.korenskoy.yandexmusic.data.network.TrackDownloadManager.Place
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -119,7 +119,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -162,7 +161,7 @@ fun SettingsSheet(
     onDismiss: () -> Unit,
     initialPage: SettingsPage? = null
 ) {
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val lite = LocalHiFiLite.current
     val scope = rememberCoroutineScope()
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -575,7 +574,9 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
             SettingsHint(stringResource(R.string.settings_start_music_note))
         }
         SwitchRow(Icons.Rounded.Bluetooth, stringResource(R.string.settings_bluetooth), stringResource(R.string.settings_bluetooth_hint), state.bluetoothAutoplay, actions.onBluetoothAutoplayChange)
+        SwitchRow(Icons.Rounded.RestartAlt, stringResource(R.string.settings_autostart), stringResource(R.string.settings_autostart_hint), state.autoStart, actions.onAutoStartChange)
     }
+    if (state.autoStart) SettingsNote(stringResource(R.string.settings_autostart_note))
     SettingsGroup(stringResource(R.string.settings_g_content)) {
         SwitchRow(Icons.Rounded.Explicit, stringResource(R.string.settings_explicit), stringResource(R.string.settings_explicit_hint), state.skipExplicit, actions.onSkipExplicitChange)
         SwitchRow(Icons.Rounded.AutoAwesome, stringResource(R.string.settings_skip_ai), stringResource(R.string.settings_skip_ai_hint), state.skipAi, actions.onSkipAiChange)
@@ -585,6 +586,10 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
     SettingsGroup(stringResource(R.string.settings_group_reserve)) {
         SwitchRow(Icons.Rounded.Timeline, stringResource(R.string.settings_smooth), stringResource(R.string.settings_smooth_hint), state.smoothPlayback, actions.onSmoothPlaybackChange)
         RoadReserveRows(state.reserveMb, actions.onReserveChange, state.reserveUsedBytes, actions.onClearReserve)
+        // Only where a card or a flash drive can take it (the downloads' drive, with a key to encrypt)
+        if (state.reserveMb > 0 && (state.storage.cardAvailable || state.reserveOnDrive)) {
+            ReservePlaceRow(state.reserveOnDrive, state.storage.cardIsUsb, state.storage.cardAvailable, actions.onReservePlaceChange)
+        }
         // Nothing to play from while the link is uneven: said where the choice is made
         if (state.smoothPlayback && state.reserveMb == 0) {
             Text(

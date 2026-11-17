@@ -6,7 +6,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.content.res.Configuration
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
@@ -69,7 +68,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -286,7 +284,7 @@ fun LocalMusicPage(
     val view = LocalView.entries[viewIndex]
     val folder = openedFolder?.let { key -> folders.firstOrNull { it.key == key } }
     val artist = openedArtist?.let { key -> artists.firstOrNull { artistKey(it) == key } }
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val showSource = sources.size > 1 && source == null
 
     LazyColumn(

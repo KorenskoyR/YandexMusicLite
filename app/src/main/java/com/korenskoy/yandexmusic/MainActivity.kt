@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic
 
+import com.korenskoy.yandexmusic.presentation.voice.VoiceInput
 import com.korenskoy.yandexmusic.presentation.account.NoPlusScreen
 import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
 import android.app.SearchManager
@@ -75,6 +76,9 @@ class MainActivity : ComponentActivity() {
     /** Incremented on each "open the player" request (notification tap); MainScreen reacts to changes. */
     private var openPlayerSignal by mutableIntStateOf(0)
 
+    /** The steering wheel's voice button asked to listen (YandexMusicLite.KorenskoyR.START_VOICE). */
+    private var voiceSignal by mutableIntStateOf(0)
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -93,6 +97,7 @@ class MainActivity : ComponentActivity() {
 
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
         if (savedInstanceState == null) intent?.let { playFromSearch(it) }
+        if (savedInstanceState == null && intent?.action == ACTION_START_VOICE) voiceSignal++
 
         // The app is always dark: dark system bars whatever the system's own theme. "Auto" followed the system,
         // so a light head unit got a light navigation bar (painted turquoise by the vendor) and dark status icons
@@ -120,16 +125,55 @@ class MainActivity : ComponentActivity() {
                         color = HiFi.Ground
                     ) {
                         // Skip the splash when the app is re-entered with a session already on screen
-                        AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal)
+                        AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal)
                     }
                 }
             }
         }
     }
 
+    private val wheelVoiceTimeout = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * The steering wheel asked to listen and the system's voice window is the way: it is opened from here, so that
+     * with no words heard it is closed after [WHEEL_VOICE_TIMEOUT_MS] instead of waiting on the screen of a moving
+     * car (the window offers "try again" and stays). What is heard plays, as from the microphone button.
+     */
+    fun listenFromWheel() {
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(VoiceInput.intent(getString(R.string.voice_prompt)), REQUEST_WHEEL_VOICE)
+        } catch (e: android.content.ActivityNotFoundException) {
+            android.util.Log.w("MainActivity", "No voice window after all", e)
+            return
+        }
+        wheelVoiceTimeout.removeCallbacksAndMessages(null)
+        wheelVoiceTimeout.postDelayed({ finishActivity(REQUEST_WHEEL_VOICE) }, WHEEL_VOICE_TIMEOUT_MS)
+    }
+
+    @Deprecated("The steering wheel's voice window needs its own request code to be closed")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_WHEEL_VOICE) return
+        wheelVoiceTimeout.removeCallbacksAndMessages(null)
+        if (resultCode != RESULT_OK) return
+        val phrase = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.takeIf { it.isNotBlank() } ?: return
+        mainViewModel.playByVoice(phrase)
+    }
+
+    /** The same model as the screens' (the activity's own store). */
+    private val mainViewModel: MainViewModel by lazy { androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java] }
+
+    override fun onDestroy() {
+        wheelVoiceTimeout.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) openPlayerSignal++
+        if (intent.action == ACTION_START_VOICE) voiceSignal++
         playFromSearch(intent)
     }
 
@@ -160,11 +204,19 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_PLAYER = "open_player"
+
+        /** Listen for a track by voice now: the steering wheel's button through the head unit or a key-mapping app. */
+        const val ACTION_START_VOICE = "YandexMusicLite.KorenskoyR.START_VOICE"
+
+        private const val REQUEST_WHEEL_VOICE = 7401
+
+        /** The voice window listens about 5 s and answers within a few more: no answer by then — nothing was said. */
+        private const val WHEEL_VOICE_TIMEOUT_MS = 15_000L
     }
 }
 
 @Composable
-fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
+fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0, voiceSignal: Int = 0) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val isAuthorized by mainViewModel.isAuthorized.collectAsStateWithLifecycle()
@@ -224,6 +276,7 @@ fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0) {
                 MainScreen(
                     viewModel = mainViewModel,
                     openPlayerSignal = openPlayerSignal,
+                    voiceSignal = voiceSignal,
                     onNavigateToAuth = {
                         navController.navigate("auth")
                     }

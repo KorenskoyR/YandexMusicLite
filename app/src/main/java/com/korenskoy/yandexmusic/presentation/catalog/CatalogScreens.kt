@@ -2,8 +2,6 @@ package com.korenskoy.yandexmusic.presentation.catalog
 
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Favorite
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -136,8 +134,7 @@ fun CatalogPageScreen(
             )
         }
     }
-    val isLandscape = LocalConfiguration.current.orientation ==
-        Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = contentBottom),

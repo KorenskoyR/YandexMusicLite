@@ -1,7 +1,5 @@
 package com.korenskoy.yandexmusic.presentation.main
 
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
@@ -190,8 +188,7 @@ fun PlaylistScreen(
             onDismiss = { deleting = false }
         )
     }
-    val isLandscape = LocalConfiguration.current.orientation ==
-        Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val backButton: @Composable () -> Unit = {
         Box(
             modifier = Modifier

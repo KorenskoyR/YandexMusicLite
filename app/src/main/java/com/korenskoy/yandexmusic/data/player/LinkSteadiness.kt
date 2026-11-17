@@ -14,15 +14,20 @@ internal class LinkSteadiness(private val now: () -> Long) {
     var uneven: Boolean = false
         private set
 
-    /** The music ran dry mid-track. @return true when this made the link uneven. */
-    fun onStall(): Boolean {
+    /**
+     * The music ran dry mid-track. Nothing is decided yet: a wait of a tenth of a second (the refill after a pause the
+     * headphones asked for) says nothing of the link — two of them made it "uneven" with a good Wi-Fi (1.14.10
+     * report). It is weighed when it ends ([onStallOver]) or once it lasts long ([onStallLasted]).
+     */
+    fun onStall() {
         val at = now()
         stallSince = at
         lastStallAt = at
-        stallStarts.addLast(at)
-        while (stallStarts.isNotEmpty() && at - stallStarts.first() > WINDOW_MS) stallStarts.removeFirst()
-        return becomeUnevenIf(stallStarts.size >= 2)
     }
+
+    /** The last stop that ended made the link uneven: two stops of [COUNTED_STALL_MS] or more within [WINDOW_MS]. */
+    var unevenByLastStop: Boolean = false
+        private set
 
     /** Asked [LONG_STALL_MS] after a stall began. @return true when this made the link uneven. */
     fun onStallLasted(): Boolean {
@@ -32,11 +37,18 @@ internal class LinkSteadiness(private val now: () -> Long) {
 
     /** The music is back. @return how long it stood, or null when it was not standing. */
     fun onStallOver(): Long? {
+        unevenByLastStop = false
         val since = stallSince ?: return null
         stallSince = null
         val at = now()
         lastStallAt = at
-        return at - since
+        val duration = at - since
+        if (duration >= COUNTED_STALL_MS) {
+            stallStarts.addLast(since)
+            while (stallStarts.isNotEmpty() && at - stallStarts.first() > WINDOW_MS) stallStarts.removeFirst()
+            unevenByLastStop = becomeUnevenIf(stallStarts.size >= 2)
+        }
+        return duration
     }
 
     /** @return true when the link has just become steady again: no wait for [STEADY_MS]. */
@@ -64,6 +76,8 @@ internal class LinkSteadiness(private val now: () -> Long) {
 
     companion object {
         const val LONG_STALL_MS = 1_500L
+        /** Shorter stops are not counted: a refill after a pause or a seek, not the link. */
+        const val COUNTED_STALL_MS = 500L
         const val WINDOW_MS = 120_000L
         const val STEADY_MS = 300_000L
     }

@@ -166,6 +166,19 @@ class PlaybackController @Inject constructor(
     private val steadiness = LinkSteadiness(SystemClock::elapsedRealtime)
     /** The track that has been heard: only its stops count, not the wait before a track starts. */
     private val heard = HeardTrack()
+
+    /** A pause the device slept through: Play opens the track afresh instead of the stale one. */
+    private val afterRest = AfterRest()
+
+    /**
+     * The output got stuck once in this run (media3: no sound taken for 10 s, ERROR_CODE_TIMEOUT): from now on the next
+     * track is not prepared beside the playing one. With a Bluetooth headset and the screen off (Xiaomi, 1.14.10) the
+     * output stood a minute before the end of every track, when the next one was readied beside it; the retry from the
+     * same second fell in that minute again and readied it again — the same piece over and over. Such a device keeps
+     * doing it, so for the rest of the run the next track starts the usual way when the playing one ends.
+     */
+    @Volatile
+    private var earlyStandbyOff = false
     private var stallLastedJob: Job? = null
 
     /** A track of the network waiting to start sounding: since when, and its title. */
@@ -347,6 +360,7 @@ class PlaybackController @Inject constructor(
         playerRepository.isPlaying
             .onEach { wantsToPlay ->
                 if (!wantsToPlay && playerRepository.currentTrackId.value != null) _isStarting.value = false
+                if (wantsToPlay) afterRest.onPlaying() else afterRest.onPaused()
             }
             .launchIn(scope)
 
@@ -577,7 +591,18 @@ class PlaybackController @Inject constructor(
         }
         // A start is already in flight (e.g. a second Play from a headset): don't restart it
         if (_isStarting.value) return
-        if (playerRepository.currentTrackId.value == current.idString && playerRepository.resume()) return
+        if (playerRepository.currentTrackId.value == current.idString) {
+            // The head unit slept with the track paused: its link and sound output are gone, it opens afresh
+            val rested = afterRest.staleFor()
+            if (rested == null) {
+                if (playerRepository.resume()) return
+            } else {
+                afterRest.onPlaying()
+                journal.record(PlaybackJournal.Kind.REOPENED_AFTER_REST, title = current.title, valueMs = rested)
+                resolveAndPlay(current, crossfade = false, startPositionMs = progress.value)
+                return
+            }
+        }
         // Nothing loaded (restored session or stopped player): start the current track where it was left.
         resolveAndPlay(current, crossfade = false, startPositionMs = restoredPositionMs.value)
     }
@@ -1251,13 +1276,14 @@ class PlaybackController @Inject constructor(
                     return@onEach
                 }
                 startWait = null
-                if (steadiness.onStall()) onLinkUneven()
+                steadiness.onStall()
                 stallLastedJob = scope.launch {
                     delay(LinkSteadiness.LONG_STALL_MS)
                     if (playerRepository.isBuffering.value && steadiness.onStallLasted()) onLinkUneven()
                 }
             } else {
                 steadiness.onStallOver()?.let { journal.record(PlaybackJournal.Kind.STALL, track?.title, it) }
+                if (steadiness.unevenByLastStop) onLinkUneven()
                 startWait?.let { (since, title) ->
                     val waited = SystemClock.elapsedRealtime() - since
                     if (waited >= SLOW_START_MS) journal.record(PlaybackJournal.Kind.SLOW_START, title, waited)
@@ -1444,6 +1470,10 @@ class PlaybackController @Inject constructor(
         }
 
         preloadManager.evictUrl(failure.trackId)
+        if (failure.reason == STUCK_OUTPUT) {
+            earlyStandbyOff = true
+            playerRepository.dropStandby()
+        }
         // A copy that does not play is no use to anyone. No link for the stream is never the copy's fault: taking the
         // copy away for it skipped a track that was playing from its copy
         val copyFailed = playingCopyId == failure.trackId && failure.reason != "URL_RESOLVE" && failure.reason != TRACK_UNAVAILABLE
@@ -1659,6 +1689,8 @@ class PlaybackController @Inject constructor(
     }
 
     private fun prepareStandby(track: TrackDetailsDto) {
+        // The output got stuck in this run: nothing is readied beside the playing track any more
+        if (earlyStandbyOff) return
         if (track.isRadio) return
         scope.launch {
             val nextId = track.idString
@@ -1858,6 +1890,8 @@ class PlaybackController @Inject constructor(
         const val ERROR_OF_A_FILE = -1
 
         /** [PlaybackJournal.Kind.WAVE_STUCK]'s detail: why the wave got nothing new. */
+        /** media3 found the player stuck: playing, and the output took no sound for 10 s. */
+        const val STUCK_OUTPUT = "ERROR_CODE_TIMEOUT"
         /** A track the service took out of its catalogue: skipped, the link is not to blame. */
         const val TRACK_UNAVAILABLE = "TRACK_UNAVAILABLE"
         const val WAVE_STUCK_OFFLINE = "offline"

@@ -121,7 +121,7 @@ fun rememberVoiceRoute(): VoiceRoute {
  * time. Null when the device can do neither, so the caller shows no microphone.
  */
 @Composable
-fun rememberVoiceInput(onText: (String) -> Unit): (() -> Unit)? {
+fun rememberVoiceInput(closeWhenUnheard: Boolean = false, onText: (String) -> Unit): (() -> Unit)? {
     val context = LocalContext.current
     val route = rememberVoiceRoute()
     val latest = rememberUpdatedState(onText)
@@ -168,6 +168,12 @@ fun rememberVoiceInput(onText: (String) -> Unit): (() -> Unit)? {
             delay(HEARD_SHOWN_MS)
             listening = null
         }
+        // From the steering wheel: nothing heard — said so for a moment, and the window goes by itself
+        if (closeWhenUnheard && (listening == Listening.Missed || listening is Listening.Failed)) {
+            delay(UNHEARD_SHOWN_MS)
+            session.stop()
+            listening = null
+        }
     }
 
     return when (route) {
@@ -186,3 +192,4 @@ fun rememberVoiceInput(onText: (String) -> Unit): (() -> Unit)? {
 }
 
 private const val HEARD_SHOWN_MS = 900L
+private const val UNHEARD_SHOWN_MS = 2_000L

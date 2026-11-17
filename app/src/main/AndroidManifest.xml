@@ -15,6 +15,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- «Запуск с устройством» (off unless switched on): the app opens when the head unit starts -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android 10+ lets an app open itself from the background only with «Поверх других приложений»; asked only when
+         «Запуск с устройством» is switched on -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- "Музыка с устройства": reads the music files on the phone, the SD card and flash drives (never writes) -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -84,6 +89,12 @@
                 <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- The voice button on the steering wheel: a head unit or a key-mapping app sends this, the app listens
+                 at once. The system's own voice button (the assistant) is left alone. -->
+            <intent-filter>
+                <action android:name="YandexMusicLite.KorenskoyR.START_VOICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- Exported so the system, Bluetooth and other controllers can reach the media session;
@@ -151,6 +162,17 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- «Запуск с устройством»: the device has started; it opens the app only when switched on -->
+        <receiver
+            android:name=".data.start.DeviceStartReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

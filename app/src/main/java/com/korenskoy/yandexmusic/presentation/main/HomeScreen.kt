@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import com.korenskoy.yandexmusic.presentation.hifi.toArtist
+import com.korenskoy.yandexmusic.presentation.hifi.toAlbum
 import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
 import com.korenskoy.yandexmusic.presentation.main.components.WaveTuneChips
 import com.korenskoy.yandexmusic.domain.model.WaveTuning
@@ -9,7 +11,6 @@ import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
 import com.korenskoy.yandexmusic.presentation.hifi.hifiSoftShadow
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -62,7 +63,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -147,7 +147,7 @@ fun HomeScreen(
     val chips: @Composable (Modifier) -> Unit = { modifier ->
         WaveTuneChips(tuning, trackWave = trackWaveSeed != null, onTune = onTune, onBackToMyWave = onBackToMyWave, modifier = modifier)
     }
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val minDim = minOf(windowSize.widthDp, windowSize.heightDp).toFloat()
     val preferredKnob = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.waveKnob(minDim, isLandscape)
@@ -335,7 +335,9 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                         letterSpacing = (-0.02).em,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        // The title leads to the album, the artist to the artist's page
+                        modifier = Modifier.toAlbum(shown)
                     )
                     Text(
                         text = shown.artists.joinToString { it.name ?: "" },
@@ -344,7 +346,8 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                         lineHeight = 22.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.toArtist(shown)
                     )
                 }
                 GlassCircleButton(onClick = onLike, contentDescription = stringResource(R.string.cd_nravitsya), size = 48.dp) {

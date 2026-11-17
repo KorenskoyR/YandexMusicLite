@@ -37,5 +37,7 @@ class WaveLoopTest {
         assertTrue(PlaybackQueue.isNetworkFailure("BUFFERING_TIMEOUT"))
         assertFalse(PlaybackQueue.isNetworkFailure("ERROR_CODE_DECODING_FAILED"))
         assertFalse(PlaybackQueue.isNetworkFailure("ERROR_CODE_IO_FILE_NOT_FOUND"))
+        // media3's "player stuck" (no sound taken for 10 s) is not the network
+        assertFalse(PlaybackQueue.isNetworkFailure("ERROR_CODE_TIMEOUT"))
     }
 }

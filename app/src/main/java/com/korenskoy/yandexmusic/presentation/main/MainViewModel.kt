@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.korenskoy.yandexmusic.domain.model.CarLayout
@@ -421,7 +423,15 @@ class MainViewModel @Inject constructor(
 
     /** Offline downloads run in WorkManager: they continue after the app is closed. */
     fun downloadAllLikedTracks() {
-        viewModelScope.launch { downloadScheduler.downloadAllLiked() }
+        viewModelScope.launch {
+            // Everything already here: said so, instead of a job that ends at once with nothing seen
+            val liked = libraryRepository.likedTracks.value
+            val allHere = withContext(Dispatchers.IO) {
+                liked.isNotEmpty() && liked.all { downloadManager.isTrackDownloaded(it.idString) }
+            }
+            if (allHere) _trackMessages.tryEmit(UiMessage(R.string.download_all_nothing))
+            else downloadScheduler.downloadAllLiked()
+        }
     }
 
     fun cancelDownloadAll() {

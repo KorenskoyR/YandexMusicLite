@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import androidx.compose.material.icons.rounded.SdCard
 import com.korenskoy.yandexmusic.utils.AutoScaleReason
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
@@ -263,6 +264,29 @@ internal fun SegmentedRow(icon: ImageVector, title: String, control: @Composable
         }
         Spacer(Modifier.height(12.dp))
         control()
+    }
+}
+
+/** Where the road reserve lives: the phone's memory or, encrypted, the downloads' card or flash drive. */
+@Composable
+internal fun ReservePlaceRow(onDrive: Boolean, driveIsUsb: Boolean, driveThere: Boolean, onChange: (Boolean) -> Unit) {
+    SegmentedRow(Icons.Rounded.SdCard, stringResource(R.string.settings_reserve_place)) {
+        HiFiSegmented(
+            options = listOf(
+                stringResource(R.string.settings_reserve_place_memory),
+                stringResource(if (driveIsUsb) R.string.settings_reserve_place_usb else R.string.settings_reserve_place_card)
+            ),
+            selectedIndex = if (onDrive) 1 else 0,
+            onSelect = { onChange(it == 1) },
+            fontSize = 13.sp
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            stringResource(if (onDrive && !driveThere) R.string.settings_reserve_place_gone else R.string.settings_reserve_place_hint),
+            color = HiFi.TextSecondary,
+            fontSize = 13.sp,
+            lineHeight = 18.sp
+        )
     }
 }
 

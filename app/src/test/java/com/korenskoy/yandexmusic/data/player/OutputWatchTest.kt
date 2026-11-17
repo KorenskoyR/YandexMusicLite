@@ -2,6 +2,7 @@ package com.korenskoy.yandexmusic.data.player
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -67,6 +68,16 @@ class OutputWatchTest {
         watch.reset()
         position -= 8_000
         assertEquals(emptyList<OutputWatch.Finding>(), play(2_000))
+    }
+
+    @Test
+    fun theLastSoundOfAnOldPlayIsNotTheStartOfAStall() {
+        // The output last took sound an hour and twenty minutes ago (another play); the watch starts now
+        fed = clock - 4_891_000
+        play(3_000, taking = false)
+        val found = play(1_000)
+        val stall = found.single() as OutputWatch.Finding.OutputStall
+        assertTrue("counted from the start of the watch, not 81 minutes back: ${stall.durationMs}", stall.durationMs in 2_500..3_500)
     }
 
     @Test

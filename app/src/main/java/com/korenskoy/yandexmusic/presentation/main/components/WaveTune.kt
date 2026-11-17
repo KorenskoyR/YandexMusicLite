@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.BasicText
 import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
 import androidx.compose.material.icons.rounded.RestartAlt
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
@@ -68,7 +67,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -362,7 +360,7 @@ fun sidePanelWidth(screenWidth: Dp): Dp = (screenWidth * 0.45f).coerceIn(360.dp,
  */
 @Composable
 fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss: () -> Unit) {
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     LaunchedEffect(visible.currentState, visible.targetState) {
         if (!visible.targetState && visible.isIdle) onDismiss()

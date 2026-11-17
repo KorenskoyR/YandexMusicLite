@@ -85,6 +85,14 @@ interface SettingsRepository {
     val bluetoothAutoplay: Flow<Boolean>
     suspend fun setBluetoothAutoplay(enabled: Boolean)
 
+    /** The road reserve on the downloads' SD card or flash drive (encrypted) instead of the phone's memory. */
+    val roadReserveOnDrive: Flow<Boolean>
+    suspend fun setRoadReserveOnDrive(onDrive: Boolean)
+
+    /** Open the app when the device (the head unit) starts. Off unless switched on. */
+    val autoStartWithDevice: Flow<Boolean>
+    suspend fun setAutoStartWithDevice(enabled: Boolean)
+
     /** Skip tracks the service marks as explicit in the wave and when moving on by itself. */
     val skipExplicit: Flow<Boolean>
     suspend fun setSkipExplicit(enabled: Boolean)

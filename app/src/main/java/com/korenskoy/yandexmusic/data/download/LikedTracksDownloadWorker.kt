@@ -42,6 +42,7 @@ class LikedTracksDownloadWorker(
         fun downloadManager(): TrackDownloadManager
         fun preloadManager(): TrackPreloadManager
         fun soundMode(): SoundMode
+        fun autoDownloadBaseline(): AutoDownloadBaseline
     }
 
     private val deps = EntryPointAccessors.fromApplication(context.applicationContext, Dependencies::class.java)
@@ -50,10 +51,16 @@ class LikedTracksDownloadWorker(
         val downloads = deps.downloadManager()
         val library = deps.libraryRepository()
         library.loadCached()
+        // No likes kept on the device yet (some devices, the first run): asked from the server, or "Скачать всю
+        // коллекцию" ended at once and nothing was downloaded
+        if (library.likedTracks.value.isEmpty()) runCatching { library.syncLikes() }
         val single = inputData.getString(KEY_TRACK_ID)
         val upgrade = inputData.getBoolean(KEY_UPGRADE, false)
+        val newLikesOnly = inputData.getBoolean(KEY_NEW_LIKES, false)
+        val baseline = if (newLikesOnly) deps.autoDownloadBaseline().get() ?: return Result.success() else emptySet()
         val tracks = library.likedTracks.value
             .filter { single == null || it.idString == single }
+            .filter { !newLikesOnly || it.idString !in baseline }
             .filter { downloads.isTrackDownloaded(it.idString) == upgrade }
         if (tracks.isEmpty()) return Result.success()
 
@@ -116,6 +123,8 @@ class LikedTracksDownloadWorker(
     companion object {
         const val KEY_TRACK_ID = "track_id"
         const val KEY_UPGRADE = "upgrade_quality"
+        /** Only the likes made after "Скачивать избранное" was switched on. */
+        const val KEY_NEW_LIKES = "new_likes"
         private const val CHANNEL_ID = "yandex_music_lite_downloads"
         private const val NOTIFICATION_ID = 4201
     }

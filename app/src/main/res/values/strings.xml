@@ -273,6 +273,12 @@
     <string name="journal_why_sounds">поток зазвучал</string>
     <string name="journal_why_server_answered">сервер ответил</string>
     <string name="settings_reserve_size">Размер кэша</string>
+    <string name="settings_reserve_place">Где хранить кэш</string>
+    <string name="settings_reserve_place_memory">Память</string>
+    <string name="settings_reserve_place_card">SD-карта</string>
+    <string name="settings_reserve_place_usb">Флешка</string>
+    <string name="settings_reserve_place_hint">На карте и флешке кэш зашифрован, как и скачанное. При смене места он собирается заново.</string>
+    <string name="settings_reserve_place_gone">Накопитель не найден: пока он не вставлен, кэш хранится в памяти.</string>
     <string name="settings_reserve_hint">Следующие треки сохраняются заранее и играют, когда связь слабая или её нет</string>
     <string name="settings_reserve_off">Выкл</string>
     <string name="settings_reserve_mb">%1$d МБ</string>
@@ -325,7 +331,7 @@
     <string name="settings_crossfade_off">Выкл.</string>
     <string name="settings_crossfade_seconds">%1$d с</string>
     <string name="settings_auto_download">Автоскачивание</string>
-    <string name="settings_auto_download_hint">Сохранять «Мне нравится» офлайн</string>
+    <string name="settings_auto_download_hint">Сохранять офлайн новые «Мне нравится»</string>
     <string name="settings_download_all">Скачать всю коллекцию</string>
     <string name="settings_storage">Хранилище</string>
     <string name="settings_storage_value">Скачано %1$s</string>
@@ -431,6 +437,12 @@
     <string name="settings_start_music_note">Играет сразу, без нажатия на «Пуск». Вместе с «Открывать: В авто» в разделе «Интерфейс» магнитола включает «Мою волну» сама.</string>
     <string name="settings_bluetooth">Bluetooth машины</string>
     <string name="settings_bluetooth_hint">Включать музыку при подключении к машине, пока приложение запущено</string>
+    <string name="settings_autostart">Запуск с устройством</string>
+    <string name="settings_autostart_hint">Открывать приложение при включении магнитолы</string>
+    <string name="settings_autostart_note">Если у магнитолы есть свой список автозапуска, добавьте приложение и туда.</string>
+    <string name="autostart_channel">Запуск с устройством</string>
+    <string name="autostart_title">Яндекс Музыка Lite</string>
+    <string name="autostart_text">Нажмите, чтобы открыть</string>
     <string name="settings_explicit">Без ненормативной лексики</string>
     <string name="settings_explicit_hint">Пропускать треки 18+ в волне и при переходе к следующему</string>
     <string name="settings_wave_tuning_note">Характер, настроение и язык «Моей волны» — на экране волны.</string>
@@ -866,8 +878,14 @@
     <string name="journal_event_output_stall">%1$s — звук остановился на выходе на %2$s с · %3$s</string>
     <string name="journal_event_position_back">%1$s — время трека откатилось назад на %2$s с · %3$s</string>
     <string name="journal_event_output_changed">Вывод звука: %1$s</string>
+    <string name="journal_event_reopened">%1$s — открыт заново после сна или паузы (%2$s мин)</string>
     <string name="journal_output_stalls">Остановки на выходе звука</string>
     <string name="journal_position_jumps">Откаты времени трека</string>
     <string name="journal_env_output">Вывод звука: %1$s</string>
     <string name="journal_env_output_format">Аудиовыход устройства: %1$s</string>
+    <string name="journal_event_stuck_output">%1$s — звук завис на выходе (10 с плеер не мог отдать звук): %2$s</string>
+    <string name="track_link_artist">Открыть исполнителя</string>
+    <string name="track_link_album">Открыть альбом</string>
+    <string name="track_link_which_artist">Чья страница?</string>
+    <string name="download_all_nothing">Все треки «Мне нравится» уже на устройстве</string>
 </resources>

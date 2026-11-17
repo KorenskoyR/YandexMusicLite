@@ -37,4 +37,12 @@ class DownloadQueueStateTest {
             queueStateOf(listOf(WorkInfo.State.SUCCEEDED, WorkInfo.State.FAILED, WorkInfo.State.CANCELLED))
         )
     }
+
+    @Test
+    fun aQueuedJobWithAConnectionIsNotWaitingForTheNetwork() {
+        // "Ожидание сети" flashed for a moment with a good Wi-Fi and nothing seemed to happen
+        assertEquals(DownloadQueueState.RUNNING, queueStateOf(listOf(WorkInfo.State.ENQUEUED), connected = true))
+        assertEquals(DownloadQueueState.WAITING, queueStateOf(listOf(WorkInfo.State.ENQUEUED), connected = false))
+        assertEquals(DownloadQueueState.IDLE, queueStateOf(emptyList(), connected = true))
+    }
 }

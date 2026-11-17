@@ -1,8 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.main
 
 import androidx.compose.material.icons.rounded.Mic
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
 import kotlin.math.roundToInt
@@ -126,8 +124,7 @@ fun SearchScreen(
     onVoice: (() -> Unit)? = null,
     initiallyShowHistory: Boolean = false
 ) {
-    val isLandscape = LocalConfiguration.current.orientation ==
-        Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
     val contentStart = 20.dp

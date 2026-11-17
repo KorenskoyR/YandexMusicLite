@@ -78,7 +78,9 @@ class PlaybackJournal(
         /** The position went back by [Event.valueMs] without a seek: [Event.detail] where the sound went. */
         POSITION_BACK,
         /** An output came or went while the music played (headphones, a speaker, a car): [Event.detail] which. */
-        OUTPUT_CHANGED
+        OUTPUT_CHANGED,
+        /** Play after the device slept or a long pause: the track opened afresh; [Event.valueMs] the pause. */
+        REOPENED_AFTER_REST
     }
 
     data class Event(

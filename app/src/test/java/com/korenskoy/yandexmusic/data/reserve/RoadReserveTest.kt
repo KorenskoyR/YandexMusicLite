@@ -4,7 +4,10 @@ import android.app.Application
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.network.TrackPreloadManager.ResolvedStream
 import com.korenskoy.yandexmusic.data.network.TrackPreloadManager.StreamQuality
+import com.korenskoy.yandexmusic.data.download.CardStorage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -118,5 +121,52 @@ class RoadReserveTest {
 
         assertFalse(reserve.has("1"))
         assertEquals(0L, reserve.usedBytes.value)
+    }
+
+    private val key = ByteArray(32) { it.toByte() }
+
+    @Test
+    fun onTheDriveTheTrackLiesEncryptedAndReadsBack() = runBlocking {
+        val driveDir = File(app.filesDir, "drive_reserve").apply { deleteRecursively() }
+        val reserve = RoadReserve(app, client(body = "audio-on-the-card"), json, MutableStateFlow(true)) { ReservePlace(driveDir, key) }
+        reserve.clear()
+
+        assertTrue(reserve.store(track("1"), stream) { false })
+
+        val file = reserve.fileOf("1")!!
+        assertEquals(driveDir, file.parentFile)
+        // "<id>.enc": the player reads it through the downloads' decryption
+        assertEquals(CardStorage.EXTENSION, file.extension)
+        assertFalse(file.readBytes().decodeToString().contains("audio-on-the-card"))
+        assertEquals("audio-on-the-card", CardStorage.decryptingStream(key, file).use { it.readBytes().decodeToString() })
+        assertTrue(reserve.onDrive)
+    }
+
+    @Test
+    fun movingToTheDriveStartsAfreshAndLeavesNothingBehind() = runBlocking {
+        val driveDir = File(app.filesDir, "drive_reserve2").apply { deleteRecursively() }
+        val wanted = MutableStateFlow(false)
+        val reserve = RoadReserve(app, client(), json, wanted) { ReservePlace(driveDir, key) }
+        reserve.clear()
+        reserve.store(track("1"), stream) { false }
+        val inMemory = reserve.fileOf("1")!!
+
+        wanted.value = true
+        withTimeout(5_000) { while (!reserve.onDrive) delay(10) }
+
+        assertFalse(inMemory.exists())
+        assertFalse(reserve.has("1"))
+        assertEquals(0L, reserve.usedBytes.value)
+    }
+
+    @Test
+    fun noDriveThereKeepsItInMemory() = runBlocking {
+        val reserve = RoadReserve(app, client(), json, MutableStateFlow(true)) { null }
+        reserve.clear()
+
+        assertTrue(reserve.store(track("1"), stream) { false })
+
+        assertFalse(reserve.onDrive)
+        assertEquals("audio", reserve.fileOf("1")?.readText())
     }
 }

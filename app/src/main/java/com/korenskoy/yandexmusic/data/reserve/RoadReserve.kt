@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.data.reserve
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.Flow
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import com.korenskoy.yandexmusic.data.download.CardStorage
 import android.annotation.SuppressLint
 import kotlinx.coroutines.CompletableDeferred
 import android.content.Context
@@ -70,20 +76,45 @@ object ReservePolicy {
         entries.sortedWith(compareBy({ heardLately(it.id) || it.playedAtMs != null }, { it.playedAtMs ?: it.addedAtMs }))
 }
 
+/** Where the reserve lives: a folder, and the key its files are encrypted with (null: plain, the phone's own cache). */
+class ReservePlace(val dir: File, val key: ByteArray? = null)
+
 /**
  * The road reserve: tracks saved ahead while the music plays, to fall back on when the link is weak or
- * gone. It lives in the app's cache, apart from the user's downloads, and rolls over by itself.
+ * gone. It lives in the app's cache, apart from the user's downloads, and rolls over by itself — or, chosen in the
+ * settings, encrypted on the SD card or the flash drive of the downloads (a head unit with little memory).
  *
  * It only ever holds the ordinary stream the service offers this app, so its size stays predictable.
  */
 @Singleton
-class RoadReserve @Inject constructor(
-    @param:ApplicationContext context: Context,
+class RoadReserve(
+    context: Context,
     private val okHttpClient: OkHttpClient,
-    private val json: Json
+    private val json: Json,
+    /** Wants the reserve on the drive. */
+    onDrive: Flow<Boolean> = flowOf(false),
+    /** The reserve's folder on the drive with its key; null — no drive to write to (taken out, no key). */
+    private val drivePlace: () -> ReservePlace? = { null }
 ) {
-    private val dir = File(context.cacheDir, "road_reserve")
-    private val indexFile = File(dir, "index.json")
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        okHttpClient: OkHttpClient,
+        json: Json,
+        settings: SettingsRepository,
+        card: CardStorage
+    ) : this(context, okHttpClient, json, settings.roadReserveOnDrive, {
+        val root = card.cardRoot()
+        val key = card.key()
+        if (root != null && key != null) ReservePlace(File(root, "road_reserve"), key) else null
+    })
+
+    private val internal = ReservePlace(File(context.cacheDir, "road_reserve"))
+
+    @Volatile
+    private var place = internal
+    private val dir: File get() = place.dir
+    private val indexFile: File get() = File(dir, "index.json")
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -99,12 +130,32 @@ class RoadReserve @Inject constructor(
     init {
         scope.launch {
             try {
-                mutex.withLock { load() }
+                mutex.withLock {
+                    place = placeFor(runCatching { onDrive.first() }.getOrDefault(false))
+                    load()
+                }
             } finally {
                 loaded.complete(Unit)
             }
+            // Moved between the phone and the drive: it starts afresh there, what was on the old place goes
+            onDrive.distinctUntilChanged().collect { wanted ->
+                mutex.withLock {
+                    val next = placeFor(wanted)
+                    if (next.dir == place.dir) return@withLock
+                    runCatching { place.dir.listFiles()?.forEach { it.delete() } }
+                    place = next
+                    load()
+                }
+            }
         }
     }
+
+    /** The drive when wanted and there (with a key to encrypt with), else the phone's cache. */
+    private fun placeFor(wanted: Boolean): ReservePlace =
+        if (wanted) runCatching { drivePlace() }.getOrNull()?.takeIf { it.dir.isDirectory || it.dir.mkdirs() } ?: internal else internal
+
+    /** The reserve is encrypted on a drive now. */
+    val onDrive: Boolean get() = place.key != null
 
     fun has(trackId: String): Boolean = trackId in _entries.value
 
@@ -130,15 +181,17 @@ class RoadReserve @Inject constructor(
     /** Saves [track] from [stream]; while [yieldTo] says so, the download steps back for the playing stream. */
     suspend fun store(track: TrackDetailsDto, stream: ResolvedStream, yieldTo: () -> Boolean): Boolean = withContext(Dispatchers.IO) {
         val id = track.idString
-        val file = fileFor(id)
-        val temp = File(dir, "$id.tmp")
         loaded.await()
-        dir.mkdirs()
+        val target = place
+        val temp = File(target.dir, "$id.tmp")
+        target.dir.mkdirs()
         try {
             val saved = okHttpClient.newCall(Request.Builder().url(stream.url).build()).execute().use { response ->
                 if (!response.isSuccessful) return@use false
                 response.body.byteStream().use { input ->
-                    FileOutputStream(temp).use { output ->
+                    // On a drive the track lands encrypted, as the downloads there
+                    val file = FileOutputStream(temp)
+                    (target.key?.let { CardStorage.encrypting(it, file) } ?: file).use { output ->
                         val buffer = ByteArray(BUFFER_BYTES)
                         while (true) {
                             ensureActive()
@@ -155,7 +208,12 @@ class RoadReserve @Inject constructor(
                 temp.delete()
                 return@withContext false
             }
-            adopt(track, temp, stream.quality)
+            if (target !== place) {
+                // The place changed while it downloaded
+                temp.delete()
+                return@withContext false
+            }
+            adopt(track, temp, stream.quality, encrypted = target.key != null)
         } catch (e: CancellationException) {
             temp.delete()
             throw e
@@ -166,13 +224,20 @@ class RoadReserve @Inject constructor(
         }
     }
 
-    /** Takes the finished [temp] file in as the copy of [track]. */
-    internal suspend fun adopt(track: TrackDetailsDto, temp: File, quality: StreamQuality): Boolean {
+    /** Takes the finished [temp] file in as the copy of [track]; a plain one is encrypted when the reserve is on a drive. */
+    internal suspend fun adopt(track: TrackDetailsDto, temp: File, quality: StreamQuality, encrypted: Boolean = false): Boolean {
         loaded.await()
         dir.mkdirs()
         val file = fileFor(track.idString)
-        if (temp.length() == 0L || !temp.renameTo(file)) {
+        if (temp.length() == 0L) {
             temp.delete()
+            return false
+        }
+        val key = place.key
+        val ready = if (key != null && !encrypted) encryptInto(key, temp, file) else temp.renameTo(file)
+        if (!ready) {
+            temp.delete()
+            file.delete()
             return false
         }
         mutex.withLock {
@@ -211,7 +276,14 @@ class RoadReserve @Inject constructor(
         publish(_entries.value - ids.toSet())
     }
 
-    private fun fileFor(trackId: String) = File(dir, "$trackId.audio")
+    /** On a drive "<id>.enc": the player reads such a file through the downloads' decryption. */
+    private fun fileFor(trackId: String) = File(dir, "$trackId." + if (place.key != null) CardStorage.EXTENSION else "audio")
+
+    private fun encryptInto(key: ByteArray, plain: File, target: File): Boolean = runCatching {
+        plain.inputStream().use { input -> CardStorage.encrypting(key, FileOutputStream(target)).use { input.copyTo(it) } }
+        plain.delete()
+        true
+    }.onFailure { Log.w(TAG, "Could not encrypt ${plain.name}", it) }.getOrDefault(false)
 
     private fun load() {
         val saved = runCatching { json.decodeFromString<List<ReserveEntry>>(indexFile.readText()) }.getOrDefault(emptyList())

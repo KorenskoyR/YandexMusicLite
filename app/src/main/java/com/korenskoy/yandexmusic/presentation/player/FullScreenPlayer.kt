@@ -16,7 +16,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogActionKind
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiDialogAction
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiAlertDialog
 import com.korenskoy.yandexmusic.data.download.TrackOfflineState
-import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
@@ -51,7 +50,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.korenskoy.yandexmusic.R
@@ -173,7 +171,7 @@ fun FullScreenPlayer(
     }
     val back = rememberPredictiveBack(enabled = !showQueue, onBack = onCollapse)
 
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val split = remember(queue, track.idString) { queueSplitOf(queue, track.idString) }
     val nextTrack = if (track.isRadio) null else split.next.firstOrNull()
     val durationMs = (track.durationMs ?: 0L).coerceAtLeast(0L)

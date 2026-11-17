@@ -21,7 +21,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
 import com.korenskoy.yandexmusic.R
 import kotlinx.coroutines.delay
 
@@ -29,8 +28,7 @@ import kotlinx.coroutines.delay
 fun SplashScreen(
     onSplashFinished: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val minSide = minOf(windowSize.widthDp, windowSize.heightDp)
     val scaleFactor = (minSide / 400f).coerceIn(0.7f, 1.4f)

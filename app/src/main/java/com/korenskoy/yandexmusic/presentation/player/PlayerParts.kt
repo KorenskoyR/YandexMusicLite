@@ -1,6 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
-import androidx.compose.ui.platform.LocalConfiguration
+import com.korenskoy.yandexmusic.presentation.hifi.toArtist
+import com.korenskoy.yandexmusic.presentation.hifi.toAlbum
 import com.korenskoy.yandexmusic.presentation.hifi.TrackLyrics
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.ui.unit.TextUnit
@@ -441,7 +442,9 @@ internal fun TitleRow(
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.02).em,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                // The title leads to the album, the artist to the artist's page
+                modifier = Modifier.toAlbum(track)
             )
             val aiMark = rememberAiMark(track)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -452,7 +455,7 @@ internal fun TitleRow(
                     lineHeight = 22.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f, fill = false).toArtist(track)
                 )
                 if (aiMark != null) AiChip(Modifier.padding(start = 8.dp), fontSize = 11.sp, height = 20.dp, horizontal = 7.dp)
             }

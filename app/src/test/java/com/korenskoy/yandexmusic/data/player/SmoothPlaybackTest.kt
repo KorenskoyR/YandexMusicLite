@@ -28,7 +28,8 @@ class SmoothPlaybackTest {
 
     @Test
     fun oneLongStopMakesTheLinkUneven() {
-        assertFalse("a stop alone is not yet a pattern", steadiness.onStall())
+        steadiness.onStall()
+        assertFalse("a stop alone is not yet a pattern", steadiness.uneven)
         clock += 1_000
         assertFalse("1 s is still short", steadiness.onStallLasted())
         clock += 500
@@ -40,19 +41,38 @@ class SmoothPlaybackTest {
     @Test
     fun twoShortStopsWithinTwoMinutesMakeItUneven() {
         steadiness.onStall()
-        clock += 400
-        assertEquals(400L, steadiness.onStallOver())
+        clock += 600
+        assertEquals(600L, steadiness.onStallOver())
+        assertFalse(steadiness.unevenByLastStop)
         clock += 90_000
-        assertTrue(steadiness.onStall())
+        steadiness.onStall()
+        clock += 700
+        steadiness.onStallOver()
+        assertTrue(steadiness.unevenByLastStop)
+        assertTrue(steadiness.uneven)
+    }
+
+    @Test
+    fun tenthsOfASecondAfterPausesNeverMakeItUneven() {
+        // 1.14.10 report: two 0.1 s refills after the headphones' pauses, and the light stream on a good Wi-Fi
+        repeat(5) {
+            steadiness.onStall()
+            clock += 100
+            steadiness.onStallOver()
+            clock += 20_000
+        }
+        assertFalse(steadiness.uneven)
     }
 
     @Test
     fun stopsFarApartDoNot() {
         steadiness.onStall()
-        clock += 300
+        clock += 800
         steadiness.onStallOver()
         clock += LinkSteadiness.WINDOW_MS + 1_000
-        assertFalse(steadiness.onStall())
+        steadiness.onStall()
+        clock += 800
+        steadiness.onStallOver()
         assertFalse(steadiness.uneven)
     }
 

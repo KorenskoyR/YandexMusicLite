@@ -117,9 +117,13 @@ object PlaybackQueue {
         else -> AfterWaveFetch.Nothing
     }
 
-    /** A failure of the link, not of the track: the player's network and timeout errors. Pure. */
+    /**
+     * A failure of the link, not of the track: the player's network errors and the app's own wait for data that never
+     * came. Not ERROR_CODE_TIMEOUT: that is media3 finding the player stuck (the output took no sound for 10 s, a
+     * Bluetooth headset with the screen off); counted as the network it lit "Слабая связь" on a good Wi-Fi (1.14.10). Pure.
+     */
     fun isNetworkFailure(reason: String): Boolean =
-        "NETWORK" in reason || "TIMEOUT" in reason || reason == "ERROR_CODE_IO_UNSPECIFIED"
+        reason.startsWith("ERROR_CODE_IO_NETWORK") || reason == "ERROR_CODE_IO_UNSPECIFIED" || reason == "BUFFERING_TIMEOUT"
 
     /** Index of the previous track, or null when "previous" should restart the current one. */
     fun previousIndex(currentIndex: Int, progressMs: Long): Int? =
