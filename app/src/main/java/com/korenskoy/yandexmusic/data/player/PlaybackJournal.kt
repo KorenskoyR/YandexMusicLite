@@ -80,7 +80,9 @@ class PlaybackJournal(
         /** An output came or went while the music played (headphones, a speaker, a car): [Event.detail] which. */
         OUTPUT_CHANGED,
         /** Play after the device slept or a long pause: the track opened afresh; [Event.valueMs] the pause. */
-        REOPENED_AFTER_REST
+        REOPENED_AFTER_REST,
+        /** A media button or another app's command reached the player: [Event.detail] which and from where. */
+        MEDIA_KEY
     }
 
     data class Event(

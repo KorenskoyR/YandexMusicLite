@@ -21,9 +21,9 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * The way from a playing track to its artist's and album's pages: the player and the wave take it from here, the
- * main screen gives it (the same pages as the track menu's «Исполнитель» and «Альбом»). Null where there is no such
- * way (the car: no extra steps while driving; screenshots).
+ * The way from a playing track to its artist's and album's pages: the player, the wave and «В авто» take it from
+ * here, the main screen gives it (the same pages as the track menu's «Исполнитель» and «Альбом»; over «В авто» they
+ * open on top of it and Back returns). Null where there is no such way (screenshots).
  */
 class TrackLinks(val onArtist: (TrackDetailsDto) -> Unit, val onAlbum: (TrackDetailsDto) -> Unit)
 

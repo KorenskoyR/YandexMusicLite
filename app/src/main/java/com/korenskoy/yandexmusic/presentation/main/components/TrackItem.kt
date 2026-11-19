@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.ExplicitMark
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
 import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
@@ -122,13 +124,19 @@ fun TrackItem(
         Spacer(modifier = Modifier.width(16.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = track.title ?: stringResource(R.string.bez_nazvaniya),
-                style = HiFiType.Body.copy(fontSize = HiFiType.RowTitle.fontSize, lineHeight = HiFiType.RowTitle.lineHeight),
-                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.title ?: stringResource(R.string.bez_nazvaniya),
+                    style = HiFiType.Body.copy(fontSize = HiFiType.RowTitle.fontSize, lineHeight = HiFiType.RowTitle.lineHeight),
+                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (track.showsExplicit) {
+                    ExplicitMark(HiFiType.RowTitle.fontSize, Modifier.padding(start = 6.dp))
+                }
+            }
             Spacer(modifier = Modifier.height(2.dp))
             val aiMark = rememberAiMark(track)
             Row(verticalAlignment = Alignment.CenterVertically) {

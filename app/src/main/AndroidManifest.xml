@@ -75,10 +75,14 @@
         tools:targetApi="33"
         android:supportsRtl="true"
         android:theme="@style/Theme.YandexMusic">
+        <!-- A new window size (split screen, a free window, a launcher's strip, turning) is laid out in place: the
+             screens are Compose and follow the window; recreated, the open player and the panels closed and the
+             picture blinked on every move of the divider -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.YandexMusic.Starting"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -164,6 +168,16 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- «Голосовой поиск» for button programs that start a screen by name only (MK+ cannot pass an action):
+             no launcher icon, it brings the app forward listening and goes away -->
+        <activity
+            android:name=".VoiceSearchActivity"
+            android:exported="true"
+            android:label="@string/voice_search_entry"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
 
         <!-- «Запуск с устройством»: the device has started; it opens the app only when switched on -->
         <receiver

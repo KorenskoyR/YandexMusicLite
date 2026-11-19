@@ -1,7 +1,12 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.toArtist
+import com.korenskoy.yandexmusic.presentation.hifi.toAlbum
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackHeadline
 import com.korenskoy.yandexmusic.presentation.hifi.ShrinkToFit
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.ui.platform.LocalLayoutDirection
 import com.korenskoy.yandexmusic.presentation.hifi.TrackLyrics
@@ -278,6 +283,7 @@ fun CarScreen(
     val isRadio = currentTrack?.isRadio == true
     val withQueue = underCover == CarUnderCover.QUEUE
     val wideShown = remember { WideShown() }
+    val stripShown = remember { StripShown() }
     // A station has no queue: the panel never stays open over one
     LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
     // A station leaves «Станции» open only while the radio plays
@@ -359,7 +365,15 @@ fun CarScreen(
         val usableHeight = maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding()
         val layoutDirection = LocalLayoutDirection.current
         val usableWidth = maxWidth - bars.calculateLeftPadding(layoutDirection) - bars.calculateRightPadding(layoutDirection)
-        val u = Scale(carScaleOf(usableWidth, usableHeight, isLandscape, LocalManualUiScale.current))
+        // A low wide window lies as one strip: the controls beside the title get the whole height
+        val strip = isLandscape && carStripOf(usableWidth, usableHeight, stripShown.strip)
+        SideEffect { stripShown.strip = strip }
+        // Lying in its usual columns (not the strip): the panels open over the cover column
+        val lying = isLandscape && !strip
+        // A panel the strip shows over its title and cover
+        val stripPanel = strip && (queueOpen || downloadsOpen || stationsOpen || playlistsOpen)
+        val interfaceScale = currentInterfaceScale()
+        val u = Scale(if (strip) carStripScaleOf(usableWidth, usableHeight) else carScaleOf(usableWidth, usableHeight, isLandscape, interfaceScale))
         // Standing on a screen too short for the design even at the smallest scale (a small phone): the cover and
         // the panels give up the missing height, the controls and the sources keep their size
         val standingShort = if (isLandscape) 0f else carStandingShortfall(usableHeight, u.factor)
@@ -495,7 +509,18 @@ fun CarScreen(
                 )
             }
         }
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+        if (strip) CarStrip(
+            u = u, track = currentTrack, sourceLabel = sourceLabel, isPlaying = isPlaying, isLiked = isLiked,
+            ringMode = ringMode, fraction = fraction, progress = progress, durationMs = durationMs, isRadio = isRadio,
+            onPlayPause = playPause, onPrev = onPrevClick, onNext = onNextClick,
+            onLike = { currentTrack?.let(onToggleLike) }, onDislike = { currentTrack?.let(onDislikeClick) },
+            sources = sources, active = active, onSeek = onSeek, onExit = onExit,
+            onOpenSettings = onOpenSettings, onVoiceSearch = onVoiceSearch, steeringWheelOnLeft = steeringWheelOnLeft,
+            onCoverClick = { if (isRadio && radio != null) openStations() else if (!isRadio) openQueue() },
+            coverDescription = stringResource(if (isRadio) R.string.car_stations else R.string.cd_ochered),
+            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen,
+            panelOpen = queueOpen || downloadsOpen || stationsOpen || playlistsOpen
+        ) else Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
             CarHeader(
                 u, onExit, showClock, pills = if (isLandscape) ({ wavePills(Modifier) }) else null,
@@ -706,7 +731,7 @@ fun CarScreen(
             }
         }
         // "Очередь" lying down: over the cover column too, the whole height of it
-        if (queueOpen && isLandscape) {
+        if (queueOpen && lying) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 queuePanel(
@@ -719,7 +744,7 @@ fun CarScreen(
             }
         }
         // "Скачанные" lying down: over the cover column too, the whole height of it
-        if (downloadsOpen && isLandscape) {
+        if (downloadsOpen && lying) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 downloadsPanel(
@@ -732,7 +757,7 @@ fun CarScreen(
             }
         }
         // «В плейлист» lying down: over the cover column, the whole height of it
-        val lyingPlaylists = playlists?.takeIf { playlistsOpen && isLandscape }
+        val lyingPlaylists = playlists?.takeIf { playlistsOpen && lying }
         if (lyingPlaylists != null && currentTrack != null) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
@@ -748,7 +773,7 @@ fun CarScreen(
             }
         }
         // «Станции» lying down: over the cover column, the whole height of it
-        if (stationsOpen && isLandscape && radio != null) {
+        if (stationsOpen && lying && radio != null) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val panelWidth = lyingPanelWidth(maxWidth)
                 CarStationsPanel(
@@ -762,8 +787,26 @@ fun CarScreen(
                 )
             }
         }
+        // The strip: a panel over the title and the cover, the controls beside it stay free
+        if (stripPanel) {
+            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = u(STRIP_SIDE), vertical = u(16f))) {
+                val panelWidth = maxWidth - u(56f + 28f + STRIP_CONTROLS + 28f)
+                // The row's height only: the sources under it stay in reach
+                val panelModifier = Modifier
+                    .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                    .width(panelWidth)
+                    .height(u(STRIP_ROW))
+                when {
+                    queueOpen -> queuePanel(panelModifier)
+                    downloadsOpen -> downloadsPanel(panelModifier)
+                    stationsOpen && radio != null -> CarStationsPanel(u, radio, panelModifier, onClose = { stationsOpen = false })
+                    playlistsOpen && playlists != null && currentTrack != null ->
+                        CarPlaylistsPanel(u, playlists, currentTrack, panelModifier, onClose = { playlistsOpen = false })
+                }
+            }
+        }
         // "Настроить волну" lying down: over the cover column, so the controls and the sources stay free
-        if (tuneOpen && isLandscape) {
+        if (tuneOpen && lying) {
             BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             // Over the cover column only: never wider than what the driver's panel leaves (it is u(652) wide
             // with u(48) + u(40) + u(40) around it), so the controls and the sources stay uncovered
@@ -811,24 +854,55 @@ private class WideShown {
  * every side ([usableWidth] and [usableHeight]). Lying, it used the whole height: a head unit's own status bar above
  * the app left the design short, and the source dock at the bottom got squeezed. Pure; unit-tested.
  */
-internal fun carScaleOf(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean, manual: Float = 1f): Float {
-    val s = if (isLandscape) minOf(usableWidth / 1280.dp, usableHeight / 720.dp) else minOf(usableWidth / 600.dp, usableHeight / 1200.dp)
-    // «Масштаб интерфейса: Вручную» grows and shrinks «В авто» as well, as before 1.14.9 (Carlinkit Ultra2 in a 40%
-    // window: the buttons stayed small whatever the scale); never wider than the window, the height gives way
-    val widthFit = if (isLandscape) usableWidth / 1280.dp else usableWidth / 600.dp
-    val chosen = if (manual > 1f) minOf(s * manual, widthFit).coerceAtLeast(s) else s * manual
-    return chosen.coerceIn(0.55f, 2f)
+internal fun carScaleOf(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean, interfaceScale: Float = 1f): Float {
+    val s = if (isLandscape) minOf(usableWidth / 1280.dp, usableHeight / 720.dp) else carStandingScaleOf(usableWidth, usableHeight, interfaceScale)
+    // No floor above what fits: «В авто» is as big as its window, whatever the interface scale. A floor of 0.55 (in
+    // dp) held the design bigger than a window that the scale had made small in dp; the title and the controls
+    // were then squeezed to fit while the sources kept their size — the higher the scale, the smaller the buttons
+    // (Geely Monjaro at 150 %, Carlinkit, 1.14.12)
+    return s.coerceIn(CAR_MIN_SCALE, 2f)
 }
 
-/** The manual interface scale (1 with «Авто»): «В авто» follows it on top of fitting its window. */
-val LocalManualUiScale = androidx.compose.runtime.staticCompositionLocalOf { 1f }
+/**
+ * Standing: the whole design while it comes out big enough to hit at a glance. In a window much less tall than the
+ * design (half of a lying 1024×600 unit beside a navigator: 507×600, a phone's half in split screen) it came out
+ * at half size, the buttons 32 dp and over each other; there the cover gives up its height (down to none) and the
+ * panels theirs (down to two rows) for bigger controls, up to [STANDING_COMFORT].
+ */
+internal fun carStandingScaleOf(usableWidth: Dp, usableHeight: Dp, interfaceScale: Float = 1f): Float {
+    // Comfortable by the screen's own dp: the interface scale makes the window's dp fewer, not the screen smaller,
+    // and «В авто» stays the same whatever the scale
+    val comfort = STANDING_COMFORT / interfaceScale.coerceAtLeast(0.1f)
+    val whole = minOf(usableWidth / 600.dp, usableHeight / STANDING_DESIGN_HEIGHT.dp)
+    if (whole >= comfort) return whole
+    val squeezed = minOf(usableWidth / 600.dp, usableHeight / STANDING_SQUEEZED_HEIGHT.dp, comfort)
+    return maxOf(whole, squeezed)
+}
+
+/** The interface scale the app put over the system's density (Settings → «Масштаб интерфейса»), 1 — none. */
+@Composable
+internal fun currentInterfaceScale(): Float {
+    val system = androidx.compose.ui.platform.LocalResources.current.displayMetrics.density
+    return if (system > 0f) LocalDensity.current.density / system else 1f
+}
+
+/** The scale at which the standing controls are big enough (the header's 56-unit buttons 42 dp): no squeezing above. */
+private const val STANDING_COMFORT = 0.75f
+
+/** The standing design with its cover given up as far as the queue (400 → [STANDING_MIN_PANEL]) can follow it: 140 less. */
+private const val STANDING_SQUEEZED_HEIGHT = 1060f
+
+/** Only a guard against a window of nothing: anything real fits by [carScaleOf] itself. */
+private const val CAR_MIN_SCALE = 0.15f
 
 /**
  * How high the source dock reaches from the bottom of the car screen above the navigation bar, plus a gap:
  * a message placed over this never covers the sources. Lying: 28 + 96 + 12; standing: 24 + 88 + 12.
  */
-fun carDockClearance(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean, manual: Float = 1f): Dp {
-    val s = carScaleOf(usableWidth, usableHeight, isLandscape, manual)
+fun carDockClearance(usableWidth: Dp, usableHeight: Dp, isLandscape: Boolean, interfaceScale: Float = 1f): Dp {
+    // The strip: its dock at the bottom, 16 under it
+    if (isLandscape && carStripOf(usableWidth, usableHeight, wasStrip = false)) return ((16f + 96f + 12f) * carStripScaleOf(usableWidth, usableHeight)).dp
+    val s = carScaleOf(usableWidth, usableHeight, isLandscape, interfaceScale)
     return ((if (isLandscape) 136f else 124f) * s).dp
 }
 
@@ -1000,16 +1074,14 @@ private fun DriverPanel(
                 modifier = Modifier.weight(1f)
             ) { shown ->
                 Column {
-                    Text(
-                        shown?.title ?: stringResource(R.string.car_source_wave),
-                        color = Color.White,
-                        fontSize = u.sp(if (compactDock) 44f else 56f),
-                        lineHeight = u.sp(if (compactDock) 50f else 62f),
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.03).em,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = u(6f))
+                    // Calmer than before (56 → 46): read at a glance, not shouted; two lines and a smaller type before
+                    // an ellipsis, the "E" plate after an explicit title (1.14.12 feedback)
+                    TrackHeadline(
+                        title = shown?.title ?: stringResource(R.string.car_source_wave),
+                        fontSize = u.sp(if (compactDock) 38f else 46f),
+                        explicit = shown?.showsExplicit == true,
+                        // As in the player: the title leads to the album, the artist to the artist's page
+                        modifier = Modifier.padding(top = u(6f)).then(if (shown != null) Modifier.toAlbum(shown) else Modifier)
                     )
                     val aiMark = rememberAiMark(shown)
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1020,7 +1092,7 @@ private fun DriverPanel(
                             lineHeight = u.sp(32f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
+                            modifier = Modifier.weight(1f, fill = false).then(if (shown != null) Modifier.toArtist(shown) else Modifier)
                         )
                         if (aiMark != null) AiChip(Modifier.padding(start = u(12f)), fontSize = u.sp(15f), height = u(28f), horizontal = u(10f))
                     }
@@ -1033,6 +1105,46 @@ private fun DriverPanel(
             }
 
             if (!showDock) Spacer(Modifier.weight(1f))
+            GaugeCluster(u, compactDock, track, isPlaying, isLiked, ringMode, fraction, onPlayPause, onPrev, onNext, onLike, onDislike, Modifier.fillMaxWidth())
+            // A timeline without digits under the gauge; radio is live and shows the on-air line
+            if (!showDock) Spacer(Modifier.weight(1f))
+            if (isRadio) CarLiveLine(u, Modifier.padding(top = u(10f)))
+            else CarTimeline(u, progress, durationMs, isPlaying, onSeek, Modifier.padding(top = u(10f)))
+            // Level with the middle of the sources beside
+            if (!showDock) Spacer(Modifier.height(u(30f)))
+        }
+        if (showDock) {
+            // Smaller as a whole when the height runs short: never under the sources, never cut
+            ShrinkToFit(Modifier.weight(1f).fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { upper() } }
+        } else {
+            Column(Modifier.fillMaxHeight()) { upper() }
+        }
+        if (!showDock) return@Column
+        if (beforeDock != null) {
+            beforeDock()
+            Spacer(Modifier.height(u(18f)))
+        }
+        Dock(u, sources, active, compact = compactDock)
+    }
+}
+
+/** Dislike, back, the knob in its spectrum ring, forward, like: the same cluster lying, standing and in the strip. */
+@Composable
+private fun GaugeCluster(
+    u: Scale,
+    compactDock: Boolean,
+    track: TrackDetailsDto?,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    ringMode: RingMode,
+    fraction: () -> Float,
+    onPlayPause: () -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
+    modifier: Modifier = Modifier
+) {
             // The gauge cluster. Standing (544 wide) all of it is smaller, so the five never touch:
             // 60 + 80 + 196 + 80 + 60 = 476, about 17 between neighbours; lying (652 wide) 19 between them
             val sideSize = if (compactDock) 60f else 72f
@@ -1042,7 +1154,7 @@ private fun DriverPanel(
             val sideIcon = if (compactDock) 24f else 28f
             val skipIcon = if (compactDock) 32f else 38f
             Row(
-                Modifier.fillMaxWidth().height(u(ringSize + 4f)),
+                modifier.height(u(ringSize + 4f)),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1089,26 +1201,170 @@ private fun DriverPanel(
                     Spacer(Modifier.size(u(sideSize)))
                 }
             }
-            // A timeline without digits under the gauge; radio is live and shows the on-air line
-            if (!showDock) Spacer(Modifier.weight(1f))
-            if (isRadio) CarLiveLine(u, Modifier.padding(top = u(10f)))
-            else CarTimeline(u, progress, durationMs, isPlaying, onSeek, Modifier.padding(top = u(10f)))
-            // Level with the middle of the sources beside
-            if (!showDock) Spacer(Modifier.height(u(30f)))
+}
+
+/**
+ * «В авто» in a low wide window (a launcher's lower 40 %, a split on its side): everything in one row — the controls
+ * beside the title instead of under it, so they get the whole height — and the sources under it. Lying, such a
+ * window squeezed the title and the controls to a sliver while the sources kept their size (Carlinkit Ultra2,
+ * 1.14.12). The 1600×420 design.
+ */
+@Composable
+private fun CarStrip(
+    u: Scale,
+    track: TrackDetailsDto?,
+    sourceLabel: String,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    ringMode: RingMode,
+    fraction: () -> Float,
+    progress: () -> Long,
+    durationMs: Long,
+    isRadio: Boolean,
+    onPlayPause: () -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
+    sources: List<DockItem>,
+    active: CarSource?,
+    onSeek: (Long) -> Unit,
+    onExit: () -> Unit,
+    onOpenSettings: (() -> Unit)?,
+    onVoiceSearch: (() -> Unit)?,
+    steeringWheelOnLeft: Boolean,
+    onCoverClick: () -> Unit,
+    coverDescription: String,
+    onAddToPlaylist: (() -> Unit)?,
+    playlistsOpen: Boolean,
+    /** A panel lies over the title and the cover: they fade away under it, out of reach for touch and the reader. */
+    panelOpen: Boolean
+) {
+    val underAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen) 0f else 1f, HiFiMotion.standard(), label = "car_strip_under")
+    Column(
+        Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = u(STRIP_SIDE), vertical = u(16f)),
+        // Fitted by the width, the strip is lower than its window: in the middle, not stuck to the top
+        verticalArrangement = Arrangement.spacedBy(u(20f), Alignment.CenterVertically)
+    ) {
+        val buttons: @Composable () -> Unit = {
+            Column(Modifier.width(u(56f)), verticalArrangement = Arrangement.spacedBy(u(12f), Alignment.CenterVertically)) {
+                Box(
+                    Modifier.size(u(56f)).hifiGlass(CircleShape).clickable(role = Role.Button, onClick = onExit),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = Color.White, modifier = Modifier.size(u(26f)))
+                }
+                if (onOpenSettings != null) {
+                    HiFiWellButton(onClick = onOpenSettings, contentDescription = stringResource(R.string.library_settings), size = u(56f)) {
+                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
+                    }
+                }
+                if (onVoiceSearch != null) {
+                    HiFiWellButton(onClick = onVoiceSearch, contentDescription = stringResource(R.string.voice_search), size = u(56f)) {
+                        Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
+                    }
+                }
+            }
         }
-        if (showDock) {
-            // Smaller as a whole when the height runs short: never under the sources, never cut
-            ShrinkToFit(Modifier.weight(1f).fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { upper() } }
-        } else {
-            Column(Modifier.fillMaxHeight()) { upper() }
+        val controls: @Composable () -> Unit = {
+            GaugeCluster(
+                u, compactDock = false, track = track, isPlaying = isPlaying, isLiked = isLiked, ringMode = ringMode, fraction = fraction,
+                onPlayPause = onPlayPause, onPrev = onPrev, onNext = onNext, onLike = onLike, onDislike = onDislike,
+                modifier = Modifier.width(u(STRIP_CONTROLS))
+            )
         }
-        if (!showDock) return@Column
-        if (beforeDock != null) {
-            beforeDock()
-            Spacer(Modifier.height(u(18f)))
+        val info: @Composable RowScope.() -> Unit = {
+            Column(
+                Modifier.weight(1f).graphicsLayer { alpha = underAlpha }.hiddenUnder(panelOpen),
+                verticalArrangement = Arrangement.spacedBy(u(6f), Alignment.CenterVertically)
+            ) {
+                if (sourceLabel.isNotEmpty()) {
+                    Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.12.em, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TrackHeadline(
+                        title = track?.title ?: stringResource(R.string.car_source_wave),
+                        fontSize = u.sp(38f),
+                        explicit = track?.showsExplicit == true,
+                        modifier = Modifier.weight(1f).then(if (track != null) Modifier.toAlbum(track) else Modifier)
+                    )
+                    if (onAddToPlaylist != null) {
+                        Spacer(Modifier.width(u(12f)))
+                        AddToPlaylistButton(u(56f), open = playlistsOpen, onClick = onAddToPlaylist)
+                    }
+                }
+                Text(
+                    if (track?.isRadio == true) stringResource(R.string.mini_player_live) else track?.artists?.joinToString { it.name ?: "" }.orEmpty(),
+                    color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(22f), lineHeight = u.sp(28f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = if (track != null) Modifier.toArtist(track) else Modifier
+                )
+                if (isRadio) CarLiveLine(u, Modifier.padding(top = u(6f)))
+                else CarTimeline(u, progress, durationMs, isPlaying, onSeek, Modifier.padding(top = u(6f)))
+            }
         }
-        Dock(u, sources, active, compact = compactDock)
+        val cover: @Composable () -> Unit = {
+            // A tap on the cover opens «Очередь» (or «Станции» on the radio): no room for their buttons here
+            CarCover(
+                u, track,
+                Modifier
+                    .size(u(STRIP_ROW))
+                    .graphicsLayer { alpha = underAlpha }
+                    .hiddenUnder(panelOpen)
+                    .clip(RoundedCornerShape(u(22f)))
+                    .clickable(role = Role.Button, onClickLabel = coverDescription, onClick = onCoverClick)
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().height(u(STRIP_ROW)),
+            horizontalArrangement = Arrangement.spacedBy(u(28f)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (steeringWheelOnLeft) { buttons(); controls(); info(); cover() } else { cover(); info(); controls(); buttons() }
+        }
+        Dock(u, sources, active, compact = false)
     }
+}
+
+/** The strip's row (cover, controls, title) and its parts across, in design units. */
+private const val STRIP_ROW = 260f
+private const val STRIP_CONTROLS = 600f
+private const val STRIP_SIDE = 32f
+private const val STRIP_DESIGN_WIDTH = 1600f
+private const val STRIP_DESIGN_HEIGHT = 420f
+
+/**
+ * The strip takes over where its controls are at least this much bigger than lying (a launcher's lower 40 %: ×1.5,
+ * a half of a lying unit: ×1.4), and gives way below LEAVE, so a few pixels do not flip it. A flat unit keeps its
+ * columns (×1.1–1.29).
+ */
+private const val STRIP_ENTER_GAIN = 1.3f
+private const val STRIP_LEAVE_GAIN = 1.22f
+
+/**
+ * Whether «В авто» lies as one strip in a window of [usableWidth] × [usableHeight]: where its controls come out at
+ * least [STRIP_ENTER_GAIN] times bigger than lying; [wasStrip] holds the choice near the edge. Pure; unit-tested.
+ */
+internal fun carStripOf(usableWidth: Dp, usableHeight: Dp, wasStrip: Boolean): Boolean {
+    if (usableHeight <= 0.dp || usableWidth <= 0.dp) return false
+    // The controls' size lying (in three columns where they fit, grown as there) against the strip's: the strip only
+    // where it makes them clearly bigger. By the shape alone a flat unit with its own bars (1760×550 left by them, a
+    // 1920×720 with a bar below) turned into a strip and lost its three columns. Ratios only: the interface scale
+    // and the density do not change the choice
+    val lying = carScaleOf(usableWidth, usableHeight, isLandscape = true)
+    val wide = CarWide.layout(usableWidth.value / lying - CAR_SIDE_MARGINS, usableHeight.value / lying - CAR_HEADER_AND_BOTTOM)
+    val controls = lying * (wide?.driverScale ?: 1f)
+    val gain = carStripScaleOf(usableWidth, usableHeight) / controls
+    return gain >= if (wasStrip) STRIP_LEAVE_GAIN else STRIP_ENTER_GAIN
+}
+
+/** The strip's scale: its 1600×420 design fitted to the window. Pure; unit-tested. */
+internal fun carStripScaleOf(usableWidth: Dp, usableHeight: Dp): Float =
+    minOf(usableWidth / STRIP_DESIGN_WIDTH.dp, usableHeight / STRIP_DESIGN_HEIGHT.dp).coerceIn(CAR_MIN_SCALE, 2f)
+
+/** Whether the strip is on screen: the choice is held near the edge. */
+private class StripShown {
+    var strip = false
 }
 
 @Composable

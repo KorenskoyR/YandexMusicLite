@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.catalog
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +47,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -148,7 +152,7 @@ fun CatalogPageScreen(
                 HiFiWideHeader(
                     title = state.artist?.artist?.name ?: state.album?.title ?: state.page.title,
                     modifier = Modifier
-                        .statusBarsPadding()
+                        .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     back = {
                         GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
@@ -179,7 +183,7 @@ fun CatalogPageScreen(
             } else Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {

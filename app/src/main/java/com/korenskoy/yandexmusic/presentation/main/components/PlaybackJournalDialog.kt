@@ -56,7 +56,10 @@ fun PlaybackJournalDialog(
     onClear: () -> Unit,
     onDismiss: () -> Unit,
     backgroundRestricted: Boolean = false,
-    onAllowBackground: () -> Unit = {}
+    onAllowBackground: () -> Unit = {},
+    /** The phone's maker has a switch of its own that closes apps (Xiaomi's «Автозапуск»); null — none known. */
+    makerName: String? = null,
+    onOpenMakerScreen: () -> Unit = {}
 ) {
     val resources = LocalResources.current
     val locale = LocalConfiguration.current.locales[0]
@@ -70,7 +73,11 @@ fun PlaybackJournalDialog(
                 Text(stringResource(R.string.journal_hint), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
                 if (backgroundRestricted && (closedByThePhone(snapshot) || snapshot.summary.stalls >= STALLS_WORTH_THE_HINT)) {
                     Spacer(Modifier.height(12.dp))
-                    BackgroundHint(onAllowBackground)
+                    BackgroundHint(stringResource(R.string.journal_background_hint), stringResource(R.string.journal_allow_background), onAllowBackground)
+                } else if (makerName != null && closedByThePhone(snapshot)) {
+                    // Allowed in Android, closed all the same: the maker's own switch
+                    Spacer(Modifier.height(12.dp))
+                    BackgroundHint(stringResource(R.string.journal_maker_hint, makerName), stringResource(R.string.journal_maker_open), onOpenMakerScreen)
                 }
                 Spacer(Modifier.height(12.dp))
                 summaryLines(resources, s).forEach { (label, value) ->
@@ -111,7 +118,7 @@ internal fun closedByThePhone(snapshot: PlaybackJournal.Snapshot): Boolean =
     snapshot.events.any { it.kind == PlaybackJournal.Kind.KILLED && ProcessExits.closedByThePhone(it.detail) }
 
 @Composable
-private fun BackgroundHint(onAllow: () -> Unit) {
+private fun BackgroundHint(text: String, action: String, onAllow: () -> Unit) {
     val shape = RoundedCornerShape(14.dp)
     Column(
         Modifier
@@ -119,14 +126,14 @@ private fun BackgroundHint(onAllow: () -> Unit) {
             .hifiGlass(shape, fill = HiFi.Warning.copy(alpha = 0.10f), border = HiFi.Warning.copy(alpha = 0.35f))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Text(stringResource(R.string.journal_background_hint), color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
+        Text(text, color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
         Box(
             Modifier
                 .heightIn(min = 40.dp)
                 .clickable(role = Role.Button, onClick = onAllow),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(stringResource(R.string.journal_allow_background), color = HiFi.Warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(action, color = HiFi.Warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -212,6 +219,7 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.POSITION_BACK -> r.getString(R.string.journal_event_position_back, title, seconds(e.valueMs), e.detail.orEmpty()).removePrefix(" — ").trim()
         PlaybackJournal.Kind.OUTPUT_CHANGED -> r.getString(R.string.journal_event_output_changed, e.detail.orEmpty())
         PlaybackJournal.Kind.REOPENED_AFTER_REST -> r.getString(R.string.journal_event_reopened, e.title.orEmpty(), minutes(e.valueMs))
+        PlaybackJournal.Kind.MEDIA_KEY -> r.getString(R.string.journal_event_media_key, e.detail.orEmpty())
     }
 }
 

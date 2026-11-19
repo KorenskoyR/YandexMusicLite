@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.local
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.mutableIntStateOf
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -28,7 +33,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -288,7 +292,7 @@ fun LocalMusicPage(
     val showSource = sources.size > 1 && source == null
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().statusBarsPadding(),
+        modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)
     ) {
         item(key = "header") {

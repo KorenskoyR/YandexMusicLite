@@ -58,8 +58,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 25
         targetSdk = 36
-        versionCode = 62
-        versionName = "1.14.12"
+        versionCode = 63
+        versionName = "1.15.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -133,6 +133,13 @@ android {
     testOptions {
         // Robolectric screenshot tests render with the app's real resources
         unitTests.isIncludeAndroidResources = true
+        // The layout audit runs on the Android versions it is given: -PauditSdks=28,30,33,35,36 before a release (9,
+        // 11, 13, 15, 16); Android 15 alone otherwise, so CI stays quick
+        unitTests.all {
+            it.systemProperty("robolectric.enabledSdks", providers.gradleProperty("auditSdks").getOrElse("35"))
+            // Android 16's runtime reaches into the JDK's file descriptors: allowed, or every test on it fails at setup
+            it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+        }
     }
 }
 

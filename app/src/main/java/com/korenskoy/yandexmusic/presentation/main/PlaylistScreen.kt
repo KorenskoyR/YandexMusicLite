@@ -1,5 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
@@ -42,7 +47,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -296,7 +300,7 @@ fun PlaylistScreen(
             HiFiWideHeader(
                 title = playlist.title.orEmpty(),
                 modifier = Modifier
-                    .statusBarsPadding()
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 back = backButton,
                 cover = { size -> PlaylistCover(playlist, Modifier.size(size)) },
@@ -320,7 +324,7 @@ fun PlaylistScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

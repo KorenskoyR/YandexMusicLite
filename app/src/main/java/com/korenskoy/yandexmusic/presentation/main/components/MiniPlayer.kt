@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
 import androidx.compose.material.icons.rounded.SkipPrevious
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
@@ -225,13 +227,11 @@ fun MiniPlayer(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title ?: stringResource(R.string.bez_nazvaniya),
-                    color = Color.White,
+                TrackTitleLine(
+                    title = track.title ?: stringResource(R.string.bez_nazvaniya),
+                    explicit = track.showsExplicit,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    fontWeight = FontWeight.Bold
                 )
                 if (track.isRadio) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

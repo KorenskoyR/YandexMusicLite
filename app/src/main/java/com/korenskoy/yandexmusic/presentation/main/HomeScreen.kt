@@ -1,5 +1,15 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.layout.SubcomposeLayout
+import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackHeadline
 import com.korenskoy.yandexmusic.presentation.hifi.toArtist
 import com.korenskoy.yandexmusic.presentation.hifi.toAlbum
 import com.korenskoy.yandexmusic.utils.currentWindowSizeDp
@@ -37,7 +47,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -174,7 +183,7 @@ fun HomeScreen(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                 .navigationBarsPadding()
                 .padding(start = 20.dp, end = 24.dp, top = 12.dp, bottom = contentBottom),
             verticalAlignment = Alignment.CenterVertically
@@ -192,54 +201,68 @@ fun HomeScreen(
                 }
                 if (!chipsOverKnob) chips(Modifier.padding(top = 10.dp))
                 Spacer(Modifier.weight(1f))
-                WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike)
-                WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.lyingShelfCard(windowSize.heightDp))
+                // A low window (a phone on its side, a launcher's strip, a third of a phone): the "next up" cards
+                // give their room up rather than be squeezed into slivers with their titles cut; the track stays
+                WaveTrackAndShelf(
+                    track = { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) },
+                    preferredCard = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.lyingShelfCard(windowSize.heightDp),
+                    shelf = { card -> WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = card) }
+                )
             }
         }
     } else {
         // The knob stays centred in the space between the title and the bottom block, as if that block sat
         // at the very bottom; the block itself is lifted up to just under the ring, so the track and the
         // "next up" cards keep away from the tab bar. On short screens it stays at the bottom.
-        Layout(
-            contents = listOf(
-                {
-                    // The knob's place is counted from this height: it must not change with the title
-                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp)) {
-                        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
-                            HiFiLargeTitle(title, modifier = Modifier.weight(1f))
-                            HiFiLinkBadge()
-                        }
-                        chips(Modifier.padding(top = 10.dp).height(36.dp))
-                    }
-                },
-                {
-                    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        instrument(minOf(maxWidth, maxHeight))
-                    }
-                },
-                {
-                    Column {
-                        Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
-                        WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 20.dp, cardSize = portraitShelfCard(windowSize.widthDp.dp))
-                    }
-                }
-            ),
-            modifier = Modifier
+        // A short window (a head unit's split screen): with no room for the knob between the title and the bottom
+        // block, the "next up" cards give way — the bottom block ran into "Настроить волну" (1.14.12, a split
+        // screen beside a navigator). The track and its buttons stay; the cards are a tap away in the player
+        SubcomposeLayout(
+            Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                 .padding(bottom = contentBottom)
-        ) { (titleSlot, instrumentSlot, bottomSlot), constraints ->
+        ) { constraints ->
             val width = constraints.maxWidth
             val height = constraints.maxHeight
             val loose = Constraints(maxWidth = width)
-            val title = titleSlot.first().measure(loose)
-            val bottom = bottomSlot.first().measure(loose)
+            val title = subcompose(WaveSlot.TITLE) {
+                // The knob's place is counted from this height: it must not change with the title
+                Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp)) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+                        HiFiLargeTitle(title, modifier = Modifier.weight(1f))
+                        HiFiLinkBadge()
+                    }
+                    chips(Modifier.padding(top = 10.dp).height(36.dp))
+                }
+            }.first().measure(loose)
             val pad = WaveInstrumentPadding.roundToPx()
-            val innerHeight = (height - title.height - bottom.height - 2 * pad).coerceAtLeast(0)
-            val instrumentPlaceable = instrumentSlot.first().measure(Constraints.fixed(width, innerHeight))
+            val leftFor = { bottomHeight: Int -> height - title.height - bottomHeight - 2 * pad }
+            val fullBlock: @Composable () -> Unit = {
+                Column {
+                    Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
+                    WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 20.dp, cardSize = portraitShelfCard(windowSize.widthDp.dp))
+                }
+            }
+            // Its height first, from a copy no one sees or hears (never placed, out of the screen reader's tree)
+            val fullHeight = subcompose(WaveSlot.PROBE) {
+                Box(Modifier.clearAndSetSemantics { }) { fullBlock() }
+            }.first().measure(loose).height
+            val fits = leftFor(fullHeight) >= WaveMinInstrument.roundToPx()
+            val bottom = subcompose(if (fits) WaveSlot.BOTTOM else WaveSlot.TRACK_ONLY) {
+                if (fits) fullBlock() else Box(Modifier.padding(horizontal = 20.dp)) { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) }
+            }.first().measure(loose)
+            val innerHeight = leftFor(bottom.height).coerceAtLeast(0)
+            val instrumentPlaceable = subcompose(WaveSlot.INSTRUMENT) {
+                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    instrument(minOf(maxWidth, maxHeight))
+                }
+            }.first().measure(Constraints.fixed(width, innerHeight))
             val ring = waveRingSize(preferredKnob, minOf(width, innerHeight).toDp()).roundToPx()
             val centerY = title.height + pad + innerHeight / 2
+            // Lifted to just under the ring as before, never up into the title whatever the height
             val bottomY = minOf(centerY + ring / 2 + WaveRingToTrackGap.roundToPx(), height - bottom.height)
+                .coerceAtLeast(title.height)
             layout(width, height) {
                 title.place(0, 0)
                 instrumentPlaceable.place(0, title.height + pad)
@@ -248,6 +271,46 @@ fun HomeScreen(
         }
     }
 }
+
+/**
+ * [track] with [shelf] under it: the cards at [preferredCard] where they fit the height given, smaller (down to
+ * [WaveMinShelfCard]) where not, and none where even those would not fit — never squeezed with their titles cut.
+ * Decided by the measured heights (the shelf measured from a copy no one sees or hears), never by a screen size.
+ */
+@Composable
+private fun WaveTrackAndShelf(track: @Composable () -> Unit, preferredCard: Dp, shelf: @Composable (Dp) -> Unit) {
+    SubcomposeLayout(Modifier.fillMaxWidth()) { constraints ->
+        val loose = Constraints(maxWidth = constraints.maxWidth)
+        val trackPlaceable = subcompose(WaveSlot.TRACK_ONLY) { track() }.first().measure(loose)
+        val shelfHeight = subcompose(WaveSlot.PROBE) { Box(Modifier.clearAndSetSemantics { }) { shelf(preferredCard) } }.first().measure(loose).height
+        val room = if (constraints.maxHeight == Constraints.Infinity) Int.MAX_VALUE else constraints.maxHeight - trackPlaceable.height
+        // The cards give up what is missing (the rest of the shelf, its caption and the titles, keeps its height)
+        val card = when {
+            shelfHeight <= room -> preferredCard
+            else -> preferredCard - (shelfHeight - room).toDp()
+        }
+        val shelfPlaceable = if (card >= WaveMinShelfCard) subcompose(WaveSlot.BOTTOM) { shelf(card) }.first().measure(loose) else null
+        val height = trackPlaceable.height + (shelfPlaceable?.height ?: 0)
+        layout(constraints.maxWidth, height.coerceAtMost(constraints.maxHeight)) {
+            trackPlaceable.place(0, 0)
+            shelfPlaceable?.place(0, trackPlaceable.height)
+        }
+    }
+}
+
+/** A "next up" card smaller than this is no picture to tap: the shelf gives way instead. */
+private val WaveMinShelfCard = 56.dp
+
+/** The parts of the standing wave page, measured one after another. */
+private enum class WaveSlot { TITLE, PROBE, BOTTOM, TRACK_ONLY, INSTRUMENT }
+
+/**
+ * The knob is never smaller than this (the same rule that sizes it: [waveKnobSize]). Where even this would not fit
+ * between the title and the bottom block, the "next up" cards give their room up — decided by the measured heights,
+ * not by a screen size: a split screen, never a phone, where the knob always had this much or more.
+ */
+private val WaveMinKnob = 84.dp
+private val WaveMinInstrument = WaveMinKnob
 
 private val WaveInstrumentPadding = 8.dp
 
@@ -260,7 +323,7 @@ internal fun portraitShelfCard(width: Dp): Dp = ((width - 40.dp - 36.dp) / 3.4f)
 private val WaveRingToTrackGap = 18.dp
 
 /** The knob for the space it is given; the ring around it is 1.72 × the knob. */
-private fun waveKnobSize(preferred: Dp, maxRing: Dp): Dp = minOf(preferred, maxRing / 1.72f).coerceAtLeast(84.dp)
+private fun waveKnobSize(preferred: Dp, maxRing: Dp): Dp = minOf(preferred, maxRing / 1.72f).coerceAtLeast(WaveMinKnob)
 
 private fun waveRingSize(preferredKnob: Dp, maxRing: Dp): Dp = waveKnobSize(preferredKnob, maxRing) * 1.72f
 
@@ -326,18 +389,15 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                     Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = shown.title ?: stringResource(R.string.bez_nazvaniya),
-                        color = Color.White,
+                    // As in the player: two lines and a smaller type before an ellipsis, the "E" plate.
+                    // The title leads to the album, the artist to the artist's page. The artist is measured first:
+                    // in a narrow window the title gets what the line under it leaves, never the artist's place
+                    TrackHeadline(
+                        title = shown.title ?: stringResource(R.string.bez_nazvaniya),
                         fontSize = 26.sp,
-                        lineHeight = 32.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.02).em,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        explicit = shown.showsExplicit,
                         textAlign = TextAlign.Center,
-                        // The title leads to the album, the artist to the artist's page
-                        modifier = Modifier.toAlbum(shown)
+                        modifier = Modifier.weight(1f, fill = false).toAlbum(shown)
                     )
                     Text(
                         text = shown.artists.joinToString { it.name ?: "" },
@@ -423,7 +483,7 @@ private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
                 .background(HiFi.Placeholder)
         )
         Spacer(Modifier.height(8.dp))
-        Text(track.title ?: stringResource(R.string.bez_nazvaniya), color = Color.White, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        TrackTitleLine(track.title ?: stringResource(R.string.bez_nazvaniya), track.showsExplicit, 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
         Text(track.artists.joinToString { it.name ?: "" }, color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

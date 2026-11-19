@@ -161,7 +161,8 @@ fun LyricsPanel(
         contentAlignment = Alignment.Center
     ) {
         val fit = with(LocalDensity.current) { (maxWidth / FIT_LETTERS).toSp() }
-        val shrink = (fit.value / fontSize.value).coerceIn(MIN_TYPE / fontSize.value, 1f)
+        // A type already under the least (a small car screen) is not grown, and the range never turns empty
+        val shrink = (fit.value / fontSize.value).coerceIn(minOf(MIN_TYPE / fontSize.value, 1f), 1f)
         val scaledFontSize = fontSize * shrink
         val scaledLineHeight = lineHeight * shrink
 

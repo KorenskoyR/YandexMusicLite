@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
 import androidx.compose.foundation.layout.PaddingValues
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
@@ -319,14 +321,12 @@ private fun QueueCover(track: TrackDetailsDto) {
 @Composable
 private fun QueueTexts(track: TrackDetailsDto, bold: Boolean, modifier: Modifier) {
     Column(modifier) {
-        Text(
-            track.title ?: stringResource(R.string.bez_nazvaniya),
-            color = Color.White,
+        TrackTitleLine(
+            title = track.title ?: stringResource(R.string.bez_nazvaniya),
+            explicit = track.showsExplicit,
             fontSize = 15.sp,
             lineHeight = 20.sp,
-            fontWeight = if (bold) FontWeight.Bold else FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.SemiBold
         )
         Text(
             track.artists.joinToString(", ") { it.name ?: "" },

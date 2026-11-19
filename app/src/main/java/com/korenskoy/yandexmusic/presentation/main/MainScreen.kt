@@ -117,6 +117,8 @@ fun MainScreen(
     viewModel: MainViewModel,
     onNavigateToAuth: () -> Unit = {},
     openPlayerSignal: Int = 0,
+    /** This opening of the app (MainActivity): the music on launch is started once for it. */
+    launch: Long = 0L,
     /** The steering wheel's voice button: each new value listens once, whatever tab is open. */
     voiceSignal: Int = 0,
     accountVm: AccountViewModel = hiltViewModel(),
@@ -158,12 +160,16 @@ fun MainScreen(
     val tabKnown = chosenTab != null || startTab != null
     val currentTabState = androidx.compose.runtime.rememberUpdatedState(currentTab)
     LaunchedEffect(currentTab, tabKnown) { if (tabKnown) viewModel.rememberTab(currentTab) }
-    LaunchedEffect(Unit) { viewModel.applyStartMusic() }
+    LaunchedEffect(launch) { viewModel.applyStartMusic(launch) }
     val swipeToClose by viewModel.swipeToCloseMiniPlayer.collectAsStateWithLifecycle()
     val animationMode by viewModel.animationMode.collectAsStateWithLifecycle()
-    var isPlayerExpanded by remember { mutableStateOf(false) }
+    var isPlayerExpanded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(openPlayerSignal) {
-        if (openPlayerSignal > 0 && viewModel.currentTrack.value != null) isPlayerExpanded = true
+        if (openPlayerSignal == 0) return@LaunchedEffect
+        // Opened from the notification, the widget or the assistant before the session is back (the app was closed):
+        // the player opens as soon as there is a track, instead of the request being dropped
+        val track = kotlinx.coroutines.withTimeoutOrNull(OPEN_PLAYER_WAIT_MS) { viewModel.currentTrack.first { it != null } }
+        if (track != null) isPlayerExpanded = true
     }
     // The steering wheel's voice button: the same listening as the car's microphone, what is heard plays. Only once
     // the screen is in front (the voice window cannot open over another app); no words — the window closes, and the
@@ -180,9 +186,16 @@ fun MainScreen(
         if (wheelRoute == com.korenskoy.yandexmusic.presentation.voice.VoiceRoute.SYSTEM_WINDOW && main != null) main.listenFromWheel()
         else wheelVoice?.invoke()
     }
-    // "Open the player when the music starts": only for music the user started, never in the car
+    // "Open the player when the music starts": only for music the user started, never in the car. Each start once,
+    // and only a fresh one: a start made before this screen listened still counts, a previous opening's does not
+    var handledStart by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
-        viewModel.openPlayerRequests.collect { if (currentTabState.value != MainTab.CAR) isPlayerExpanded = true }
+        viewModel.musicStarts.collect { start ->
+            if (start == null || start.id <= handledStart) return@collect
+            handledStart = start.id
+            val fresh = com.korenskoy.yandexmusic.data.player.PlayRequests.isFresh(start, android.os.SystemClock.elapsedRealtime())
+            if (fresh && currentTabState.value != MainTab.CAR && viewModel.expandsOnPlay()) isPlayerExpanded = true
+        }
     }
     // Nothing to show: a stale "expanded" would open an empty player with the next track
     LaunchedEffect(currentTrack == null) { if (currentTrack == null) isPlayerExpanded = false }
@@ -308,13 +321,14 @@ fun MainScreen(
                     tabStates.SaveableStateProvider(tab.route) {
                         // An artist or album page covers the tab until Back (or another tab) closes it. Pages
                         // slide in from the right as they open and back out to the right on Back.
-                        val depth = if (tab == MainTab.CAR) 0 else catalogStack.size
+                        // Over «В авто» too: the artist or the album opened from it shows, Back returns to the car
+                        val depth = catalogStack.size
                         AnimatedContent(
                             targetState = depth to catalogStack.lastOrNull()?.takeIf { depth > 0 },
                             contentKey = { (_, page) -> page?.page },
                             transitionSpec = { catalogTransition(forward = targetState.first > initialState.first, lite = lite) },
                             label = "catalog_page",
-                            modifier = if (tab != MainTab.CAR) Modifier.windowInsetsPadding(sideInsets) else Modifier
+                            modifier = if (tab != MainTab.CAR || depth > 0) Modifier.windowInsetsPadding(sideInsets) else Modifier
                         ) { (_, catalogTop) ->
                         if (catalogTop != null) {
                             val albumId = (catalogTop.page as? CatalogPage.Album)?.id
@@ -478,7 +492,7 @@ fun MainScreen(
                             bars.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
                         maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(),
                         isLandscape,
-                        com.korenskoy.yandexmusic.presentation.car.LocalManualUiScale.current
+                        com.korenskoy.yandexmusic.presentation.car.currentInterfaceScale()
                     )
                     isLandscape -> DockClearance
                     currentTrack != null -> 160.dp
@@ -617,3 +631,6 @@ private fun PrefetchCovers(viewModel: MainViewModel, track: TrackDetailsDto?) {
         com.korenskoy.yandexmusic.utils.prefetchCovers(context, wavePreview.take(5), listOf(CoverSize.Medium))
     }
 }
+
+/** How long a request to open the player waits for the session to come back. */
+private const val OPEN_PLAYER_WAIT_MS = 8_000L

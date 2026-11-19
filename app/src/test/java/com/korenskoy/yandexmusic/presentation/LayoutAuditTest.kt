@@ -99,7 +99,7 @@ import kotlin.math.min
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], application = Application::class)
+@Config(sdk = [28, 30, 33, 35, 36], application = Application::class)
 class LayoutAuditTest(private val screen: String, private val qualifiers: String, private val scale: Float) {
 
     /** The screen's size and density, set before the activity of the compose rule starts. */
@@ -178,13 +178,13 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         )
     }
 
-    private fun player(lyricsOpen: Boolean) = show {
+    private fun player(lyricsOpen: Boolean, wheelOnLeft: Boolean = true) = show {
         FullScreenPlayer(
             track = tracks[1], isPlaying = true, isLiked = false, progress = { 61_000L }, queue = tracks,
             onPlayPauseClick = {}, onToggleLike = {}, onNextClick = {}, onPrevClick = {}, onSeekTo = {},
             onTrackSelect = {}, onRemoveFromQueue = {}, onCollapse = {}, onCloseAndClear = {}, onDislikeClick = {},
             sourceLabel = "Моя волна", onTrackWave = {}, offline = com.korenskoy.yandexmusic.data.download.TrackOfflineState.NONE,
-            initialLyricsOpen = lyricsOpen, coverOnRight = true
+            initialLyricsOpen = lyricsOpen, coverOnRight = wheelOnLeft
         )
     }
 
@@ -197,7 +197,8 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         onRadio: Boolean = false,
         stationsOpen: Boolean = false,
         playlistsOpen: Boolean = false,
-        layout: CarLayout = CarLayout.AUTO
+        layout: CarLayout = CarLayout.AUTO,
+        wheelOnLeft: Boolean = true
     ) = show {
         val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
         val radio = CarRadio(stations, setOf(stations[0].id, stations[3].id, stations[9].id, stations[14].id), onAir = stations[0].id, onPlay = {}, onToggleFavourite = {})
@@ -213,7 +214,8 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             upcoming = tracks.drop(2), source = source, initialTuneOpen = tune, initialQueueOpen = queue, initialLyricsOpen = lyricsOpen,
             shuffled = shuffled, onOpenSettings = {}, onVoiceSearch = {}, waveTuning = WaveTuning(),
             radio = radio, initialStationsOpen = stationsOpen, isLiked = onRadio,
-            playlists = carPlaylists(tracks[1].idString), initialPlaylistsOpen = playlistsOpen, layout = layout
+            playlists = carPlaylists(tracks[1].idString), initialPlaylistsOpen = playlistsOpen, layout = layout,
+            steeringWheelOnLeft = wheelOnLeft
         )
     }
 
@@ -319,6 +321,18 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "car_stations" -> car(source = PlaylistSource.RADIO, onRadio = true, stationsOpen = true)
             "car_playlists" -> car(playlistsOpen = true)
             "car_three" -> car(layout = CarLayout.THREE)
+            // The wheel on the right: every car layout and panel mirrored, the player's cover on the other side
+            "car_right" -> car(wheelOnLeft = false)
+            "car_tune_right" -> car(tune = true, wheelOnLeft = false)
+            "car_queue_right" -> car(queue = true, wheelOnLeft = false)
+            "car_lyrics_right" -> car(lyricsOpen = true, wheelOnLeft = false)
+            "car_liked_right" -> car(source = PlaylistSource.LIBRARY, shuffled = true, wheelOnLeft = false)
+            "car_radio_right" -> car(source = PlaylistSource.RADIO, onRadio = true, wheelOnLeft = false)
+            "car_stations_right" -> car(source = PlaylistSource.RADIO, onRadio = true, stationsOpen = true, wheelOnLeft = false)
+            "car_playlists_right" -> car(playlistsOpen = true, wheelOnLeft = false)
+            "car_three_right" -> car(layout = CarLayout.THREE, wheelOnLeft = false)
+            "player_right" -> player(lyricsOpen = false, wheelOnLeft = false)
+            "player_lyrics_right" -> player(lyricsOpen = true, wheelOnLeft = false)
             "auth_strip" -> show {
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1f).fillMaxWidth())
@@ -392,35 +406,96 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "wave_paused", "wave_playing", "wave_mini", "wave_tune", "player", "player_lyrics", "track_menu", "mini_player",
             "settings_interface", "settings_playback", "library", "search", "radio",
             "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations",
-            "car_playlists", "car_three", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
+            "car_playlists", "car_three", "car_right", "car_tune_right", "car_queue_right", "car_lyrics_right",
+            "car_liked_right", "car_radio_right", "car_stations_right", "car_playlists_right", "car_three_right", "player_right", "player_lyrics_right", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
             "settings_about", "settings_support", "no_plus", "update_failed", "equalizer"
         )
 
-        /** Phones, standing units (the Geely's 960×1280), flat units (the Monjaro's 1280×480, 1920×720), old 800×480. */
+        /**
+         * The screens the app meets, each as the window it gives in dp (pixels ÷ density) with the density bucket it
+         * draws in; the scale the interface may get on top of it. Gathered for 1.15 from the market as a whole:
+         * phones by StatCounter's most common viewports, tablets by the common panels, head units by what the
+         * aftermarket sells most (1024×600 and 1280×720 at 9–10″, QLED 1280×720, 2K 2000×1200, 1920×720 bars) and
+         * by the cars' own screens (Geely, Changan, Chery 12.3″ 1920×720, vertical Geely 1440×1920, the Monjaro's
+         * 1760×720 at ~198 dpi, Android Automotive portrait screens), and split windows beside a navigator.
+         */
         private val SIZES = listOf(
-            "w360dp-h640dp-port-xhdpi" to 1f,
+            // Phones (StatCounter: 360×800, 393×873, 412×915, 384×854, 360×780 the most common Android viewports)
+            "w360dp-h800dp-port-xhdpi" to 1f,
+            "w393dp-h873dp-port-xxhdpi" to 1f,
             "w412dp-h915dp-port-xxhdpi" to 1f,
-            "w915dp-h412dp-land-xxhdpi" to 1f,
-            "w600dp-h1024dp-port-hdpi" to 1f,
-            "w960dp-h1280dp-port-mdpi" to 1f,
-            "w800dp-h480dp-land-mdpi" to 1f,
-            "w1024dp-h600dp-land-mdpi" to 1f,
-            "w1280dp-h480dp-land-mdpi" to 1f,
-            "w1280dp-h720dp-land-mdpi" to 1f,
-            "w1920dp-h720dp-land-mdpi" to 1f,
-            "w1920dp-h1080dp-land-mdpi" to 1f,
-            "w1280dp-h480dp-land-mdpi" to 1.2f,
-            "w1920dp-h720dp-land-mdpi" to 0.8f,
+            "w384dp-h854dp-port-xhdpi" to 1f,
+            "w360dp-h780dp-port-xxhdpi" to 1f,
+            "w360dp-h640dp-port-xhdpi" to 1f,
+            "w320dp-h568dp-port-hdpi" to 1f,
             "w412dp-h915dp-port-xxhdpi" to 1.2f,
-            "w1024dp-h600dp-land-mdpi" to 0.8f,
-            // Tablets: 10" standing and lying (the Galaxy Tab S5e's 800×1280), 12" lying, half of a tablet in split
-            // screen, a foldable's inner screen, a small old phone
+            // Phones on their side, in the car holder
+            "w800dp-h360dp-land-xhdpi" to 1f,
+            "w873dp-h393dp-land-xxhdpi" to 1f,
+            "w915dp-h412dp-land-xxhdpi" to 1f,
+            // Foldables
+            "w673dp-h841dp-port-xxhdpi" to 1f,
+            // Tablets: 7–8″ (1200×1920 at 320), 10″ (1200×1920 at 240, 1600×2560 at 320), 12″, half in split screen
+            "w600dp-h960dp-port-xhdpi" to 1f,
+            "w600dp-h1024dp-port-hdpi" to 1f,
             "w800dp-h1280dp-port-xhdpi" to 1f,
             "w1280dp-h800dp-land-xhdpi" to 1f,
             "w1366dp-h1024dp-land-xhdpi" to 1f,
             "w636dp-h752dp-port-xhdpi" to 1f,
-            "w673dp-h841dp-port-xxhdpi" to 1f,
-            "w320dp-h568dp-port-hdpi" to 1f
+            // Aftermarket head units lying: 1024×600 and 1280×720 at 160 (the most sold 9–10″), 1280×720 at 240,
+            // 1280×800, 2000×1200 at 240 and 320 (Teyes CC3 2K), 1920×720 at 160 and 240, 1600×720, old 800×480
+            "w1024dp-h600dp-land-mdpi" to 1f,
+            "w1024dp-h600dp-land-mdpi" to 0.8f,
+            "w1280dp-h720dp-land-mdpi" to 1f,
+            "w853dp-h480dp-land-hdpi" to 1f,
+            "w1280dp-h800dp-land-mdpi" to 1f,
+            "w1333dp-h800dp-land-hdpi" to 1f,
+            "w1000dp-h600dp-land-xhdpi" to 1f,
+            "w1920dp-h720dp-land-mdpi" to 1f,
+            "w1920dp-h720dp-land-mdpi" to 0.8f,
+            "w1280dp-h480dp-land-mdpi" to 1f,
+            "w1280dp-h480dp-land-mdpi" to 1.2f,
+            "w1600dp-h720dp-land-mdpi" to 1f,
+            "w800dp-h480dp-land-mdpi" to 1f,
+            "w1920dp-h1080dp-land-mdpi" to 1f,
+            // The cars' own screens: the Monjaro (1760×720 at ~198), 2.5K 2560×1440 at 320, vertical Geely
+            // (1440×1920 at 320) and the vertical units (1080×1920 at 240, 768×1024 at 160 — also Android
+            // Automotive's portrait screens), the Geely Galaxy's 960×1280
+            "w1422dp-h582dp-land-hdpi" to 1f,
+            "w1280dp-h720dp-land-xhdpi" to 1f,
+            "w720dp-h960dp-port-xhdpi" to 1f,
+            "w720dp-h1280dp-port-hdpi" to 1f,
+            "w768dp-h1024dp-port-mdpi" to 1f,
+            "w960dp-h1280dp-port-mdpi" to 1f,
+            // A head unit's split screen beside a navigator: a third, a half and two thirds of 1280×720, a half and a
+            // third of 1920×720, a half of 1024×600, a launcher's lower 40 %, short windows
+            "w426dp-h720dp-port-mdpi" to 1f,
+            "w640dp-h720dp-port-mdpi" to 1f,
+            "w853dp-h720dp-land-mdpi" to 1f,
+            "w960dp-h720dp-land-mdpi" to 1f,
+            "w512dp-h600dp-port-mdpi" to 1f,
+            "w700dp-h560dp-land-mdpi" to 1f,
+            "w1550dp-h349dp-land-mdpi" to 1f,
+            "w420dp-h500dp-port-mdpi" to 1f,
+            "w480dp-h420dp-land-mdpi" to 1f,
+            // Windows of any shape (1.15): a phone's split screen standing (a half, a third) and lying (a half, a
+            // third), Android 16's smallest free window on a tablet (386×352), free squares, a standing tablet split
+            // in two and in thirds, Carlinkit's 40/60 beside CarPlay on 1280×720 and 1920×720, a launcher's lower
+            // strip on 1280×720 and 1024×600, a desktop window
+            "w412dp-h450dp-port-xxhdpi" to 1f,
+            "w412dp-h300dp-land-xxhdpi" to 1f,
+            "w457dp-h412dp-land-xxhdpi" to 1f,
+            "w300dp-h412dp-port-xxhdpi" to 1f,
+            "w386dp-h352dp-land-xhdpi" to 1f,
+            "w500dp-h500dp-port-xhdpi" to 1f,
+            "w700dp-h700dp-port-xhdpi" to 1f,
+            "w800dp-h640dp-land-xhdpi" to 1f,
+            "w800dp-h426dp-land-xhdpi" to 1f,
+            "w768dp-h720dp-land-mdpi" to 1f,
+            "w1152dp-h720dp-land-mdpi" to 1f,
+            "w1280dp-h288dp-land-mdpi" to 1f,
+            "w1024dp-h240dp-land-mdpi" to 1f,
+            "w1100dp-h700dp-land-xhdpi" to 1f
         )
 
         @JvmStatic

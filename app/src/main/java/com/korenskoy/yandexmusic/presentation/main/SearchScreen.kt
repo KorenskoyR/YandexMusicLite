@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.rounded.Mic
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
@@ -19,7 +22,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -44,7 +46,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -125,7 +126,7 @@ fun SearchScreen(
     initiallyShowHistory: Boolean = false
 ) {
     val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
-    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBar = WindowInsets.systemBars.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
     val contentStart = 20.dp
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()

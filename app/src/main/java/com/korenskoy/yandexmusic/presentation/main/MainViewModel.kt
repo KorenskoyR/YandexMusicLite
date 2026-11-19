@@ -249,6 +249,15 @@ class MainViewModel @Inject constructor(
     private val _trackMessages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 4)
     val trackMessages: SharedFlow<UiMessage> = _trackMessages
 
+    init {
+        // «Скачать всю коллекцию» finished short of the collection: how many cannot be downloaded and why
+        viewModelScope.launch {
+            downloadScheduler.downloadAllOutcomes.collect { outcome ->
+                _trackMessages.tryEmit(UiMessage(R.string.download_all_some_unavailable, listOf(outcome.done.toString(), outcome.failed.toString())))
+            }
+        }
+    }
+
     /** "Скачать" for one track: in the background, then among the downloads. */
     fun downloadTrack(track: TrackDetailsDto) {
         viewModelScope.launch {
@@ -469,6 +478,16 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The big play button on the radio page: as the wave's knob, a station restored at launch counts as switching
+     * music on (the full player may open); a play after the user's own pause only resumes.
+     */
+    fun radioKnob() {
+        val press = WaveKnob.press(waveActive = true, isPlaying = playbackController.isPlaying.value, hasPlayed = playRequests.hasPlayed)
+        if (press.opensPlayer) playRequests.userStarted()
+        playbackController.togglePlayPause()
+    }
+
     fun loadMoreQueue() = playbackController.loadMoreQueue()
 
     fun playAllLikedTracks() {
@@ -519,9 +538,11 @@ class MainViewModel @Inject constructor(
 
     // region Launch and the look of things
 
-    /** Opens the full player when the user starts music, if the setting asks for it. */
-    val openPlayerRequests: Flow<Unit> = playRequests.userStarted
-        .filter { settingsRepository.expandPlayerOnPlay.first() }
+    /** The user's latest start of music: the screen opens the full player for it, if [expandsOnPlay]. */
+    val musicStarts: StateFlow<PlayRequests.Start?> = playRequests.starts
+
+    /** «Разворачивать плеер», read when a start comes. */
+    suspend fun expandsOnPlay(): Boolean = settingsRepository.expandPlayerOnPlay.first()
 
     /** Tracks Yandex marks as made with AI: id → its words. Shown always; passed over when [skipAi] is on. */
     val aiMarks: StateFlow<Map<String, String>> = ai.marks
@@ -563,18 +584,26 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setLastTab(tab.route) }
     }
 
-    /** "Music on launch": once per process, and never over music that already plays. */
-    fun applyStartMusic() {
-        if (!isAuthorized.value || !playRequests.claimLaunchStart()) return
+    /**
+     * "Music on launch": once per opening of the app ([launch], see MainActivity), never over music that already
+     * plays. Music playing as the app opens (a head unit's Play at power-on, music left on in the background) opens
+     * the player as music started then would.
+     */
+    fun applyStartMusic(launch: Long) {
+        if (!isAuthorized.value || !playRequests.claimLaunchStart(launch)) return
         viewModelScope.launch {
             val mode = settingsRepository.startMusic.first()
-            if (mode == StartMusic.OFF) return@launch
             playbackController.awaitRestoredSession()
-            if (playbackController.isPlaying.value) return@launch
             // The music the settings start counts as the user's own: «Разворачивать плеер» opens the player for it
             // too (not in «В авто», where the car screen is the player) — it stayed folded (1.14.11 feedback)
             // The tab may not be chosen yet at this moment: «Открывать: В авто» is asked directly
-            if (settingsRepository.startPage.first() != StartPage.CAR) playRequests.userStarted()
+            val toCar = settingsRepository.startPage.first() == StartPage.CAR
+            if (playbackController.isPlaying.value) {
+                if (!toCar) playRequests.userStarted()
+                return@launch
+            }
+            if (mode == StartMusic.OFF) return@launch
+            if (!toCar) playRequests.userStarted()
             when (mode) {
                 StartMusic.CONTINUE -> playbackController.play()
                 StartMusic.WAVE -> if (playbackController.currentSource.value == PlaylistSource.VIBE && playbackController.currentTrack.value != null) {

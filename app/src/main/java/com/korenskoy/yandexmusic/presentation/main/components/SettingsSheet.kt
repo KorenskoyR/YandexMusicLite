@@ -162,6 +162,9 @@ fun SettingsSheet(
     initialPage: SettingsPage? = null
 ) {
     val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
+    // Two panes (the sections beside the page) only where both have room: a lying window of a split screen
+    // (480 dp) cut the page's choices and buttons; narrower ones go page by page, as standing
+    val twoPanes = isLandscape && com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp >= SETTINGS_TWO_PANES_DP
     val lite = LocalHiFiLite.current
     val scope = rememberCoroutineScope()
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -182,9 +185,9 @@ fun SettingsSheet(
 
     AppDialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // Inside the dialog's window: Back there first steps out of a page to the root list, then closes
-        BackHandler(enabled = !isLandscape && page != null) { pageName = page?.parent?.name }
+        BackHandler(enabled = !twoPanes && page != null) { pageName = page?.parent?.name }
         // Lying, a sub-page steps back to its page in the pane
-        BackHandler(enabled = isLandscape && page?.parent != null) { pageName = page?.parent?.name }
+        BackHandler(enabled = twoPanes && page?.parent != null) { pageName = page?.parent?.name }
         Box(Modifier.fillMaxSize()) {
             AnimatedVisibility(visibleState = visible, enter = fadeIn(HiFiMotion.standard()), exit = fadeOut(HiFiMotion.standard())) {
                 Box(
@@ -243,10 +246,10 @@ fun SettingsSheet(
                                 .align(Alignment.CenterHorizontally)
                         )
                         Row(
-                            Modifier.fillMaxWidth().padding(start = if (!isLandscape && page != null) 12.dp else 20.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
+                            Modifier.fillMaxWidth().padding(start = if (!twoPanes && page != null) 12.dp else 20.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val sub = page.takeIf { !isLandscape }
+                            val sub = page.takeIf { !twoPanes }
                             if (sub != null) {
                                 GlassCircleButton(onClick = { pageName = sub.parent?.name }, contentDescription = stringResource(R.string.cd_nazad)) {
                                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -268,7 +271,7 @@ fun SettingsSheet(
                         }
                     }
 
-                    if (isLandscape) {
+                    if (twoPanes) {
                         val open = page ?: SettingsPage.PLAYBACK
                         Row(Modifier.fillMaxWidth().weight(1f).padding(start = 12.dp, end = 16.dp)) {
                             Column(
@@ -791,6 +794,10 @@ private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActio
                 runCatching { context.startActivity(BackgroundWork.settingsIntent(context)) }
                     .recoverCatching { context.startActivity(BackgroundWork.appDetailsIntent(context)) }
                     .onFailure { Log.w("SettingsSheet", "No settings screen for background work", it) }
+            },
+            makerName = remember { android.os.Build.MANUFACTURER.replaceFirstChar { it.titlecase() }.takeIf { BackgroundWork.makerScreens().isNotEmpty() } },
+            onOpenMakerScreen = {
+                if (!BackgroundWork.openMakerScreen(context)) runCatching { context.startActivity(BackgroundWork.appDetailsIntent(context)) }
             }
         )
     }
@@ -939,3 +946,6 @@ private fun StoragePlaceRow(storage: StorageStatus, actions: SettingsActions) {
         }
     }
 }
+
+/** The narrowest window that shows the sections of the settings beside the page. */
+private const val SETTINGS_TWO_PANES_DP = 700

@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.data.download
 
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.combine
 import com.korenskoy.yandexmusic.data.network.NetworkMonitor
 import android.content.Context
@@ -53,6 +57,19 @@ class DownloadScheduler @Inject constructor(
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(ALL_WORK),
         network.isConnectedFlow
     ) { infos, connected -> queueStateOf(infos.map { it.state }, connected) }
+
+    /**
+     * Each finished «Скачать всю коллекцию» with tracks that could not be downloaded: said once, so the listener
+     * knows why the count stops short of the collection.
+     */
+    val downloadAllOutcomes: Flow<DownloadOutcome> = WorkManager.getInstance(context)
+        .getWorkInfosForUniqueWorkFlow(ALL_WORK)
+        .map { infos -> infos.firstOrNull { it.state == WorkInfo.State.SUCCEEDED } }
+        .filterNotNull()
+        .distinctUntilChangedBy { it.id }
+        .drop(1)
+        .map { DownloadOutcome(it.outputData.getInt(LikedTracksDownloadWorker.KEY_DONE, 0), it.outputData.getInt(LikedTracksDownloadWorker.KEY_FAILED, 0)) }
+        .filter { it.failed > 0 }
 
     /** True while saved tracks are being re-downloaded in a better quality. */
     val isUpgradingQuality: Flow<Boolean> = WorkManager.getInstance(context)

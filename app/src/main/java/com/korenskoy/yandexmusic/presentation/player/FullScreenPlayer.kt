@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -149,7 +150,7 @@ fun FullScreenPlayer(
     /** Lying down, the cover is on the passenger's side ("Сторона руля"): on the right with the wheel on the left. */
     coverOnRight: Boolean = false
 ) {
-    var showQueue by remember { mutableStateOf(initialQueueOpen) }
+    var showQueue by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialQueueOpen) }
     // Taking a downloaded track off the device is asked first; stopping a download is not
     var askRemove by remember { mutableStateOf(false) }
     if (askRemove) {
@@ -199,7 +200,7 @@ fun FullScreenPlayer(
     // The words of the track take the cover's place while asked for; a new track shows its cover again
     val lyrics = rememberLyrics(track)
     // Open words stay open on the next track and show its words; a track without any closes them
-    var lyricsOpen by remember { mutableStateOf(initialLyricsOpen) }
+    var lyricsOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialLyricsOpen) }
     LaunchedEffect(lyrics == null, lyrics?.answer) { if (lyricsClose(lyrics)) lyricsOpen = false }
     val cover = @Composable { modifier: Modifier ->
         PlayerCover(track, direction, isPlaying, coverModifier, onPrevClick, onNextClick, modifier) {
@@ -303,7 +304,29 @@ fun FullScreenPlayer(
             // As tall as the screen, but never more than 42% of its width: on a low wide unit (800 × 480) the
             // title, its buttons and the controls keep their room beside it
             val coverSide = minOf(maxHeight, maxWidth * LANDSCAPE_COVER_SHARE)
-            Row(
+            // A strip (a launcher's lower part, a low split window): one row — the cover, the title over its
+            // timeline, the controls — instead of a column whose controls went under the window's edge
+            if (maxHeight < PLAYER_STRIP_HEIGHT && maxWidth >= PLAYER_STRIP_MIN_WIDTH) Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val stripCoverSide = minOf(this@BoxWithConstraints.maxHeight, this@BoxWithConstraints.maxWidth * PLAYER_STRIP_COVER_SHARE)
+                val stripCover = @Composable { cover(Modifier.size(stripCoverSide)) }
+                if (!coverOnRight) stripCover()
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
+                    header()
+                    TitleRow(track, direction, true, onAddToPlaylist, onTrackWave, offline, onDownloadClick, lyrics, lyricsOpen) { lyricsOpen = !lyricsOpen }
+                    if (track.isRadio) HiFiLiveLine(height = 36f) else PlayerTimeline(progress, durationMs, isPlaying, onSeekTo)
+                }
+                Box(Modifier.width(PLAYER_STRIP_CONTROLS)) {
+                    PlayerControls(
+                        isPlaying = isPlaying, isLiked = isLiked, isRadio = track.isRadio, canReact = !track.isLocal, compact = true,
+                        onDislike = onDislikeClick, onPrev = onPrevClick, onPlayPause = onPlayPauseClick, onNext = onNextClick, onLike = onToggleLike
+                    )
+                }
+                if (coverOnRight) stripCover()
+            } else Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(28.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -359,6 +382,18 @@ fun FullScreenPlayer(
 
 /** Lying down, the cover takes at most this share of the width. */
 private const val LANDSCAPE_COVER_SHARE = 0.42f
+
+/** Lying lower than this (inside the bars and the margins), the player is one row: see the strip above. */
+private val PLAYER_STRIP_HEIGHT = 300.dp
+
+/** Narrower than this the row holds no title beside the controls: the column stays (a phone's third lying). */
+private val PLAYER_STRIP_MIN_WIDTH = 600.dp
+
+/** The controls' share of the strip: five round buttons at their compact size. */
+private val PLAYER_STRIP_CONTROLS = 300.dp
+
+/** The strip's cover: as tall as the strip, never more than this share of its width. */
+private const val PLAYER_STRIP_COVER_SHARE = 0.25f
 
 /** Which way the track changed (see [PlayerGesture.direction]); remembered between compositions, not state. */
 @Composable

@@ -1,5 +1,37 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.hifiRecessed
+import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
+import com.korenskoy.yandexmusic.VoiceSearchActivity
+import com.korenskoy.yandexmusic.MainActivity
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.SettingsRemote
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import android.widget.Toast
+import android.os.Build
+import android.content.Intent
+import android.content.Context
+import android.content.ClipboardManager
+import android.content.ClipData
 import androidx.compose.foundation.layout.ColumnScope
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +89,8 @@ internal fun ColumnScope.VoiceSearchGroup() {
             onInstall = { VoiceInput.installGoogle(context) },
             onAllowMic = { ask.launch(Manifest.permission.RECORD_AUDIO) }
         )
+        // The steering wheel: only where the device can hear at all
+        if (route != VoiceRoute.NONE) WheelVoiceRows()
     }
 }
 
@@ -104,6 +138,98 @@ internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: 
                 Modifier.widthIn(min = 180.dp),
                 height = 44.dp
             )
+        }
+    }
+}
+
+/**
+ * «Голос с руля»: how to put «Голосовой поиск» on a steering-wheel button, a check that runs the very same entry,
+ * and, folded away, the command for programs that send intents or run ADB (Tasker, Key Mapper, MK+).
+ */
+@Composable
+internal fun WheelVoiceRows() {
+    val context = LocalContext.current
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    val copied = stringResource(R.string.settings_copied)
+    val copy: (String, String) -> Unit = { label, value ->
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboard?.setPrimaryClip(ClipData.newPlainText(label, value))
+        // Android 13+ shows its own note of what was copied
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+    }
+    SettingsRow(
+        icon = Icons.Rounded.SettingsRemote,
+        title = stringResource(R.string.settings_wheel_voice),
+        subtitle = stringResource(R.string.settings_wheel_voice_sub),
+        onClick = null,
+        chevron = false,
+        trailing = {
+            MetalPillButton(
+                stringResource(R.string.settings_wheel_voice_check),
+                { context.startActivity(Intent(context, VoiceSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                height = 44.dp
+            )
+        }
+    )
+    Text(
+        stringResource(R.string.settings_wheel_voice_how),
+        color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp,
+        modifier = Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 14.dp)
+    )
+    SettingsRow(
+        icon = Icons.Rounded.Code,
+        title = stringResource(R.string.settings_wheel_advanced),
+        subtitle = stringResource(R.string.settings_wheel_advanced_sub),
+        onClick = { advanced = !advanced },
+        chevron = false,
+        trailing = {
+            Icon(
+                if (advanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = null, tint = HiFi.TextSecondary, modifier = Modifier.size(24.dp)
+            )
+        }
+    )
+    AnimatedVisibility(advanced) {
+        Column(
+            Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(stringResource(R.string.settings_wheel_advanced_how), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+            CopyField(stringResource(R.string.settings_wheel_action), MainActivity.ACTION_START_VOICE, copy)
+            CopyField(stringResource(R.string.settings_wheel_package), context.packageName, copy)
+            CopyField(stringResource(R.string.settings_wheel_adb), VoiceSearchActivity.adbCommand(context), copy)
+        }
+    }
+}
+
+/** A value to type into another program: its name over it, the value in a recessed field, a copy button inside. */
+@Composable
+private fun CopyField(label: String, value: String, onCopy: (String, String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label.uppercase(), style = HiFiType.SectionCaps)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .hifiRecessed(12.dp)
+                .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                value, color = Color.White, fontSize = 14.sp, lineHeight = 19.sp, fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f)
+            )
+            val description = stringResource(R.string.settings_copy_cd, label)
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(role = Role.Button, onClickLabel = description) { onCopy(label, value) }
+                    .semantics { contentDescription = description },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.ContentCopy, contentDescription = null, tint = HiFi.TextSecondary, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }

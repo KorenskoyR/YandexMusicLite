@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -185,13 +187,11 @@ fun TrackContextMenu(
                     }
                     Spacer(Modifier.width(4.dp))
                 }
-                Text(
-                    text = track.title ?: stringResource(R.string.bez_nazvaniya),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
+                TrackTitleLine(
+                    title = track.title ?: stringResource(R.string.bez_nazvaniya),
+                    explicit = track.showsExplicit,
                     fontSize = 17.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
                 if (asSidePanel) {

@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
 import com.korenskoy.yandexmusic.presentation.hifi.rememberAiMark
 import com.korenskoy.yandexmusic.presentation.hifi.AiChip
 import androidx.compose.foundation.layout.PaddingValues
@@ -243,7 +245,7 @@ private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onCli
         }
         Spacer(Modifier.width(u(16f)))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            TrackTitleLine(title, track.showsExplicit, u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isCurrent) {
                     Text(stringResource(R.string.car_queue_now) + " · ", color = Color.White.copy(alpha = 0.86f), fontSize = u.sp(13f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em, maxLines = 1)
@@ -356,7 +358,7 @@ private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> 
                 .background(HiFi.Placeholder)
         )
         Spacer(Modifier.height(u(8f)))
-        Text(title, color = Color.White, fontSize = u.sp(15f), lineHeight = u.sp(19f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        TrackTitleLine(title, track.showsExplicit, u.sp(15f), lineHeight = u.sp(19f), fontWeight = FontWeight.Bold)
         Text(
             track.artists.joinToString { it.name ?: "" },
             color = Color.White.copy(alpha = 0.66f),

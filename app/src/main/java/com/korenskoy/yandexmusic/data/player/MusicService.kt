@@ -96,10 +96,16 @@ class MusicService : MediaLibraryService() {
                 journal.expectPause(cause)
                 playerRepository.pause()
             }
-            // Who took the sound shows a moment later, when it plays
+            // Who took the sound shows a moment later, when it plays; a navigator or an assistant may take a few
+            // seconds to speak, so it is asked again before settling on "another app" (Android 9 head unit, 1.14.12)
             serviceScope.launch {
-                delay(SOUND_TAKER_DELAY_MS)
-                journal.amendLastPause(soundTakenBy())
+                var who = SoundTaker.APP
+                for (wait in SOUND_TAKER_WAITS_MS) {
+                    delay(wait)
+                    who = soundTakenBy()
+                    if (who != SoundTaker.APP) break
+                }
+                journal.amendLastPause(who)
             }
         }
         override fun resume() = playbackController.play()
@@ -442,15 +448,22 @@ class MusicService : MediaLibraryService() {
                 availableCommands.contains(command)
 
             override fun play() {
+                noteKey(R.string.journal_key_play)
                 startPendingOrPlay()
             }
             override fun pause() {
+                noteKey(R.string.journal_key_pause)
                 pendingStart = null
                 // From outside the app: the notification, the lock screen, a headset, a car; who it was is kept
                 playbackController.pause(StopCause.USER_DEVICE, mediaLibrarySession?.controllerForCurrentRequest?.packageName)
             }
             override fun setPlayWhenReady(playWhenReady: Boolean) {
-                if (playWhenReady) startPendingOrPlay() else pause()
+                if (playWhenReady) {
+                    noteKey(R.string.journal_key_play)
+                    startPendingOrPlay()
+                } else {
+                    pause()
+                }
             }
             override fun prepare() {
                 // A failed/idle stream is re-resolved by the controller on play()
@@ -470,9 +483,11 @@ class MusicService : MediaLibraryService() {
                 playbackController.seekTo(positionMs)
             }
             override fun seekToNext() {
+                noteKey(R.string.journal_key_next)
                 playbackController.playNext()
             }
             override fun seekToPrevious() {
+                noteKey(R.string.journal_key_prev)
                 playbackController.playPrev()
             }
             override fun seekToNextMediaItem() {
@@ -490,7 +505,30 @@ class MusicService : MediaLibraryService() {
         if (start != null) start() else playbackController.play()
     }
 
+    /**
+     * A command from outside the app (a steering wheel, a headset, the shade, a car's screen) in the journal with
+     * where it came from: the first song after a head unit's sleep did not answer the wheel, and only such a line
+     * tells whether the press reached the app at all. The app's own screens are not written.
+     */
+    private fun noteKey(what: Int) {
+        val session = mediaLibrarySession
+        val controller = session?.controllerForCurrentRequest
+        // Media buttons (a wheel, a headset) and the shade come through the session's own notification controller,
+        // which is this app's package: told apart from the app's own screens, which are not written
+        val viaButtonsOrShade = controller != null && session.isMediaNotificationController(controller)
+        if (controller?.packageName == packageName && !viaButtonsOrShade) return
+        val from = if (viaButtonsOrShade) getString(R.string.journal_key_buttons) else controller?.packageName
+        journal.record(PlaybackJournal.Kind.MEDIA_KEY, title = playbackController.currentTrack.value?.title, detail = listOfNotNull(getString(what), from).joinToString(" · "))
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // A button that started the service (the process was not running): written before anything else happens
+        if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
+            val key = androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_KEY_EVENT, android.view.KeyEvent::class.java)
+            if (key != null && key.action == android.view.KeyEvent.ACTION_DOWN) {
+                journal.record(PlaybackJournal.Kind.MEDIA_KEY, detail = getString(R.string.journal_key_at_start, android.view.KeyEvent.keyCodeToString(key.keyCode)))
+            }
+        }
         super.onStartCommand(intent, flags, startId)
         // Started for a media button (a head unit sends Play at power-on): Android wants the service in the
         // foreground within seconds, and with nothing to resume the player's notification never comes —
@@ -593,7 +631,8 @@ class MusicService : MediaLibraryService() {
         /** Android Auto and the Automotive OS media center: allowed to browse and pick what to play. */
         private val CAR_HOSTS = setOf("com.google.android.projection.gearhead", "com.android.car.media")
 
-        private const val SOUND_TAKER_DELAY_MS = 700L
+        /** When to look who took the sound: at once it may not play yet; a navigator speaks within seconds. */
+        private val SOUND_TAKER_WAITS_MS = longArrayOf(700L, 2_000L, 4_000L)
 
         /** Android ends a service started for the foreground that is not there in 5–10 s: well before that. */
         private const val FOREGROUND_PROMISE_MS = 3_000L

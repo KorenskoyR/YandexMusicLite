@@ -16,7 +16,10 @@ data class DisplayScaleInfo(
     val autoScale: Float,
     val reason: AutoScaleReason = AutoScaleReason.TRUSTED,
     /** The screen's diagonal by the reported physical density, inches (0 when unknown). */
-    val impliedDiagonalIn: Float = 0f
+    val impliedDiagonalIn: Float = 0f,
+    /** The app's own window: the screen's whole, half of it beside a navigator, a launcher's strip, a free window. */
+    val windowWidthPx: Int = widthPx,
+    val windowHeightPx: Int = heightPx
 )
 
 /** Why "Авто" chose its scale: said in the settings beside it. */
@@ -43,6 +46,23 @@ object DisplayScale {
 
     fun analyze(metrics: DisplayMetrics): DisplayScaleInfo =
         decide(metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, physicalDpi(metrics))
+
+    /**
+     * As [analyze], with the app in a window of [windowWidthPx]×[windowHeightPx] (0 — not known yet): the screen
+     * decides whether its density is believed, the window how far the scale may go — a half of the screen or a
+     * launcher's strip holds less than the whole, and the scale that fits the screen would not fit there.
+     */
+    fun analyze(metrics: DisplayMetrics, windowWidthPx: Int, windowHeightPx: Int): DisplayScaleInfo =
+        inWindow(analyze(metrics), windowWidthPx, windowHeightPx)
+
+    /** [info] for the app in a window of this size: "Авто" no larger than the window holds. Pure; unit-tested. */
+    fun inWindow(info: DisplayScaleInfo, windowWidthPx: Int, windowHeightPx: Int): DisplayScaleInfo {
+        if (windowWidthPx <= 0 || windowHeightPx <= 0) return info
+        val limit = largestFitting(windowWidthPx, windowHeightPx, info.reportedDpi)
+        val auto = if (info.autoScale > limit) limit else info.autoScale
+        val reason = if (auto < info.autoScale) AutoScaleReason.LIMITED else info.reason
+        return info.copy(autoScale = auto, reason = reason, windowWidthPx = windowWidthPx, windowHeightPx = windowHeightPx)
+    }
 
     /**
      * "Авто" for a screen of [widthPx]×[heightPx]: the ratio of the physical density to the system's, unless the
@@ -82,6 +102,9 @@ object DisplayScale {
     }
 
     private const val BASE_DPI = 160f
+
+    /** The short side of the smallest phone the pages are made for. */
+    private const val MIN_SHORT_SIDE_ANY_DP = 320f
     private const val LARGE_SCREEN_MAX_DPI = 240
     private const val MIN_LARGE_DIAGONAL_IN = 7f
     private const val MIN_SHORT_SIDE_LANDSCAPE_DP = 480f
@@ -110,5 +133,17 @@ object DisplayScale {
     /** The scale to apply now: the chosen automatic value, or the manual one. */
     fun effectiveScale(auto: Boolean, manualScale: Float, info: DisplayScaleInfo): Float =
         if (auto) info.autoScale
-        else manualScale.coerceIn(SettingsRepository.MIN_UI_SCALE, SettingsRepository.MAX_UI_SCALE)
+        else manualScale.coerceIn(SettingsRepository.MIN_UI_SCALE, manualCeiling(info.windowWidthPx, info.windowHeightPx, info.reportedDpi))
+
+    /**
+     * The most the interface may be scaled by hand on a screen of [widthPx]×[heightPx] at [reportedDpi]: the short
+     * side never under [MIN_SHORT_SIDE_ANY_DP], the smallest screen every page is made for (a 320 dp phone). Beyond
+     * it the wave's knob ran into its buttons and the dock (1760×720 at 320 dpi and 150 %). Never under 100 %, never
+     * over [SettingsRepository.MAX_UI_SCALE]. Pure; unit-tested.
+     */
+    fun manualCeiling(widthPx: Int, heightPx: Int, reportedDpi: Int): Float {
+        if (widthPx <= 0 || heightPx <= 0 || reportedDpi <= 0) return SettingsRepository.MAX_UI_SCALE
+        val fit = minOf(widthPx, heightPx) / (reportedDpi / BASE_DPI * MIN_SHORT_SIDE_ANY_DP)
+        return (floor(fit * 20f) / 20f).coerceIn(SettingsRepository.DEFAULT_UI_SCALE, SettingsRepository.MAX_UI_SCALE)
+    }
 }

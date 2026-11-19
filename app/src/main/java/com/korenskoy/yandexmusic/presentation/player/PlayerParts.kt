@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackHeadline
 import com.korenskoy.yandexmusic.presentation.hifi.toArtist
 import com.korenskoy.yandexmusic.presentation.hifi.toAlbum
 import com.korenskoy.yandexmusic.presentation.hifi.TrackLyrics
@@ -168,14 +170,19 @@ internal fun PlayerHeader(
         // Balances the two buttons on the right, so the caption stays in the middle
         if (balanced) Spacer(Modifier.width(44.dp))
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
+            // A narrow window (a split screen, a player lying in 480 dp): the caption shrinks rather than gets cut
+            androidx.compose.foundation.text.BasicText(
                 text = stringResource(R.string.full_player_seychas_igraet),
-                color = Color.White.copy(alpha = 0.66f),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.14.em,
-                maxLines = 1
+                style = androidx.compose.ui.text.TextStyle(
+                    color = Color.White.copy(alpha = 0.66f),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.14.em
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 12.sp, stepSize = 0.5.sp)
             )
             if (sourceLabel.isNotEmpty()) {
                 Text(
@@ -434,16 +441,12 @@ internal fun TitleRow(
             modifier = Modifier.weight(1f)
         ) { track ->
         Column(Modifier.fillMaxWidth()) {
-            Text(
-                text = track.title ?: stringResource(R.string.bez_nazvaniya),
-                color = Color.White,
+            // Two lines and a smaller type before an ellipsis; the "E" plate after an explicit title.
+            // The title leads to the album, the artist to the artist's page
+            TrackHeadline(
+                title = track.title ?: stringResource(R.string.bez_nazvaniya),
                 fontSize = if (compact) 22.sp else 26.sp,
-                lineHeight = if (compact) 28.sp else 32.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.02).em,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // The title leads to the album, the artist to the artist's page
+                explicit = track.showsExplicit,
                 modifier = Modifier.toAlbum(track)
             )
             val aiMark = rememberAiMark(track)

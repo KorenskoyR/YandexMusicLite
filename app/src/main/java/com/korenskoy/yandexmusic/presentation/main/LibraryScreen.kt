@@ -1,5 +1,11 @@
 package com.korenskoy.yandexmusic.presentation.main
 
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
+import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
@@ -19,7 +25,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiWellButton
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiCollapsingTitle
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.utils.cover
@@ -57,7 +62,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -186,7 +190,7 @@ fun LibraryScreen(
     /** The view "Музыка с устройства" opens on (screenshots). */
     initialLocalView: Int = 0
 ) {
-    var showSettings by remember { mutableStateOf(false) }
+    var showSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var showProgressModal by remember { mutableStateOf(false) }
     var sectionName by rememberSaveable { mutableStateOf(initialSection) }
     val section = sectionName?.let { LibrarySection.valueOf(it) }
@@ -240,7 +244,7 @@ fun LibraryScreen(
         val listPadding = PaddingValues(start = contentStart, end = 20.dp, bottom = contentBottom)
         when (shown) {
             null -> Box(Modifier.fillMaxSize()) {
-            val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val statusBar = WindowInsets.systemBars.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
             val density = LocalDensity.current
             val list = rememberLazyListState()
             val collapse by rememberHeaderCollapse(list)
@@ -308,7 +312,7 @@ fun LibraryScreen(
             LibrarySection.LIKED, LibrarySection.DOWNLOADED -> {
                 val list = if (shown == LibrarySection.LIKED) tracks else downloaded
                 val appearance = rememberAppearance(shown)
-                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).statusBarsPadding(), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)) {
+                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)) {
                     item(key = "header") {
                         SectionHeader(
                             title = stringResource(if (shown == LibrarySection.LIKED) R.string.library_liked else R.string.library_downloaded),
@@ -606,7 +610,7 @@ internal fun CoverCard(track: TrackDetailsDto, modifier: Modifier = Modifier, on
                 .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
         )
         Spacer(Modifier.height(9.dp))
-        Text(track.title ?: stringResource(R.string.bez_nazvaniya), style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        TrackTitleLine(track.title ?: stringResource(R.string.bez_nazvaniya), track.showsExplicit, HiFiType.CardTitle.fontSize, style = HiFiType.CardTitle, color = HiFiType.CardTitle.color)
         Text(track.artists.joinToString { it.name ?: "" }, style = HiFiType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -633,7 +637,7 @@ private fun PlaylistsPage(
         )
     }
     val cells: List<UserPlaylistDto?> = listOf<UserPlaylistDto?>(null) + playlists
-    LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = contentPadding) {
+    LazyColumn(modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)), contentPadding = contentPadding) {
         item(key = "header") {
             PageHeader(stringResource(R.string.library_playlists_row), onBack)
         }
@@ -737,7 +741,7 @@ private fun AlbumsPage(
     onOpen: (AlbumDto) -> Unit
 ) {
     val context = LocalContext.current
-    LazyColumn(modifier = modifier.fillMaxSize().statusBarsPadding(), contentPadding = contentPadding) {
+    LazyColumn(modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)), contentPadding = contentPadding) {
         item(key = "header") { PageHeader(stringResource(R.string.library_albums_row), onBack) }
         if (albums.isEmpty()) {
             item(key = "empty") {

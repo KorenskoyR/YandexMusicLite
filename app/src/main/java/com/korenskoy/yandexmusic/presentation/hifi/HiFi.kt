@@ -57,6 +57,9 @@ object HiFi {
     /** A liked track or a favourite station: the heart is always this red, everywhere. */
     val Love = Color(0xFFFF3B5C)
 
+    /** The plate of the explicit "E": light grey, the letter in the ground's colour. */
+    val ExplicitPlate = Color(0xFFC9CED6)
+
     /** The metal rim: a sweep through light and dark steel. */
     val MetalSweep = listOf(
         Color(0xFF8E94A3), Color(0xFF2A2C33), Color(0xFFC9CED8), Color(0xFF2A2C33),

@@ -79,6 +79,12 @@ class MainActivity : ComponentActivity() {
     /** The steering wheel's voice button asked to listen (YandexMusicLite.KorenskoyR.START_VOICE). */
     private var voiceSignal by mutableIntStateOf(0)
 
+    /**
+     * This opening of the app: new when the activity is created afresh (from the launcher, after Back, after the
+     * system closed it), the same when it is only recreated. «Музыка при запуске» plays once for each.
+     */
+    private var launch = 0L
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -95,6 +101,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        launch = savedInstanceState?.getLong(KEY_LAUNCH) ?: android.os.SystemClock.elapsedRealtimeNanos()
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
         if (savedInstanceState == null) intent?.let { playFromSearch(it) }
         if (savedInstanceState == null && intent?.action == ACTION_START_VOICE) voiceSignal++
@@ -112,13 +119,16 @@ class MainActivity : ComponentActivity() {
             val uiScaleManual by settingsRepository.uiScaleManual.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE)
             val resources = LocalResources.current
             val baseDensity = LocalDensity.current
-            val uiScale = remember(uiScaleAuto, uiScaleManual, resources) {
-                val info = DisplayScale.analyze(resources.displayMetrics)
+            // The window, not the screen: half of it beside a navigator or a launcher's strip holds less. Resized
+            // in place (the activity is not recreated for a new size), so read again on every change
+            val window = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+            val uiScale = remember(uiScaleAuto, uiScaleManual, resources, configuration, window) {
+                val info = DisplayScale.analyze(resources.displayMetrics, window.width, window.height)
                 DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
             }
             CompositionLocalProvider(
-                LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale),
-                com.korenskoy.yandexmusic.presentation.car.LocalManualUiScale provides if (uiScaleAuto) 1f else uiScaleManual
+                LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale)
             ) {
                 YandexMusicTheme {
                     Surface(
@@ -126,7 +136,7 @@ class MainActivity : ComponentActivity() {
                         color = HiFi.Ground
                     ) {
                         // Skip the splash when the app is re-entered with a session already on screen
-                        AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal)
+                        AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal, launch = launch)
                     }
                 }
             }
@@ -171,6 +181,11 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putLong(KEY_LAUNCH, launch)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) openPlayerSignal++
@@ -205,6 +220,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_PLAYER = "open_player"
+        private const val KEY_LAUNCH = "launch"
 
         /** Listen for a track by voice now: the steering wheel's button through the head unit or a key-mapping app. */
         const val ACTION_START_VOICE = "YandexMusicLite.KorenskoyR.START_VOICE"
@@ -217,7 +233,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0, voiceSignal: Int = 0) {
+fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0, voiceSignal: Int = 0, launch: Long = 0L) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val isAuthorized by mainViewModel.isAuthorized.collectAsStateWithLifecycle()
@@ -278,6 +294,7 @@ fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0, voiceS
                     viewModel = mainViewModel,
                     openPlayerSignal = openPlayerSignal,
                     voiceSignal = voiceSignal,
+                    launch = launch,
                     onNavigateToAuth = {
                         navController.navigate("auth")
                     }

@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.data.download
 
+import androidx.work.workDataOf
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.NotificationChannelCompat
 import com.korenskoy.yandexmusic.data.player.SoundMode
@@ -91,9 +92,17 @@ class LikedTracksDownloadWorker(
         } finally {
             if (single == null) downloads.setDownloadProgress(null)
         }
-        // Network dropped mid-way: WorkManager retries when the constraint is met again
-        return if (failed > 0 && failed == tracks.size) Result.retry() else Result.success()
+        // Retried only when the network is gone: a track that cannot be had (gone from the catalogue, not for this
+        // region) failed every run, and with the rest done the job waited "for the network" forever on a good
+        // connection (608 liked, 599 downloaded, the last 9 «Ожидание сети», 1.14.12)
+        if (failed > 0 && DownloadOutcome.shouldRetry(failed, online = isOnline())) return Result.retry()
+        return Result.success(workDataOf(KEY_DONE to tracks.size - failed, KEY_FAILED to failed))
     }
+
+    private fun isOnline(): Boolean = runCatching {
+        val manager = applicationContext.getSystemService(android.net.ConnectivityManager::class.java)
+        manager.getNetworkCapabilities(manager.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    }.getOrDefault(true)
 
     override suspend fun getForegroundInfo(): ForegroundInfo = foregroundInfo(0, 0, "", inputData.getBoolean(KEY_UPGRADE, false))
 
@@ -125,6 +134,10 @@ class LikedTracksDownloadWorker(
         const val KEY_UPGRADE = "upgrade_quality"
         /** Only the likes made after "Скачивать избранное" was switched on. */
         const val KEY_NEW_LIKES = "new_likes"
+
+        /** In the finished job's output: how many were downloaded, how many could not be. */
+        const val KEY_DONE = "done"
+        const val KEY_FAILED = "failed"
         private const val CHANNEL_ID = "yandex_music_lite_downloads"
         private const val NOTIFICATION_ID = 4201
     }

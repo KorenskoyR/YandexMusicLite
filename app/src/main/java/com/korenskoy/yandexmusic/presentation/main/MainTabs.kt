@@ -302,7 +302,7 @@ internal fun RadioTab(viewModel: MainViewModel, radioVm: RadioViewModel, now: No
         favoriteStationIds = favoriteStationIds,
         onStationClick = { radioVm.play(it) },
         onToggleFavorite = { radioVm.toggleFavorite(it) },
-        onPlayPause = { viewModel.togglePlayPause() },
+        onPlayPause = { viewModel.radioKnob() },
         hasActiveTrack = now.hasTrack
     )
 }

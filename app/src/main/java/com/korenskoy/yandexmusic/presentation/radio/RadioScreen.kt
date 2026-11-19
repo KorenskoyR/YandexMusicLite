@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.animation.fadeOut
@@ -11,7 +14,6 @@ import com.korenskoy.yandexmusic.presentation.hifi.HiFiCollapsingTitle
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import com.korenskoy.yandexmusic.presentation.hifi.hifiPress
@@ -36,7 +38,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -153,7 +154,7 @@ fun RadioScreen(
     val hero = current ?: allStations.firstOrNull { it.id in favoriteStationIds } ?: allStations.firstOrNull()
     val favorites = remember(allStations, favoriteStationIds) { allStations.filter { it.id in favoriteStationIds } }
 
-    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBar = WindowInsets.systemBars.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
     val list = rememberLazyListState()
     val collapseState = rememberHeaderCollapse(list)
@@ -213,7 +214,14 @@ fun RadioScreen(
                         ) {
                             StationLogo(station, 76.dp, 20.dp, Modifier.hifiSoftShadow(RoundedCornerShape(20.dp), 16.dp))
                             Spacer(Modifier.height(7.dp))
-                            Text(station.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // The name in full where a smaller type holds it (Android 9–13 draw it wider: «Новое Ра…»)
+                            androidx.compose.foundation.text.BasicText(
+                                station.name,
+                                style = androidx.compose.ui.text.TextStyle(color = Color.White, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 12.sp, stepSize = 0.5.sp)
+                            )
                         }
                     }
                 }

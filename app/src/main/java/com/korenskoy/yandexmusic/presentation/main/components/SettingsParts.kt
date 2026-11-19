@@ -364,7 +364,9 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
 @Composable
 internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualScale: Float, onManualChange: (Float) -> Unit) {
     val resources = LocalResources.current
-    val info = remember(resources) { DisplayScale.analyze(resources.displayMetrics) }
+    val window = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val info = remember(resources, configuration, window) { DisplayScale.analyze(resources.displayMetrics, window.width, window.height) }
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(Icons.Rounded.Fullscreen, size = 32.dp)
@@ -395,13 +397,24 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
                 else -> null
             }?.let { Text(it, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
         } else {
-            var value by remember(manualScale) { mutableFloatStateOf(manualScale) }
+            // No further than this screen holds every page (a short side of 320 dp at the least)
+            val ceiling = DisplayScale.manualCeiling(info.windowWidthPx, info.windowHeightPx, info.reportedDpi)
+            var value by remember(manualScale, ceiling) { mutableFloatStateOf(manualScale.coerceAtMost(ceiling)) }
             Text(
                 stringResource(R.string.settings_ui_scale_manual_value, (value * 100).roundToInt(), (info.reportedDpi * value).roundToInt()),
                 color = HiFi.TextTertiary,
                 fontSize = 13.sp
             )
-            HiFiSlider(value = value, onValueChange = { value = it }, onValueChangeFinished = { onManualChange(value) }, valueRange = 0.5f..2.0f, steps = 29)
+            HiFiSlider(
+                value = value, onValueChange = { value = it }, onValueChangeFinished = { onManualChange(value) },
+                valueRange = 0.5f..ceiling, steps = ((ceiling - 0.5f) / 0.05f).roundToInt().coerceAtLeast(1) - 1
+            )
+            if (ceiling < SettingsRepository.MAX_UI_SCALE) {
+                Text(
+                    stringResource(R.string.settings_ui_scale_ceiling, (ceiling * 100).roundToInt()),
+                    color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
         // The car screen fits itself to the screen whatever the scale: said here, where the scale is looked for
         Spacer(Modifier.height(8.dp))

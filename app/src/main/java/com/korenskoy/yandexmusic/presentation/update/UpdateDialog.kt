@@ -91,9 +91,11 @@ fun UpdateDialog(
         // short even for the header and the buttons does the whole window scroll.
         val roomy = maxHeight >= UpdateWindowMinHeight
         val showSkipHint = maxHeight >= UpdateWindowRoomForHint
+        // A narrow window (a third of a phone, a free window) keeps its room for the words, not for the margins
+        val margin = if (maxWidth < UpdateNarrowWindow) 10.dp else 24.dp
         Box(
             modifier = Modifier
-                .padding(24.dp)
+                .padding(margin)
                 .widthIn(max = 480.dp)
                 .clip(RoundedCornerShape(28.dp))
                 .background(HiFiDialogDefaults.Container)
@@ -331,11 +333,14 @@ fun UpdateDialog(
 
                 Spacer(modifier = Modifier.height(22.dp))
 
-                // Actions row
-                Row(
+                // Actions: on a narrow window (a third of a phone, a free window) they go on to a second line, to the
+                // right as before, instead of squeezing their words
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
                 ) {
                     // Later Button
                     Box(
@@ -353,7 +358,6 @@ fun UpdateDialog(
                     }
 
                     if (isSignatureMismatch) {
-                        Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
@@ -374,7 +378,6 @@ fun UpdateDialog(
                     // The file for installing by hand, once an install did not finish
                     val offerFile = downloadProgress >= 2f && (installFailed || failedBefore)
                     if (offerFile && !isSignatureMismatch) {
-                        Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
@@ -392,7 +395,6 @@ fun UpdateDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
 
                     // Primary Action Button (Download / Install)
                     val isDownloading = downloadProgress in 0f..1f || installing
@@ -519,6 +521,9 @@ fun UpdateDialog(
 
 /** Below this the update window scrolls as a whole; above it only the part between the header and the buttons does. */
 private val UpdateWindowMinHeight = 280.dp
+
+/** Narrower than this the window keeps small margins around it. */
+private val UpdateNarrowWindow = 400.dp
 
 /** The note under "Пропустить эту версию" only where the screen has room for it. */
 private val UpdateWindowRoomForHint = 560.dp

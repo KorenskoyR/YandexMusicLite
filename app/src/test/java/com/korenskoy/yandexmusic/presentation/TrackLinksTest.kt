@@ -81,4 +81,22 @@ class TrackLinksTest {
         show(track, TrackLinks({}, {}))
         compose.onNodeWithText("Исполнитель").assertHasClickAction()
     }
+
+    @Test
+    fun inTheCarTooTheNamesLeadToTheirPages() {
+        val opened = mutableListOf<String>()
+        val car = track.copy(artists = listOf(ArtistDto(id = JsonPrimitive(7), name = "Группа Крови")), title = "Звезда")
+        compose.setContent {
+            CompositionLocalProvider(LocalTrackLinks provides TrackLinks({ opened += "artist" }, { opened += "album" })) {
+                com.korenskoy.yandexmusic.presentation.car.CarScreen(
+                    currentTrack = car, isPlaying = true, likedTrackIds = emptySet(), onPlayPauseClick = {}, onNextClick = {},
+                    onPrevClick = {}, onToggleLike = {}, onDislikeClick = {}, onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {},
+                    onPlayDownloaded = {}, onPlayRadio = {}, onExit = {}, isLandscape = false
+                )
+            }
+        }
+        compose.onNodeWithText("Группа Крови").performClick()
+        compose.onNodeWithText("Звезда").performClick()
+        assertEquals(listOf("artist", "album"), opened)
+    }
 }

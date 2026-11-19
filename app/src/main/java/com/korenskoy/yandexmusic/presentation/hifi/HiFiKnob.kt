@@ -82,6 +82,9 @@ fun HiFiKnob(
                 val r = this.size.minDimension / 2f
                 val c = Offset(this.size.width / 2f, this.size.height / 2f)
                 val rimWidth = max(1.5.dp.toPx(), r * 0.032f)
+                // Squeezed to almost nothing for a moment (a window dragged down to its smallest): nothing to
+                // draw, and a gradient of no radius is a crash (Android 15, a free window of 386×352)
+                if (r <= rimWidth + 1f) return@drawWithCache onDrawBehind { }
                 val faceR = r - rimWidth
                 val shadow = Brush.radialGradient(
                     colors = listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent),

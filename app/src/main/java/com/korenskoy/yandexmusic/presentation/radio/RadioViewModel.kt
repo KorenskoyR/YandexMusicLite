@@ -5,6 +5,7 @@ import com.korenskoy.yandexmusic.data.repository.RadioRules
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.korenskoy.yandexmusic.data.player.PlaybackController
+import com.korenskoy.yandexmusic.data.player.PlayRequests
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
 import com.korenskoy.yandexmusic.domain.model.RadioStation
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +21,8 @@ import javax.inject.Inject
 @HiltViewModel
 class RadioViewModel @Inject constructor(
     private val radioRepository: RadioRepository,
-    private val playbackController: PlaybackController
+    private val playbackController: PlaybackController,
+    private val playRequests: PlayRequests
 ) : ViewModel() {
 
     val stations: StateFlow<List<RadioStation>> = MutableStateFlow(radioRepository.getBuiltinStations()).asStateFlow()
@@ -28,7 +30,11 @@ class RadioViewModel @Inject constructor(
     val favoriteStationIds: StateFlow<Set<String>> = radioRepository.favoriteStationIds
         .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
 
-    fun play(station: RadioStation) = playbackController.playRadioStation(station)
+    /** A station the user chose: switching music on, «Разворачивать плеер» opens the player for it (as for a track). */
+    fun play(station: RadioStation) {
+        playRequests.userStarted()
+        playbackController.playRadioStation(station)
+    }
 
     /** "Радио" in the car: the station that played last, else the first favourite, else the first of the list. */
     fun playFirst() {
