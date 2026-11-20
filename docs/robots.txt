@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://korenskoyr.github.io/YandexMusicLite/sitemap.xml

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://korenskoyr.github.io/YandexMusicLite/</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image><image:loc>https://korenskoyr.github.io/YandexMusicLite/assets/showcase.jpg</image:loc></image:image>
+    <image:image><image:loc>https://korenskoyr.github.io/YandexMusicLite/assets/wave.jpg</image:loc></image:image>
+    <image:image><image:loc>https://korenskoyr.github.io/YandexMusicLite/assets/player.jpg</image:loc></image:image>
+    <image:image><image:loc>https://korenskoyr.github.io/YandexMusicLite/assets/car.jpg</image:loc></image:image>
+    <image:image><image:loc>https://korenskoyr.github.io/YandexMusicLite/assets/radio.jpg</image:loc></image:image>
+  </url>
+</urlset>
