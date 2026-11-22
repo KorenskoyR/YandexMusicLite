@@ -39,6 +39,7 @@ import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
+import androidx.core.graphics.scale
 import coil3.toBitmap
 import com.korenskoy.yandexmusic.MainActivity
 import com.korenskoy.yandexmusic.R
@@ -141,8 +142,8 @@ private suspend fun loadArt(context: Context, track: TrackDetailsDto): Pair<Bitm
     val request = ImageRequest.Builder(context).data(data).size(COVER_PX).allowHardware(false).build()
     val cover = (SingletonImageLoader.get(context).execute(request) as? SuccessResult)?.image?.toBitmap() ?: return null to null
     val glow = runCatching {
-        val tiny = Bitmap.createScaledBitmap(cover, GLOW_TINY, GLOW_TINY, true)
-        Bitmap.createScaledBitmap(tiny, GLOW_PX, GLOW_PX, true)
+        val tiny = cover.scale(GLOW_TINY, GLOW_TINY)
+        tiny.scale(GLOW_PX, GLOW_PX)
     }.getOrNull()
     return cover to glow
 }

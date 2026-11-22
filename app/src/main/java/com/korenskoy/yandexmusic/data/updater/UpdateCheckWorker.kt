@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.edit
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -49,7 +50,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
         if (available.versionName == deps.settings().skippedUpdateVersion.first()) return Result.success()
         val prefs = applicationContext.getSharedPreferences(UpdateSchedule.PREFS, Context.MODE_PRIVATE)
         if (prefs.getString(NOTIFIED_VERSION, null) == available.versionName) return Result.success()
-        if (notify(available.versionName)) prefs.edit().putString(NOTIFIED_VERSION, available.versionName).apply()
+        if (notify(available.versionName)) prefs.edit { putString(NOTIFIED_VERSION, available.versionName) }
         return Result.success()
     }
 
@@ -113,8 +114,10 @@ object UpdateSchedule {
         lastAt <= 0L || now < lastAt || now - lastAt >= if (lastOk) AFTER_OK_MS else AFTER_FAILED_MS
 
     fun remember(context: Context, ok: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putLong(LAST_AT, System.currentTimeMillis()).putBoolean(LAST_OK, ok).apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putLong(LAST_AT, System.currentTimeMillis())
+            putBoolean(LAST_OK, ok)
+        }
     }
 
     fun dueNow(context: Context): Boolean {

@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.korenskoy.yandexmusic.R
@@ -105,7 +106,7 @@ object VoiceInput {
 
     private fun prefs(context: Context) = context.getSharedPreferences("voice", Context.MODE_PRIVATE)
     fun savedRecognizer(context: Context): String? = prefs(context).getString("recognizer", null)
-    fun saveRecognizer(context: Context, id: String) = prefs(context).edit().putString("recognizer", id).apply()
+    fun saveRecognizer(context: Context, id: String) = prefs(context).edit { putString("recognizer", id) }
 
     fun micGranted(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED

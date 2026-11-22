@@ -182,8 +182,6 @@
     <string name="widget_page_liked">Мне нравится</string>
     <string name="widget_page_radio">Радио</string>
     <string name="widget_page_car">В авто</string>
-    <string name="widget_nothing_playing">Ничего не играет</string>
-    <string name="widget_tap_to_open">Нажмите, чтобы открыть приложение</string>
     <string name="crash_log_title">Журнал сбоев</string>
     <string name="crash_log_none">Сбоев не было</string>
     <string name="crash_log_send">Отправить разработчику</string>
