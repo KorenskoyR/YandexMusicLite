@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the «Обложка» widget looks like in the list of widgets (Android 11 and older; newer draw it live) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="28dp" />
+            <gradient android:angle="270" android:startColor="#8A2F43" android:endColor="#1A0F14" />
+            <size android:width="170dp" android:height="170dp" />
+        </shape>
+    </item>
+    <item android:left="63dp" android:top="104dp" android:width="44dp" android:height="44dp">
+        <shape android:shape="oval"><solid android:color="#F2F4F7" /></shape>
+    </item>
+</layer-list>

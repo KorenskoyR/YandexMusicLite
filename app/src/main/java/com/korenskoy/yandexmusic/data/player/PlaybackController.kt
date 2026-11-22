@@ -354,6 +354,7 @@ class PlaybackController @Inject constructor(
                     heard.onAudible(playerRepository.currentTrackId.value)
                     if (streamingTrackId != null && streamingTrackId == _currentTrack.value?.idString) {
                         blockedStreamHost = null
+                        streamReturn.onAudible()
                         updateLink(LinkReason.STREAM_SOUNDS) { onStreamAudible() }
                     }
                 }
@@ -1395,6 +1396,12 @@ class PlaybackController @Inject constructor(
     @Volatile
     private var blockedStreamHost: String? = null
 
+    /** Whether the streams may be tried again after they failed, and how long to wait (see [StreamReturn]). */
+    private val streamReturn = StreamReturn { SystemClock.elapsedRealtime() }
+
+    /** The return to the streams on trial: the place it left and its check. */
+    private var returnTrial: Job? = null
+
     /** Changes the link's state; a change is written to the journal with [why], so a report can be read later. */
     private fun updateLink(why: LinkReason? = null, change: LinkTracker.() -> Unit) {
         val before = link.state
@@ -1439,7 +1446,8 @@ class PlaybackController @Inject constructor(
     /** The connection is good again: the music left for a mix of what is on the device goes back. */
     private fun returnFromOfflineMix(): Boolean {
         val point = returnPoint ?: return false
-        if (currentLink() != LinkState.GOOD) return false
+        // The server answers (a weak link too: the trial tells), and not too soon after a failed return
+        if (currentLink() == LinkState.NONE || !streamReturn.mayTry()) return false
         if (point.source == PlaylistSource.VIBE) {
             // Back to the wave only with something new in it; otherwise it is asked again and the mix plays on
             if (wave.firstUnplayed() == null) {
@@ -1448,14 +1456,41 @@ class PlaybackController @Inject constructor(
             }
             returnPoint = null
             playMyVibe()
+            onTrial(point)
             return true
         }
         returnPoint = null
         val index = point.queue.indexOfFirst { it.idString == point.leftTrackId }
         val next = point.queue.getOrNull(index + 1) ?: point.queue.firstOrNull() ?: return false
         playTrack(next.idString, point.queue, point.source, chosen = false)
+        onTrial(point)
         return true
     }
+
+    /**
+     * The music went back to the streams: a stream that does not sound within [StreamReturn.TRIAL_MS] sends it back
+     * to the device at once, and the next try waits longer (see [StreamReturn]).
+     */
+    private fun onTrial(point: ReturnPoint) {
+        journal.record(PlaybackJournal.Kind.RETURN_TRY)
+        returnTrial?.cancel()
+        returnTrial = scope.launch {
+            delay(StreamReturn.TRIAL_MS)
+            val current = _currentTrack.value ?: return@launch
+            // Back on the device already (a failure got there first), or paused by the listener: nothing to judge
+            if (returnPoint != null || !(playerRepository.isPlaying.value || _isStarting.value)) return@launch
+            val sounds = playerRepository.isPlaying.value && !isBuffering.value && playerRepository.soundingTrackId.value == current.idString
+            if (sounds || !current.isStreamed || playingCopyId == current.idString) return@launch
+            streamReturn.onStreamsFailed()
+            journal.record(PlaybackJournal.Kind.RETURN_FAILED, current.title, streamReturn.nextTryInMs())
+            playOfflineMix(point)
+        }
+    }
+
+    /** Anything of the service or the user's own on the device to go on with. */
+    private fun deviceHasMusic(): Boolean =
+        reserve.entries.value.isNotEmpty() || libraryTracks.any { preloadManager.hasPlayableCopy(it.idString) } ||
+            localMusic.library.value.tracks.isNotEmpty()
 
     private fun upcomingTracks(): List<TrackDetailsDto> {
         val queue = _currentPlaylist.value
@@ -1487,6 +1522,7 @@ class PlaybackController @Inject constructor(
             playingCopyId = null
             scope.launch { reserve.remove(failure.trackId) }
         }
+        val networkFailure = PlaybackQueue.isNetworkFailure(failure.reason) && !copyFailed
         val action = PlaybackQueue.recoveryFor(
             offline = isOffline(),
             isRadio = current.isRadio,
@@ -1495,8 +1531,12 @@ class PlaybackController @Inject constructor(
             alreadyRetried = retriedTrackId == failure.trackId || failure.reason == TRACK_UNAVAILABLE,
             failedTracksInARow = consecutiveFailedTracks + 1,
             hasCopy = !copyFailed && reserve.has(failure.trackId),
-            weakLink = _linkState.value == LinkState.WEAK
+            weakLink = _linkState.value == LinkState.WEAK,
+            networkFailure = networkFailure,
+            deviceHasMusic = networkFailure && deviceHasMusic()
         )
+        // The streams failed the music: the way back to them is a trial, and not at once
+        if (networkFailure && current.isStreamed) streamReturn.onStreamsFailed()
         journal.record(PlaybackJournal.Kind.ERROR, current.title, failure.positionMs, action.ordinal, failure.reason)
         if (PlaybackQueue.isNetworkFailure(failure.reason) && failure.streamHost != null) {
             scope.launch { reportTrouble(LinkReason.STREAM_FAILED, failure.streamHost) }
@@ -1509,7 +1549,13 @@ class PlaybackController @Inject constructor(
             Recovery.CONTINUE_OFFLINE -> {
                 // The link dropped mid-track: not a broken track, continue with what is on the device
                 retriedTrackId = null
-                skipToNextOnDevice(current)
+                // With the link "there" but the stream not coming, the device's music plays until a trial return
+                // proves the streams again (not the queue's next online track, which would hang the same way)
+                if (networkFailure && !isOffline()) {
+                    playOfflineMix(ReturnPoint(_currentSource.value, _currentPlaylist.value, current.idString))
+                } else {
+                    skipToNextOnDevice(current)
+                }
             }
             Recovery.RETRY -> {
                 retriedTrackId = failure.trackId

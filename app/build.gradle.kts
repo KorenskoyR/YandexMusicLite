@@ -58,8 +58,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 25
         targetSdk = 36
-        versionCode = 63
-        versionName = "1.15.0"
+        versionCode = 64
+        versionName = "1.16.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -137,6 +137,8 @@ android {
         // 11, 13, 15, 16); Android 15 alone otherwise, so CI stays quick
         unitTests.all {
             it.systemProperty("robolectric.enabledSdks", providers.gradleProperty("auditSdks").getOrElse("35"))
+            // The report of «В авто»'s button sizes in millimetres (CarSizeReport), only when asked: -PcarSizeReport
+            it.systemProperty("carSizeReport", providers.gradleProperty("carSizeReport").map { "true" }.getOrElse("false"))
             // Android 16's runtime reaches into the JDK's file descriptors: allowed, or every test on it fails at setup
             it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
         }

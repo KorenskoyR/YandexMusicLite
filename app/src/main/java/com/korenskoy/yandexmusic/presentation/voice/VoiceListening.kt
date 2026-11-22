@@ -55,7 +55,10 @@ internal class RecognizerSession(private val context: Context) {
 
     fun start(onState: (Listening) -> Unit) {
         stop()
-        val r = runCatching { SpeechRecognizer.createSpeechRecognizer(context) }
+        val r = runCatching {
+            val chosen = VoiceInput.chosen(VoiceInput.recognizers(context), VoiceInput.savedRecognizer(context))?.component()
+            if (chosen != null) SpeechRecognizer.createSpeechRecognizer(context, chosen) else SpeechRecognizer.createSpeechRecognizer(context)
+        }
             .onFailure { Log.w(TAG, "No speech recognizer", it) }
             .getOrNull()
         if (r == null) {

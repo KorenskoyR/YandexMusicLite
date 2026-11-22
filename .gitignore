@@ -57,6 +57,10 @@ Thumbs.db
 AGENT_MEMORY.md
 CHANGELOG.md
 PLAN*.md
+handoff_summary.md
+.claudeignore
+*-artifact-content-*.txt
+scripts/backup_to_gdrive.ps1
 .gemini/
 .claude/
 .cursor/

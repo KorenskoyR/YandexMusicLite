@@ -82,7 +82,13 @@ class PlaybackJournal(
         /** Play after the device slept or a long pause: the track opened afresh; [Event.valueMs] the pause. */
         REOPENED_AFTER_REST,
         /** A media button or another app's command reached the player: [Event.detail] which and from where. */
-        MEDIA_KEY
+        MEDIA_KEY,
+        /** The music goes back from the device to the streams, on trial. */
+        RETURN_TRY,
+        /** The trial stayed silent: back to the device; [Event.valueMs] until the next try. */
+        RETURN_FAILED,
+        /** «Запуск с устройством»: [Event.detail] the signal and what came of it. */
+        AUTOSTART
     }
 
     data class Event(

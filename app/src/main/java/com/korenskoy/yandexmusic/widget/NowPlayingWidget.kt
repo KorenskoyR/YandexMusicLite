@@ -1,22 +1,13 @@
 package com.korenskoy.yandexmusic.widget
 
 import android.content.BroadcastReceiver
-import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
-import com.korenskoy.yandexmusic.utils.CoverSize
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.view.KeyEvent
+import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -24,134 +15,97 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
-import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.action.actionSendBroadcast
+import androidx.glance.appwidget.LinearProgressIndicator
+import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.semantics.contentDescription
-import androidx.glance.semantics.semantics
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaButtonReceiver
-import coil3.SingletonImageLoader
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
-import coil3.request.allowHardware
-import coil3.toBitmap
-import com.korenskoy.yandexmusic.MainActivity
 import com.korenskoy.yandexmusic.R
-import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
-import com.korenskoy.yandexmusic.data.player.PlaybackController
-import com.korenskoy.yandexmusic.utils.toCoverUrl
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
 
 /**
- * Home screen widget with the current track. Play/pause is an ordinary media button event for
- * [MediaButtonReceiver] — like a Bluetooth headset — so it works even after the app process was closed:
- * the player service starts and resumes the saved session. media3 lets only "play" keys through there,
- * so skipping goes to [WidgetSkipReceiver].
+ * «Строка» 4×1: the cover, the track over its progress, back, play, forward and — from five cells — the heart.
+ * Play is an ordinary media button for [MediaButtonReceiver] (like a Bluetooth headset), so it works after the app's
+ * process was closed: the player service starts and resumes the saved session. Its name stays as it was: the widgets
+ * people have placed keep working after the update.
  */
 class NowPlayingWidget : GlanceAppWidget() {
-
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface Dependencies {
-        fun playbackController(): PlaybackController
-    }
+    override val sizeMode = SizeMode.Responsive(setOf(DpSize(250.dp, 64.dp), DpSize(320.dp, 64.dp)))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val controller = EntryPointAccessors.fromApplication(context.applicationContext, Dependencies::class.java).playbackController()
-        provideContent {
-            val track by controller.currentTrack.collectAsState()
-            val isPlaying by controller.isPlaying.collectAsState()
-            var cover by remember { mutableStateOf<Bitmap?>(null) }
-            LaunchedEffect(track?.idString) { cover = track?.let { loadCover(context, it) } }
-            NowPlayingContent(track?.title, track?.artists?.joinToString { it.name.orEmpty() }, isPlaying, cover)
-        }
-    }
-
-    private suspend fun loadCover(context: Context, track: TrackDetailsDto): Bitmap? {
-        val uri = track.coverUri ?: return null
-        val data = if (uri.startsWith("android.resource") || uri.startsWith("http")) uri else uri.toCoverUrl(CoverSize.Small)
-        val request = ImageRequest.Builder(context).data(data).size(200).allowHardware(false).build()
-        return (SingletonImageLoader.get(context).execute(request) as? SuccessResult)?.image?.toBitmap()
+        provideContent { LineWidget(rememberWidgetNow(context)) }
     }
 }
 
-/** The widget's look; separate from the data so it can be tested with any state. */
 @Composable
-fun NowPlayingContent(title: String?, artist: String?, isPlaying: Boolean, cover: Bitmap?) {
+fun LineWidget(now: WidgetNow) {
     val context = LocalContext.current
+    val wide = LocalSize.current.width >= 300.dp
     Row(
         modifier = GlanceModifier
             .fillMaxSize()
-            .cornerRadius(20.dp)
-            .background(ColorProvider(Color(0xFF1E1E26)))
-            .padding(8.dp)
-            .clickable(actionStartActivity(openPlayerIntent(context))),
+            .appWidgetBackground()
+            .cornerRadius(24.dp)
+            .background(WidgetColors.ground)
+            .padding(start = 8.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+            .clickable(if (now.hasTrack) WidgetActions.openPlayer(context) else WidgetActions.startWave(context)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = GlanceModifier.size(48.dp).cornerRadius(10.dp).background(ColorProvider(Color(0xFF3A2A4A))),
-            contentAlignment = Alignment.Center
-        ) {
-            if (cover != null) {
-                Image(ImageProvider(cover), contentDescription = null, modifier = GlanceModifier.size(48.dp).cornerRadius(10.dp))
+        Box(GlanceModifier.size(56.dp).cornerRadius(14.dp).background(WidgetColors.chip), contentAlignment = Alignment.Center) {
+            if (now.cover != null) {
+                Image(ImageProvider(now.cover), contentDescription = null, modifier = GlanceModifier.size(56.dp).cornerRadius(14.dp), contentScale = ContentScale.Crop)
             } else {
-                Image(ImageProvider(R.drawable.ic_notification), contentDescription = null, modifier = GlanceModifier.size(24.dp))
+                Image(ImageProvider(R.drawable.ic_notification), contentDescription = null, modifier = GlanceModifier.size(26.dp))
             }
         }
-        Spacer(GlanceModifier.width(10.dp))
+        Spacer(GlanceModifier.width(12.dp))
         Column(modifier = GlanceModifier.defaultWeight()) {
-            Text(
-                text = title ?: context.getString(R.string.widget_nothing_playing),
-                maxLines = 1,
-                style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            )
-            Text(
-                text = artist ?: context.getString(R.string.widget_tap_to_open),
-                maxLines = 1,
-                style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.65f)), fontSize = 12.sp)
+            WidgetText(now.title ?: context.getString(R.string.widget_wave_title), 15.sp, bold = true)
+            WidgetText(now.artist ?: context.getString(R.string.widget_wave_hint), 12.sp, WidgetColors.textSoft)
+            now.progress?.let {
+                Spacer(GlanceModifier.height(6.dp))
+                LinearProgressIndicator(progress = it, modifier = GlanceModifier.fillMaxWidth().height(3.dp), color = WidgetColors.text, backgroundColor = WidgetColors.track)
+            }
+        }
+        Spacer(GlanceModifier.width(6.dp))
+        if (!now.hasTrack) {
+            WidgetRound(R.drawable.ic_widget_play, context.getString(R.string.widget_wave_start), WidgetActions.startWave(context), 52.dp, 24.dp, WidgetColors.knob, WidgetColors.onKnob)
+            return@Row
+        }
+        if (wide && now.canReact) {
+            WidgetRound(
+                if (now.isLiked) R.drawable.ic_notification_liked else R.drawable.ic_notification_like,
+                context.getString(R.string.cd_nravitsya), WidgetActions.like(context), 44.dp, 22.dp, null,
+                if (now.isLiked) WidgetColors.love else androidx.compose.ui.graphics.Color.White
             )
         }
-        ControlButton(R.drawable.ic_widget_prev, context.getString(R.string.cd_predyduschiy), skipIntent(context, next = false))
-        ControlButton(
-            if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
-            context.getString(R.string.cd_vosproizvedenie_ili_pauza),
-            mediaButtonIntent(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+        WidgetRound(R.drawable.ic_widget_prev, context.getString(R.string.cd_predyduschiy), WidgetActions.previous(context), 44.dp, 22.dp, WidgetColors.chip)
+        Spacer(GlanceModifier.width(4.dp))
+        WidgetRound(
+            if (now.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
+            context.getString(R.string.cd_vosproizvedenie_ili_pauza), WidgetActions.playPause(context), 52.dp, 24.dp, WidgetColors.knob, WidgetColors.onKnob
         )
-        ControlButton(R.drawable.ic_widget_next, context.getString(R.string.cd_sleduyuschiy), skipIntent(context, next = true))
-    }
-}
-
-@Composable
-private fun ControlButton(icon: Int, description: String, intent: Intent) {
-    Box(
-        modifier = GlanceModifier
-            .size(44.dp)
-            .clickable(actionSendBroadcast(intent))
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center
-    ) {
-        Image(ImageProvider(icon), contentDescription = null, modifier = GlanceModifier.size(26.dp))
+        Spacer(GlanceModifier.width(4.dp))
+        WidgetRound(R.drawable.ic_widget_next, context.getString(R.string.cd_sleduyuschiy), WidgetActions.next(context), 44.dp, 22.dp, WidgetColors.chip)
     }
 }
 
@@ -166,15 +120,10 @@ internal fun skipIntent(context: Context, next: Boolean): Intent =
     Intent(context, WidgetSkipReceiver::class.java)
         .setAction(if (next) WidgetSkipReceiver.ACTION_NEXT else WidgetSkipReceiver.ACTION_PREVIOUS)
 
-private fun openPlayerIntent(context: Context): Intent =
-    Intent(context, MainActivity::class.java)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        .putExtra(MainActivity.EXTRA_OPEN_PLAYER, true)
-
 /** "Next" / "previous" from the widget: skips within the current session (nothing to skip without one). */
 class WidgetSkipReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val controller = EntryPointAccessors.fromApplication(context.applicationContext, NowPlayingWidget.Dependencies::class.java)
+        val controller = EntryPointAccessors.fromApplication(context.applicationContext, WidgetDependencies::class.java)
             .playbackController()
         if (controller.currentTrack.value == null) return
         when (intent.action) {

@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.drop
+import com.korenskoy.yandexmusic.data.updater.UpdateCheckWorker
+import com.korenskoy.yandexmusic.data.updater.UpdateSchedule
 import com.korenskoy.yandexmusic.data.updater.InstallGate
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -35,7 +39,8 @@ class UpdateViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     @param:ApplicationContext private val context: Context,
     private val installer: SessionInstaller,
-    private val playbackController: PlaybackController
+    private val playbackController: PlaybackController,
+    private val networkMonitor: com.korenskoy.yandexmusic.data.network.NetworkMonitor
 ) : ViewModel() {
 
     /** What Android's installer said about the update being installed; null while nothing is installed. */
@@ -69,6 +74,19 @@ class UpdateViewModel @Inject constructor(
             delay(5000L)
             checkForUpdates(silent = true)
         }
+        // A check that failed (no network at that second: in a car it comes later) is made again once the network is
+        // back, not only at the next start, which on a head unit may be weeks away
+        networkMonitor.isConnectedFlow
+            .drop(1)
+            .filter { it }
+            .onEach {
+                if (UpdateSchedule.lastFailed(context)) {
+                    delay(NETWORK_SETTLE_MS)
+                    checkForUpdates(silent = true)
+                }
+            }
+            .launchIn(viewModelScope)
+        UpdateCheckWorker.plan(context)
         // Leftover update files and install sessions from an earlier run
         viewModelScope.launch(Dispatchers.IO) {
             updateManager.cleanupUpdateFiles()
@@ -87,6 +105,7 @@ class UpdateViewModel @Inject constructor(
                 _statusMessage.value = context.getString(R.string.update_status_checking)
             }
             val result = updateManager.checkForUpdates()
+            UpdateSchedule.remember(context, ok = result !is UpdateCheckResult.Error)
             val skipped = settingsRepository.skippedUpdateVersion.first()
             val available = result as? UpdateCheckResult.UpdateAvailable
             val status = UpdatePolicy.statusAfterCheck(
@@ -189,6 +208,9 @@ class UpdateViewModel @Inject constructor(
      */
     fun onAppResumed() {
         if (installer.state.value == InstallState.Confirming) startWatchdog()
+        // Open for long (a head unit's app runs for days): looked for again, quietly, every few hours
+        val busy = _downloadProgress.value in 0f..2f || installer.busy
+        if (!busy && UpdateSchedule.dueNow(context)) checkForUpdates(silent = true)
         // Back from the permission screen the app sent the user to: the install goes on, once
         if (InstallGate.installOnReturn(awaitingPermission, _downloadProgress.value >= 2f, updateManager.canRequestPackageInstalls(), installer.busy)) {
             awaitingPermission = false
@@ -265,6 +287,9 @@ class UpdateViewModel @Inject constructor(
 
     private companion object {
         const val PREFS = "update_install"
+
+        /** The network that came back is given this long before the check goes out. */
+        private const val NETWORK_SETTLE_MS = 10_000L
         const val FAILED_VERSION = "failed_version"
 
         /** Without a confirmation window within this, the installer is working on its own. */

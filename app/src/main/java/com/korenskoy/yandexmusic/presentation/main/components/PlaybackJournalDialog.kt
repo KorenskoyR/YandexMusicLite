@@ -142,7 +142,7 @@ private fun eventColor(event: PlaybackJournal.Event): Color = when (event.kind) 
     PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE,
     PlaybackJournal.Kind.WAVE_REPEAT, PlaybackJournal.Kind.ERROR, PlaybackJournal.Kind.KILLED, PlaybackJournal.Kind.UNDERRUN,
     PlaybackJournal.Kind.SLOW_START, PlaybackJournal.Kind.WAVE_STUCK, PlaybackJournal.Kind.OUTPUT_STALL,
-    PlaybackJournal.Kind.POSITION_BACK -> HiFi.Warning
+    PlaybackJournal.Kind.POSITION_BACK, PlaybackJournal.Kind.RETURN_FAILED -> HiFi.Warning
     PlaybackJournal.Kind.PAUSED -> if (event.cause?.byListener == true) Color.White.copy(alpha = 0.82f) else HiFi.Warning
     PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY, PlaybackJournal.Kind.LINK_BACK, PlaybackJournal.Kind.RESUMED,
     PlaybackJournal.Kind.LINK_RENEWED -> HiFi.Success
@@ -220,6 +220,9 @@ internal fun eventText(r: Resources, e: PlaybackJournal.Event): String {
         PlaybackJournal.Kind.OUTPUT_CHANGED -> r.getString(R.string.journal_event_output_changed, e.detail.orEmpty())
         PlaybackJournal.Kind.REOPENED_AFTER_REST -> r.getString(R.string.journal_event_reopened, e.title.orEmpty(), minutes(e.valueMs))
         PlaybackJournal.Kind.MEDIA_KEY -> r.getString(R.string.journal_event_media_key, e.detail.orEmpty())
+        PlaybackJournal.Kind.RETURN_TRY -> r.getString(R.string.journal_event_return_try)
+        PlaybackJournal.Kind.RETURN_FAILED -> r.getString(R.string.journal_event_return_failed, minutes(e.valueMs))
+        PlaybackJournal.Kind.AUTOSTART -> r.getString(R.string.journal_event_autostart, e.detail.orEmpty())
     }
 }
 

@@ -3,9 +3,11 @@ package com.korenskoy.yandexmusic.presentation.voice
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
@@ -27,6 +29,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.player.BackgroundWork
 import kotlinx.coroutines.delay
+
+/** A speech recognition service of the device: [id] is its component, [label] what the owner sees. */
+data class Recognizer(val id: String, val label: String) {
+    fun component(): ComponentName? = ComponentName.unflattenFromString(id)
+}
 
 /** How this device can hear what to play. */
 enum class VoiceRoute {
@@ -77,19 +84,47 @@ object VoiceInput {
         else -> VoiceRoute.NONE
     }
 
+    /** Every speech recognition service installed. */
+    fun recognizers(context: Context): List<Recognizer> = runCatching {
+        val pm = context.packageManager
+        pm.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0).mapNotNull { info ->
+            val s = info.serviceInfo ?: return@mapNotNull null
+            Recognizer(ComponentName(s.packageName, s.name).flattenToString(), runCatching { pm.getApplicationLabel(s.applicationInfo).toString() }.getOrDefault(s.packageName))
+        }
+    }.getOrDefault(emptyList())
+
+    /** The saved pick if still installed, else the first, else none. Pure. */
+    fun chosen(all: List<Recognizer>, saved: String?): Recognizer? = all.firstOrNull { it.id == saved } ?: all.firstOrNull()
+
+    /** The one after [current], wrapping round. Pure. */
+    fun next(all: List<Recognizer>, current: Recognizer?): Recognizer? {
+        if (all.isEmpty()) return null
+        val i = all.indexOfFirst { it.id == current?.id }
+        return all[(i + 1) % all.size]
+    }
+
+    private fun prefs(context: Context) = context.getSharedPreferences("voice", Context.MODE_PRIVATE)
+    fun savedRecognizer(context: Context): String? = prefs(context).getString("recognizer", null)
+    fun saveRecognizer(context: Context, id: String) = prefs(context).edit().putString("recognizer", id).apply()
+
     fun micGranted(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    /** Where to get the "Google" app: the store, or its page in a browser where there is no store. */
+    /**
+     * Whether Play is on the device: the "Google" app is only there. A "market://" link without it opened RuStore,
+     * which has no such app and said "нет ссылки" (1.15 feedback).
+     */
+    fun hasPlayStore(context: Context): Boolean = runCatching {
+        context.packageManager.getApplicationInfo(PLAY_STORE, 0).enabled
+    }.getOrDefault(false)
+
+    /** The "Google" app's page in Play itself, never in another store that takes "market://" links. */
     fun installGoogle(context: Context) {
-        val ways = listOf("market://details?id=$GOOGLE_APP", "https://play.google.com/store/apps/details?id=$GOOGLE_APP")
-        for (way in ways) {
-            try {
-                context.startActivity(Intent(Intent.ACTION_VIEW, way.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                return
-            } catch (e: ActivityNotFoundException) {
-                Log.i("VoiceInput", "Nothing opens $way", e)
-            }
+        val inPlay = Intent(Intent.ACTION_VIEW, "market://details?id=$GOOGLE_APP".toUri()).setPackage(PLAY_STORE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(inPlay)
+        } catch (e: ActivityNotFoundException) {
+            Log.i("VoiceInput", "No Play to open", e)
         }
     }
 
@@ -101,6 +136,7 @@ object VoiceInput {
 
     private const val LANGUAGE = "ru-RU"
     const val GOOGLE_APP = "com.google.android.googlequicksearchbox"
+    private const val PLAY_STORE = "com.android.vending"
 }
 
 /** How this device can hear, asked again each time the app comes back (the "Google" app installed meanwhile). */

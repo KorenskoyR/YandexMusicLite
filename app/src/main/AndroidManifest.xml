@@ -155,6 +155,34 @@
             android:name=".widget.WidgetSkipReceiver"
             android:exported="false" />
 
+        <!-- «Плеер» 4×2 and «Обложка» 2×2 beside «Строка» -->
+        <receiver
+            android:name=".widget.PlayerWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_player_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/player_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.CoverWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_cover_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/cover_widget_info" />
+        </receiver>
+        <!-- Like and dislike from a widget -->
+        <receiver
+            android:name=".widget.WidgetActionReceiver"
+            android:exported="false" />
+
         <!-- Android's installer answers about the update being installed (only to this app) -->
         <receiver
             android:name=".data.updater.UpdateInstallReceiver"
@@ -187,6 +215,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <!-- MediaTek's quick boot from hibernation (IPO) -->
+                <action android:name="android.intent.action.ACTION_BOOT_IPO" />
+            </intent-filter>
+            <!-- The ignition turned on (FYT/Teyes, GLSX, Microntek): a head unit wakes, it does not boot. Up to Android 7
+                 they reach a closed app; later the running app hears them itself (DeviceWake) -->
+            <intent-filter>
+                <action android:name="com.fyt.boot.ACCON" />
+                <action android:name="com.glsx.boot.ACCON" />
+                <action android:name="com.cayboy.action.ACC_ON" />
+                <action android:name="com.carboy.action.ACC_ON" />
             </intent-filter>
         </receiver>
 

@@ -151,9 +151,17 @@ object PlaybackQueue {
         alreadyRetried: Boolean,
         failedTracksInARow: Int,
         hasCopy: Boolean = false,
-        weakLink: Boolean = false
+        weakLink: Boolean = false,
+        /** The stream did not come (buffering forever, a network error): not the track's fault. */
+        networkFailure: Boolean = false,
+        /** There is music on the device to go on with. */
+        deviceHasMusic: Boolean = false
     ): Recovery = when {
         offline && !isRadio && !isDownloaded -> if (hasCopy) Recovery.RESUME_FROM_COPY else Recovery.CONTINUE_OFFLINE
+        // A stream that did not come: its own copy, else the device's music, at once. Retrying, skipping and at last
+        // stopping, track after silent track, left the car in silence for hours under a hard block (1.15 report)
+        networkFailure && !isRadio && !isDownloaded && hasCopy -> Recovery.RESUME_FROM_COPY
+        networkFailure && !isRadio && !isDownloaded && deviceHasMusic -> Recovery.CONTINUE_OFFLINE
         !alreadyRetried -> Recovery.RETRY
         // A fresh link did not help, and this is not the track's fault when the link is weak
         hasCopy && !isRadio && !isDownloaded -> Recovery.RESUME_FROM_COPY

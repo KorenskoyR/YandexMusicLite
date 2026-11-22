@@ -73,7 +73,51 @@ class GitHubUpdateManager @Inject constructor(
     /**
      * Checks if a newer release exists on GitHub Releases.
      */
-    suspend fun checkForUpdates(): UpdateCheckResult = withContext(Dispatchers.IO) {
+    /**
+     * The latest release: GitHub's API first, its release page when the API refuses. The API lets 60 requests an hour
+     * from one address, and a mobile operator puts thousands of phones behind one: the check failed, quietly, and the
+     * update was never offered (1.15 feedback). The page has no such limit.
+     */
+    suspend fun checkForUpdates(): UpdateCheckResult {
+        val api = checkViaApi()
+        if (api !is UpdateCheckResult.Error) return api
+        val page = checkViaReleasePage()
+        return if (page is UpdateCheckResult.Error) api else page
+    }
+
+    /** The latest release's tag from where github.com/…/releases/latest sends; the APK's address follows from it. */
+    private suspend fun checkViaReleasePage(): UpdateCheckResult = withContext(Dispatchers.IO) {
+        try {
+            val noRedirects = okHttpClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
+            val location = noRedirects.newCall(
+                Request.Builder().url("https://github.com/$repoOwner/$repoName/releases/latest").header("User-Agent", "YandexMusicLite-Android").build()
+            ).execute().use { it.header("Location") }
+            val tag = tagFromLocation(location) ?: return@withContext UpdateCheckResult.Error(context.getString(R.string.update_err_network))
+            val remoteVersion = tag.removePrefix("v").trim()
+            val localVersion = BuildConfig.VERSION_NAME.removePrefix("v").trim()
+            if (!isVersionNewer(remoteVersion, localVersion)) return@withContext UpdateCheckResult.UpToDate(BuildConfig.VERSION_NAME)
+            val apkUrl = "https://github.com/$repoOwner/$repoName/releases/download/$tag/$APK_NAME"
+            // Its size, where the server says it (the window shows it); not needed to go on
+            val size = runCatching {
+                okHttpClient.newCall(Request.Builder().url(apkUrl).head().header("User-Agent", "YandexMusicLite-Android").build())
+                    .execute().use { it.header("Content-Length")?.toLongOrNull() ?: 0L }
+            }.getOrDefault(0L)
+            UpdateCheckResult.UpdateAvailable(
+                versionName = remoteVersion,
+                title = "Yandex Music Lite $tag",
+                changelog = context.getString(R.string.update_notes_default),
+                apkDownloadUrl = apkUrl,
+                apkSizeBytes = size
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "No answer from the release page", e)
+            UpdateCheckResult.Error(e.localizedMessage ?: context.getString(R.string.update_err_network))
+        }
+    }
+
+    private suspend fun checkViaApi(): UpdateCheckResult = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url(releasesApiUrl)
@@ -455,6 +499,14 @@ class GitHubUpdateManager @Inject constructor(
     }
 
     companion object {
+        /** The name every release's APK has (release.yml). */
+        const val APK_NAME = "YandexMusicLite.apk"
+
+        /** The tag in a release page's address (…/releases/tag/v1.15.0); null for anything else. Pure; unit-tested. */
+        fun tagFromLocation(location: String?): String? =
+            location?.substringAfter("/releases/tag/", "")?.substringBefore('?')?.substringBefore('#')
+                ?.takeIf { it.isNotBlank() && !it.contains('/') }
+
         private const val TAG = "GitHubUpdateManager"
         /** Used without a Context (tests); the app passes the localized string. */
         private const val DEFAULT_NOTES = "•"

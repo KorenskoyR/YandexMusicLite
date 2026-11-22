@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.widget
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.korenskoy.yandexmusic.data.player.PlaybackController
@@ -35,7 +38,28 @@ class NowPlayingWidgetUpdater @Inject constructor(
         combine(playbackController.currentTrack, playbackController.isPlaying) { track, playing -> track?.idString to playing }
             .distinctUntilChanged()
             .debounce(300)
-            .onEach { runCatching { NowPlayingWidget().updateAll(context) } }
+            .onEach { updateAll() }
             .launchIn(scope)
+        // The progress moves every half-minute while music plays, never faster: a widget redrawn every second costs
+        // the battery
+        scope.launch {
+            playbackController.isPlaying.collectLatest { playing ->
+                while (playing) {
+                    delay(TICK_MS)
+                    WidgetClock.advance()
+                    updateAll()
+                }
+            }
+        }
+    }
+
+    private suspend fun updateAll() {
+        runCatching { NowPlayingWidget().updateAll(context) }
+        runCatching { PlayerWidget().updateAll(context) }
+        runCatching { CoverWidget().updateAll(context) }
+    }
+
+    private companion object {
+        const val TICK_MS = 30_000L
     }
 }

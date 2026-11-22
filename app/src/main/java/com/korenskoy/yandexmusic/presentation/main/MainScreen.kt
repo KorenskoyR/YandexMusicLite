@@ -119,6 +119,10 @@ fun MainScreen(
     openPlayerSignal: Int = 0,
     /** This opening of the app (MainActivity): the music on launch is started once for it. */
     launch: Long = 0L,
+    /** A widget asked for «Моя волна»: each new value starts it once. */
+    waveSignal: Int = 0,
+    /** A widget asked for a page (route, with a count). */
+    tabSignal: Pair<Int, String>? = null,
     /** The steering wheel's voice button: each new value listens once, whatever tab is open. */
     voiceSignal: Int = 0,
     accountVm: AccountViewModel = hiltViewModel(),
@@ -161,6 +165,9 @@ fun MainScreen(
     val currentTabState = androidx.compose.runtime.rememberUpdatedState(currentTab)
     LaunchedEffect(currentTab, tabKnown) { if (tabKnown) viewModel.rememberTab(currentTab) }
     LaunchedEffect(launch) { viewModel.applyStartMusic(launch) }
+    // From a widget: the wave starts (as its knob does: the player may open), a page opens
+    LaunchedEffect(waveSignal) { if (waveSignal > 0) viewModel.waveKnob(waveActive = false) }
+    LaunchedEffect(tabSignal) { tabSignal?.second?.let { route -> MainTab.entries.firstOrNull { it.route == route }?.let { chosenTab = it } } }
     val swipeToClose by viewModel.swipeToCloseMiniPlayer.collectAsStateWithLifecycle()
     val animationMode by viewModel.animationMode.collectAsStateWithLifecycle()
     var isPlayerExpanded by rememberSaveable { mutableStateOf(false) }

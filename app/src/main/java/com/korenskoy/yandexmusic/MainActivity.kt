@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic
 
+import androidx.compose.runtime.mutableStateOf
 import com.korenskoy.yandexmusic.presentation.voice.VoiceInput
 import com.korenskoy.yandexmusic.presentation.account.NoPlusScreen
 import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
@@ -79,11 +80,26 @@ class MainActivity : ComponentActivity() {
     /** The steering wheel's voice button asked to listen (YandexMusicLite.KorenskoyR.START_VOICE). */
     private var voiceSignal by mutableIntStateOf(0)
 
+    /** A widget asked for «Моя волна» (each new value starts it once). */
+    private var waveSignal by mutableIntStateOf(0)
+
+    /** A widget asked for a page: its route, with a count so the same page asked again opens again. */
+    private var tabSignal by mutableStateOf<Pair<Int, String>?>(null)
+
+    private fun takeWidgetAsks(intent: Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra(EXTRA_START_WAVE, false)) waveSignal++
+        intent.getStringExtra(EXTRA_OPEN_TAB)?.let { tabSignal = ((tabSignal?.first ?: 0) + 1) to it }
+    }
+
     /**
      * This opening of the app: new when the activity is created afresh (from the launcher, after Back, after the
      * system closed it), the same when it is only recreated. «Музыка при запуске» plays once for each.
      */
     private var launch = 0L
+
+    /** Recreated with a session on screen: the splash is skipped. */
+    private var restored = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -102,9 +118,11 @@ class MainActivity : ComponentActivity() {
         }
 
         launch = savedInstanceState?.getLong(KEY_LAUNCH) ?: android.os.SystemClock.elapsedRealtimeNanos()
+        restored = savedInstanceState != null
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true && savedInstanceState == null) openPlayerSignal++
         if (savedInstanceState == null) intent?.let { playFromSearch(it) }
         if (savedInstanceState == null && intent?.action == ACTION_START_VOICE) voiceSignal++
+        if (savedInstanceState == null) takeWidgetAsks(intent)
 
         // The app is always dark: dark system bars whatever the system's own theme. "Auto" followed the system,
         // so a light head unit got a light navigation bar (painted turquoise by the vendor) and dark status icons
@@ -113,31 +131,44 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
         setContent {
-            // Scale the whole UI for screens whose reported density is wrong (dense car head units):
-            // the app cannot change the system density, so it overrides its own instead.
-            val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
-            val uiScaleManual by settingsRepository.uiScaleManual.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE)
-            val resources = LocalResources.current
-            val baseDensity = LocalDensity.current
-            // The window, not the screen: half of it beside a navigator or a launcher's strip holds less. Resized
-            // in place (the activity is not recreated for a new size), so read again on every change
-            val window = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
-            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-            val uiScale = remember(uiScaleAuto, uiScaleManual, resources, configuration, window) {
-                val info = DisplayScale.analyze(resources.displayMetrics, window.width, window.height)
-                DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
+            // The size the app really draws in, measured here at its root: every page decides lying or standing,
+            // and the scale what fits, by it — not by what the system says of the window, which can be stale
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                val drawn = androidx.compose.ui.unit.IntSize(
+                    if (constraints.hasBoundedWidth) constraints.maxWidth else 0,
+                    if (constraints.hasBoundedHeight) constraints.maxHeight else 0
+                )
+                CompositionLocalProvider(com.korenskoy.yandexmusic.utils.LocalAppWindowSize provides drawn) { AppRoot() }
             }
-            CompositionLocalProvider(
-                LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale)
-            ) {
-                YandexMusicTheme {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = HiFi.Ground
-                    ) {
-                        // Skip the splash when the app is re-entered with a session already on screen
-                        AppNavigation(skipSplash = savedInstanceState != null, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal, launch = launch)
-                    }
+        }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun AppRoot() {
+        // Scale the whole UI for screens whose reported density is wrong (dense car head units):
+        // the app cannot change the system density, so it overrides its own instead.
+        val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
+        val uiScaleManual by settingsRepository.uiScaleManual.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE)
+        val resources = LocalResources.current
+        val baseDensity = LocalDensity.current
+        // The window, not the screen: half of it beside a navigator or a launcher's strip holds less. Resized
+        // in place (the activity is not recreated for a new size), so read again on every change
+        val window = com.korenskoy.yandexmusic.utils.currentWindowSizePx()
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val uiScale = remember(uiScaleAuto, uiScaleManual, resources, configuration, window) {
+            val info = DisplayScale.analyze(resources.displayMetrics, window.width, window.height)
+            DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
+        }
+        CompositionLocalProvider(
+            LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale)
+        ) {
+            YandexMusicTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = HiFi.Ground
+                ) {
+                    // Skip the splash when the app is re-entered with a session already on screen
+                    AppNavigation(skipSplash = restored, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal, launch = launch, waveSignal = waveSignal, tabSignal = tabSignal)
                 }
             }
         }
@@ -190,6 +221,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) openPlayerSignal++
         if (intent.action == ACTION_START_VOICE) voiceSignal++
+        takeWidgetAsks(intent)
         playFromSearch(intent)
     }
 
@@ -220,6 +252,12 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_PLAYER = "open_player"
+
+        /** From a widget with nothing playing: the app opens and «Моя волна» starts. */
+        const val EXTRA_START_WAVE = "start_wave"
+
+        /** From a widget: the app opens on this page (a [com.korenskoy.yandexmusic.presentation.main.components.MainTab]'s route). */
+        const val EXTRA_OPEN_TAB = "open_tab"
         private const val KEY_LAUNCH = "launch"
 
         /** Listen for a track by voice now: the steering wheel's button through the head unit or a key-mapping app. */
@@ -233,7 +271,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0, voiceSignal: Int = 0, launch: Long = 0L) {
+fun AppNavigation(
+    skipSplash: Boolean = false,
+    openPlayerSignal: Int = 0,
+    voiceSignal: Int = 0,
+    launch: Long = 0L,
+    waveSignal: Int = 0,
+    tabSignal: Pair<Int, String>? = null
+) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val isAuthorized by mainViewModel.isAuthorized.collectAsStateWithLifecycle()
@@ -295,6 +340,8 @@ fun AppNavigation(skipSplash: Boolean = false, openPlayerSignal: Int = 0, voiceS
                     openPlayerSignal = openPlayerSignal,
                     voiceSignal = voiceSignal,
                     launch = launch,
+                    waveSignal = waveSignal,
+                    tabSignal = tabSignal,
                     onNavigateToAuth = {
                         navController.navigate("auth")
                     }

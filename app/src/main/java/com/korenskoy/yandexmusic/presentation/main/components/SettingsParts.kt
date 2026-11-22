@@ -364,7 +364,7 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
 @Composable
 internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualScale: Float, onManualChange: (Float) -> Unit) {
     val resources = LocalResources.current
-    val window = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val window = com.korenskoy.yandexmusic.utils.currentWindowSizePx()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val info = remember(resources, configuration, window) { DisplayScale.analyze(resources.displayMetrics, window.width, window.height) }
     Column(Modifier.fillMaxWidth().padding(14.dp)) {

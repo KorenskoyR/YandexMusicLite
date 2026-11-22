@@ -88,12 +88,40 @@ class CarStripTest {
     @Test
     fun standingInAShortWindowTheControlsStayBig() {
         // Half of a lying 1024×600 unit beside a navigator (Android 7.1 split screen): the whole design came out at
-        // 0.5 with 32 dp buttons over each other; the cover gives up its height instead
-        assertEquals(600f / 1060f, carScaleOf(507.dp, 600.dp, isLandscape = false), 0.001f)
+        // 0.5 with 32 dp buttons over each other; the cover gives up all its height instead: 600 / 800
+        assertEquals(0.75f, carScaleOf(507.dp, 600.dp, isLandscape = false), 0.001f)
+        // A split of 40 % on a 10″ 1280×720: 0.85, not 0.6
+        assertEquals(512f / 600f, carScaleOf(512.dp, 720.dp, isLandscape = false), 0.001f)
         // Where the whole design is big enough nothing changes: the Geely's standing 960×1280, a phone
         assertEquals(1280f / 1200f, carScaleOf(960.dp, 1280.dp, isLandscape = false), 0.001f)
         assertEquals(0.6f, carScaleOf(360.dp, 800.dp, isLandscape = false), 0.001f)
-        // A 600×700 window: 700/1060, under the comfortable 0.75, so all of it
-        assertEquals(700f / 1060f, carScaleOf(600.dp, 700.dp, isLandscape = false), 0.001f)
+    }
+
+    @Test
+    fun theControlsComeFirst() {
+        // A little bigger than the design always, and the interface scale grows them more (where there is room)
+        assertEquals(1.3f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(1f), 0.001f)
+        assertEquals(1.95f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(1.5f), 0.001f)
+        assertEquals(com.korenskoy.yandexmusic.presentation.car.CAR_CONTROLS_MAX, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(3f), 0.001f)
+        // A scale under 100 % never makes them smaller than the design's
+        assertEquals(1.3f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(0.8f), 0.001f)
+        // Lying, the player's column widens into the cover's, which keeps its least
+        val room = 1192f
+        assertEquals(652f * 1.3f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(room, 1.3f), 0.5f)
+        assertEquals(room - 40f - 280f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(room, 2f), 0.5f)
+        // Never narrower than designed
+        assertEquals(652f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(800f, 2f), 0.5f)
+    }
+
+    @Test
+    fun aWindowNotMuchWiderThanHighStands() {
+        // Splits of 60 and 70 % on a 1280×720 unit (768 and 896 wide): standing, the controls get the width
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 768.dp, 720.dp))
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 896.dp, 720.dp))
+        // The whole unit and a 1024×600 lie
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 1280.dp, 720.dp))
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 1024.dp, 600.dp))
+        // A standing window never lies
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(false, 2000.dp, 720.dp))
     }
 }

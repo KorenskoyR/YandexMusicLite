@@ -5,6 +5,7 @@ import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.unit.hasContentDescription
 import androidx.glance.testing.unit.hasText
 import androidx.test.core.app.ApplicationProvider
+import androidx.compose.ui.unit.dp
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -16,24 +17,73 @@ class NowPlayingWidgetTest {
 
     private val context = ApplicationProvider.getApplicationContext<Application>()
 
-    @Test
-    fun showsTheTrackAndTheControls() = runGlanceAppWidgetUnitTest {
-        setContext(context)
-        provideComposable { NowPlayingContent("Группа крови", "Кино", isPlaying = true, cover = null) }
+    private val playing = WidgetNow(
+        title = "Группа крови", artist = "Кино", isPlaying = true, isLiked = true, isRadio = false, canReact = true,
+        progress = 0.4f, positionMs = 82_000, durationMs = 285_000, source = "МОЯ ВОЛНА", cover = null, glow = null
+    )
+    private val nothing = WidgetNow(null, null, false, false, false, false, null, 0, 0, null, null, null)
 
+    @Test
+    fun theLineShowsTheTrackAndTheControls() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        setAppWidgetSize(androidx.compose.ui.unit.DpSize(320.dp, 64.dp))
+        provideComposable { LineWidget(playing) }
         onNode(hasText("Группа крови")).assertExists()
         onNode(hasText("Кино")).assertExists()
         onNode(hasContentDescription("Предыдущий")).assertExists()
         onNode(hasContentDescription("Воспроизведение или пауза")).assertExists()
         onNode(hasContentDescription("Следующий")).assertExists()
+        // Five cells: the heart too
+        onNode(hasContentDescription("Нравится")).assertExists()
     }
 
     @Test
-    fun nothingPlayingInvitesToOpenTheApp() = runGlanceAppWidgetUnitTest {
+    fun withNothingPlayingTheWaveIsATapAway() = runGlanceAppWidgetUnitTest {
         setContext(context)
-        provideComposable { NowPlayingContent(null, null, isPlaying = false, cover = null) }
+        provideComposable { LineWidget(nothing) }
+        onNode(hasText("Моя волна")).assertExists()
+        onNode(hasContentDescription("Слушать Мою волну")).assertExists()
+    }
 
-        onNode(hasText("Ничего не играет")).assertExists()
-        onNode(hasText("Нажмите, чтобы открыть приложение")).assertExists()
+    @Test
+    fun thePlayerShowsEverything() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        setAppWidgetSize(androidx.compose.ui.unit.DpSize(320.dp, 180.dp))
+        provideComposable { PlayerWidgetContent(playing) }
+        onNode(hasText("МОЯ ВОЛНА")).assertExists()
+        onNode(hasText("Группа крови")).assertExists()
+        onNode(hasText("1:22")).assertExists()
+        onNode(hasText("−3:23")).assertExists()
+        onNode(hasContentDescription("Не нравится")).assertExists()
+        onNode(hasContentDescription("Нравится")).assertExists()
+    }
+
+    @Test
+    fun thePlayerWithNothingPlayingOffersTheWaveAndThePages() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        setAppWidgetSize(androidx.compose.ui.unit.DpSize(320.dp, 180.dp))
+        provideComposable { PlayerWidgetContent(nothing) }
+        onNode(hasContentDescription("Слушать Мою волну")).assertExists()
+        onNode(hasText("Мне нравится")).assertExists()
+        onNode(hasText("Радио")).assertExists()
+        onNode(hasText("В авто")).assertExists()
+    }
+
+    @Test
+    fun theCoverShowsTheTrackAndTheControls() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        setAppWidgetSize(androidx.compose.ui.unit.DpSize(180.dp, 180.dp))
+        provideComposable { CoverWidgetContent(playing) }
+        onNode(hasText("Группа крови")).assertExists()
+        onNode(hasContentDescription("Воспроизведение или пауза")).assertExists()
+    }
+
+    @Test
+    fun aStationHasNoProgress() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        setAppWidgetSize(androidx.compose.ui.unit.DpSize(320.dp, 180.dp))
+        provideComposable { PlayerWidgetContent(playing.copy(isRadio = true, progress = null, source = "РАДИО", artist = "В эфире")) }
+        onNode(hasText("РАДИО")).assertExists()
+        onNode(hasText("1:22")).assertDoesNotExist()
     }
 }

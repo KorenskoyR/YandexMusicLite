@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the «Строка» widget looks like in the list of widgets (Android 11 and older; newer draw it live) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="24dp" />
+            <solid android:color="#141821" />
+            <size android:width="300dp" android:height="68dp" />
+        </shape>
+    </item>
+    <item android:left="8dp" android:top="6dp" android:width="56dp" android:height="56dp">
+        <shape android:shape="rectangle"><corners android:radius="14dp" /><solid android:color="#8A2F43" /></shape>
+    </item>
+    <item android:left="76dp" android:top="20dp" android:width="120dp" android:height="12dp">
+        <shape android:shape="rectangle"><corners android:radius="6dp" /><solid android:color="#F2F4F7" /></shape>
+    </item>
+    <item android:left="238dp" android:top="8dp" android:width="52dp" android:height="52dp">
+        <shape android:shape="oval"><solid android:color="#F2F4F7" /></shape>
+    </item>
+</layer-list>

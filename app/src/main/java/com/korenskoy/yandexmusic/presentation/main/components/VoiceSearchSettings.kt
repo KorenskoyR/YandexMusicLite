@@ -83,20 +83,44 @@ internal fun ColumnScope.VoiceSearchGroup() {
         if (!granted) VoiceInput.openAppSettings(context)
     }
     SettingsGroup(stringResource(R.string.settings_g_voice)) {
+        // Play on the device: the way to the "Google" app; without it there is none (RuStore has no such app)
+        val play = remember { VoiceInput.hasPlayStore(context) }
         VoiceSearchRows(
             route = route,
             micGranted = mic,
-            onInstall = { VoiceInput.installGoogle(context) },
+            onInstall = if (play) ({ VoiceInput.installGoogle(context) }) else null,
             onAllowMic = { ask.launch(Manifest.permission.RECORD_AUDIO) }
         )
         // The steering wheel: only where the device can hear at all
+        if (route == VoiceRoute.RECOGNIZER) RecognizerPickRow()
         if (route != VoiceRoute.NONE) WheelVoiceRows()
     }
 }
 
+/** Several speech services installed: the row names the one that listens, a tap passes to the next. */
+@Composable
+private fun RecognizerPickRow() {
+    val context = LocalContext.current
+    val all = remember { VoiceInput.recognizers(context) }
+    if (all.size < 2) return
+    var current by remember { mutableStateOf(VoiceInput.chosen(all, VoiceInput.savedRecognizer(context))) }
+    SettingsRow(
+        icon = Icons.Rounded.Mic,
+        title = stringResource(R.string.settings_voice_engine),
+        subtitle = current?.label.orEmpty(),
+        onClick = {
+            VoiceInput.next(all, current)?.let {
+                current = it
+                VoiceInput.saveRecognizer(context, it.id)
+            }
+        },
+        chevron = false
+    )
+}
+
 /** The row itself, for each way the device can hear. */
 @Composable
-internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: () -> Unit, onAllowMic: () -> Unit) {
+internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: (() -> Unit)?, onAllowMic: () -> Unit) {
     val needsMic = route == VoiceRoute.RECOGNIZER && !micGranted
     val works = route != VoiceRoute.NONE && !needsMic
     val status = stringResource(
@@ -123,6 +147,7 @@ internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: 
             stringResource(
                 when {
                     route == VoiceRoute.SYSTEM_WINDOW -> R.string.settings_voice_hint_window
+                    route == VoiceRoute.NONE && onInstall == null -> R.string.settings_voice_hint_none_no_play
                     route == VoiceRoute.NONE -> R.string.settings_voice_hint_none
                     needsMic -> R.string.settings_voice_hint_service_mic
                     else -> R.string.settings_voice_hint_service
@@ -130,11 +155,12 @@ internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: 
             ),
             color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp
         )
-        if (route == VoiceRoute.NONE || needsMic) {
+        val action = if (needsMic) onAllowMic else onInstall.takeIf { route == VoiceRoute.NONE }
+        if (action != null) {
             Spacer(Modifier.height(12.dp))
             MetalPillButton(
                 stringResource(if (needsMic) R.string.settings_voice_allow_mic else R.string.settings_voice_install),
-                if (needsMic) onAllowMic else onInstall,
+                action,
                 Modifier.widthIn(min = 180.dp),
                 height = 44.dp
             )

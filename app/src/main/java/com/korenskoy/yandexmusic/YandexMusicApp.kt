@@ -33,6 +33,9 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
     @Inject
     lateinit var bluetoothAutoplay: BluetoothAutoplay
 
+    @Inject
+    lateinit var deviceWake: com.korenskoy.yandexmusic.data.start.DeviceWake
+
     /**
      * Covers: a quarter of the app's memory for decoded images and 300 MB on disk, so covers seen once come
      * back without the network. The loader keeps its own HTTP client: the app's one adds the account token
@@ -66,6 +69,7 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
         super.onCreate()
         widgetUpdater.start()
         bluetoothAutoplay.start()
+        deviceWake.start()
     }
 }
 
