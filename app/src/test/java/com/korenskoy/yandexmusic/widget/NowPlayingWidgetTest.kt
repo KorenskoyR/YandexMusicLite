@@ -33,7 +33,14 @@ class NowPlayingWidgetTest {
         onNode(hasContentDescription("Предыдущий")).assertExists()
         onNode(hasContentDescription("Воспроизведение или пауза")).assertExists()
         onNode(hasContentDescription("Следующий")).assertExists()
-        // Five cells: the heart too
+    }
+
+    @Test
+    fun theWideLineShowsTheHeartToo() = runGlanceAppWidgetUnitTest {
+        setContext(context)
+        setAppWidgetSize(androidx.compose.ui.unit.DpSize(430.dp, 64.dp))
+        provideComposable { LineWidget(playing) }
+        onNode(hasText("Группа крови")).assertExists()
         onNode(hasContentDescription("Нравится")).assertExists()
     }
 

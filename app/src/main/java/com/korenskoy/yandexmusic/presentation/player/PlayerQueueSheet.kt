@@ -3,6 +3,10 @@ package com.korenskoy.yandexmusic.presentation.player
 import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
 import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import com.korenskoy.yandexmusic.utils.cover
 import com.korenskoy.yandexmusic.utils.CoverSize
 import androidx.compose.runtime.getValue
@@ -14,7 +18,6 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -142,7 +145,11 @@ internal fun QueueSheet(
         exit = slideOutVertically(HiFiMotion.standard()) { it },
         modifier = Modifier.fillMaxSize()
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        val insetSides = if (fullHeight) WindowInsetsSides.Horizontal + WindowInsetsSides.Top else WindowInsetsSides.Horizontal
+        Box(
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(insetSides)),
+            contentAlignment = Alignment.BottomCenter
+        ) {
             QueueSheetContent(
                 split = split,
                 isPlaying = isPlaying,
@@ -231,12 +238,13 @@ private fun QueueSheetContent(
                     .background(Color.White.copy(alpha = 0.28f))
             )
             Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 16.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                val compact = com.korenskoy.yandexmusic.utils.currentWindowSizeDp().heightDp < 440
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.player_queue_title),
                         color = Color.White,
-                        fontSize = 26.sp,
-                        lineHeight = 32.sp,
+                        fontSize = if (compact) 20.sp else 26.sp,
+                        lineHeight = if (compact) 26.sp else 32.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.02).em
                     )
@@ -252,7 +260,7 @@ private fun QueueSheetContent(
             state = listState,
             modifier = Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                bottom = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding() + 16.dp
             )
         ) {
             split.current?.let { now ->

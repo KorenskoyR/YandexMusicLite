@@ -1,5 +1,6 @@
 package com.korenskoy.yandexmusic.presentation.update
 
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.drop
 import com.korenskoy.yandexmusic.data.updater.UpdateCheckWorker
@@ -72,7 +73,7 @@ class UpdateViewModel @Inject constructor(
         // Silent check on launch, after a delay for network readiness
         viewModelScope.launch {
             delay(5000L)
-            checkForUpdates(silent = true)
+            if (settingsRepository.autoCheckUpdates.first()) checkForUpdates(silent = true)
         }
         // A check that failed (no network at that second: in a car it comes later) is made again once the network is
         // back, not only at the next start, which on a head unit may be weeks away
@@ -80,13 +81,18 @@ class UpdateViewModel @Inject constructor(
             .drop(1)
             .filter { it }
             .onEach {
-                if (UpdateSchedule.lastFailed(context)) {
+                if (settingsRepository.autoCheckUpdates.first() && UpdateSchedule.lastFailed(context)) {
                     delay(NETWORK_SETTLE_MS)
                     checkForUpdates(silent = true)
                 }
             }
             .launchIn(viewModelScope)
-        UpdateCheckWorker.plan(context)
+        settingsRepository.autoCheckUpdates
+            .distinctUntilChanged()
+            .onEach { enabled ->
+                if (enabled) UpdateCheckWorker.plan(context) else UpdateCheckWorker.cancel(context)
+            }
+            .launchIn(viewModelScope)
         // Leftover update files and install sessions from an earlier run
         viewModelScope.launch(Dispatchers.IO) {
             updateManager.cleanupUpdateFiles()
@@ -101,6 +107,7 @@ class UpdateViewModel @Inject constructor(
 
     fun checkForUpdates(silent: Boolean = false) {
         viewModelScope.launch {
+            if (!UpdatePolicy.allowAutoCheck(settingsRepository.autoCheckUpdates.first(), silent)) return@launch
             if (!silent) {
                 _statusMessage.value = context.getString(R.string.update_status_checking)
             }
@@ -210,7 +217,11 @@ class UpdateViewModel @Inject constructor(
         if (installer.state.value == InstallState.Confirming) startWatchdog()
         // Open for long (a head unit's app runs for days): looked for again, quietly, every few hours
         val busy = _downloadProgress.value in 0f..2f || installer.busy
-        if (!busy && UpdateSchedule.dueNow(context)) checkForUpdates(silent = true)
+        if (!busy && UpdateSchedule.dueNow(context)) {
+            viewModelScope.launch {
+                if (settingsRepository.autoCheckUpdates.first()) checkForUpdates(silent = true)
+            }
+        }
         // Back from the permission screen the app sent the user to: the install goes on, once
         if (InstallGate.installOnReturn(awaitingPermission, _downloadProgress.value >= 2f, updateManager.canRequestPackageInstalls(), installer.busy)) {
             awaitingPermission = false

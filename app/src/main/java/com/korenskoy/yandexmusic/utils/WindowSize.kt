@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.IntSize
 
 /** Size of the app window in dp (multi-window and foldable aware, unlike Configuration.screenWidthDp). */
@@ -17,7 +17,7 @@ data class WindowSizeDp(val widthDp: Int, val heightDp: Int)
  * Android 15) showing the app in its launcher's small standing card reported that card again a second after the
  * app was opened full screen, and every page took the standing layout on the lying screen (1.15, left-hand drive).
  */
-val LocalAppWindowSize = staticCompositionLocalOf { IntSize.Zero }
+val LocalAppWindowSize = compositionLocalOf { IntSize.Zero }
 
 /** The app's window in pixels: as drawn where known, else as the system says. */
 @Composable

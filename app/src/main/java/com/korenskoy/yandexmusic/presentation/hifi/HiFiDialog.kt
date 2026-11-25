@@ -1,5 +1,8 @@
 package com.korenskoy.yandexmusic.presentation.hifi
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -94,15 +97,19 @@ fun HiFiAlertDialog(
     dismiss: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
 ) {
-    AppDialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    AppDialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
         Column(
             Modifier
-                .padding(horizontal = 24.dp, vertical = 24.dp)
-                .widthIn(min = 280.dp, max = 560.dp)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .widthIn(min = 240.dp, max = 560.dp)
                 .clip(HiFiDialogDefaults.Shape)
                 .background(HiFiDialogDefaults.Container)
                 .border(1.dp, HiFiDialogDefaults.Rim, HiFiDialogDefaults.Shape)
-                .padding(24.dp)
+                .padding(22.dp)
         ) {
             Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
             if (content != null) {

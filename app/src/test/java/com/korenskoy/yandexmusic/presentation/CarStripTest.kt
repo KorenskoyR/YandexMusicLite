@@ -99,29 +99,46 @@ class CarStripTest {
 
     @Test
     fun theControlsComeFirst() {
-        // A little bigger than the design always, and the interface scale grows them more (where there is room)
-        assertEquals(1.3f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(1f), 0.001f)
-        assertEquals(1.95f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(1.5f), 0.001f)
+        // Default 100% scale keeps v1.14.12 proportions (no unconditional 1.3x boost); higher scales grow within room
+        assertEquals(1.0f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(1f), 0.001f)
+        assertEquals(1.5f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(1.5f), 0.001f)
         assertEquals(com.korenskoy.yandexmusic.presentation.car.CAR_CONTROLS_MAX, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(3f), 0.001f)
         // A scale under 100 % never makes them smaller than the design's
-        assertEquals(1.3f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(0.8f), 0.001f)
-        // Lying, the player's column widens into the cover's, which keeps its least
+        assertEquals(1.0f, com.korenskoy.yandexmusic.presentation.car.carControlsGrow(0.8f), 0.001f)
+        // Lying, the player's column stays 652 at 1.0x, and widens only up to leaving >= 400 for cover + NextRow
         val room = 1192f
-        assertEquals(652f * 1.3f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(room, 1.3f), 0.5f)
-        assertEquals(room - 40f - 280f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(room, 2f), 0.5f)
+        assertEquals(652f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(room, 1.0f), 0.5f)
+        assertEquals(room - 40f - 400f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(room, 2f), 0.5f)
         // Never narrower than designed
         assertEquals(652f, com.korenskoy.yandexmusic.presentation.car.carDriverWidth(800f, 2f), 0.5f)
     }
 
     @Test
     fun aWindowNotMuchWiderThanHighStands() {
-        // Splits of 60 and 70 % on a 1280×720 unit (768 and 896 wide): standing, the controls get the width
+        // Narrow splits (< 1.08) stand: 50/50 on 1280×720 (0.89), Monji 35% (0.93), 768×720 (1.07)
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 640.dp, 720.dp))
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 672.dp, 720.dp))
         assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 768.dp, 720.dp))
-        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 896.dp, 720.dp))
+        // Splits >= 1.15 switch to lying 2-column layout (Issue #31: Changan 60/40, 1920×720 50/50)
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 768.dp, 640.dp))
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 896.dp, 720.dp))
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 960.dp, 720.dp))
         // The whole unit and a 1024×600 lie
         assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 1280.dp, 720.dp))
         assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 1024.dp, 600.dp))
         // A standing window never lies
         assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(false, 2000.dp, 720.dp))
+    }
+
+    @Test
+    fun carLyingShapeHoldsStateWithHysteresis() {
+        // Aspect 1.11 (800×720) sits in the hysteresis band [1.08, 1.15):
+        // stays standing when coming from standing, stays lying when coming from lying
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 800.dp, 720.dp, wasLying = false))
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 800.dp, 720.dp, wasLying = true))
+        // Below 1.08 (768×720 = 1.067) leaves lying cleanly
+        assertFalse(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 768.dp, 720.dp, wasLying = true))
+        // At or above 1.15 (768×640 = 1.20) enters lying cleanly
+        assertTrue(com.korenskoy.yandexmusic.presentation.car.carLyingShape(true, 768.dp, 640.dp, wasLying = false))
     }
 }

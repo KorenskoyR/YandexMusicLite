@@ -488,7 +488,8 @@ internal fun settingsHost(
             onCheckPath = settingsVm::checkStoragePath,
             onUiScaleAutoChange = settingsVm::setUiScaleAuto,
             onUiScaleManualChange = settingsVm::setUiScaleManual,
-            onAnimationModeChange = settingsVm::setAnimationMode
+            onAnimationModeChange = settingsVm::setAnimationMode,
+            onAutoCheckUpdatesChange = settingsVm::setAutoCheckUpdates
         )
     }
     return settings to settingsActions

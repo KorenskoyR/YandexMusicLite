@@ -30,6 +30,11 @@ jobs:
           java-version: '21' # Robolectric screenshot tests for SDK 35 need Java 21
           distribution: 'temurin'
           cache: gradle
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-m2-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-m2-
       - run: chmod +x gradlew
       # verifyRoborazziDebug runs all unit tests and compares the screens with app/src/test/screenshots
       - run: ./gradlew verifyRoborazziDebug lintDebug --no-daemon

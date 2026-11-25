@@ -194,20 +194,21 @@ fun HomeScreen(
                     instrument(minOf(maxWidth, maxHeight))
                 }
             }
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom) {
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Top) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HiFiLargeTitle(title, modifier = Modifier.weight(1f))
                     HiFiLinkBadge()
                 }
                 if (!chipsOverKnob) chips(Modifier.padding(top = 10.dp))
-                Spacer(Modifier.weight(1f))
                 // A low window (a phone on its side, a launcher's strip, a third of a phone): the "next up" cards
                 // give their room up rather than be squeezed into slivers with their titles cut; the track stays
-                WaveTrackAndShelf(
-                    track = { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) },
-                    preferredCard = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.lyingShelfCard(windowSize.heightDp),
-                    shelf = { card -> WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = card) }
-                )
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomStart) {
+                    WaveTrackAndShelf(
+                        track = { WaveTrackInfo(waveTrack, shelf.startsWith, isLiked, onLike, onDislike) },
+                        preferredCard = com.korenskoy.yandexmusic.presentation.hifi.Adaptive.lyingShelfCard(windowSize.heightDp),
+                        shelf = { card -> WaveShelf(shelf, shimmer, onOpenPlayer, onShelfClick, horizontalPadding = 0.dp, cardSize = card) }
+                    )
+                }
             }
         }
     } else {
@@ -283,13 +284,14 @@ private fun WaveTrackAndShelf(track: @Composable () -> Unit, preferredCard: Dp, 
         val loose = Constraints(maxWidth = constraints.maxWidth)
         val trackPlaceable = subcompose(WaveSlot.TRACK_ONLY) { track() }.first().measure(loose)
         val shelfHeight = subcompose(WaveSlot.PROBE) { Box(Modifier.clearAndSetSemantics { }) { shelf(preferredCard) } }.first().measure(loose).height
-        val room = if (constraints.maxHeight == Constraints.Infinity) Int.MAX_VALUE else constraints.maxHeight - trackPlaceable.height
+        val room = if (constraints.maxHeight == Constraints.Infinity) Int.MAX_VALUE else (constraints.maxHeight - trackPlaceable.height).coerceAtLeast(0)
         // The cards give up what is missing (the rest of the shelf, its caption and the titles, keeps its height)
         val card = when {
+            room <= 0 -> 0.dp
             shelfHeight <= room -> preferredCard
             else -> preferredCard - (shelfHeight - room).toDp()
         }
-        val shelfPlaceable = if (card >= WaveMinShelfCard) subcompose(WaveSlot.BOTTOM) { shelf(card) }.first().measure(loose) else null
+        val shelfPlaceable = if (room > 0 && card >= WaveMinShelfCard) subcompose(WaveSlot.BOTTOM) { shelf(card) }.first().measure(loose) else null
         val height = trackPlaceable.height + (shelfPlaceable?.height ?: 0)
         layout(constraints.maxWidth, height.coerceAtMost(constraints.maxHeight)) {
             trackPlaceable.place(0, 0)
@@ -310,6 +312,7 @@ private enum class WaveSlot { TITLE, PROBE, BOTTOM, TRACK_ONLY, INSTRUMENT }
  * not by a screen size: a split screen, never a phone, where the knob always had this much or more.
  */
 private val WaveMinKnob = 84.dp
+private val WaveMinCompactKnob = 48.dp
 private val WaveMinInstrument = WaveMinKnob
 
 private val WaveInstrumentPadding = 8.dp
@@ -323,7 +326,11 @@ internal fun portraitShelfCard(width: Dp): Dp = ((width - 40.dp - 36.dp) / 3.4f)
 private val WaveRingToTrackGap = 18.dp
 
 /** The knob for the space it is given; the ring around it is 1.72 × the knob. */
-private fun waveKnobSize(preferred: Dp, maxRing: Dp): Dp = minOf(preferred, maxRing / 1.72f).coerceAtLeast(WaveMinKnob)
+private fun waveKnobSize(preferred: Dp, maxRing: Dp): Dp {
+    val fit = maxRing / 1.72f
+    val floor = if (maxRing < WaveMinKnob * 1.3f) minOf(WaveMinKnob, fit.coerceAtLeast(WaveMinCompactKnob)) else WaveMinKnob
+    return minOf(preferred, fit).coerceAtLeast(floor)
+}
 
 private fun waveRingSize(preferredKnob: Dp, maxRing: Dp): Dp = waveKnobSize(preferredKnob, maxRing) * 1.72f
 

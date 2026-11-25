@@ -265,8 +265,6 @@ fun CarScreen(
         if (!playlistsOpen) { tuneOpen = false; queueOpen = false; downloadsOpen = false; lyricsOpen = false; stationsOpen = false }
         playlistsOpen = !playlistsOpen
     }
-    // On a flat head unit the panels lying down are as wide as the cover column, never over the next tracks
-    var wideCover by remember { mutableStateOf<Dp?>(null) }
     // A panel over the cover column: the column fades away under it
     val panelOpen = tuneOpen || queueOpen || downloadsOpen || stationsOpen || playlistsOpen
     // The music left the device (the drive was taken out): the choice goes with it
@@ -286,6 +284,7 @@ fun CarScreen(
     val withQueue = underCover == CarUnderCover.QUEUE
     val wideShown = remember { WideShown() }
     val stripShown = remember { StripShown() }
+    val lyingShown = remember { LyingShown() }
     // A station has no queue: the panel never stays open over one
     LaunchedEffect(isRadio) { if (isRadio) queueOpen = false }
     // A station leaves «Станции» open only while the radio plays
@@ -369,7 +368,8 @@ fun CarScreen(
         val usableWidth = maxWidth - bars.calculateLeftPadding(layoutDirection) - bars.calculateRightPadding(layoutDirection)
         // A window not much wider than high (a split of 60 or 70 %) stands: lying, its controls were fitted to the
         // width of the 1280 design and came out at 10 mm (1.15 feedback: «в сплите 40/60, 30/70 прям беда»)
-        val lyingShape = carLyingShape(isLandscape, usableWidth, usableHeight)
+        val lyingShape = carLyingShape(isLandscape, usableWidth, usableHeight, lyingShown.lying)
+        SideEffect { lyingShown.lying = lyingShape }
         // A low wide window lies as one strip: the controls beside the title get the whole height
         val strip = lyingShape && carStripOf(usableWidth, usableHeight, stripShown.strip)
         SideEffect { stripShown.strip = strip }
@@ -380,16 +380,10 @@ fun CarScreen(
         val interfaceScale = currentInterfaceScale()
         val u = Scale(if (strip) carStripScaleOf(usableWidth, usableHeight) else carScaleOf(usableWidth, usableHeight, lyingShape, interfaceScale))
         val controlsGrow = carControlsGrow(interfaceScale)
-        // Lying, a panel opens under the header, as tall as its round buttons have grown
-        val panelTop = 40f + 56f * controlsGrow.coerceIn(1f, HEADER_MAX_GROW)
+        val headerGrow = carHeaderGrow(controlsGrow, usableHeight, u.factor)
         // Standing on a screen too short for the design even at the smallest scale (a small phone): the cover and
         // the panels give up the missing height, the controls and the sources keep their size
         val standingShort = if (lyingShape) 0f else carStandingShortfall(usableHeight, u.factor)
-        // A panel lying down covers the cover column only: never wider than the driver's panel leaves (u(652)
-        // with u(48) + u(40) + u(40) around it), and on a flat head unit as wide as the cover column itself
-        val lyingPanelWidth: (Dp) -> Dp = { width ->
-            (wideCover ?: androidx.compose.ui.unit.min(u(500f), width - u(780f))).coerceAtLeast(u(400f))
-        }
         val farFocus = if (lyingShape) Offset(if (steeringWheelOnLeft) 0.78f else 0.22f, 0.45f) else Offset(0.5f, 0.25f)
         HiFiBackdrop(tint = tint, coverUrl = coverUrl, glowCenter = farFocus, bottomFade = !lyingShape)
         if (lyingShape) {
@@ -532,7 +526,7 @@ fun CarScreen(
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
             CarHeader(
                 u, onExit, showClock, pills = if (lyingShape) ({ wavePills(Modifier) }) else null,
-                onOpenSettings = onOpenSettings, onVoiceSearch = onVoiceSearch, grow = controlsGrow,
+                onOpenSettings = onOpenSettings, onVoiceSearch = onVoiceSearch, grow = headerGrow,
                 showCaption = lyingShape || (onOpenSettings == null && onVoiceSearch == null)
             )
             if (!lyingShape) {
@@ -550,9 +544,12 @@ fun CarScreen(
                 val roomHeight = maxHeight.value / u.factor
                 // The layout is chosen for a room that held for a moment. Another app coming over and going, a bar
                 // showing for an instant, left a room just too small for an instant: the screen switched to two
-                // columns and stayed so (1.14.10, a head unit with a panel on the left)
+                // columns and stayed so (1.14.10, a head unit with a panel on the left). Manual layout toggles settle
+                // immediately without waiting for resize hysteresis.
                 LaunchedEffect(roomWidth, roomHeight, layout) {
-                    if (wideShown.wide != null) delay(CarWide.SETTLE_MS)
+                    val layoutChanged = wideShown.lastLayout != null && wideShown.lastLayout != layout
+                    if (wideShown.wide != null && !layoutChanged) delay(CarWide.SETTLE_MS)
+                    wideShown.lastLayout = layout
                     wideShown.wide = CarWide.layout(roomWidth, roomHeight, layout, wideShown.wide) != null
                 }
                 val wide = when (wideShown.wide) {
@@ -561,8 +558,7 @@ fun CarScreen(
                     true -> CarWide.layout(roomWidth, roomHeight, layout, true) ?: CarWide.layout(roomWidth, roomHeight, CarLayout.THREE)
                     false -> null
                 }
-                val coverColumn = wide?.let { u(it.cover) }
-                SideEffect { wideCover = coverColumn }
+                val lyingPanelWidth = (wide?.let { u(it.cover) } ?: androidx.compose.ui.unit.min(u(500f), maxWidth - u(DRIVER_COLUMN + LYING_GAP))).coerceAtLeast(u(400f))
                 if (wide != null) {
                     // A flat head unit: the player, the next tracks with the sources, the cover as tall as the row
                     val big = Scale(u.factor * wide.driverScale)
@@ -680,6 +676,19 @@ fun CarScreen(
                     }
                     if (steeringWheelOnLeft) { driver(); far() } else { far(); driver() }
                 }
+                val lyingPanelModifier = Modifier
+                    .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                    .padding(top = u(8f))
+                    .width(lyingPanelWidth)
+                when {
+                    tuneOpen && lying -> tunePanel(lyingPanelModifier, lyingPanelWidth >= u(460f))
+                    queueOpen && lying -> queuePanel(lyingPanelModifier.fillMaxHeight())
+                    downloadsOpen && lying -> downloadsPanel(lyingPanelModifier.fillMaxHeight())
+                    playlists != null && playlistsOpen && lying && currentTrack != null ->
+                        CarPlaylistsPanel(u, playlists, currentTrack, lyingPanelModifier.fillMaxHeight(), onClose = { playlistsOpen = false })
+                    stationsOpen && lying && radio != null ->
+                        CarStationsPanel(u, radio, lyingPanelModifier.fillMaxHeight(), onClose = { stationsOpen = false })
+                }
             } else {
                 Column(
                     Modifier.fillMaxSize().padding(horizontal = u(28f)).padding(bottom = u(24f)),
@@ -744,70 +753,13 @@ fun CarScreen(
                         beforeDock = when {
                             isRadio && radio != null && !stationsOpen -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { StationsPill(u, radio.favourites.size, onClick = openStations) } } }
                             isRadio || tuneOpen || downloadsOpen || playlistsOpen -> null
-                            // A narrow window (a split beside a navigator): the queue's button instead of the four small
-                            // covers, and their height goes to the controls
-                            withQueue || usableWidth.value / u.factor < NARROW_STANDING -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { QueuePill(u, queueCount, onClick = openQueue) } } }
+                            // A narrow split or very compact standing screen hides the four thumbnails so controls keep their room;
+                            // standard portrait phones still show NextRow when the user chose it.
+                            withQueue || usableWidth < 340.dp || standingShort > 120f -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { QueuePill(u, queueCount, onClick = openQueue) } } }
                             else -> { { NextRow(u, nextCaption, upcoming, upcomingLoading, maxCard = u(124f), gap = u(16f), onClick = onUpcomingClick, onCaptionClick = openQueue) } }
                         }
                     )
                 }
-            }
-        }
-        // "Очередь" lying down: over the cover column too, the whole height of it
-        if (queueOpen && lying) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val panelWidth = lyingPanelWidth(maxWidth)
-                queuePanel(
-                    Modifier
-                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
-                        .padding(top = u(panelTop), start = u(48f), end = u(40f), bottom = u(28f))
-                        .width(panelWidth)
-                        .fillMaxHeight()
-                )
-            }
-        }
-        // "Скачанные" lying down: over the cover column too, the whole height of it
-        if (downloadsOpen && lying) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val panelWidth = lyingPanelWidth(maxWidth)
-                downloadsPanel(
-                    Modifier
-                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
-                        .padding(top = u(panelTop), start = u(48f), end = u(40f), bottom = u(28f))
-                        .width(panelWidth)
-                        .fillMaxHeight()
-                )
-            }
-        }
-        // «В плейлист» lying down: over the cover column, the whole height of it
-        val lyingPlaylists = playlists?.takeIf { playlistsOpen && lying }
-        if (lyingPlaylists != null && currentTrack != null) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val panelWidth = lyingPanelWidth(maxWidth)
-                CarPlaylistsPanel(
-                    u, lyingPlaylists, currentTrack,
-                    Modifier
-                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
-                        .padding(top = u(panelTop), start = u(48f), end = u(40f), bottom = u(28f))
-                        .width(panelWidth)
-                        .fillMaxHeight(),
-                    onClose = { playlistsOpen = false }
-                )
-            }
-        }
-        // «Станции» lying down: over the cover column, the whole height of it
-        if (stationsOpen && lying && radio != null) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-                val panelWidth = lyingPanelWidth(maxWidth)
-                CarStationsPanel(
-                    u, radio,
-                    Modifier
-                        .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
-                        .padding(top = u(panelTop), start = u(48f), end = u(40f), bottom = u(28f))
-                        .width(panelWidth)
-                        .fillMaxHeight(),
-                    onClose = { stationsOpen = false }
-                )
             }
         }
         // The strip: a panel over the title and the cover, the controls beside it stay free
@@ -826,22 +778,6 @@ fun CarScreen(
                     playlistsOpen && playlists != null && currentTrack != null ->
                         CarPlaylistsPanel(u, playlists, currentTrack, panelModifier, onClose = { playlistsOpen = false })
                 }
-            }
-        }
-        // "Настроить волну" lying down: over the cover column, so the controls and the sources stay free
-        if (tuneOpen && lying) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
-            // Over the cover column only: never wider than what the driver's panel leaves (it is u(652) wide
-            // with u(48) + u(40) + u(40) around it), so the controls and the sources stay uncovered
-            val panelWidth = lyingPanelWidth(maxWidth)
-            tunePanel(
-                Modifier
-                    .align(if (steeringWheelOnLeft) Alignment.TopEnd else Alignment.TopStart)
-                    .padding(top = u(panelTop), start = u(48f), end = u(40f), bottom = u(24f))
-                    .width(panelWidth),
-                // One-line strips need the full width; a narrower panel wraps the choices as chips
-                panelWidth >= u(460f)
-            )
             }
         }
         }
@@ -870,6 +806,7 @@ private fun Modifier.hiddenUnder(panel: Boolean): Modifier =
 /** Whether three columns are on screen (null before the first choice): changed only for a room that held. */
 private class WideShown {
     var wide by mutableStateOf<Boolean?>(null)
+    var lastLayout by mutableStateOf<CarLayout?>(null)
 }
 
 /**
@@ -894,11 +831,8 @@ internal fun carStandingGaugeExtra(widthUnits: Float, grow: Float): Float {
 
 internal const val DRIVER_COLUMN = 652f
 private const val LYING_GAP = 40f
-private const val LYING_MIN_FAR = 280f
+private const val LYING_MIN_FAR = 400f
 private const val STANDING_SIDE = 28f
-
-/** Narrower than this (in the design's units) a standing window is a split beside a navigator: the controls first. */
-private const val NARROW_STANDING = 640f
 
 /** The five standing at their least gaps (60 + 80 + 196 + 80 + 60 + 4 × 12), the three (80 + 196 + 80 + 2 × 12), their row's height, and the second row (like and dislike) with its gap. */
 private const val STANDING_GAUGE_WIDTH = 524f
@@ -906,12 +840,37 @@ private const val STANDING_THREE_WIDTH = 380f
 private const val STANDING_SECOND_ROW = 72f
 internal const val STANDING_GAUGE_HEIGHT = 200f
 
-/** Lying in «В авто»: a lying window at least [CAR_LYING_MIN_ASPECT] times as wide as high. Pure; unit-tested. */
-internal fun carLyingShape(windowLying: Boolean, usableWidth: Dp, usableHeight: Dp): Boolean =
-    windowLying && usableHeight > 0.dp && usableWidth / usableHeight >= CAR_LYING_MIN_ASPECT
+/**
+ * Lying in «В авто»: a lying window at least [CAR_LYING_MIN_ASPECT] times as wide as high, holding the lying
+ * layout down to [CAR_LYING_LEAVE_ASPECT] so dragging a split divider near the edge does not flicker. Pure; unit-tested.
+ */
+internal fun carLyingShape(
+    windowLying: Boolean,
+    usableWidth: Dp,
+    usableHeight: Dp,
+    wasLying: Boolean = false
+): Boolean {
+    if (!windowLying || usableHeight <= 0.dp) return false
+    val threshold = if (wasLying) CAR_LYING_LEAVE_ASPECT else CAR_LYING_MIN_ASPECT
+    return usableWidth / usableHeight >= threshold
+}
 
-/** Squarer than this, «В авто» stands even in a lying window: its controls get the width. */
-internal const val CAR_LYING_MIN_ASPECT = 1.4f
+/** Enter lying 2-column mode from 1.15:1 (60/40 Changan, 50/50 1920×720); leave below 1.08:1. */
+internal const val CAR_LYING_MIN_ASPECT = 1.15f
+internal const val CAR_LYING_LEAVE_ASPECT = 1.08f
+
+/** Caps header button growth so the header row never clips or overwhelms a compact split window. */
+internal fun carHeaderGrow(controlsGrow: Float, usableHeight: Dp, factor: Float): Float {
+    val clamped = controlsGrow.coerceIn(1f, HEADER_MAX_GROW)
+    if (factor <= 0f || usableHeight <= 0.dp) return clamped
+    val maxUnits = usableHeight.value * CAR_HEADER_MAX_HEIGHT_SHARE / factor
+    val byHeight = ((maxUnits - CAR_HEADER_VERTICAL_PADDING) / CAR_HEADER_BUTTON_SIZE).coerceIn(1f, HEADER_MAX_GROW)
+    return minOf(clamped, byHeight)
+}
+
+private const val CAR_HEADER_MAX_HEIGHT_SHARE = 0.24f
+private const val CAR_HEADER_VERTICAL_PADDING = 32f
+private const val CAR_HEADER_BUTTON_SIZE = 56f
 
 /**
  * The scale of the 1280×720 (lying) or 600×1200 (standing) design on this screen: by what the system bars leave on
@@ -1396,7 +1355,7 @@ private const val GAUGE_MIN_GAP = 12f
 internal fun carControlsGrow(interfaceScale: Float): Float =
     (CAR_CONTROLS_BOOST * interfaceScale.coerceAtLeast(1f)).coerceIn(1f, CAR_CONTROLS_MAX)
 
-internal const val CAR_CONTROLS_BOOST = 1.3f
+internal const val CAR_CONTROLS_BOOST = 1.0f
 internal const val CAR_CONTROLS_MAX = 2.4f
 
 /**
@@ -1561,6 +1520,11 @@ internal fun carStripScaleOf(usableWidth: Dp, usableHeight: Dp): Float =
 /** Whether the strip is on screen: the choice is held near the edge. */
 private class StripShown {
     var strip = false
+}
+
+/** Whether the lying 2-column layout is on screen: held near the 1.15/1.08 aspect boundary. */
+private class LyingShown {
+    var lying = false
 }
 
 @Composable

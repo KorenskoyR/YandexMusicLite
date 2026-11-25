@@ -20,7 +20,11 @@ data class DisplayScaleInfo(
     /** The app's own window: the screen's whole, half of it beside a navigator, a launcher's strip, a free window. */
     val windowWidthPx: Int = widthPx,
     val windowHeightPx: Int = heightPx
-)
+) {
+    /** True when the app occupies a sub-window (split screen, launcher widget, freeform) smaller than 85% of the screen. */
+    val isSubWindow: Boolean
+        get() = DisplayScale.isSubWindow(widthPx, heightPx, windowWidthPx, windowHeightPx)
+}
 
 /** Why "Авто" chose its scale: said in the settings beside it. */
 enum class AutoScaleReason {
@@ -55,10 +59,18 @@ object DisplayScale {
     fun analyze(metrics: DisplayMetrics, windowWidthPx: Int, windowHeightPx: Int): DisplayScaleInfo =
         inWindow(analyze(metrics), windowWidthPx, windowHeightPx)
 
+    /** True when the window is noticeably smaller than the physical screen (split screen, launcher card, freeform). */
+    internal fun isSubWindow(screenWidthPx: Int, screenHeightPx: Int, windowWidthPx: Int, windowHeightPx: Int): Boolean {
+        if (screenWidthPx <= 0 || screenHeightPx <= 0) return false
+        if (windowWidthPx <= 0 || windowHeightPx <= 0) return false
+        return windowWidthPx < screenWidthPx * SUB_WINDOW_RATIO || windowHeightPx < screenHeightPx * SUB_WINDOW_RATIO
+    }
+
     /** [info] for the app in a window of this size: "Авто" no larger than the window holds. Pure; unit-tested. */
     fun inWindow(info: DisplayScaleInfo, windowWidthPx: Int, windowHeightPx: Int): DisplayScaleInfo {
         if (windowWidthPx <= 0 || windowHeightPx <= 0) return info
-        val limit = largestFitting(windowWidthPx, windowHeightPx, info.reportedDpi)
+        val subWindow = isSubWindow(info.widthPx, info.heightPx, windowWidthPx, windowHeightPx)
+        val limit = largestFitting(windowWidthPx, windowHeightPx, info.reportedDpi, subWindow = subWindow)
         val auto = if (info.autoScale > limit) limit else info.autoScale
         val reason = if (auto < info.autoScale) AutoScaleReason.LIMITED else info.reason
         return info.copy(autoScale = auto, reason = reason, windowWidthPx = windowWidthPx, windowHeightPx = windowHeightPx)
@@ -94,21 +106,27 @@ object DisplayScale {
      * ([MIN_SHORT_SIDE_PORTRAIT_DP] standing): the car screen, the settings and the windows fit whole. Never
      * below 100% by this rule. Rounded down to 5%.
      */
-    internal fun largestFitting(widthPx: Int, heightPx: Int, reportedDpi: Int): Float {
+    internal fun largestFitting(widthPx: Int, heightPx: Int, reportedDpi: Int, subWindow: Boolean = false): Float {
         val density = reportedDpi / BASE_DPI
-        val minShort = if (widthPx >= heightPx) MIN_SHORT_SIDE_LANDSCAPE_DP else MIN_SHORT_SIDE_PORTRAIT_DP
+        val minShort = when {
+            subWindow -> MIN_SHORT_SIDE_WINDOW_DP
+            widthPx >= heightPx -> MIN_SHORT_SIDE_LANDSCAPE_DP
+            else -> MIN_SHORT_SIDE_PORTRAIT_DP
+        }
         val fit = minOf(widthPx, heightPx) / (density * minShort)
         return (floor(fit * 20f) / 20f).coerceAtLeast(SettingsRepository.DEFAULT_UI_SCALE)
     }
 
     private const val BASE_DPI = 160f
 
-    /** The short side of the smallest phone the pages are made for. */
-    private const val MIN_SHORT_SIDE_ANY_DP = 320f
+    /** The short side of the smallest window the pages are made for when scaled manually. */
+    private const val MIN_SHORT_SIDE_ANY_DP = 290f
     private const val LARGE_SCREEN_MAX_DPI = 240
     private const val MIN_LARGE_DIAGONAL_IN = 7f
     private const val MIN_SHORT_SIDE_LANDSCAPE_DP = 480f
     private const val MIN_SHORT_SIDE_PORTRAIT_DP = 360f
+    private const val MIN_SHORT_SIDE_WINDOW_DP = 360f
+    private const val SUB_WINDOW_RATIO = 0.85f
 
     /** Average of the panel's physical x/y dpi, or 0 when the device does not report a usable value. */
     private fun physicalDpi(metrics: DisplayMetrics): Int {

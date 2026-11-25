@@ -2,9 +2,11 @@ package com.korenskoy.yandexmusic.presentation.main.components
 
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.ui.res.stringResource
 import com.korenskoy.yandexmusic.R
 import androidx.compose.animation.animateColorAsState
@@ -151,7 +153,7 @@ fun FloatingGlassDock(
  */
 @Composable
 fun DockScrim(modifier: Modifier = Modifier) {
-    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val navigationBar = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
     Box(
         modifier
             .fillMaxWidth()

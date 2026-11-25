@@ -26,13 +26,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,9 +87,12 @@ fun UpdateDialog(
     val installing = installState == InstallState.Started || installState == InstallState.Confirming
     AppDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        BoxWithConstraints {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
+            contentAlignment = Alignment.Center
+        ) {
         // The window never hides its buttons: the header stays on top, the buttons at the bottom, and what lies
         // between (the description, the size, the warnings) gives up its height and scrolls. Only on a screen too
         // short even for the header and the buttons does the whole window scroll.
@@ -166,7 +173,7 @@ fun UpdateDialog(
                     // Close button
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.08f))
                             .clickable { onDismiss() },

@@ -240,7 +240,7 @@ fun TrackContextMenu(
             }
 
             if (picking) {
-                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+                LazyColumn(modifier = Modifier.heightIn(max = (window.heightDp * 0.55f).dp.coerceIn(140.dp, 420.dp))) {
                     item(key = "new") {
                         ContextMenuItem(icon = Icons.Default.Add, text = stringResource(R.string.playlist_new)) { naming = true }
                     }
@@ -334,10 +334,11 @@ fun TrackContextMenu(
                         .background(Color.Black.copy(alpha = 0.35f))
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
                 )
+                val panelMax = if (window.widthDp < 480) (window.widthDp * 0.72f).dp else SIDE_PANEL_MAX
                 Box(
                     Modifier
                         .align(Alignment.CenterEnd)
-                        .width(sidePanelWidth(window.widthDp.dp).coerceAtMost(SIDE_PANEL_MAX))
+                        .width(sidePanelWidth(window.widthDp.dp).coerceAtMost(panelMax))
                         .fillMaxHeight()
                         // Clear of every system bar on any side and of a camera cutout
                         .windowInsetsPadding(WindowInsets.safeDrawing)
@@ -356,7 +357,11 @@ fun TrackContextMenu(
             containerColor = HiFiDialogDefaults.Container,
             properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
         ) {
-            AppScale(appDensity) { menuBody() }
+            AppScale(appDensity) {
+                Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+                    menuBody()
+                }
+            }
         }
     }
 }

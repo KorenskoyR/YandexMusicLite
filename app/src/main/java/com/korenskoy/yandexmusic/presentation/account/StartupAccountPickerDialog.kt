@@ -11,8 +11,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -46,23 +48,28 @@ fun StartupAccountPickerDialog(
     }
     var rememberAsDefault by remember { mutableStateOf(false) }
 
+    val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+
     AppDialog(
         onDismissRequest = {}, // Modal startup dialog cannot be dismissed without selecting
         properties = DialogProperties(
             dismissOnBackPress = false,
             dismissOnClickOutside = false,
-            usePlatformDefaultWidth = false
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
         )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.82f)),
+                .background(Color.Black.copy(alpha = 0.82f))
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(12.dp),
             contentAlignment = Alignment.Center
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
+                    .fillMaxWidth()
                     .widthIn(max = 440.dp)
                     .wrapContentHeight()
                     .clip(RoundedCornerShape(28.dp))
@@ -81,7 +88,8 @@ fun StartupAccountPickerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(22.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp)
                 ) {
                     // Header Row
                     Row(
@@ -139,7 +147,7 @@ fun StartupAccountPickerDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 240.dp)
+                            .heightIn(max = if (window.heightDp < 520) 140.dp else 220.dp)
                     ) {
                         items(accounts, key = { it.uid }) { account ->
                             val isSelected = account.uid == selectedUid
@@ -298,10 +306,11 @@ fun StartupAccountPickerDialog(
                         // Add account button
                         Row(
                             modifier = Modifier
+                                .heightIn(min = 44.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White.copy(alpha = 0.08f))
                                 .clickable { onAddNewAccount() }
-                                .padding(horizontal = 12.dp, vertical = 11.dp),
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(

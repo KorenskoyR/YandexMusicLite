@@ -216,4 +216,8 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCardRoot(path: String?) {
         context.dataStore.edit { if (path == null) it.remove(CARD_ROOT_KEY) else it[CARD_ROOT_KEY] = path }
     }
+
+    private val autoCheckUpdatesPref = bool("auto_check_updates", SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES)
+    override val autoCheckUpdates = autoCheckUpdatesPref.first
+    override suspend fun setAutoCheckUpdates(enabled: Boolean) = autoCheckUpdatesPref.second(enabled)
 }

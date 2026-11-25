@@ -79,7 +79,12 @@ class SettingsViewModel @Inject constructor(
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
     private val equalizerFound = MutableStateFlow<SystemEqualizer.Target?>(null)
     private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE, val mini: MiniOnWave = MiniOnWave.LANDSCAPE, val carLayout: CarLayout = CarLayout.AUTO)
-    private data class Scale(val auto: Boolean, val manual: Float, val animations: AnimationMode)
+    private data class Scale(
+        val auto: Boolean,
+        val manual: Float,
+        val animations: AnimationMode,
+        val autoCheckUpdates: Boolean = SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES
+    )
     private data class Library(
         val reserveMb: Int,
         val reserveUsed: Long,
@@ -107,7 +112,13 @@ class SettingsViewModel @Inject constructor(
         settings.carLayout
     ) { look, under, mini, carLayout -> look.copy(under = under, mini = mini, carLayout = carLayout) }
 
-    private val scale: Flow<Scale> = combine(settings.uiScaleAuto, settings.uiScaleManual, settings.animationMode, ::Scale)
+    private val scale: Flow<Scale> = combine(
+        settings.uiScaleAuto,
+        settings.uiScaleManual,
+        settings.animationMode,
+        settings.autoCheckUpdates,
+        ::Scale
+    )
 
     private val library: Flow<Library> = combine(
         combine(settings.roadReserveMb, roadReserve.usedBytes, settings.autoDownloadLikedTracks, downloadManager.cacheSizeBytes) { mb, used, auto, cache ->
@@ -148,7 +159,8 @@ class SettingsViewModel @Inject constructor(
             carLayout = l.carLayout,
             uiScaleAuto = sc.auto,
             uiScaleManual = sc.manual,
-            animationMode = sc.animations
+            animationMode = sc.animations,
+            autoCheckUpdates = sc.autoCheckUpdates
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -287,4 +299,5 @@ class SettingsViewModel @Inject constructor(
     fun setUiScaleAuto(enabled: Boolean) = save { setUiScaleAuto(enabled) }
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }
+    fun setAutoCheckUpdates(enabled: Boolean) = save { setAutoCheckUpdates(enabled) }
 }

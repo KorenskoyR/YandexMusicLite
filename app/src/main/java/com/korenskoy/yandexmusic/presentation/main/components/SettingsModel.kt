@@ -76,7 +76,8 @@ data class SettingsUiState(
     val carLayout: CarLayout = CarLayout.AUTO,
     val uiScaleAuto: Boolean = true,
     val uiScaleManual: Float = 1f,
-    val animationMode: AnimationMode = AnimationMode.AUTO
+    val animationMode: AnimationMode = AnimationMode.AUTO,
+    val autoCheckUpdates: Boolean = com.korenskoy.yandexmusic.domain.repository.SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES
 )
 
 /** What the settings can do. Every action has a harmless default, so previews and tests pass only what they need. */
@@ -125,5 +126,6 @@ data class SettingsActions(
     val onCheckPath: (String) -> Unit = {},
     val onUiScaleAutoChange: (Boolean) -> Unit = {},
     val onUiScaleManualChange: (Float) -> Unit = {},
-    val onAnimationModeChange: (AnimationMode) -> Unit = {}
+    val onAnimationModeChange: (AnimationMode) -> Unit = {},
+    val onAutoCheckUpdatesChange: (Boolean) -> Unit = {}
 )

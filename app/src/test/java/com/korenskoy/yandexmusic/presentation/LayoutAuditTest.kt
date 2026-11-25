@@ -198,7 +198,8 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         stationsOpen: Boolean = false,
         playlistsOpen: Boolean = false,
         layout: CarLayout = CarLayout.AUTO,
-        wheelOnLeft: Boolean = true
+        wheelOnLeft: Boolean = true,
+        underCover: com.korenskoy.yandexmusic.domain.model.CarUnderCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE
     ) = show {
         val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
         val radio = CarRadio(stations, setOf(stations[0].id, stations[3].id, stations[9].id, stations[14].id), onAir = stations[0].id, onPlay = {}, onToggleFavourite = {})
@@ -215,7 +216,7 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             shuffled = shuffled, onOpenSettings = {}, onVoiceSearch = {}, waveTuning = WaveTuning(),
             radio = radio, initialStationsOpen = stationsOpen, isLiked = onRadio,
             playlists = carPlaylists(tracks[1].idString), initialPlaylistsOpen = playlistsOpen, layout = layout,
-            steeringWheelOnLeft = wheelOnLeft
+            steeringWheelOnLeft = wheelOnLeft, underCover = underCover
         )
     }
 
@@ -331,6 +332,153 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "car_stations_right" -> car(source = PlaylistSource.RADIO, onRadio = true, stationsOpen = true, wheelOnLeft = false)
             "car_playlists_right" -> car(playlistsOpen = true, wheelOnLeft = false)
             "car_three_right" -> car(layout = CarLayout.THREE, wheelOnLeft = false)
+            "car_next" -> car(underCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.NEXT)
+            "car_next_right" -> car(wheelOnLeft = false, underCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.NEXT)
+            "account_management" -> show {
+                val accs = listOf(
+                    com.korenskoy.yandexmusic.domain.model.UserAccount("1", "ivan.petrov", "Иван Петров", "tok1", hasPlus = true),
+                    com.korenskoy.yandexmusic.domain.model.UserAccount("2", "guest", "Гостевой", "tok2", hasPlus = false)
+                )
+                com.korenskoy.yandexmusic.presentation.account.AccountManagementDialog(
+                    accounts = accs, activeAccount = accs[0], defaultAccountUid = accs[0].uid,
+                    onSwitchAccount = {}, onRemoveAccount = {}, onAddNewAccount = {},
+                    onLogoutCurrent = {}, onLogoutAll = {}, onDismiss = {}
+                )
+            }
+            "startup_account_picker" -> show {
+                val accs = listOf(
+                    com.korenskoy.yandexmusic.domain.model.UserAccount("1", "ivan.petrov", "Иван Петров", "tok1", hasPlus = true),
+                    com.korenskoy.yandexmusic.domain.model.UserAccount("2", "guest", "Гостевой", "tok2", hasPlus = false)
+                )
+                com.korenskoy.yandexmusic.presentation.account.StartupAccountPickerDialog(
+                    accounts = accs, activeAccount = accs[0], onSelectAccount = { _, _ -> }, onAddNewAccount = {}
+                )
+            }
+            "quality_details" -> show {
+                com.korenskoy.yandexmusic.presentation.player.QualityDetailsDialog(
+                    details = com.korenskoy.yandexmusic.data.player.PlaybackController.QualityDetails(
+                        playing = "FLAC · 44.1 кГц · 16 бит",
+                        offered = "flac-mp4, aac-mp4, mp3",
+                        hasPlus = true
+                    ),
+                    onDismiss = {}
+                )
+            }
+            "crash_log" -> show {
+                val reports = listOf(
+                    com.korenskoy.yandexmusic.data.crash.CrashLog.Report(
+                        file = java.io.File("crash_1.txt"),
+                        time = java.util.Date(FIXED_TIME),
+                        summary = "IllegalStateException: Player released unexpectedly during reconnect"
+                    )
+                )
+                com.korenskoy.yandexmusic.presentation.crash.CrashLogDialog(
+                    reports = reports, onSend = {}, onClear = {}, onDismiss = {}
+                )
+            }
+            "playlist_name_dialog" -> show {
+                com.korenskoy.yandexmusic.presentation.main.components.PlaylistNameDialog(
+                    title = "Новый плейлист",
+                    confirmLabel = "Создать",
+                    initialName = "В дорогу 2026",
+                    onConfirm = {},
+                    onDismiss = {}
+                )
+            }
+            "voice_listening" -> show {
+                com.korenskoy.yandexmusic.presentation.voice.VoiceListeningWindow(
+                    state = com.korenskoy.yandexmusic.presentation.voice.Listening.Missed,
+                    onRetry = {},
+                    onOpenSettings = {},
+                    onClose = {}
+                )
+            }
+            "queue_sheet" -> show {
+                com.korenskoy.yandexmusic.presentation.player.QueueSheet(
+                    visible = true,
+                    split = com.korenskoy.yandexmusic.presentation.player.QueueSplit(tracks[0], tracks.drop(1)),
+                    isPlaying = true,
+                    sourceLabel = "Моя волна",
+                    isFetchingMore = false,
+                    fullHeight = false,
+                    onDismiss = {},
+                    onTrackSelect = {},
+                    onRemove = {},
+                    onMove = { _, _ -> },
+                    onLoadMore = {}
+                )
+            }
+            "playlist_screen" -> show {
+                com.korenskoy.yandexmusic.presentation.main.PlaylistScreen(
+                    opened = com.korenskoy.yandexmusic.presentation.main.OpenedPlaylist(
+                        playlist = playlists[0], tracks = tracks, isLoading = false
+                    ),
+                    currentTrackId = "1",
+                    isPlaying = true,
+                    likedTrackIds = setOf("1"),
+                    downloadedTrackIds = emptySet(),
+                    contentBottom = 84.dp,
+                    onBack = {},
+                    onPlay = {},
+                    onTrackClick = {},
+                    onToggleLike = {},
+                    onRetry = {},
+                    onRename = {},
+                    onDelete = {}
+                )
+            }
+            "catalog_album" -> show {
+                val album = com.korenskoy.yandexmusic.data.dto.AlbumDto(
+                    id = JsonPrimitive(100),
+                    title = "Нечего терять",
+                    year = 1991,
+                    trackCount = tracks.size,
+                    artists = listOf(ArtistDto(id = JsonPrimitive(10), name = "Янка Дягилева")),
+                    volumes = listOf(tracks)
+                )
+                com.korenskoy.yandexmusic.presentation.catalog.CatalogPageScreen(
+                    state = com.korenskoy.yandexmusic.presentation.catalog.CatalogPageState(
+                        page = com.korenskoy.yandexmusic.presentation.catalog.CatalogPage.Album("100", "Нечего терять"),
+                        album = album,
+                        isLoading = false
+                    ),
+                    currentTrackId = "1",
+                    isPlaying = true,
+                    likedTrackIds = setOf("1"),
+                    contentBottom = 84.dp,
+                    actions = com.korenskoy.yandexmusic.presentation.catalog.CatalogActions(
+                        onBack = {}, onRetry = {}, onOpenArtist = { _, _ -> }, onOpenAlbum = { _, _ -> },
+                        onPlay = { _, _, _ -> }, onToggleLike = {}
+                    )
+                )
+            }
+            "local_music" -> show {
+                val localTracks = tracks.mapIndexed { idx, t ->
+                    com.korenskoy.yandexmusic.data.local.LocalTrack(
+                        id = "local_m$idx",
+                        uri = "content://media/external/audio/media/$idx",
+                        title = t.title.orEmpty(),
+                        artist = t.artists.firstOrNull()?.name,
+                        album = "На устройстве",
+                        durationMs = 195_000L,
+                        source = if (idx % 2 == 0) com.korenskoy.yandexmusic.data.local.LocalSource.PHONE else com.korenskoy.yandexmusic.data.local.LocalSource.FLASH,
+                        folder = "Music",
+                        addedAt = 1_700_000_000L
+                    )
+                }
+                com.korenskoy.yandexmusic.presentation.local.LocalMusicPage(
+                    ui = com.korenskoy.yandexmusic.presentation.local.LocalMusicUi(
+                        library = com.korenskoy.yandexmusic.data.local.LocalMusicRepository.Library(
+                            tracks = localTracks, hasAccess = true, scanned = true
+                        ),
+                        toTrack = { lt -> track(lt.id, lt.title, lt.artist.orEmpty()) }
+                    ),
+                    currentTrackId = "local_m0",
+                    isPlaying = true,
+                    contentBottom = 84.dp,
+                    onBack = {}
+                )
+            }
             "player_right" -> player(lyricsOpen = false, wheelOnLeft = false)
             "player_lyrics_right" -> player(lyricsOpen = true, wheelOnLeft = false)
             "auth_strip" -> show {
@@ -407,7 +555,11 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "settings_interface", "settings_playback", "library", "search", "radio",
             "car", "car_tune", "car_queue", "car_lyrics", "car_liked", "car_radio", "car_stations",
             "car_playlists", "car_three", "car_right", "car_tune_right", "car_queue_right", "car_lyrics_right",
-            "car_liked_right", "car_radio_right", "car_stations_right", "car_playlists_right", "car_three_right", "player_right", "player_lyrics_right", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
+            "car_liked_right", "car_radio_right", "car_stations_right", "car_playlists_right", "car_three_right",
+            "car_next", "car_next_right", "account_management", "startup_account_picker", "quality_details",
+            "crash_log", "playlist_name_dialog", "voice_listening", "queue_sheet", "playlist_screen",
+            "catalog_album", "local_music",
+            "player_right", "player_lyrics_right", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
             "settings_about", "settings_support", "no_plus", "update_failed", "equalizer"
         )
 
@@ -495,7 +647,24 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "w1152dp-h720dp-land-mdpi" to 1f,
             "w1280dp-h288dp-land-mdpi" to 1f,
             "w1024dp-h240dp-land-mdpi" to 1f,
-            "w1100dp-h700dp-land-xhdpi" to 1f
+            "w1100dp-h700dp-land-xhdpi" to 1f,
+            // 1.16.1 matrix expansion (devices_and_dpi.json + Issue #31/#36 reproductions):
+            "w444dp-h800dp-port-hdpi" to 1f,
+            "w667dp-h400dp-land-hdpi" to 1f,
+            "w672dp-h720dp-port-mdpi" to 1f,
+            "w1248dp-h720dp-land-mdpi" to 1f,
+            "w320dp-h240dp-land-mdpi" to 1f,
+            "w420dp-h300dp-land-hdpi" to 1f,
+            "w1600dp-h600dp-land-hdpi" to 1f,
+            "w1440dp-h810dp-land-xhdpi" to 1f,
+            "w1080dp-h1920dp-port-mdpi" to 1f,
+            "w756dp-h813dp-port-xxxhdpi" to 1f,
+            "w360dp-h374dp-port-xhdpi" to 1f,
+            "w853dp-h533dp-land-xxhdpi" to 1f,
+            "w640dp-h400dp-land-xhdpi" to 1f,
+            "w340dp-h520dp-port-xxhdpi" to 1f,
+            "w768dp-h640dp-land-mdpi" to 1f,
+            "w900dp-h460dp-land-mdpi" to 1.35f
         )
 
         @JvmStatic

@@ -73,4 +73,26 @@ class DisplayScaleTest {
         // Rare opposite case: system density too high, UI too big → scale below 1.0.
         assertEquals(0.75f, DisplayScale.autoScale(reportedDpi = 320, physicalDpi = 240), 0.001f)
     }
+
+    @Test
+    fun subWindowsKeepReadableScaleAt360DpFloor() {
+        // 1920×1080 head unit (~9.2") @ 160 dpi / 240 ppi (plausible = true, autoScale = 1.5f):
+        // Launcher window 900×460 -> 460 / 360 = 1.27 -> 1.25f (instead of dropping to 1.0f at 480 dp)
+        val screen = DisplayScale.decide(1920, 1080, reportedDpi = 160, physicalDpi = 240)
+        assertEquals(1.5f, screen.autoScale, 0.001f)
+
+        val launcher = DisplayScale.inWindow(screen, 900, 460)
+        assertEquals(1.25f, launcher.autoScale, 0.001f)
+        assertEquals(AutoScaleReason.LIMITED, launcher.reason)
+
+        // Split 768×540 -> 540 / 360 = 1.5f -> keeps full 1.5f
+        val split = DisplayScale.inWindow(screen, 768, 540)
+        assertEquals(1.5f, split.autoScale, 0.001f)
+        assertEquals(AutoScaleReason.SCALED, split.reason)
+
+        // Low strip 1280×300 is still capped at 1.0f
+        val strip = DisplayScale.inWindow(screen, 1280, 300)
+        assertEquals(1.0f, strip.autoScale, 0.001f)
+        assertEquals(AutoScaleReason.LIMITED, strip.reason)
+    }
 }

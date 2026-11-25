@@ -147,23 +147,26 @@ fun WaveTuneChips(
     height: Dp = 36.dp,
     fontSize: TextUnit = 14.sp
 ) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (trackWave) {
-            WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = height, fontSize = fontSize, onClick = onBackToMyWave)
-            WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !tuning.isDefault, height = height, fontSize = fontSize, onClick = onTune,
-                description = stringResource(R.string.wave_tune_title))
-        } else {
-            val summary = waveTuningSummary(tuning)
-            WavePill(
-                icon = Icons.Rounded.Tune,
-                text = summary ?: stringResource(R.string.wave_tune_title),
-                active = summary != null,
-                height = height,
-                fontSize = fontSize,
-                onClick = onTune,
-                description = summary?.let { stringResource(R.string.wave_tune_cd, it) },
-                modifier = Modifier.weight(1f, fill = false)
-            )
+    BoxWithConstraints(modifier) {
+        val compact = maxWidth < 170.dp
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (trackWave) {
+                WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), active = false, height = height, fontSize = fontSize, onClick = onBackToMyWave)
+                WavePill(Icons.Rounded.Tune, stringResource(R.string.wave_tune_short), active = !tuning.isDefault, height = height, fontSize = fontSize, onClick = onTune,
+                    description = stringResource(R.string.wave_tune_title))
+            } else {
+                val summary = waveTuningSummary(tuning)
+                WavePill(
+                    icon = Icons.Rounded.Tune,
+                    text = summary ?: stringResource(if (compact) R.string.wave_tune_short else R.string.wave_tune_title),
+                    active = summary != null,
+                    height = height,
+                    fontSize = fontSize,
+                    onClick = onTune,
+                    description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title),
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
         }
     }
 }

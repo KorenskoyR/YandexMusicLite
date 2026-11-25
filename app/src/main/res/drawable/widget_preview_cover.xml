@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- What the «Обложка» widget looks like in the list of widgets (Android 11 and older; newer draw it live) -->
+<!-- Widget picker preview for «Обложка» 2×2 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
@@ -8,7 +8,19 @@
             <size android:width="170dp" android:height="170dp" />
         </shape>
     </item>
-    <item android:left="63dp" android:top="104dp" android:width="44dp" android:height="44dp">
+    <item android:left="14dp" android:top="82dp" android:width="128dp" android:height="11dp">
+        <shape android:shape="rectangle"><corners android:radius="5.5dp" /><solid android:color="#F2F4F7" /></shape>
+    </item>
+    <item android:left="14dp" android:top="98dp" android:width="92dp" android:height="9dp">
+        <shape android:shape="rectangle"><corners android:radius="4.5dp" /><solid android:color="#99FFFFFF" /></shape>
+    </item>
+    <item android:left="14dp" android:top="118dp" android:width="38dp" android:height="38dp">
+        <shape android:shape="oval"><solid android:color="#D9141821" /></shape>
+    </item>
+    <item android:left="62dp" android:top="114dp" android:width="46dp" android:height="46dp">
         <shape android:shape="oval"><solid android:color="#F2F4F7" /></shape>
+    </item>
+    <item android:left="118dp" android:top="118dp" android:width="38dp" android:height="38dp">
+        <shape android:shape="oval"><solid android:color="#D9141821" /></shape>
     </item>
 </layer-list>

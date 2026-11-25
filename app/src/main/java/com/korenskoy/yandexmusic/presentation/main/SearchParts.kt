@@ -29,8 +29,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Album
@@ -78,10 +80,13 @@ import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 
 @Composable
 internal fun RecentPanel(history: List<String>, onPick: (String) -> Unit, onRemove: (String) -> Unit, onClear: () -> Unit, onClose: () -> Unit) {
+    val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     Column(
         Modifier
             .widthIn(max = 560.dp)
             .fillMaxWidth()
+            .heightIn(max = (window.heightDp * 0.65f).dp.coerceAtLeast(160.dp))
+            .verticalScroll(rememberScrollState())
             .hifiSoftShadow(RoundedCornerShape(24.dp), 30.dp)
             .hifiGlass(RoundedCornerShape(24.dp), fill = HiFi.SheetFill, border = Color.White.copy(alpha = 0.12f))
             .padding(top = 6.dp, bottom = 8.dp)

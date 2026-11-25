@@ -98,6 +98,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.SwipeLeft
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -197,31 +198,35 @@ fun SettingsSheet(
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = close)
                 )
             }
-            AnimatedVisibility(
-                visibleState = visible,
-                enter = slideInVertically(HiFiMotion.large()) { it },
-                exit = slideOutVertically(HiFiMotion.standard()) { it },
-                modifier = Modifier.align(if (isLandscape) Alignment.Center else Alignment.BottomCenter)
-            ) {
-                val sheetShape = if (isLandscape) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
-                Column(
-                    modifier = Modifier
-                        // Clear of every system bar on any side (a car's own panel on the left, a camera cutout), in
-                        // landscape at the bottom too; standing, the pages keep clear of the bottom bar themselves
-                        .windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(
-                                if (isLandscape) WindowInsetsSides.Horizontal + WindowInsetsSides.Vertical
-                                else WindowInsetsSides.Horizontal + WindowInsetsSides.Top
-                            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Clear of every system bar on any side (a car's own panel on the left, a camera cutout, bottom nav bar);
+                    // applied to the full-size container so Alignment.Center stays strictly inside the safe area
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            if (isLandscape) WindowInsetsSides.Horizontal + WindowInsetsSides.Vertical
+                            else WindowInsetsSides.Horizontal + WindowInsetsSides.Top
                         )
-                        .then(if (isLandscape) Modifier.widthIn(max = 980.dp).fillMaxWidth(0.94f).fillMaxHeight(0.94f) else Modifier.fillMaxWidth().fillMaxHeight())
-                        .padding(top = if (isLandscape) 0.dp else 24.dp)
-                        .offset { IntOffset(0, dragOffset.value.roundToInt()) }
-                        .clip(sheetShape)
-                        .background(HiFi.SheetFill)
-                        .hifiGrain(enabled = !lite, alpha = 0.35f)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                    ),
+                contentAlignment = if (isLandscape) Alignment.Center else Alignment.BottomCenter
+            ) {
+                AnimatedVisibility(
+                    visibleState = visible,
+                    enter = slideInVertically(HiFiMotion.large()) { it },
+                    exit = slideOutVertically(HiFiMotion.standard()) { it }
                 ) {
+                    val sheetShape = if (isLandscape) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
+                    Column(
+                        modifier = Modifier
+                            .then(if (isLandscape) Modifier.widthIn(max = 980.dp).fillMaxWidth(0.94f).fillMaxHeight(0.94f) else Modifier.fillMaxWidth().fillMaxHeight())
+                            .padding(top = if (isLandscape) 0.dp else 24.dp)
+                            .offset { IntOffset(0, dragOffset.value.roundToInt()) }
+                            .clip(sheetShape)
+                            .background(HiFi.SheetFill)
+                            .hifiGrain(enabled = !lite, alpha = 0.35f)
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                    ) {
                     // Header: drag it down to close
                     Column(
                         Modifier
@@ -330,6 +335,7 @@ fun SettingsSheet(
                                 else SettingsPageContent(shown, state, pageActions) { pageName = it.name }
                             }
                         }
+                    }
                     }
                 }
             }
@@ -759,6 +765,13 @@ private fun ColumnScope.AboutPage(state: SettingsUiState, actions: SettingsActio
             title = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
             subtitle = state.updateStatus ?: stringResource(R.string.settings_check_updates),
             onClick = actions.onCheckForUpdates
+        )
+        SwitchRow(
+            icon = Icons.Rounded.Update,
+            title = stringResource(R.string.settings_auto_check_updates),
+            hint = stringResource(R.string.settings_auto_check_updates_hint),
+            checked = state.autoCheckUpdates,
+            onChange = actions.onAutoCheckUpdatesChange
         )
     }
     var journalOpen by remember { mutableStateOf(false) }

@@ -4,10 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.view.KeyEvent
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -19,9 +20,7 @@ import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -30,6 +29,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
+import androidx.glance.layout.RowScope
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
@@ -41,15 +41,14 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaButtonReceiver
 import com.korenskoy.yandexmusic.R
 import dagger.hilt.android.EntryPointAccessors
+import kotlin.math.roundToInt
 
 /**
- * «Строка» 4×1: the cover, the track over its progress, back, play, forward and — from five cells — the heart.
- * Play is an ordinary media button for [MediaButtonReceiver] (like a Bluetooth headset), so it works after the app's
- * process was closed: the player service starts and resumes the saved session. Its name stays as it was: the widgets
- * people have placed keep working after the update.
+ * «Строка» 4×1: responsive to exact launcher bounds across phones, head units, and tall tablet cells.
+ * Play is an ordinary media button for [MediaButtonReceiver], so it resumes even after process death.
  */
 class NowPlayingWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(DpSize(250.dp, 64.dp), DpSize(320.dp, 64.dp)))
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent { LineWidget(rememberWidgetNow(context)) }
@@ -59,53 +58,135 @@ class NowPlayingWidget : GlanceAppWidget() {
 @Composable
 fun LineWidget(now: WidgetNow) {
     val context = LocalContext.current
-    val wide = LocalSize.current.width >= 300.dp
-    Row(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .appWidgetBackground()
-            .cornerRadius(24.dp)
-            .background(WidgetColors.ground)
-            .padding(start = 8.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
-            .clickable(if (now.hasTrack) WidgetActions.openPlayer(context) else WidgetActions.startWave(context)),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(GlanceModifier.size(56.dp).cornerRadius(14.dp).background(WidgetColors.chip), contentAlignment = Alignment.Center) {
-            if (now.cover != null) {
-                Image(ImageProvider(now.cover), contentDescription = null, modifier = GlanceModifier.size(56.dp).cornerRadius(14.dp), contentScale = ContentScale.Crop)
-            } else {
-                Image(ImageProvider(R.drawable.ic_notification), contentDescription = null, modifier = GlanceModifier.size(26.dp))
+    val (w, h) = LocalSize.current.safeOrDefault(250f, 64f)
+    val fs = context.resources.configuration.fontScale
+    val spec = lineSpec(w, h, fs, now.hasTrack, now.canReact)
+    val clickAction = if (now.hasTrack) WidgetActions.openPlayer(context) else WidgetActions.startWave(context)
+
+    Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(spec.cardH.dp)
+                .widgetCardBackground(R.drawable.widget_bg_24, 24.dp)
+                .padding(horizontal = spec.padH.dp, vertical = spec.padV.dp)
+                .clickable(clickAction),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = if (!now.hasTrack && !spec.showText) Alignment.CenterHorizontally else Alignment.Start
+        ) {
+            if (!now.hasTrack) {
+                LineEmptyContent(context, spec)
+                return@Row
             }
+            if (spec.showCover) {
+                LineCover(now, spec.cover)
+                Spacer(GlanceModifier.width(spec.coverGap.dp))
+            }
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                WidgetText(now.title.orEmpty(), 15.sp, bold = true)
+                if (spec.showArtist) {
+                    WidgetText(now.artist.orEmpty(), 12.sp, WidgetColors.textSoft)
+                }
+                if (spec.showProgress && now.progress != null) {
+                    Spacer(GlanceModifier.height(6.dp))
+                    WidgetProgressBar(now.progress, 3.dp)
+                }
+            }
+            Spacer(GlanceModifier.width(6.dp))
+            LineButtons(context, now, spec)
         }
-        Spacer(GlanceModifier.width(12.dp))
+    }
+}
+
+@Composable
+private fun RowScope.LineEmptyContent(context: Context, spec: LineSpec) {
+    if (spec.showText) {
         Column(modifier = GlanceModifier.defaultWeight()) {
-            WidgetText(now.title ?: context.getString(R.string.widget_wave_title), 15.sp, bold = true)
-            WidgetText(now.artist ?: context.getString(R.string.widget_wave_hint), 12.sp, WidgetColors.textSoft)
-            now.progress?.let {
-                Spacer(GlanceModifier.height(6.dp))
-                LinearProgressIndicator(progress = it, modifier = GlanceModifier.fillMaxWidth().height(3.dp), color = WidgetColors.text, backgroundColor = WidgetColors.track)
+            WidgetText(context.getString(R.string.widget_wave_title), 15.sp, bold = true)
+            if (spec.showArtist) {
+                WidgetText(context.getString(R.string.widget_wave_hint), 12.sp, WidgetColors.textSoft)
             }
         }
-        Spacer(GlanceModifier.width(6.dp))
-        if (!now.hasTrack) {
-            WidgetRound(R.drawable.ic_widget_play, context.getString(R.string.widget_wave_start), WidgetActions.startWave(context), 52.dp, 24.dp, WidgetColors.knob, WidgetColors.onKnob)
-            return@Row
+        Spacer(GlanceModifier.width(8.dp))
+    }
+    val iconDp = (spec.knob * 0.46f).roundToInt().dp
+    WidgetRound(
+        icon = R.drawable.ic_widget_play,
+        description = context.getString(R.string.widget_wave_start),
+        action = WidgetActions.startWave(context),
+        size = spec.knob.dp,
+        iconSize = iconDp,
+        fill = WidgetFill.KNOB,
+        tint = WidgetColors.onKnob
+    )
+}
+
+@Composable
+private fun LineCover(now: WidgetNow, coverDp: Float) {
+    val bmp = rememberWidgetBitmap(now.cover, coverDp, coverDp, 14f, cropToAspect = true)
+    val base = GlanceModifier.size(coverDp.dp).background(ImageProvider(R.drawable.widget_cover_chip_14))
+    val boxMod = if (Build.VERSION.SDK_INT >= 31) base.cornerRadius(14.dp) else base
+    Box(modifier = boxMod, contentAlignment = Alignment.Center) {
+        if (bmp != null) {
+            val imgBase = GlanceModifier.size(coverDp.dp)
+            val imgMod = if (Build.VERSION.SDK_INT >= 31) imgBase.cornerRadius(14.dp) else imgBase
+            val scale = if (Build.VERSION.SDK_INT >= 31) ContentScale.Crop else ContentScale.FillBounds
+            Image(ImageProvider(bmp), contentDescription = now.title, modifier = imgMod, contentScale = scale)
+        } else {
+            val noteDp = (coverDp * 0.46f).roundToInt().coerceAtLeast(18).dp
+            Image(ImageProvider(R.drawable.ic_notification), contentDescription = null, modifier = GlanceModifier.size(noteDp))
         }
-        if (wide && now.canReact) {
+    }
+}
+
+@Composable
+private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec) {
+    val chipIcon = (spec.chip * 0.50f).roundToInt().dp
+    val knobIcon = (spec.knob * 0.46f).roundToInt().dp
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (spec.showHeart) {
             WidgetRound(
-                if (now.isLiked) R.drawable.ic_notification_liked else R.drawable.ic_notification_like,
-                context.getString(R.string.cd_nravitsya), WidgetActions.like(context), 44.dp, 22.dp, null,
-                if (now.isLiked) WidgetColors.love else androidx.compose.ui.graphics.Color.White
+                icon = if (now.isLiked) R.drawable.ic_notification_liked else R.drawable.ic_notification_like,
+                description = context.getString(R.string.cd_nravitsya),
+                action = WidgetActions.like(context),
+                size = spec.chip.dp,
+                iconSize = chipIcon,
+                fill = null,
+                tint = if (now.isLiked) WidgetColors.love else Color.White
+            )
+            Spacer(GlanceModifier.width(spec.gap.dp))
+        }
+        if (spec.showPrev) {
+            WidgetRound(
+                icon = R.drawable.ic_widget_prev,
+                description = context.getString(R.string.cd_predyduschiy),
+                action = WidgetActions.previous(context),
+                size = spec.chip.dp,
+                iconSize = chipIcon,
+                fill = WidgetFill.CHIP
+            )
+            Spacer(GlanceModifier.width(spec.gap.dp))
+        }
+        WidgetRound(
+            icon = if (now.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
+            description = context.getString(R.string.cd_vosproizvedenie_ili_pauza),
+            action = WidgetActions.playPause(context),
+            size = spec.knob.dp,
+            iconSize = knobIcon,
+            fill = WidgetFill.KNOB,
+            tint = WidgetColors.onKnob
+        )
+        if (spec.showNext) {
+            Spacer(GlanceModifier.width(spec.gap.dp))
+            WidgetRound(
+                icon = R.drawable.ic_widget_next,
+                description = context.getString(R.string.cd_sleduyuschiy),
+                action = WidgetActions.next(context),
+                size = spec.chip.dp,
+                iconSize = chipIcon,
+                fill = WidgetFill.CHIP
             )
         }
-        WidgetRound(R.drawable.ic_widget_prev, context.getString(R.string.cd_predyduschiy), WidgetActions.previous(context), 44.dp, 22.dp, WidgetColors.chip)
-        Spacer(GlanceModifier.width(4.dp))
-        WidgetRound(
-            if (now.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
-            context.getString(R.string.cd_vosproizvedenie_ili_pauza), WidgetActions.playPause(context), 52.dp, 24.dp, WidgetColors.knob, WidgetColors.onKnob
-        )
-        Spacer(GlanceModifier.width(4.dp))
-        WidgetRound(R.drawable.ic_widget_next, context.getString(R.string.cd_sleduyuschiy), WidgetActions.next(context), 44.dp, 22.dp, WidgetColors.chip)
     }
 }
 

@@ -11,6 +11,11 @@ updates:
         patterns: ["androidx.*"]
       kotlin:
         patterns: ["org.jetbrains.kotlin*", "com.google.devtools.ksp*"]
+    ignore:
+      # compose-bom 2026.11.01 (ui-android 1.13.0) requires compileSdk 37.1 (minorApiLevel = 1),
+      # which is not part of the standard android-37.0 SDK yet
+      - dependency-name: "androidx.compose:compose-bom"
+        versions: [">= 2026.11.01"]
 
   - package-ecosystem: github-actions
     directory: /

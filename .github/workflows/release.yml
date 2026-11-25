@@ -80,7 +80,7 @@ jobs:
           generate_release_notes: false
           name: Yandex Music Lite ${{ github.ref_name }}
           body: |
-            • 🛠 Исправления и улучшения
+            Исправлены некоторые проблемы с UI, приложение адаптировано для некоторых устройств.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

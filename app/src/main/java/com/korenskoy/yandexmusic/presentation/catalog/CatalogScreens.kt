@@ -176,7 +176,14 @@ fun CatalogPageScreen(
                             PlayButton(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, Modifier.weight(1f)) {
                                 actions.onPlay(tracks, null, true)
                             }
-                            offlineButton()
+                        }
+                    },
+                    trailing = {
+                        if (album != null && tracks.isNotEmpty()) {
+                            Spacer(Modifier.width(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                offlineButton()
+                            }
                         }
                     }
                 )
@@ -186,8 +193,17 @@ fun CatalogPageScreen(
                     .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        offlineButton()
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -210,14 +226,13 @@ fun CatalogPageScreen(
                 }
                 Spacer(Modifier.height(14.dp))
                 if (tracks.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         PlayButton(Icons.Default.PlayArrow, stringResource(R.string.cd_slushat), primary = true, Modifier.weight(1f)) {
                             actions.onPlay(tracks, null, false)
                         }
                         PlayButton(Icons.Default.Shuffle, stringResource(R.string.cd_peremeshat), primary = false, Modifier.weight(1f)) {
                             actions.onPlay(tracks, null, true)
                         }
-                        offlineButton()
                     }
                 }
             }

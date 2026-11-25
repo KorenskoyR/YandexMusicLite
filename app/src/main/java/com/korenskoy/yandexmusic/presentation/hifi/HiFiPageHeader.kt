@@ -247,31 +247,87 @@ fun HiFiWideHeader(
 ) {
     val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val short = window.heightDp < 480
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        back()
-        Spacer(Modifier.width(if (short) 12.dp else 16.dp))
-        cover(if (short) 52.dp else 88.dp)
-        Spacer(Modifier.width(if (short) 12.dp else 16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = HiFiType.LargeTitle.copy(
-                    fontSize = if (short) 20.sp else 26.sp,
-                    lineHeight = if (short) 26.sp else 32.sp
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+    val ultraNarrow = window.widthDp < 440
+    val narrow = window.widthDp < 900
+    if (ultraNarrow) {
+        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                back()
+                Spacer(Modifier.weight(1f))
+                trailing()
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                cover(44.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = HiFiType.LargeTitle.copy(fontSize = 19.sp, lineHeight = 24.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    details()
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions
             )
-            details()
         }
-        Spacer(Modifier.width(12.dp))
-        Row(
-            // Room for "Перемешать" in full, and always some left for the name
-            Modifier.width(minOf(if (short) 340f else 380f, window.widthDp * 0.46f).dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            content = actions
-        )
-        trailing()
+    } else if (narrow) {
+        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                back()
+                Spacer(Modifier.width(12.dp))
+                cover(52.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = HiFiType.LargeTitle.copy(fontSize = 20.sp, lineHeight = 26.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    details()
+                }
+                trailing()
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions
+            )
+        }
+    } else {
+        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            back()
+            Spacer(Modifier.width(if (short) 12.dp else 16.dp))
+            cover(if (short) 52.dp else 88.dp)
+            Spacer(Modifier.width(if (short) 12.dp else 16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = HiFiType.LargeTitle.copy(
+                        fontSize = if (short) 20.sp else 26.sp,
+                        lineHeight = if (short) 26.sp else 32.sp
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                details()
+            }
+            Spacer(Modifier.width(12.dp))
+            Row(
+                // Room for "Перемешать" in full, and always some left for the name
+                Modifier.width(minOf(if (short) 360f else 380f, window.widthDp * 0.48f).dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions
+            )
+            trailing()
+        }
     }
 }

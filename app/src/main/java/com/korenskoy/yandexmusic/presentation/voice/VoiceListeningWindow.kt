@@ -7,15 +7,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,7 +81,10 @@ private val Low = Sizes(72.dp, 88.dp, 22.sp, 15.sp, 20.sp, 48.dp, 8.dp, false)
  */
 @Composable
 fun VoiceListeningWindow(state: Listening, onRetry: () -> Unit, onOpenSettings: () -> Unit, onClose: () -> Unit) {
-    AppDialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    AppDialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
         val window = currentWindowSizeDp()
         val wide = window.widthDp >= WIDE_DP
         val sizes = when {
@@ -83,8 +92,12 @@ fun VoiceListeningWindow(state: Listening, onRetry: () -> Unit, onOpenSettings: 
             wide && window.heightDp >= TALL_DP -> Large
             else -> Compact
         }
+        val insetSides = if (wide) WindowInsetsSides.Horizontal + WindowInsetsSides.Vertical else WindowInsetsSides.Horizontal + WindowInsetsSides.Top
         Box(
-            Modifier.fillMaxSize().padding(if (wide) 24.dp else 0.dp),
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(insetSides))
+                .padding(if (wide) 24.dp else 0.dp),
             contentAlignment = if (wide) Alignment.Center else Alignment.BottomCenter
         ) {
             val shape = if (wide) RoundedCornerShape(32.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
@@ -106,6 +119,7 @@ fun VoiceListeningWindow(state: Listening, onRetry: () -> Unit, onOpenSettings: 
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Content(state: Listening, sizes: Sizes, onRetry: () -> Unit, onOpenSettings: () -> Unit, onClose: () -> Unit) {
     Text(
@@ -128,15 +142,19 @@ private fun Content(state: Listening, sizes: Sizes, onRetry: () -> Unit, onOpenS
     }
     if (state !is Listening.Heard) {
         Spacer(Modifier.height(sizes.gap + 6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             when (state) {
                 is Listening.Missed, is Listening.Failed ->
-                    MetalPillButton(stringResource(R.string.voice_again), onRetry, Modifier.weight(1f, fill = false).widthIn(min = 150.dp), height = sizes.button)
+                    MetalPillButton(stringResource(R.string.voice_again), onRetry, Modifier.widthIn(min = 130.dp), height = sizes.button)
                 is Listening.NoMic ->
-                    MetalPillButton(stringResource(R.string.voice_open_settings), onOpenSettings, Modifier.weight(1f, fill = false).widthIn(min = 180.dp), height = sizes.button)
+                    MetalPillButton(stringResource(R.string.voice_open_settings), onOpenSettings, Modifier.widthIn(min = 150.dp), height = sizes.button)
                 else -> Unit
             }
-            GlassPillButton(stringResource(R.string.voice_cancel), onClose, Modifier.widthIn(min = 140.dp), height = sizes.button)
+            GlassPillButton(stringResource(R.string.voice_cancel), onClose, Modifier.widthIn(min = 120.dp), height = sizes.button)
         }
     }
     if (sizes.footer) {

@@ -24,6 +24,8 @@ interface SettingsRepository {
     val uiScaleManual: Flow<Float>
     /** The update the user chose to skip ("1.9.3"); the launch check does not offer it again. */
     val skippedUpdateVersion: Flow<String?>
+    /** Automatic update checks on launch, resume, reconnect and in background; manual check stays available. */
+    val autoCheckUpdates: Flow<Boolean>
     /** The road reserve in megabytes, one of [ROAD_RESERVE_SIZES_MB]; 0 turns it off. */
     val roadReserveMb: Flow<Int>
 
@@ -34,6 +36,7 @@ interface SettingsRepository {
     suspend fun setUiScaleAuto(enabled: Boolean)
     suspend fun setUiScaleManual(scale: Float)
     suspend fun setSkippedUpdateVersion(version: String?)
+    suspend fun setAutoCheckUpdates(enabled: Boolean)
     suspend fun setRoadReserveMb(megabytes: Int)
 
     /** True: only the ordinary stream, for a device that plays FLAC in silence. Null: nothing chosen yet. */
@@ -134,6 +137,7 @@ interface SettingsRepository {
         const val DEFAULT_UI_SCALE = 1.0f
         const val MIN_UI_SCALE = 0.5f
         const val MAX_UI_SCALE = 2.0f
+        const val DEFAULT_AUTO_CHECK_UPDATES = true
         const val DEFAULT_ROAD_RESERVE_MB = 100
         val ROAD_RESERVE_SIZES_MB = listOf(0, 100, 300, 500, 1024)
     }

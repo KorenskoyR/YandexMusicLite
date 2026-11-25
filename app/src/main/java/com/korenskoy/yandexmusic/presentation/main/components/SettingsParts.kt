@@ -367,12 +367,18 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
     val window = com.korenskoy.yandexmusic.utils.currentWindowSizePx()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val info = remember(resources, configuration, window) { DisplayScale.analyze(resources.displayMetrics, window.width, window.height) }
+    val ceiling = DisplayScale.manualCeiling(info.windowWidthPx, info.windowHeightPx, info.reportedDpi)
+    val windowMode = if (info.isSubWindow) {
+        stringResource(R.string.settings_ui_scale_mode_window, info.windowWidthPx, info.windowHeightPx)
+    } else {
+        stringResource(R.string.settings_ui_scale_mode_full)
+    }
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(Icons.Rounded.Fullscreen, size = 32.dp)
             Spacer(Modifier.width(12.dp))
             Text(stringResource(R.string.settings_ui_scale_title), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            val percent = ((if (auto) info.autoScale else manualScale) * 100).roundToInt()
+            val percent = ((if (auto) info.autoScale else manualScale.coerceAtMost(ceiling)) * 100).roundToInt()
             Text("$percent%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
@@ -385,7 +391,7 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
         if (auto) {
             val physical = if (info.physicalDpi > 0) info.physicalDpi.toString() else "—"
             Text(
-                stringResource(R.string.settings_ui_scale_auto_info, info.widthPx, info.heightPx, info.reportedDpi, physical, (info.autoScale * 100).roundToInt()),
+                stringResource(R.string.settings_ui_scale_auto_info, info.widthPx, info.heightPx, windowMode, info.reportedDpi, physical, (info.autoScale * 100).roundToInt()),
                 color = HiFi.TextTertiary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
@@ -397,11 +403,10 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
                 else -> null
             }?.let { Text(it, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
         } else {
-            // No further than this screen holds every page (a short side of 320 dp at the least)
-            val ceiling = DisplayScale.manualCeiling(info.windowWidthPx, info.windowHeightPx, info.reportedDpi)
+            // No further than this screen holds every page (a short side of 290 dp at the least)
             var value by remember(manualScale, ceiling) { mutableFloatStateOf(manualScale.coerceAtMost(ceiling)) }
             Text(
-                stringResource(R.string.settings_ui_scale_manual_value, (value * 100).roundToInt(), (info.reportedDpi * value).roundToInt()),
+                stringResource(R.string.settings_ui_scale_manual_value, (value * 100).roundToInt(), (info.reportedDpi * value).roundToInt(), windowMode),
                 color = HiFi.TextTertiary,
                 fontSize = 13.sp
             )

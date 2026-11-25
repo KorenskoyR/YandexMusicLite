@@ -58,8 +58,8 @@ android {
         applicationId = "YandexMusicLite.KorenskoyR"
         minSdk = 25
         targetSdk = 36
-        versionCode = 64
-        versionName = "1.16.0"
+        versionCode = 65
+        versionName = "1.16.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -141,6 +141,11 @@ android {
             it.systemProperty("carSizeReport", providers.gradleProperty("carSizeReport").map { "true" }.getOrElse("false"))
             // Android 16's runtime reaches into the JDK's file descriptors: allowed, or every test on it fails at setup
             it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+            val forks = providers.gradleProperty("testForks").map { it.toInt() }.getOrElse(1)
+            if (forks > 1) {
+                it.maxParallelForks = forks
+                it.maxHeapSize = "2048m"
+            }
         }
     }
 }

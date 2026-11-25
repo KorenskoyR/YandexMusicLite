@@ -42,6 +42,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
 
     override suspend fun doWork(): Result {
         val deps = EntryPointAccessors.fromApplication(applicationContext, Dependencies::class.java)
+        if (!deps.settings().autoCheckUpdates.first()) return Result.success()
         val result = deps.updateManager().checkForUpdates()
         UpdateSchedule.remember(applicationContext, ok = result !is UpdateCheckResult.Error)
         val available = result as? UpdateCheckResult.UpdateAvailable ?: return Result.success()
@@ -96,6 +97,13 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
             runCatching {
                 WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
             }.onFailure { Log.w(TAG, "The update check was not planned", it) }
+        }
+
+        /** Stops periodic background update checks when disabled in settings. */
+        fun cancel(context: Context) {
+            runCatching {
+                WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+            }.onFailure { Log.w(TAG, "The update check was not cancelled", it) }
         }
     }
 }

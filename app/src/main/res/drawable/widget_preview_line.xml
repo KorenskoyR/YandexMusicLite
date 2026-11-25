@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- What the «Строка» widget looks like in the list of widgets (Android 11 and older; newer draw it live) -->
+<!-- Widget picker preview for «Строка» 4×1 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
@@ -11,10 +11,25 @@
     <item android:left="8dp" android:top="6dp" android:width="56dp" android:height="56dp">
         <shape android:shape="rectangle"><corners android:radius="14dp" /><solid android:color="#8A2F43" /></shape>
     </item>
-    <item android:left="76dp" android:top="20dp" android:width="120dp" android:height="12dp">
+    <item android:left="74dp" android:top="16dp" android:width="70dp" android:height="12dp">
         <shape android:shape="rectangle"><corners android:radius="6dp" /><solid android:color="#F2F4F7" /></shape>
     </item>
-    <item android:left="238dp" android:top="8dp" android:width="52dp" android:height="52dp">
+    <item android:left="74dp" android:top="34dp" android:width="52dp" android:height="9dp">
+        <shape android:shape="rectangle"><corners android:radius="4.5dp" /><solid android:color="#99FFFFFF" /></shape>
+    </item>
+    <item android:left="74dp" android:top="50dp" android:width="70dp" android:height="3dp">
+        <shape android:shape="rectangle"><corners android:radius="1.5dp" /><solid android:color="#40FFFFFF" /></shape>
+    </item>
+    <item android:left="74dp" android:top="50dp" android:width="32dp" android:height="3dp">
+        <shape android:shape="rectangle"><corners android:radius="1.5dp" /><solid android:color="#FFFFFFFF" /></shape>
+    </item>
+    <item android:left="152dp" android:top="14dp" android:width="40dp" android:height="40dp">
+        <shape android:shape="oval"><solid android:color="#1FFFFFFF" /></shape>
+    </item>
+    <item android:left="198dp" android:top="10dp" android:width="48dp" android:height="48dp">
         <shape android:shape="oval"><solid android:color="#F2F4F7" /></shape>
+    </item>
+    <item android:left="252dp" android:top="14dp" android:width="40dp" android:height="40dp">
+        <shape android:shape="oval"><solid android:color="#1FFFFFFF" /></shape>
     </item>
 </layer-list>

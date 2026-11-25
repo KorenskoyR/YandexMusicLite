@@ -258,9 +258,10 @@ fun GlassPillButton(
 @Composable
 private fun PillLabel(text: String, icon: ImageVector?) {
     BoxWithConstraints(contentAlignment = Alignment.Center) {
-        val withIcon = icon != null && maxWidth >= 132.dp
-        Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            if (withIcon && icon != null) {
+        val boxWidth = maxWidth
+        val sidePad = if (boxWidth < 130.dp) 10.dp else 14.dp
+        Row(Modifier.padding(horizontal = sidePad), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            if (icon != null && boxWidth >= 148.dp) {
                 Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(8.dp))
             }

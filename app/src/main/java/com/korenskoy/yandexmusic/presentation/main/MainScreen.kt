@@ -250,7 +250,9 @@ fun MainScreen(
     val coverForTint = if (currentTrack?.isRadio == true) null else currentTrack?.coverUri.toCoverUrl(CoverSize.Small)
     val appTint = rememberArtworkTint(coverForTint, stationTint)
     val tabStates = rememberSaveableStateHolder()
-    val contentBottom = if (isLandscape) DockClearance else if (currentTrack != null) 168.dp else 100.dp
+    val windowSizeDp = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+    val singleRowDock = isLandscape && windowSizeDp.widthDp >= 580
+    val contentBottom = if (singleRowDock) DockClearance else if (currentTrack != null) 168.dp else 100.dp
     // A notch, a three-button bar or a car's own panel can sit on either side, standing or lying: the pages keep
     // clear of all of them, their backgrounds run edge to edge
     val sideInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
@@ -312,7 +314,11 @@ fun MainScreen(
             val sharedScope = this
             Box(modifier = Modifier.fillMaxSize()) {
                 // One living background under every tab: it does not blink when tabs change
-                if (currentTab != MainTab.CAR) {
+                AnimatedVisibility(
+                    visible = currentTab != MainTab.CAR,
+                    enter = fadeIn(HiFiMotion.standard()),
+                    exit = fadeOut(HiFiMotion.quick())
+                ) {
                     HiFiBackdrop(coverUrl = coverForTint)
                 }
                 // Nothing until the start tab is known: no other tab flashes on the way
@@ -335,8 +341,14 @@ fun MainScreen(
                             contentKey = { (_, page) -> page?.page },
                             transitionSpec = { catalogTransition(forward = targetState.first > initialState.first, lite = lite) },
                             label = "catalog_page",
-                            modifier = if (tab != MainTab.CAR || depth > 0) Modifier.windowInsetsPadding(sideInsets) else Modifier
+                            modifier = Modifier.fillMaxSize()
                         ) { (_, catalogTop) ->
+                        val pageModifier = if (tab != MainTab.CAR || catalogTop != null) {
+                            Modifier.fillMaxSize().windowInsetsPadding(sideInsets)
+                        } else {
+                            Modifier.fillMaxSize()
+                        }
+                        Box(modifier = pageModifier) {
                         if (catalogTop != null) {
                             val albumId = (catalogTop.page as? CatalogPage.Album)?.id
                             val albumOffline by remember(albumId) {
@@ -379,60 +391,68 @@ fun MainScreen(
                             )
                         }
                         }
+                        }
                     }
                 }
 
                 // Floating navigation and mini-player (hidden in the car)
-                if (currentTab != MainTab.CAR) {
-                    val mini: @Composable () -> Unit = {
-                        val track = currentTrack
-                        if (showMini && track != null) {
-                            AnimatedVisibility(
-                                visible = !isPlayerExpanded,
-                                enter = fadeIn(HiFiMotion.standard()),
-                                exit = fadeOut(HiFiMotion.quick())
-                            ) {
-                                MiniPlayer(
-                                    track = track,
-                                    isPlaying = isPlaying,
-                                    progress = progress,
-                                    onPlayPauseClick = { viewModel.togglePlayPause() },
-                                    onNextClick = { viewModel.playNext() },
-                                    onPrevClick = { viewModel.playPrev() },
-                                    onClick = openPlayer,
-                                    onDismiss = { viewModel.stopAndClearPlayer() },
-                                    swipeToDismiss = swipeToClose,
-                                    coverModifier = Modifier.sharedCover(sharedScope, this, enabled = !lite && !track.isRadio)
-                                )
+                AnimatedVisibility(
+                    visible = currentTab != MainTab.CAR,
+                    enter = fadeIn(HiFiMotion.standard()),
+                    exit = fadeOut(HiFiMotion.quick()),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(Modifier.fillMaxSize()) {
+                        val mini: @Composable () -> Unit = {
+                            val track = currentTrack
+                            if (showMini && track != null) {
+                                AnimatedVisibility(
+                                    visible = !isPlayerExpanded,
+                                    enter = fadeIn(HiFiMotion.standard()),
+                                    exit = fadeOut(HiFiMotion.quick())
+                                ) {
+                                    MiniPlayer(
+                                        track = track,
+                                        isPlaying = isPlaying,
+                                        progress = progress,
+                                        onPlayPauseClick = { viewModel.togglePlayPause() },
+                                        onNextClick = { viewModel.playNext() },
+                                        onPrevClick = { viewModel.playPrev() },
+                                        onClick = openPlayer,
+                                        onDismiss = { viewModel.stopAndClearPlayer() },
+                                        swipeToDismiss = swipeToClose,
+                                        coverModifier = Modifier.sharedCover(sharedScope, this, enabled = !lite && !track.isRadio && currentTab != MainTab.CAR)
+                                    )
+                                }
                             }
                         }
-                    }
-                    if (isLandscape) {
-                        DockScrim(Modifier.align(Alignment.BottomCenter))
-                        FloatingGlassDock(
-                            currentRoute = currentTab.route,
-                            onNavigate = { chosenTab = it },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .windowInsetsPadding(sideInsets)
-                                .navigationBarsPadding()
-                                .padding(start = 16.dp, end = 16.dp, bottom = DockBottomGap),
-                            player = mini
-                        )
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-                                .fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            if (showMini) {
-                                mini()
-                                Spacer(modifier = Modifier.height(10.dp))
+                        if (singleRowDock) {
+                            DockScrim(Modifier.align(Alignment.BottomCenter))
+                            FloatingGlassDock(
+                                currentRoute = currentTab.route,
+                                onNavigate = { chosenTab = it },
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .windowInsetsPadding(sideInsets)
+                                    .navigationBarsPadding()
+                                    .padding(start = 16.dp, end = 16.dp, bottom = DockBottomGap),
+                                player = mini
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding()
+                                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                                    .fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (showMini) {
+                                    mini()
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                }
+                                FloatingGlassBottomBar(currentRoute = currentTab.route, onNavigate = { chosenTab = it })
                             }
-                            FloatingGlassBottomBar(currentRoute = currentTab.route, onNavigate = { chosenTab = it })
                         }
                     }
                 }
@@ -491,34 +511,14 @@ fun MainScreen(
                     }
                 }
                 // In the car the message sits right above the big source dock, never over it
-                val bars = WindowInsets.safeDrawing.asPaddingValues()
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                val snackBottom = when {
-                    currentTab == MainTab.CAR -> com.korenskoy.yandexmusic.presentation.car.carDockClearance(
-                        maxWidth - bars.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) -
-                            bars.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-                        maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(),
-                        isLandscape,
-                        com.korenskoy.yandexmusic.presentation.car.currentInterfaceScale()
-                    )
-                    isLandscape -> DockClearance
-                    currentTrack != null -> 160.dp
-                    else -> 90.dp
-                }
-                SnackbarHost(
-                    hostState = snackbar,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = snackBottom)
-                ) { data ->
-                    HiFiSnackbar(
-                        message = data.visuals.message,
-                        actionLabel = data.visuals.actionLabel,
-                        onAction = { data.performAction() }
-                    )
-                }
-                }
+                MainSnackbarHost(
+                    snackbar = snackbar,
+                    currentTab = currentTab,
+                    singleRowDock = singleRowDock,
+                    isLandscape = isLandscape,
+                    hasTrack = currentTrack != null,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
 
                 if (showCrashLog) CrashLogHost(crashVm) { showCrashLog = false }
                 qualityDetails?.let { details -> QualityDetailsDialog(details) { qualityDetails = null } }
@@ -636,6 +636,46 @@ private fun PrefetchCovers(viewModel: MainViewModel, track: TrackDetailsDto?) {
     }
     LaunchedEffect(wavePreview) {
         com.korenskoy.yandexmusic.utils.prefetchCovers(context, wavePreview.take(5), listOf(CoverSize.Medium))
+    }
+}
+
+/** Snackbar overlay positioned above either the car dock, the landscape dock, or the portrait player. */
+@Composable
+private fun MainSnackbarHost(
+    snackbar: SnackbarHostState,
+    currentTab: MainTab,
+    singleRowDock: Boolean,
+    isLandscape: Boolean,
+    hasTrack: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val bars = WindowInsets.safeDrawing.asPaddingValues()
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val snackBottom = when {
+            currentTab == MainTab.CAR -> com.korenskoy.yandexmusic.presentation.car.carDockClearance(
+                maxWidth - bars.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) -
+                    bars.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                maxHeight - bars.calculateTopPadding() - bars.calculateBottomPadding(),
+                isLandscape,
+                com.korenskoy.yandexmusic.presentation.car.currentInterfaceScale()
+            )
+            singleRowDock -> DockClearance
+            hasTrack -> 160.dp
+            else -> 90.dp
+        }
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = snackBottom)
+        ) { data ->
+            HiFiSnackbar(
+                message = data.visuals.message,
+                actionLabel = data.visuals.actionLabel,
+                onAction = { data.performAction() }
+            )
+        }
     }
 }
 

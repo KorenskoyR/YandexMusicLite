@@ -14,8 +14,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
@@ -59,20 +61,25 @@ fun AccountManagementDialog(
     var confirmLogoutAll by remember { mutableStateOf(false) }
     var accountToDelete by remember { mutableStateOf<UserAccount?>(null) }
 
+    val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
+
     AppDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.72f))
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
+                    .padding(if (window.widthDp < 340) 8.dp else 12.dp)
+                    .widthIn(max = 460.dp)
+                    .fillMaxWidth()
                     .wrapContentHeight()
                     .clickable(enabled = false) {}
                     .clip(RoundedCornerShape(28.dp))
@@ -88,7 +95,8 @@ fun AccountManagementDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(22.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = if (window.widthDp < 340) 14.dp else 20.dp, vertical = 20.dp)
                 ) {
                     // Header Row
                     Row(
@@ -113,7 +121,7 @@ fun AccountManagementDialog(
                         IconButton(
                             onClick = onDismiss,
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(44.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.07f))
                         ) {
@@ -142,7 +150,7 @@ fun AccountManagementDialog(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 240.dp)
+                                .heightIn(max = if (window.heightDp < 520) 140.dp else 220.dp)
                         ) {
                             items(accounts, key = { it.uid }) { account ->
                                 val isActive = account.uid == activeAccount?.uid
@@ -254,7 +262,7 @@ fun AccountManagementDialog(
                                                 onSetDefaultAccount(account.uid)
                                             }
                                         },
-                                        modifier = Modifier.size(32.dp)
+                                        modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
                                             imageVector = if (isDefault) Icons.Default.Star else Icons.Default.StarBorder,
@@ -293,7 +301,7 @@ fun AccountManagementDialog(
                                     } else {
                                         IconButton(
                                             onClick = { accountToDelete = account },
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(40.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
@@ -318,6 +326,9 @@ fun AccountManagementDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    val actionFont = if (window.widthDp < 340) 13.sp else 14.sp
+                    val actionPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+
                     // "+ Войти в другой аккаунт" Button
                     Button(
                         onClick = {
@@ -326,7 +337,8 @@ fun AccountManagementDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
+                            .heightIn(min = 48.dp),
+                        contentPadding = actionPadding,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White.copy(alpha = 0.08f)
@@ -339,12 +351,14 @@ fun AccountManagementDialog(
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.account_management_voyti_v_drugoy_akkaunt),
                             color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = actionFont,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -355,7 +369,8 @@ fun AccountManagementDialog(
                         onClick = { confirmLogoutCurrent = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
+                            .heightIn(min = 48.dp),
+                        contentPadding = actionPadding,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0x22FF5252)
@@ -368,12 +383,14 @@ fun AccountManagementDialog(
                             tint = HiFi.Danger,
                             modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.account_management_vyyti_iz_etogo_akkaunta),
                             color = HiFi.Danger,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = actionFont,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 

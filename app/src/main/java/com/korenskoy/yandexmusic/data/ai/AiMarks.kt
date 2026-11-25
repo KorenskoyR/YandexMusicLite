@@ -192,13 +192,14 @@ class AiMarks internal constructor(
             saveJob?.cancel()
             saveJob = scope.launch {
                 delay(SAVE_DELAY_MS)
+                if (target.parentFile?.exists() != true) return@launch
                 val kept = entries.entries.sortedByDescending { it.value.at }.take(MAX_TRACKS).associate { it.key to it.value }
                 val part = File(target.parentFile, target.name + ".part")
                 try {
                     part.writeText(json.encodeToString(Store.serializer(), Store(kept)))
                     part.renameTo(target)
                 } catch (e: IOException) {
-                    Log.w(TAG, "Cannot keep the marks", e)
+                    runCatching { Log.w(TAG, "Cannot keep the marks", e) }
                 }
             }
         }

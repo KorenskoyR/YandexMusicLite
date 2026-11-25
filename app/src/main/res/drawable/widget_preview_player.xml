@@ -1,26 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- What the «Плеер» widget looks like in the list of widgets (Android 11 and older; newer draw it live) -->
+<!-- Widget picker preview for «Плеер» 4×2 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="28dp" />
             <gradient android:angle="0" android:startColor="#5A1F2B" android:endColor="#141821" />
-            <size android:width="320dp" android:height="160dp" />
+            <size android:width="320dp" android:height="168dp" />
         </shape>
     </item>
-    <item android:left="16dp" android:top="16dp" android:bottom="16dp" android:width="128dp">
+    <item android:left="16dp" android:top="16dp" android:width="68dp" android:height="68dp">
         <shape android:shape="rectangle">
             <corners android:radius="18dp" />
             <solid android:color="#8A2F43" />
         </shape>
     </item>
-    <item android:left="160dp" android:top="48dp" android:right="24dp" android:height="14dp">
+    <item android:left="98dp" android:top="26dp" android:width="202dp" android:height="14dp">
         <shape android:shape="rectangle"><corners android:radius="7dp" /><solid android:color="#F2F4F7" /></shape>
     </item>
-    <item android:left="160dp" android:top="72dp" android:right="72dp" android:height="10dp">
+    <item android:left="98dp" android:top="48dp" android:width="152dp" android:height="10dp">
         <shape android:shape="rectangle"><corners android:radius="5dp" /><solid android:color="#99FFFFFF" /></shape>
     </item>
-    <item android:left="214dp" android:top="100dp" android:width="44dp" android:height="44dp">
+    <item android:left="16dp" android:top="94dp" android:width="288dp" android:height="4dp">
+        <shape android:shape="rectangle"><corners android:radius="2dp" /><solid android:color="#40FFFFFF" /></shape>
+    </item>
+    <item android:left="16dp" android:top="94dp" android:width="124dp" android:height="4dp">
+        <shape android:shape="rectangle"><corners android:radius="2dp" /><solid android:color="#FFFFFFFF" /></shape>
+    </item>
+    <item android:left="16dp" android:top="112dp" android:width="38dp" android:height="38dp">
+        <shape android:shape="oval"><solid android:color="#1FFFFFFF" /></shape>
+    </item>
+    <item android:left="74dp" android:top="110dp" android:width="42dp" android:height="42dp">
+        <shape android:shape="oval"><solid android:color="#1FFFFFFF" /></shape>
+    </item>
+    <item android:left="136dp" android:top="106dp" android:width="48dp" android:height="48dp">
         <shape android:shape="oval"><solid android:color="#F2F4F7" /></shape>
+    </item>
+    <item android:left="204dp" android:top="110dp" android:width="42dp" android:height="42dp">
+        <shape android:shape="oval"><solid android:color="#1FFFFFFF" /></shape>
+    </item>
+    <item android:left="266dp" android:top="112dp" android:width="38dp" android:height="38dp">
+        <shape android:shape="oval"><solid android:color="#1FFFFFFF" /></shape>
     </item>
 </layer-list>

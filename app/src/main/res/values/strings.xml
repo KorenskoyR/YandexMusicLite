@@ -142,8 +142,10 @@
     <string name="settings_ui_scale_title">Масштаб интерфейса</string>
     <string name="settings_ui_scale_auto">Авто</string>
     <string name="settings_ui_scale_manual">Вручную</string>
-    <string name="settings_ui_scale_auto_info" tools:ignore="PluralsCandidate">Экран %1$d×%2$d · система %3$d dpi · физически ≈ %4$s dpi → %5$d%%</string>
-    <string name="settings_ui_scale_manual_value" tools:ignore="PluralsCandidate">%1$d%% · ≈ %2$d dpi</string>
+    <string name="settings_ui_scale_mode_full">Полный экран</string>
+    <string name="settings_ui_scale_mode_window">Окно %1$d×%2$d</string>
+    <string name="settings_ui_scale_auto_info" tools:ignore="PluralsCandidate">Экран %1$d×%2$d · %3$s · система %4$d dpi · физически ≈ %5$s dpi → %6$d%%</string>
+    <string name="settings_ui_scale_manual_value" tools:ignore="PluralsCandidate">%1$d%% · ≈ %2$d dpi · %3$s</string>
     <string name="settings_upgrade_downloads">Улучшить качество скачанных</string>
     <string name="settings_upgrade_downloads_hint">Перекачать треки, для которых сервер теперь даёт лучшее качество</string>
     <string name="playlist_reorder">Изменить порядок</string>
@@ -353,6 +355,8 @@
     <string name="settings_steering_right_short">Правый</string>
     <string name="settings_version">Версия %1$s</string>
     <string name="settings_check_updates">Нажмите, чтобы проверить обновления</string>
+    <string name="settings_auto_check_updates">Проверять обновления автоматически</string>
+    <string name="settings_auto_check_updates_hint">Искать новые версии в фоне и предлагать при запуске; вручную можно проверить выше</string>
     <string name="settings_cancel">Отмена</string>
     <string name="player_unknown_artist">Неизвестный исполнитель</string>
     <string name="player_queue_title">Очередь</string>

@@ -24,7 +24,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -101,6 +104,35 @@ class MainActivity : ComponentActivity() {
     /** Recreated with a session on screen: the splash is skipped. */
     private var restored = false
 
+    /** Last decorFitsSystemWindows state applied for pre-API-30 multi-window containers. */
+    private var appliedLegacyMultiWindow: Boolean? = null
+
+    /** Last multi-window state for which insets were requested on API 30+, avoiding redundant double passes. */
+    private var lastInsetsState: Boolean? = null
+
+    private fun applyWindowInsetsMode(inMultiWindow: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            if (appliedLegacyMultiWindow != inMultiWindow) {
+                appliedLegacyMultiWindow = inMultiWindow
+                WindowCompat.setDecorFitsSystemWindows(window, inMultiWindow)
+                if (!inMultiWindow) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+                        navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+                    )
+                }
+            }
+            val decor = window.decorView
+            ViewCompat.requestApplyInsets(decor)
+            decor.post { ViewCompat.requestApplyInsets(decor) }
+            return
+        }
+        if (lastInsetsState != inMultiWindow) {
+            lastInsetsState = inMultiWindow
+            ViewCompat.requestApplyInsets(window.decorView)
+        }
+    }
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -130,6 +162,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
+        applyWindowInsetsMode(isInMultiWindowMode)
         setContent {
             // The size the app really draws in, measured here at its root: every page decides lying or standing,
             // and the scale what fits, by it — not by what the system says of the window, which can be stale
@@ -215,6 +248,24 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putLong(KEY_LAUNCH, launch)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyWindowInsetsMode(isInMultiWindowMode)
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean) {
+        @Suppress("DEPRECATION")
+        super.onMultiWindowModeChanged(isInMultiWindowMode)
+        applyWindowInsetsMode(isInMultiWindowMode)
+    }
+
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        applyWindowInsetsMode(isInMultiWindowMode)
     }
 
     override fun onNewIntent(intent: Intent) {
