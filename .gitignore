@@ -53,19 +53,6 @@ backups/
 .DS_Store
 Thumbs.db
 
-# Local notes and AI-assistant workspaces (never published)
-AGENT_MEMORY.md
-CHANGELOG.md
-PLAN*.md
-*_canvas.html
-handoff_summary.md
-.claudeignore
-*-artifact-content-*.txt
-scripts/backup_to_gdrive.ps1
-.gemini/
-.claude/
-.cursor/
-
 # More secrets / signing material
 *.p12
 *.pfx
