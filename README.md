@@ -52,7 +52,11 @@
 
 | [📻 FM Радио](docs/assets/radio.jpg) | [⚙️ Настройки](docs/assets/settings.jpg) | [🚗 Режим «В авто»](docs/assets/car.jpg) |
 | :---: | :---: | :---: |
-| <a href="docs/assets/radio.jpg"><img src="docs/assets/radio.jpg" width="220" alt="FM Радио" /></a> | <a href="docs/assets/settings.jpg"><img src="docs/assets/settings.jpg" width="220" alt="Настройки" /></a> | <a href="docs/assets/car.jpg"><img src="docs/assets/car.jpg" width="380" alt="В авто" /></a> |
+| <a href="docs/assets/radio.jpg"><img src="docs/assets/radio.jpg" width="220" alt="FM Радио" /></a> | <a href="docs/assets/settings.jpg"><img src="docs/assets/settings.jpg" width="220" alt="Настройки" /></a> | <a href="docs/assets/car.jpg"><img src="docs/assets/car.jpg" width="320" alt="В авто" /></a> |
+
+| [☀️ В авто: дневная тема](docs/assets/car-day.jpg) | [🚘 В авто: 1920×720 (3 колонки)](docs/assets/car-wide.jpg) |
+| :---: | :---: |
+| <a href="docs/assets/car-day.jpg"><img src="docs/assets/car-day.jpg" width="320" alt="В авто: дневная тема" /></a> | <a href="docs/assets/car-wide.jpg"><img src="docs/assets/car-wide.jpg" width="460" alt="Широкоформатный режим В авто 1920×720 (3 колонки)" /></a> |
 
 Треки и обложки на скриншотах придуманы для примера.
 

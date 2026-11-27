@@ -771,8 +771,13 @@ h1, h2, h3, h4 {
 .car-visual-wrapper {
   position: relative;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+}
+
+.car-tabs {
+  margin-top: 20px;
 }
 
 .car-device-frame {
@@ -812,6 +817,11 @@ h1, h2, h3, h4 {
   height: auto;
   display: block;
   object-fit: cover;
+  transition: opacity 0.28s ease;
+}
+
+.car-screen-img.fade-out {
+  opacity: 0;
 }
 
 .car-screen-glare {

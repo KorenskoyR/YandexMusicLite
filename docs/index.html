@@ -60,6 +60,8 @@
     "https://korenskoyr.github.io/YandexMusicLite/assets/day.jpg",
     "https://korenskoyr.github.io/YandexMusicLite/assets/player.jpg",
     "https://korenskoyr.github.io/YandexMusicLite/assets/car.jpg",
+    "https://korenskoyr.github.io/YandexMusicLite/assets/car-wide.jpg",
+    "https://korenskoyr.github.io/YandexMusicLite/assets/car-day.jpg",
     "https://korenskoyr.github.io/YandexMusicLite/assets/radio.jpg",
     "https://korenskoyr.github.io/YandexMusicLite/assets/library.jpg",
     "https://korenskoyr.github.io/YandexMusicLite/assets/search.jpg"
@@ -543,9 +545,15 @@
           <div class="car-visual-wrapper">
             <div class="car-device-frame">
               <div class="car-screen-inner">
-                <picture><source type="image/webp" srcset="assets/car.webp"><img src="assets/car.jpg" alt="Интерфейс режима В авто Yandex Music Lite" class="car-screen-img" width="1600" height="900" loading="lazy"></picture>
+                <picture><source id="carScreenSource" type="image/webp" srcset="assets/car.webp"><img id="carScreenImg" src="assets/car.jpg" alt="Интерфейс режима В авто Yandex Music Lite (16:9, ночная тема)" class="car-screen-img" width="1600" height="900" loading="lazy"></picture>
                 <div class="car-screen-glare"></div>
               </div>
+            </div>
+
+            <div class="screen-tabs car-tabs" role="tablist" aria-label="Варианты экрана режима В авто">
+              <button type="button" class="tab-btn car-tab-btn active" data-webp="assets/car.webp" data-jpg="assets/car.jpg" data-alt="Интерфейс режима В авто Yandex Music Lite (16:9, ночная тема)" role="tab" aria-selected="true">16:9 Ночь</button>
+              <button type="button" class="tab-btn car-tab-btn" data-webp="assets/car-wide.webp" data-jpg="assets/car-wide.jpg" data-alt="Широкоформатный режим В авто 1920×720 с тремя колонками" role="tab" aria-selected="false">1920×720 · 3 колонки</button>
+              <button type="button" class="tab-btn car-tab-btn" data-webp="assets/car-day.webp" data-jpg="assets/car-day.jpg" data-alt="Дневная тема режима В авто Yandex Music Lite" role="tab" aria-selected="false">16:9 День</button>
             </div>
           </div>
         </div>

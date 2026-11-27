@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. Interactive Phone Mockup Screenshot Switcher
   const initScreenshotSwitcher = () => {
     const screenImg = document.getElementById('phoneScreenImg');
-    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabButtons = document.querySelectorAll('.hero-visual .tab-btn');
 
     if (!screenImg || !tabButtons.length) return;
 
@@ -73,6 +73,40 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           screenImg.src = targetSrc;
           screenImg.onload = () => screenImg.classList.remove('fade-out');
+        }, 150);
+      });
+    });
+  };
+
+  // 2b. Interactive Car Mode Screenshot Switcher
+  const initCarModeSwitcher = () => {
+    const carImg = document.getElementById('carScreenImg');
+    const carSource = document.getElementById('carScreenSource');
+    const carButtons = document.querySelectorAll('.car-tab-btn');
+
+    if (!carImg || !carButtons.length) return;
+
+    carButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const targetWebp = button.getAttribute('data-webp');
+        const targetJpg = button.getAttribute('data-jpg');
+        const targetAlt = button.getAttribute('data-alt');
+        if (!targetJpg || button.classList.contains('active')) return;
+
+        carButtons.forEach(btn => {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+        });
+        button.classList.add('active');
+        button.setAttribute('aria-selected', 'true');
+
+        carImg.classList.add('fade-out');
+        setTimeout(() => {
+          if (carSource && targetWebp) carSource.srcset = targetWebp;
+          carImg.src = targetJpg;
+          if (targetAlt) carImg.alt = targetAlt;
+          if (carImg.complete) carImg.classList.remove('fade-out');
+          else carImg.onload = () => carImg.classList.remove('fade-out');
         }, 150);
       });
     });
@@ -265,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initReleaseInfo();
   initCopyButtons();
   initScreenshotSwitcher();
+  initCarModeSwitcher();
   initFaqAccordion();
   initQrModal();
 });

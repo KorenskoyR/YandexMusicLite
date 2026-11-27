@@ -36,6 +36,7 @@ import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
 import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.CarLayout
 import com.korenskoy.yandexmusic.domain.model.RadioCategory
 import com.korenskoy.yandexmusic.domain.model.RepeatMode
 import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
@@ -230,22 +231,30 @@ class PromoScreenshots {
      * `wm size 2560x1440; wm density 480` before running it, `wm size reset; wm density reset` after.
      */
     @Test
-    fun car() {
+    fun car() = renderCar(name = "car", darkTheme = true, layout = CarLayout.AUTO, upcomingCount = 3)
+
+    @Test
+    fun carWide() = renderCar(name = "car_wide", darkTheme = true, layout = CarLayout.THREE, upcomingCount = 6)
+
+    @Test
+    fun carDay() = renderCar(name = "car_day", darkTheme = false, layout = CarLayout.AUTO, upcomingCount = 3)
+
+    private fun renderCar(name: String, darkTheme: Boolean, layout: CarLayout, upcomingCount: Int) {
         val display = context.resources.displayMetrics
         assumeTrue("needs a landscape display", display.widthPixels > display.heightPixels)
         val noon = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 12)
             set(Calendar.MINUTE, 45)
         }.timeInMillis
-        shoot("car", settleMs = 3_500, backdropCover = null) {
+        shoot(name, settleMs = 3_500, darkTheme = darkTheme, backdropCover = null) {
             CompositionLocalProvider(LocalCarClock provides { noon }) {
                 CarScreen(
                     currentTrack = nowPlaying, isPlaying = true, likedTrackIds = liked,
                     onPlayPauseClick = {}, onNextClick = {}, onPrevClick = {}, onToggleLike = {}, onDislikeClick = {},
                     onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {}, onPlayDownloaded = {}, onPlayRadio = {}, onExit = {},
                     isLandscape = true, steeringWheelOnLeft = true, progress = { 82_000L }, durationMs = 286_000,
-                    upcoming = tracks.drop(1).take(3), source = PlaylistSource.LIBRARY,
-                    shuffled = true, repeatMode = RepeatMode.ALL
+                    upcoming = tracks.drop(1).take(upcomingCount), source = PlaylistSource.LIBRARY,
+                    layout = layout, shuffled = true, repeatMode = RepeatMode.ALL
                 )
             }
         }
@@ -292,7 +301,7 @@ class PromoScreenshots {
         backdropCover: String? = nowPlaying.coverUri,
         content: @Composable BoxScope.() -> Unit
     ) {
-        if (name != "car") phoneOnly()
+        if (!name.startsWith("car")) phoneOnly()
         // Pre-generate covers and warm Coil's memory cache off the main composition pass
         // so list/grid screens (queue, library) render covers on their very first frame.
         prefetchCovers(context, tracks, listOf(CoverSize.Small, CoverSize.Medium, CoverSize.Large))
