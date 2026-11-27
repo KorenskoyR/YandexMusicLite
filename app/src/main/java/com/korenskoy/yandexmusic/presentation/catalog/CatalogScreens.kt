@@ -2,8 +2,11 @@ package com.korenskoy.yandexmusic.presentation.catalog
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Favorite
@@ -139,24 +142,27 @@ fun CatalogPageScreen(
         }
     }
     val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
+    val palette = HiFi.palette
+    val topBarInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
+    val bottomBarInsets = WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom)
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = contentBottom),
         modifier = Modifier
             .fillMaxSize()
             .predictiveBack(back)
-            .navigationBarsPadding()
+            .windowInsetsPadding(bottomBarInsets)
     ) {
         item(key = "header") {
             if (isLandscape) {
                 HiFiWideHeader(
                     title = state.artist?.artist?.name ?: state.album?.title ?: state.page.title,
                     modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                        .windowInsetsPadding(topBarInsets)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     back = {
                         GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(22.dp))
                         }
                     },
                     cover = { size ->
@@ -190,7 +196,7 @@ fun CatalogPageScreen(
             } else Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                    .windowInsetsPadding(topBarInsets)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Row(
@@ -198,7 +204,7 @@ fun CatalogPageScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     GlassCircleButton(onClick = actions.onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(22.dp))
                     }
                     Spacer(Modifier.weight(1f))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -277,6 +283,7 @@ fun CatalogPageScreen(
 /** The album in the collection: a red heart, like a liked track. */
 @Composable
 private fun AlbumHeart(liked: Boolean, onClick: () -> Unit) {
+    val palette = HiFi.palette
     GlassCircleButton(
         onClick = onClick,
         contentDescription = stringResource(if (liked) R.string.album_unlike else R.string.album_like),
@@ -285,7 +292,7 @@ private fun AlbumHeart(liked: Boolean, onClick: () -> Unit) {
         Icon(
             if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             contentDescription = null,
-            tint = if (liked) HiFi.Love else Color.White,
+            tint = if (liked) palette.love else palette.textPrimary,
             modifier = Modifier.size(22.dp)
         )
     }
@@ -293,11 +300,12 @@ private fun AlbumHeart(liked: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun AlbumSubtitle(album: AlbumDto, actions: CatalogActions) {
+    val palette = HiFi.palette
     val artist = album.artists.firstOrNull { it.idString != null }
     if (artist != null) {
         Text(
             text = album.artists.joinToString { it.name.orEmpty() },
-            color = Color.White.copy(alpha = 0.88f),
+            color = palette.textPrimary.copy(alpha = 0.88f),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -310,7 +318,7 @@ private fun AlbumSubtitle(album: AlbumDto, actions: CatalogActions) {
             album.year?.toString(),
             russianQuantityString(album.tracks.size.takeIf { it > 0 } ?: album.trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many)
         ).joinToString(" · "),
-        color = Color.White.copy(alpha = 0.7f),
+        color = palette.textSecondary,
         fontSize = 13.sp
     )
 }
@@ -318,6 +326,7 @@ private fun AlbumSubtitle(album: AlbumDto, actions: CatalogActions) {
 /** A horizontal row of album covers, used on artist pages and in search results. */
 @Composable
 fun AlbumsRow(albums: List<AlbumDto>, onOpen: (AlbumDto) -> Unit, contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp)) {
+    val palette = HiFi.palette
     LazyRow(contentPadding = contentPadding, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(albums, key = { it.idString ?: it.title.orEmpty() }) { album ->
             Column(
@@ -327,10 +336,10 @@ fun AlbumsRow(albums: List<AlbumDto>, onOpen: (AlbumDto) -> Unit, contentPadding
             ) {
                 Cover(album.coverUri, Icons.Default.Album, RoundedCornerShape(12.dp), 120.dp)
                 Spacer(Modifier.height(6.dp))
-                Text(album.title.orEmpty(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(album.title.orEmpty(), color = palette.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = album.year?.toString() ?: album.artists.joinToString { it.name.orEmpty() },
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = palette.textTertiary,
                     fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -348,14 +357,15 @@ private fun SectionTitle(text: String) {
 
 @Composable
 internal fun Cover(uri: String?, placeholder: ImageVector, shape: Shape, size: Dp) {
+    val palette = HiFi.palette
     Box(
         modifier = Modifier
             .size(size)
             .clip(shape)
-            .background(Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))),
+            .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))),
         contentAlignment = Alignment.Center
     ) {
-        Icon(placeholder, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(size / 3))
+        Icon(placeholder, contentDescription = null, tint = palette.onMetal.copy(alpha = 0.45f), modifier = Modifier.size(size / 3))
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current).cover(uri, CoverSize.Medium).build(),
             contentDescription = null,

@@ -98,19 +98,20 @@ internal fun canAddToPlaylist(track: TrackDetailsDto?): Boolean = track != null 
 /** The round «В плейлист» beside the track's title; metal while its panel is open. */
 @Composable
 internal fun AddToPlaylistButton(size: androidx.compose.ui.unit.Dp, open: Boolean, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val description = stringResource(R.string.car_playlist_add_cd)
     Box(
         Modifier
             .size(size)
             .then(
                 if (open) Modifier.hifiAnodized(CircleShape)
-                else Modifier.hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f))
+                else Modifier.hifiGlass(CircleShape, fill = palette.pillFill, border = palette.glassBorder)
             )
             .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.42f))
+        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null, tint = if (open) palette.onMetal else palette.textPrimary, modifier = Modifier.size(size * 0.42f))
     }
 }
 
@@ -121,22 +122,23 @@ internal fun AddToPlaylistButton(size: androidx.compose.ui.unit.Dp, open: Boolea
  */
 @Composable
 internal fun CarPlaylistsPanel(u: Scale, playlists: CarPlaylists, track: TrackDetailsDto, modifier: Modifier, onClose: () -> Unit) {
+    val palette = HiFi.palette
     var naming by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(track.idString) { playlists.onOpen(track) }
     Column(
         modifier
             .clip(RoundedCornerShape(u(30f)))
-            .background(HiFi.SheetFill.copy(alpha = 0.97f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+            .background(palette.sheetFill.copy(alpha = 0.97f))
+            .border(1.dp, palette.glassBorder, RoundedCornerShape(u(30f)))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
             .padding(start = u(12f), end = u(16f), top = u(18f), bottom = u(12f))
     ) {
         Row(Modifier.padding(start = u(12f), end = u(2f), bottom = u(8f)), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.car_playlists_title), color = Color.White, fontSize = u.sp(28f), lineHeight = u.sp(34f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                Text(stringResource(R.string.car_playlists_title), color = palette.textPrimary, fontSize = u.sp(28f), lineHeight = u.sp(34f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
                 Text(
                     listOfNotNull(track.title, track.artists.joinToString { it.name.orEmpty() }.ifBlank { null }).joinToString(" · "),
-                    color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f), lineHeight = u.sp(20f), maxLines = 1, overflow = TextOverflow.Ellipsis
+                    color = palette.textSecondary, fontSize = u.sp(15f), lineHeight = u.sp(20f), maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
             Spacer(Modifier.width(u(12f)))
@@ -147,7 +149,7 @@ internal fun CarPlaylistsPanel(u: Scale, playlists: CarPlaylists, track: TrackDe
                     .clickable(role = Role.Button, onClick = onClose),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(u(4f))) {
@@ -156,7 +158,7 @@ internal fun CarPlaylistsPanel(u: Scale, playlists: CarPlaylists, track: TrackDe
                 item(key = "none") {
                     Text(
                         stringResource(R.string.car_playlists_none),
-                        color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(18f), lineHeight = u.sp(26f), textAlign = TextAlign.Center,
+                        color = palette.textSecondary, fontSize = u.sp(18f), lineHeight = u.sp(26f), textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = u(16f), vertical = u(20f))
                     )
                 }
@@ -179,6 +181,7 @@ internal fun CarPlaylistsPanel(u: Scale, playlists: CarPlaylists, track: TrackDe
 
 @Composable
 private fun NewPlaylistRow(u: Scale, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(u(22f))
     Row(
         Modifier
@@ -189,7 +192,7 @@ private fun NewPlaylistRow(u: Scale, onClick: () -> Unit) {
             .padding(horizontal = u(12f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val dash = Color.White.copy(alpha = 0.34f)
+        val dash = palette.textPrimary.copy(alpha = 0.34f)
         Box(
             Modifier
                 .size(u(56f))
@@ -202,15 +205,16 @@ private fun NewPlaylistRow(u: Scale, onClick: () -> Unit) {
                 },
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(u(26f)))
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(u(26f)))
         }
         Spacer(Modifier.width(u(16f)))
-        Text(stringResource(R.string.car_playlist_new), color = Color.White, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(R.string.car_playlist_new), color = palette.textPrimary, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun PlaylistRow(u: Scale, playlist: UserPlaylistDto, mark: QuickMark?, onAdd: () -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(u(22f))
     val title = playlist.title.orEmpty()
     val addLabel = stringResource(R.string.car_playlist_add_to_cd, title)
@@ -227,10 +231,10 @@ private fun PlaylistRow(u: Scale, playlist: UserPlaylistDto, mark: QuickMark?, o
         PlaylistCover(u, playlist)
         Spacer(Modifier.width(u(16f)))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = palette.textPrimary, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 russianQuantityString(playlist.trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
-                color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f), lineHeight = u.sp(20f), maxLines = 1
+                color = palette.textSecondary, fontSize = u.sp(15f), lineHeight = u.sp(20f), maxLines = 1
             )
         }
         Spacer(Modifier.width(u(12f)))
@@ -238,10 +242,10 @@ private fun PlaylistRow(u: Scale, playlist: UserPlaylistDto, mark: QuickMark?, o
             null -> Box(
                 Modifier
                     .size(u(56f))
-                    .hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f))
+                    .hifiGlass(CircleShape, fill = palette.pillFill, border = palette.glassBorder)
                     .semantics { contentDescription = addLabel },
                 contentAlignment = Alignment.Center
-            ) { Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(u(26f))) }
+            ) { Icon(Icons.Rounded.Add, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(u(26f))) }
             QuickMark.ADDING -> Box(Modifier.size(u(56f)), contentAlignment = Alignment.Center) { HiFiActivityIndicator(size = u(24f)) }
             QuickMark.ADDED -> MarkPill(u, Icons.Rounded.Check, stringResource(R.string.car_playlist_added))
             QuickMark.ALREADY -> MarkPill(u, Icons.Rounded.Check, stringResource(R.string.car_playlist_already))
@@ -252,28 +256,30 @@ private fun PlaylistRow(u: Scale, playlist: UserPlaylistDto, mark: QuickMark?, o
 
 @Composable
 private fun MarkPill(u: Scale, icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    val palette = HiFi.palette
     Row(
         Modifier
             .heightIn(min = u(40f))
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.10f))
+            .background(palette.pillFill)
             .padding(horizontal = u(14f), vertical = u(6f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(u(20f)))
+        Icon(icon, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(u(20f)))
         Spacer(Modifier.width(u(6f)))
-        Text(text, color = Color.White, fontSize = u.sp(15f), lineHeight = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(text, color = palette.textPrimary, fontSize = u.sp(15f), lineHeight = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
 @Composable
 private fun PlaylistCover(u: Scale, playlist: UserPlaylistDto) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(u(14f))
     Box(
         Modifier
             .size(u(56f))
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF2C303B), Color(0xFF14161C)))),
+            .background(palette.placeholder),
         contentAlignment = Alignment.Center
     ) {
         val uri = playlist.coverUri
@@ -285,7 +291,7 @@ private fun PlaylistCover(u: Scale, playlist: UserPlaylistDto) {
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(u(26f)))
+            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.5f), modifier = Modifier.size(u(26f)))
         }
     }
 }

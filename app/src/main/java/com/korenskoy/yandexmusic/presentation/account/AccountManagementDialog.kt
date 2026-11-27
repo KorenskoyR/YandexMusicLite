@@ -63,6 +63,7 @@ fun AccountManagementDialog(
 
     val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
 
+    val palette = HiFi.palette
     AppDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
@@ -85,7 +86,7 @@ fun AccountManagementDialog(
                     .clip(RoundedCornerShape(28.dp))
                     .border(
                         BorderStroke(1.dp, Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.05f))
+                            listOf(palette.glassBorder, palette.cardBorder)
                         )),
                         RoundedCornerShape(28.dp)
                     ),
@@ -107,14 +108,14 @@ fun AccountManagementDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.account_management_upravlenie_akkauntami),
-                                color = Color.White,
+                                color = palette.textPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = stringResource(R.string.account_management_pereklyuchenie_profiley_i_nastroyki),
-                                color = Color.White.copy(alpha = 0.55f),
+                                color = palette.textSecondary,
                                 fontSize = 12.sp
                             )
                         }
@@ -123,12 +124,12 @@ fun AccountManagementDialog(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.07f))
+                                .background(palette.pillFill)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResource(R.string.cd_zakryt),
-                                tint = Color.White.copy(alpha = 0.8f),
+                                tint = palette.textPrimary.copy(alpha = 0.8f),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -140,7 +141,7 @@ fun AccountManagementDialog(
                     if (accounts.isNotEmpty()) {
                         Text(
                             text = stringResource(R.string.account_saved_accounts_header, accounts.size),
-                            color = Color.White.copy(alpha = 0.45f),
+                            color = palette.textTertiary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.8.sp
@@ -164,18 +165,15 @@ fun AccountManagementDialog(
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(
                                             if (isActive) {
-                                                // Selected = dark anodized metal (no colour), like the rest of the app
-                                                Brush.verticalGradient(listOf(HiFi.AnodizedLight, HiFi.AnodizedDark))
+                                                Brush.verticalGradient(listOf(palette.anodizedLight, palette.anodizedDark))
                                             } else {
-                                                Brush.horizontalGradient(
-                                                    listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.03f))
-                                                )
+                                                Brush.horizontalGradient(listOf(palette.cardFill, palette.cardFill))
                                             }
                                         )
                                         .border(
                                             BorderStroke(
                                                 1.dp,
-                                                if (isActive) Color(0x80C9CED8) else Color.White.copy(alpha = 0.08f)
+                                                if (isActive) palette.steelEdge.copy(alpha = 0.55f) else palette.cardBorder
                                             ),
                                             RoundedCornerShape(16.dp)
                                         )
@@ -191,15 +189,7 @@ fun AccountManagementDialog(
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(
-                                                if (isActive) {
-                                                    Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
-                                                } else {
-                                                    Brush.linearGradient(
-                                                        listOf(HiFi.SteelLight, HiFi.SteelDark)
-                                                    )
-                                                }
-                                            ),
+                                            .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (!account.avatarUrl.isNullOrBlank()) {
@@ -211,7 +201,7 @@ fun AccountManagementDialog(
                                                 error = {
                                                     Text(
                                                         text = initialLetter.toString(),
-                                                        color = Color.White,
+                                                        color = palette.onMetal,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 17.sp
                                                     )
@@ -220,7 +210,7 @@ fun AccountManagementDialog(
                                         } else {
                                             Text(
                                                 text = initialLetter.toString(),
-                                                color = Color.White,
+                                                color = palette.onMetal,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 17.sp
                                             )
@@ -233,7 +223,7 @@ fun AccountManagementDialog(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = account.displayName.ifBlank { account.login }.ifBlank { "UID: ${account.uid}" },
-                                            color = Color.White,
+                                            color = palette.textPrimary,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
@@ -242,7 +232,7 @@ fun AccountManagementDialog(
                                         if (account.login.isNotBlank() && account.displayName != account.login) {
                                             Text(
                                                 text = account.login,
-                                                color = Color.White.copy(alpha = 0.45f),
+                                                color = palette.textTertiary,
                                                 fontSize = 11.5.sp,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -267,7 +257,7 @@ fun AccountManagementDialog(
                                         Icon(
                                             imageVector = if (isDefault) Icons.Default.Star else Icons.Default.StarBorder,
                                             contentDescription = stringResource(if (isDefault) R.string.account_is_default else R.string.account_make_default),
-                                            tint = if (isDefault) Color.White else Color.White.copy(alpha = 0.35f),
+                                            tint = if (isDefault) palette.textPrimary else palette.textTertiary,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -279,21 +269,21 @@ fun AccountManagementDialog(
                                         Row(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Color.White.copy(alpha = 0.08f))
-                                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)), RoundedCornerShape(8.dp))
+                                                .background(palette.pillFill)
+                                                .border(BorderStroke(1.dp, palette.glassBorder), RoundedCornerShape(8.dp))
                                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Check,
                                                 contentDescription = null,
-                                                tint = Color.White.copy(alpha = 0.85f),
+                                                tint = palette.textPrimary.copy(alpha = 0.85f),
                                                 modifier = Modifier.size(12.dp)
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
                                                 text = stringResource(R.string.account_management_aktiven),
-                                                color = Color.White.copy(alpha = 0.85f),
+                                                color = palette.textPrimary.copy(alpha = 0.85f),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -306,7 +296,7 @@ fun AccountManagementDialog(
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
                                                 contentDescription = stringResource(R.string.cd_udalit_profil),
-                                                tint = HiFi.Danger.copy(alpha = 0.75f),
+                                                tint = palette.danger.copy(alpha = 0.85f),
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
@@ -318,7 +308,7 @@ fun AccountManagementDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.account_management_profil_po_umolchaniyu_avto),
-                            color = Color.White.copy(alpha = 0.45f),
+                            color = palette.textTertiary,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                         )
@@ -341,20 +331,20 @@ fun AccountManagementDialog(
                         contentPadding = actionPadding,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.08f)
+                            containerColor = palette.pillFill
                         ),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                        border = BorderStroke(1.dp, palette.glassBorder)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = palette.textPrimary,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.account_management_voyti_v_drugoy_akkaunt),
-                            color = Color.White,
+                            color = palette.textPrimary,
                             fontSize = actionFont,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -373,20 +363,20 @@ fun AccountManagementDialog(
                         contentPadding = actionPadding,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0x22FF5252)
+                            containerColor = palette.danger.copy(alpha = if (palette.isDark) 0.14f else 0.10f)
                         ),
-                        border = BorderStroke(1.dp, Color(0x55FF5252))
+                        border = BorderStroke(1.dp, palette.danger.copy(alpha = if (palette.isDark) 0.35f else 0.40f))
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
-                            tint = HiFi.Danger,
+                            tint = palette.danger,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.account_management_vyyti_iz_etogo_akkaunta),
-                            color = HiFi.Danger,
+                            color = palette.danger,
                             fontSize = actionFont,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -402,7 +392,7 @@ fun AccountManagementDialog(
                         ) {
                             Text(
                                 text = stringResource(R.string.account_management_vyyti_so_vseh_akkauntov),
-                                color = Color.White.copy(alpha = 0.45f),
+                                color = palette.textTertiary,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Normal
                             )
@@ -418,7 +408,7 @@ fun AccountManagementDialog(
         HiFiAlertDialog(
             onDismissRequest = { confirmLogoutCurrent = false },
             title = stringResource(R.string.account_management_vyyti_iz_akkaunta),
-            content = { Text(stringResource(R.string.account_management_dannye_i_kesh_tekuschego), color = HiFi.TextSecondary, fontSize = 15.sp) },
+            content = { Text(stringResource(R.string.account_management_dannye_i_kesh_tekuschego), color = palette.textSecondary, fontSize = 15.sp) },
             confirm = { HiFiDialogAction(stringResource(R.string.account_management_vyyti), { confirmLogoutCurrent = false; onLogoutCurrent(); onDismiss() }, HiFiDialogActionKind.Danger) },
             dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), { confirmLogoutCurrent = false }, HiFiDialogActionKind.Quiet) }
         )
@@ -429,7 +419,7 @@ fun AccountManagementDialog(
         HiFiAlertDialog(
             onDismissRequest = { confirmLogoutAll = false },
             title = stringResource(R.string.account_management_vyyti_so_vseh_akkauntov_2),
-            content = { Text(stringResource(R.string.account_management_vse_sohranennye_uchetnye_zapisi), color = HiFi.TextSecondary, fontSize = 15.sp) },
+            content = { Text(stringResource(R.string.account_management_vse_sohranennye_uchetnye_zapisi), color = palette.textSecondary, fontSize = 15.sp) },
             confirm = { HiFiDialogAction(stringResource(R.string.account_management_vyyti_so_vseh), { confirmLogoutAll = false; onLogoutAll(); onDismiss() }, HiFiDialogActionKind.Danger) },
             dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), { confirmLogoutAll = false }, HiFiDialogActionKind.Quiet) }
         )
@@ -440,7 +430,7 @@ fun AccountManagementDialog(
         HiFiAlertDialog(
             onDismissRequest = { accountToDelete = null },
             title = stringResource(R.string.account_management_udalit_profil),
-            content = { Text(stringResource(R.string.account_remove_confirm, target.displayName.ifBlank { target.login }.ifBlank { target.uid }), color = HiFi.TextSecondary, fontSize = 15.sp) },
+            content = { Text(stringResource(R.string.account_remove_confirm, target.displayName.ifBlank { target.login }.ifBlank { target.uid }), color = palette.textSecondary, fontSize = 15.sp) },
             confirm = { HiFiDialogAction(stringResource(R.string.account_management_udalit), { val uidToRemove = target.uid; accountToDelete = null; onRemoveAccount(uidToRemove) }, HiFiDialogActionKind.Danger) },
             dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), { accountToDelete = null }, HiFiDialogActionKind.Quiet) }
         )

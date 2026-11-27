@@ -2,8 +2,11 @@ package com.korenskoy.yandexmusic.presentation.main
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -176,6 +179,8 @@ fun HomeScreen(
         WaveInstrument(knobSize = knob, mode = mode, isPlaying = playing, progress = progressFraction, onPlayPause = onPlayPause)
     }
 
+    val topInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
+    val bottomInsets = WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom)
     if (isLandscape) {
         // A phone on its side (under 480 dp tall): the chips go above the knob, where there is room, so the
         // "next up" cards keep clear of the tab dock
@@ -183,8 +188,8 @@ fun HomeScreen(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
-                .navigationBarsPadding()
+                .windowInsetsPadding(topInsets)
+                .windowInsetsPadding(bottomInsets)
                 .padding(start = 20.dp, end = 24.dp, top = 12.dp, bottom = contentBottom),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -221,7 +226,7 @@ fun HomeScreen(
         SubcomposeLayout(
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                .windowInsetsPadding(topInsets)
                 .padding(bottom = contentBottom)
         ) { constraints ->
             val width = constraints.maxWidth
@@ -371,6 +376,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
         modifier = Modifier.fillMaxWidth().height(TrackInfoHeight),
         label = "wave_track"
     ) { (shown, next) ->
+        val palette = HiFi.palette
         if (shown == null) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 if (next == null) {
@@ -380,7 +386,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                 Text(stringResource(R.string.wave_starts_with).uppercase(), style = HiFiType.SectionCaps)
                 Text(
                     text = listOfNotNull(next.title, next.artists.firstOrNull()?.name).joinToString(" · "),
-                    color = Color.White,
+                    color = palette.textPrimary,
                     fontSize = 22.sp,
                     lineHeight = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -393,7 +399,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
         } else {
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                 GlassCircleButton(onClick = onDislike, contentDescription = stringResource(R.string.cd_ne_nravitsya), size = 48.dp) {
-                    Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
+                    Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     // As in the player: two lines and a smaller type before an ellipsis, the "E" plate.
@@ -408,7 +414,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                     )
                     Text(
                         text = shown.artists.joinToString { it.name ?: "" },
-                        color = Color.White.copy(alpha = 0.70f),
+                        color = palette.textSecondary,
                         fontSize = 17.sp,
                         lineHeight = 22.sp,
                         maxLines = 1,
@@ -421,7 +427,7 @@ private fun WaveTrackInfo(track: TrackDetailsDto?, startsWith: TrackDetailsDto?,
                     Icon(
                         if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         contentDescription = null,
-                        tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.86f),
+                        tint = if (isLiked) palette.love else palette.textPrimary.copy(alpha = 0.86f),
                         modifier = Modifier.size(21.dp)
                     )
                 }
@@ -449,7 +455,7 @@ private fun WaveShelf(
             // Opens the full-screen player; hidden while there is nothing to open
             if (onOpenPlayer != null) {
                 HiFiTextAction(text = stringResource(R.string.wave_player), onClick = onOpenPlayer)
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = HiFi.palette.textSecondary, modifier = Modifier.size(18.dp))
             } else {
                 // Keeps the header as tall as with the action, so the shelf does not shift
                 Spacer(Modifier.height(44.dp))
@@ -487,11 +493,11 @@ private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
                 .size(size)
                 .hifiSoftShadow(RoundedCornerShape(14.dp), 16.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(HiFi.Placeholder)
+                .background(HiFi.palette.placeholder)
         )
         Spacer(Modifier.height(8.dp))
         TrackTitleLine(track.title ?: stringResource(R.string.bez_nazvaniya), track.showsExplicit, 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
-        Text(track.artists.joinToString { it.name ?: "" }, color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.artists.joinToString { it.name ?: "" }, color = HiFi.palette.textSecondary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -502,6 +508,7 @@ private fun UpNextCard(track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
 @Composable
 private fun SkeletonRow(cardSize: Dp, horizontalPadding: Dp, animated: Boolean) {
     val loadingText = stringResource(R.string.wave_loading)
+    val isDark = HiFi.palette.isDark
     val phase: State<Float>? = if (animated) {
         rememberInfiniteTransition(label = "wave_skeleton").animateFloat(
             initialValue = 0f,
@@ -510,8 +517,9 @@ private fun SkeletonRow(cardSize: Dp, horizontalPadding: Dp, animated: Boolean) 
             label = "wave_skeleton_phase"
         )
     } else null
-    val base = remember { Color.White.copy(alpha = 0.06f) }
-    val bright = remember { Color.White.copy(alpha = 0.14f) }
+    val shimmerTone = if (isDark) Color.White else Color(0xFF11141C)
+    val base = remember(isDark) { shimmerTone.copy(alpha = 0.06f) }
+    val bright = remember(isDark) { shimmerTone.copy(alpha = if (isDark) 0.14f else 0.12f) }
     // As many placeholders as cards would fit, so a wide screen is not left with a gap at the end
     val count = (((currentWindowSizeDp().widthDp.dp - horizontalPadding) / (cardSize + 12.dp)).toInt() + 1).coerceIn(3, 8)
     Row(

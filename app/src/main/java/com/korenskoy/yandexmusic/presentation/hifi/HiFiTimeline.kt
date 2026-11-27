@@ -157,12 +157,15 @@ fun HiFiTimeline(
     val percent by remember { derivedStateOf { (shown() * 100).toInt() } }
     val description = stringResource(R.string.car_timeline)
 
+    val palette = HiFi.palette
+    val boxDescription = description
+    val isDark = palette.isDark
     Box(
         modifier
             .fillMaxWidth()
             .height(u(height))
             .semantics {
-                contentDescription = description
+                contentDescription = boxDescription
                 progressBarRangeInfo = ProgressBarRangeInfo(percent / 100f, 0f..1f)
                 setProgress { target ->
                     seek(TimelineMath.seekPosition(target, duration))
@@ -201,8 +204,18 @@ fun HiFiTimeline(
                 }
             }
             .drawWithCache {
-                val rest = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.White.copy(alpha = 0.10f)))
-                val playedFill = Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.White))
+                val rest = if (isDark) {
+                    Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.White.copy(alpha = 0.10f)))
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFF11141C).copy(alpha = 0.16f), Color(0xFF11141C).copy(alpha = 0.08f)))
+                }
+                val restStroke = if (isDark) Color.Black.copy(alpha = 0.55f) else Color(0xFF11141C).copy(alpha = 0.14f)
+                val playedFill = if (isDark) {
+                    Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.White))
+                } else {
+                    Brush.horizontalGradient(listOf(Color(0xFF11131A).copy(alpha = 0.70f), Color(0xFF11131A)))
+                }
+                val beadCenterCol = if (isDark) listOf(Color(0xFF3A3F4B), palette.anodizedDark) else listOf(Color.White, Color(0xFFCBD2DF))
                 val sheenWidth = u(120f).toPx()
                 onDrawBehind {
                     val h = u(groove).toPx()
@@ -212,14 +225,14 @@ fun HiFiTimeline(
                     val playedW = (size.width * f).coerceAtLeast(h)
                     // Groove
                     drawRoundRect(rest, Offset(0f, top), Size(size.width, h), r)
-                    drawRoundRect(Color.Black.copy(alpha = 0.55f), Offset(0f, top), Size(size.width, h), r, style = Stroke(1f))
+                    drawRoundRect(restStroke, Offset(0f, top), Size(size.width, h), r, style = Stroke(1f))
                     // Played part with the running highlight
                     drawRoundRect(playedFill, Offset(0f, top), Size(playedW, h), r)
                     sheen?.value?.let { p ->
                         val x = -sheenWidth + p * (playedW + sheenWidth)
                         clipRect(0f, top, playedW, top + h) {
                             drawRect(
-                                Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = 0.85f), Color.White.copy(alpha = 0f)), startX = x, endX = x + sheenWidth),
+                                Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = if (isDark) 0.85f else 0.50f), Color.White.copy(alpha = 0f)), startX = x, endX = x + sheenWidth),
                                 Offset(x, top),
                                 Size(sheenWidth, h)
                             )
@@ -228,10 +241,10 @@ fun HiFiTimeline(
                     // Metal bead
                     val beadR = u(bead).toPx() / 2f
                     val c = Offset((size.width * f).coerceIn(beadR, size.width - beadR), size.height / 2f)
-                    drawCircle(Color.Black.copy(alpha = 0.45f), beadR + u(3f).toPx(), c + Offset(0f, u(3f).toPx()))
-                    drawCircle(Brush.sweepGradient(HiFi.MetalSweep, center = c), beadR, c)
+                    drawCircle(Color.Black.copy(alpha = if (isDark) 0.45f else 0.22f), beadR + u(3f).toPx(), c + Offset(0f, u(3f).toPx()))
+                    drawCircle(Brush.sweepGradient(palette.metalSweep, center = c), beadR, c)
                     drawCircle(
-                        Brush.radialGradient(listOf(Color(0xFF3A3F4B), HiFi.AnodizedDark), center = c + Offset(0f, -beadR * 0.4f), radius = beadR * 1.3f),
+                        Brush.radialGradient(beadCenterCol, center = c + Offset(0f, -beadR * 0.4f), radius = beadR * 1.3f),
                         beadR - u(1.5f).toPx(),
                         c
                     )
@@ -244,6 +257,7 @@ fun HiFiTimeline(
 @Composable
 fun HiFiLiveLine(modifier: Modifier = Modifier, unit: Dp = 1.dp, height: Float = 48f) {
     val lite = LocalHiFiLite.current
+    val palette = HiFi.palette
     val blink: State<Float>? = if (!lite) {
         rememberInfiniteTransition(label = "live").animateFloat(
             initialValue = 1f,
@@ -260,12 +274,12 @@ fun HiFiLiveLine(modifier: Modifier = Modifier, unit: Dp = 1.dp, height: Float =
         LiveGroove(Modifier.weight(1f).height(unit * 6f), fadeToRight = false)
         Box(
             Modifier.size(unit * 9f).drawWithCache {
-                onDrawBehind { drawCircle(HiFi.Live.copy(alpha = blink?.value ?: 1f)) }
+                onDrawBehind { drawCircle(palette.live.copy(alpha = blink?.value ?: 1f)) }
             }
         )
         Text(
             stringResource(R.string.radio_on_air),
-            color = Color.White,
+            color = palette.textPrimary,
             fontSize = (13f * unit.value).sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 0.14.em
@@ -276,9 +290,10 @@ fun HiFiLiveLine(modifier: Modifier = Modifier, unit: Dp = 1.dp, height: Float =
 
 @Composable
 private fun LiveGroove(modifier: Modifier, fadeToRight: Boolean) {
+    val base = if (HiFi.palette.isDark) Color.White else Color(0xFF11141C)
     Spacer(
         modifier.drawWithCache {
-            val colors = listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.30f))
+            val colors = listOf(base.copy(alpha = 0.06f), base.copy(alpha = 0.30f))
             val brush = Brush.horizontalGradient(if (fadeToRight) colors.reversed() else colors)
             onDrawBehind { drawRoundRect(brush, cornerRadius = CornerRadius(size.height / 2f)) }
         }

@@ -210,12 +210,14 @@ private fun QueueSheetContent(
         pluralStringResource(R.plurals.player_queue_tracks, total, total)
     ).joinToString(" · ")
 
+    val palette = HiFi.palette
+    val topRim = palette.glassBorder
     Column(
         modifier
             .offset { IntOffset(0, drag.value.roundToInt()) }
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(HiFi.SheetFill)
-            .drawBehind { drawLine(Color.White.copy(alpha = 0.14f), Offset(28.dp.toPx(), 0.5f), Offset(size.width - 28.dp.toPx(), 0.5f), 1f) }
+            .background(palette.sheetFill)
+            .drawBehind { drawLine(topRim, Offset(28.dp.toPx(), 0.5f), Offset(size.width - 28.dp.toPx(), 0.5f), 1f) }
             // Swallow taps so they do not reach the scrim behind the sheet
             .pointerInput(Unit) { detectTapGestures { } }
     ) {
@@ -235,23 +237,23 @@ private fun QueueSheetContent(
                     .size(width = 40.dp, height = 5.dp)
                     .align(Alignment.CenterHorizontally)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.28f))
+                    .background(palette.textPrimary.copy(alpha = 0.28f))
             )
             Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 16.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 val compact = com.korenskoy.yandexmusic.utils.currentWindowSizeDp().heightDp < 440
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.player_queue_title),
-                        color = Color.White,
+                        color = palette.textPrimary,
                         fontSize = if (compact) 20.sp else 26.sp,
                         lineHeight = if (compact) 26.sp else 32.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.02).em
                     )
-                    Text(subtitle, color = Color.White.copy(alpha = 0.62f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, color = palette.textSecondary, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 GlassCircleButton(onClick = onDismiss, contentDescription = stringResource(R.string.cd_zakryt), size = 44.dp) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -302,7 +304,7 @@ private fun QueueSheetContent(
 private fun QueueCaption(text: String, top: Dp) {
     Text(
         text = text.uppercase(),
-        color = Color.White.copy(alpha = 0.62f),
+        color = HiFi.palette.textSecondary,
         fontSize = 13.sp,
         lineHeight = 18.sp,
         fontWeight = FontWeight.ExtraBold,
@@ -314,6 +316,7 @@ private fun QueueCaption(text: String, top: Dp) {
 @Composable
 private fun QueueCover(track: TrackDetailsDto) {
     val context = LocalContext.current
+    val palette = HiFi.palette
     AsyncImage(
         model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Small).build(),
         contentDescription = null,
@@ -321,8 +324,8 @@ private fun QueueCover(track: TrackDetailsDto) {
         modifier = Modifier
             .size(46.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+            .background(palette.placeholder)
+            .border(1.dp, palette.glassBorder, RoundedCornerShape(10.dp))
     )
 }
 
@@ -338,7 +341,7 @@ private fun QueueTexts(track: TrackDetailsDto, bold: Boolean, modifier: Modifier
         )
         Text(
             track.artists.joinToString(", ") { it.name ?: "" },
-            color = Color.White.copy(alpha = 0.62f),
+            color = HiFi.palette.textSecondary,
             fontSize = 13.sp,
             lineHeight = 18.sp,
             maxLines = 1,
@@ -382,6 +385,7 @@ private fun QueueRow(
     }
     val upLabel = stringResource(R.string.action_move_up)
     val downLabel = stringResource(R.string.action_move_down)
+    val palette = HiFi.palette
     SwipeToDismissBox(
         state = swipe,
         enableDismissFromStartToEnd = false,
@@ -391,12 +395,12 @@ private fun QueueRow(
                 Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(HiFi.Danger.copy(alpha = 0.22f))
+                    .background(palette.danger.copy(alpha = 0.22f))
                     .padding(end = 20.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(stringResource(R.string.queue_remove), color = HiFi.Danger, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.queue_remove), color = palette.danger, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
     ) {
@@ -405,7 +409,7 @@ private fun QueueRow(
             .fillMaxWidth()
             .height(62.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(HiFi.SheetFill)
+            .background(palette.sheetFill)
             .hifiPress(onClick, role = null)
             .semantics {
                 customActions = listOfNotNull(
@@ -429,10 +433,10 @@ private fun QueueRow(
             contentAlignment = Alignment.Center
         ) {
             Box(
-                Modifier.size(30.dp).hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f)),
+                Modifier.size(30.dp).hifiGlass(CircleShape, fill = palette.pillFill, border = palette.glassBorder),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Close, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -442,6 +446,7 @@ private fun QueueRow(
 /** A row-shaped placeholder while more of the queue loads; the shimmer is read in the draw phase. */
 @Composable
 private fun QueueSkeletonRow() {
+    val shimmerColor = HiFi.palette.textPrimary
     val lite = LocalHiFiLite.current
     val pulse: State<Float>? = if (!lite) {
         rememberInfiniteTransition(label = "queue_skeleton").animateFloat(
@@ -462,11 +467,11 @@ private fun QueueSkeletonRow() {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         val block = Modifier.drawBehind {
-            drawRoundRect(Color.White.copy(alpha = pulse?.value ?: 0.08f), cornerRadius = CornerRadius(size.height / 2f))
+            drawRoundRect(shimmerColor.copy(alpha = pulse?.value ?: 0.08f), cornerRadius = CornerRadius(size.height / 2f))
         }
         Box(
             Modifier.size(46.dp).drawBehind {
-                drawRoundRect(Color.White.copy(alpha = pulse?.value ?: 0.08f), cornerRadius = CornerRadius(10.dp.toPx()))
+                drawRoundRect(shimmerColor.copy(alpha = pulse?.value ?: 0.08f), cornerRadius = CornerRadius(10.dp.toPx()))
             }
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

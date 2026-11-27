@@ -41,25 +41,26 @@ import com.korenskoy.yandexmusic.presentation.hifi.MetalPillButton
  */
 @Composable
 internal fun CodeFallbackStrip(reset: Boolean, onSignInByCode: () -> Unit, modifier: Modifier = Modifier) {
+    val palette = HiFi.palette
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
-            .background(if (reset) Color(0xFF1B1E27) else HiFi.SheetFill)
+            .background(if (reset && palette.isDark) Color(0xFF1B1E27) else palette.sheetFill)
             .semantics { liveRegion = LiveRegionMode.Polite }
     ) {
         // The top edge: a hairline, amber when the page has started over
-        Box(Modifier.fillMaxWidth().height(if (reset) 2.dp else 1.dp).background(if (reset) HiFi.Warning else Color.White.copy(alpha = 0.14f)))
+        Box(Modifier.fillMaxWidth().height(if (reset) 2.dp else 1.dp).background(if (reset) palette.warning else palette.glassBorder))
         val wide = maxWidth >= WIDE
         val texts: @Composable (Modifier) -> Unit = { textModifier ->
             Column(textModifier) {
                 Text(
                     stringResource(if (reset) R.string.auth_code_strip_reset else R.string.auth_code_strip_title),
-                    color = Color.White, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold,
+                    color = palette.textPrimary, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     stringResource(R.string.auth_code_strip_hint),
-                    color = Color.White.copy(alpha = 0.66f), fontSize = 13.sp, lineHeight = 18.sp,
+                    color = palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
             }
@@ -81,7 +82,7 @@ internal fun CodeFallbackStrip(reset: Boolean, onSignInByCode: () -> Unit, modif
         } else {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(22.dp))
+                    Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(12.dp))
                     texts(Modifier.weight(1f))
                 }

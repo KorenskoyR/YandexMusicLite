@@ -78,7 +78,7 @@ internal fun PlayerControls(
                 contentDescription = stringResource(if (isRadio) R.string.cd_prev_station else R.string.cd_predyduschiy_trek),
                 size = 68.dp * k
             ) {
-                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(30.dp * k))
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.palette.onMetal, modifier = Modifier.size(30.dp * k))
             }
             HiFiKnob(onClick = onPlayPause, contentDescription = stringResource(R.string.cd_vosproizvedenie_ili_pauza), size = 96.dp * k) {
                 PlayPauseGlyph(isPlaying = isPlaying, size = 40.dp * k)
@@ -88,7 +88,7 @@ internal fun PlayerControls(
                 contentDescription = stringResource(if (isRadio) R.string.cd_next_station else R.string.cd_sleduyuschiy_trek),
                 size = 68.dp * k
             ) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(30.dp * k))
+                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.palette.onMetal, modifier = Modifier.size(30.dp * k))
             }
             if (canReact) LikeHeartButton(isLiked = isLiked, onToggleLike = onLike, size = 52.dp * k) else Spacer(Modifier.size(52.dp * k))
         }
@@ -103,6 +103,7 @@ private fun GlassPressButton(
     size: Dp,
     content: @Composable () -> Unit
 ) {
+    val palette = HiFi.palette
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, HiFiMotion.spring(), label = "glass_press")
@@ -113,7 +114,7 @@ private fun GlassPressButton(
                 scaleX = scale
                 scaleY = scale
             }
-            .hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f))
+            .hifiGlass(CircleShape, fill = palette.pillFill, border = if (palette.isDark) Color.White.copy(alpha = 0.14f) else palette.glassBorder)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center
@@ -124,6 +125,7 @@ private fun GlassPressButton(
 
 @Composable
 fun LikeHeartButton(isLiked: Boolean, onToggleLike: () -> Unit, size: Dp = 52.dp) {
+    val palette = HiFi.palette
     val pop = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
     GlassPressButton(
@@ -140,7 +142,7 @@ fun LikeHeartButton(isLiked: Boolean, onToggleLike: () -> Unit, size: Dp = 52.dp
         Icon(
             imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
             contentDescription = null,
-            tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.86f),
+            tint = if (isLiked) palette.love else palette.textPrimary.copy(alpha = 0.86f),
             modifier = Modifier
                 .size(size * 0.43f)
                 .graphicsLayer {
@@ -153,6 +155,7 @@ fun LikeHeartButton(isLiked: Boolean, onToggleLike: () -> Unit, size: Dp = 52.dp
 
 @Composable
 fun DislikeButton(onDislikeClick: () -> Unit, size: Dp = 52.dp) {
+    val palette = HiFi.palette
     val flash = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     GlassPressButton(
@@ -166,11 +169,11 @@ fun DislikeButton(onDislikeClick: () -> Unit, size: Dp = 52.dp) {
         contentDescription = stringResource(R.string.cd_ne_nravitsya),
         size = size
     ) {
-        val base = Color.White.copy(alpha = 0.86f)
+        val base = palette.textPrimary.copy(alpha = 0.86f)
         Icon(
             imageVector = Icons.Outlined.HeartBroken,
             contentDescription = null,
-            tint = androidx.compose.ui.graphics.lerp(base, HiFi.Danger, flash.value),
+            tint = androidx.compose.ui.graphics.lerp(base, palette.danger, flash.value),
             modifier = Modifier
                 .size(size * 0.43f)
                 .graphicsLayer {

@@ -57,6 +57,7 @@ import com.korenskoy.yandexmusic.R
 import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.player.SleepTimerState
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
 import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiBackdrop
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiLiveLine
@@ -148,8 +149,14 @@ fun FullScreenPlayer(
     /** Opens with the words over the cover (screenshots). */
     initialLyricsOpen: Boolean = false,
     /** Lying down, the cover is on the passenger's side ("Сторона руля"): on the right with the wheel on the left. */
-    coverOnRight: Boolean = false
+    coverOnRight: Boolean = false,
+    repeatMode: RepeatMode = RepeatMode.OFF,
+    onCycleRepeat: () -> Unit = {},
+    shuffled: Boolean = false,
+    onToggleShuffle: () -> Unit = {},
+    showRepeatAndShuffle: Boolean = false
 ) {
+    val palette = HiFi.palette
     var showQueue by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialQueueOpen) }
     // Taking a downloaded track off the device is asked first; stopping a download is not
     var askRemove by remember { mutableStateOf(false) }
@@ -157,7 +164,7 @@ fun FullScreenPlayer(
         HiFiAlertDialog(
             onDismissRequest = { askRemove = false },
             title = stringResource(R.string.track_remove_title),
-            content = { Text(stringResource(R.string.track_remove_message, track.title.orEmpty()), color = HiFi.TextSecondary, fontSize = 15.sp, lineHeight = 21.sp) },
+            content = { Text(stringResource(R.string.track_remove_message, track.title.orEmpty()), color = palette.textSecondary, fontSize = 15.sp, lineHeight = 21.sp) },
             confirm = { HiFiDialogAction(stringResource(R.string.track_remove_confirm), { askRemove = false; onRemoveDownload() }, HiFiDialogActionKind.Danger) },
             dismiss = { HiFiDialogAction(stringResource(R.string.track_remove_cancel), { askRemove = false }, HiFiDialogActionKind.Quiet) }
         )
@@ -215,7 +222,23 @@ fun FullScreenPlayer(
         }
     }
     val details = @Composable { compact: Boolean ->
-        TitleRow(track, direction, compact, onAddToPlaylist, onTrackWave, offline, onDownloadClick, lyrics, lyricsOpen) { lyricsOpen = !lyricsOpen }
+        TitleRow(
+            track = track,
+            direction = direction,
+            compact = compact,
+            onAddToPlaylist = onAddToPlaylist,
+            onTrackWave = onTrackWave,
+            offline = offline,
+            onDownloadClick = onDownloadClick,
+            lyrics = lyrics,
+            lyricsOpen = lyricsOpen,
+            onLyrics = { lyricsOpen = !lyricsOpen },
+            repeatMode = repeatMode,
+            onCycleRepeat = onCycleRepeat,
+            shuffled = shuffled,
+            onToggleShuffle = onToggleShuffle,
+            showRepeatAndShuffle = showRepeatAndShuffle
+        )
         Spacer(Modifier.height(10.dp))
         QualityChip(track.isRadio, onQualityClick)
         Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
@@ -240,6 +263,7 @@ fun FullScreenPlayer(
         )
     }
 
+    val groundColor = palette.ground
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -256,7 +280,7 @@ fun FullScreenPlayer(
                     clip = true
                 }
             }
-            .background(HiFi.Ground)
+            .background(groundColor)
             .draggable(
                 orientation = Orientation.Vertical,
                 enabled = !showQueue,
@@ -278,13 +302,13 @@ fun FullScreenPlayer(
                 .drawWithCache {
                     val vignette = Brush.radialGradient(
                         0.3f to Color.Transparent,
-                        1f to HiFi.Ground.copy(alpha = 0.80f),
+                        1f to groundColor.copy(alpha = 0.80f),
                         center = Offset(size.width / 2f, size.height * 0.3f),
                         radius = maxOf(size.width, size.height) * 0.62f
                     )
                     val fade = Brush.verticalGradient(
                         0f to Color.Transparent,
-                        1f to HiFi.Ground,
+                        1f to groundColor,
                         startY = size.height * 0.45f,
                         endY = size.height * 0.84f
                     )
@@ -299,25 +323,46 @@ fun FullScreenPlayer(
             Modifier
                 .fillMaxSize()
                 .safeDrawingPadding()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
+            val isStrip = maxHeight - 24.dp < PLAYER_STRIP_HEIGHT && maxWidth - 48.dp >= PLAYER_STRIP_MIN_WIDTH
+            val vPad = if (isStrip && maxHeight < 230.dp) 4.dp else 12.dp
+            val innerWidth = maxWidth - 48.dp
+            val innerHeight = maxHeight - vPad * 2
+            Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = vPad)) {
             // As tall as the screen, but never more than 42% of its width: on a low wide unit (800 × 480) the
             // title, its buttons and the controls keep their room beside it
-            val coverSide = minOf(maxHeight, maxWidth * LANDSCAPE_COVER_SHARE)
+            val coverSide = minOf(innerHeight, innerWidth * LANDSCAPE_COVER_SHARE)
             // A strip (a launcher's lower part, a low split window): one row — the cover, the title over its
             // timeline, the controls — instead of a column whose controls went under the window's edge
-            if (maxHeight < PLAYER_STRIP_HEIGHT && maxWidth >= PLAYER_STRIP_MIN_WIDTH) Row(
+            if (isStrip) Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val stripCoverSide = minOf(this@BoxWithConstraints.maxHeight, this@BoxWithConstraints.maxWidth * PLAYER_STRIP_COVER_SHARE)
+                val stripCoverSide = minOf(innerHeight, innerWidth * PLAYER_STRIP_COVER_SHARE)
                 val stripCover = @Composable { cover(Modifier.size(stripCoverSide)) }
                 if (!coverOnRight) stripCover()
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
                     header()
-                    TitleRow(track, direction, true, onAddToPlaylist, onTrackWave, offline, onDownloadClick, lyrics, lyricsOpen) { lyricsOpen = !lyricsOpen }
-                    if (track.isRadio) HiFiLiveLine(height = 36f) else PlayerTimeline(progress, durationMs, isPlaying, onSeekTo)
+                    TitleRow(
+                        track = track,
+                        direction = direction,
+                        compact = true,
+                        onAddToPlaylist = onAddToPlaylist,
+                        onTrackWave = onTrackWave,
+                        offline = offline,
+                        onDownloadClick = onDownloadClick,
+                        lyrics = lyrics,
+                        lyricsOpen = lyricsOpen,
+                        onLyrics = { lyricsOpen = !lyricsOpen },
+                        repeatMode = repeatMode,
+                        onCycleRepeat = onCycleRepeat,
+                        shuffled = shuffled,
+                        onToggleShuffle = onToggleShuffle,
+                        showRepeatAndShuffle = showRepeatAndShuffle,
+                        strip = true
+                    )
+                    if (track.isRadio) HiFiLiveLine(height = 34f) else PlayerTimeline(progress, durationMs, isPlaying, onSeekTo, height = 34f)
                 }
                 Box(Modifier.width(PLAYER_STRIP_CONTROLS)) {
                     PlayerControls(
@@ -340,6 +385,7 @@ fun FullScreenPlayer(
                 }
                 val coverBox = @Composable { cover(Modifier.size(coverSide)) }
                 if (coverOnRight) { controls(); coverBox() } else { coverBox(); controls() }
+            }
             }
         } else {
             Column(

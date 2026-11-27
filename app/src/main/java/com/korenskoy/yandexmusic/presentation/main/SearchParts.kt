@@ -80,6 +80,7 @@ import com.korenskoy.yandexmusic.presentation.main.components.TrackItem
 
 @Composable
 internal fun RecentPanel(history: List<String>, onPick: (String) -> Unit, onRemove: (String) -> Unit, onClear: () -> Unit, onClose: () -> Unit) {
+    val palette = HiFi.palette
     val window = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     Column(
         Modifier
@@ -87,8 +88,12 @@ internal fun RecentPanel(history: List<String>, onPick: (String) -> Unit, onRemo
             .fillMaxWidth()
             .heightIn(max = (window.heightDp * 0.65f).dp.coerceAtLeast(160.dp))
             .verticalScroll(rememberScrollState())
-            .hifiSoftShadow(RoundedCornerShape(24.dp), 30.dp)
-            .hifiGlass(RoundedCornerShape(24.dp), fill = HiFi.SheetFill, border = Color.White.copy(alpha = 0.12f))
+            .hifiSoftShadow(
+                RoundedCornerShape(24.dp),
+                30.dp,
+                color = if (palette.isDark) Color.Black.copy(alpha = 0.42f) else Color(0xFF11141C).copy(alpha = 0.16f)
+            )
+            .hifiGlass(RoundedCornerShape(24.dp), fill = palette.sheetFill, border = palette.glassBorder)
             .padding(top = 6.dp, bottom = 8.dp)
     ) {
         HiFiSectionHeader(stringResource(R.string.search_recent), Modifier.padding(start = 18.dp, end = 8.dp)) {
@@ -103,11 +108,11 @@ internal fun RecentPanel(history: List<String>, onPick: (String) -> Unit, onRemo
                     .padding(start = 18.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.History, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(q, style = HiFiType.Body.copy(fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(q, style = HiFiType.Body.copy(color = palette.textPrimary, fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button) { onRemove(q) }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_remove_from_history), tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_remove_from_history), tint = palette.textTertiary, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -125,11 +130,13 @@ internal fun DiscoverList(
     columns: Int,
     onTrackClick: (String, List<TrackDetailsDto>) -> Unit,
     onLoadMoreHits: () -> Unit,
-    onLoadMoreTrends: () -> Unit
+    onLoadMoreTrends: () -> Unit,
+    topChart: List<TrackDetailsDto> = emptyList()
 ) {
     val hits = weeklyHits.ifEmpty { trendTracks.take(20) }
+    val chart = topChart
     val trends = trendTracks.ifEmpty { weeklyHits }
-    if (hits.isEmpty() && trends.isEmpty()) {
+    if (hits.isEmpty() && chart.isEmpty() && trends.isEmpty()) {
         HiFiSkeletonRows(Modifier.padding(top = top), count = 6)
         return
     }
@@ -156,6 +163,20 @@ internal fun DiscoverList(
                 }
             }
         }
+        if (chart.isNotEmpty()) {
+            item(key = "chart_title") {
+                HiFiSectionHeader(stringResource(R.string.search_top_chart), Modifier.padding(start = contentStart, end = 20.dp, top = 24.dp, bottom = 12.dp))
+            }
+            item(key = "chart") {
+                LazyRow(contentPadding = PaddingValues(start = contentStart, end = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    itemsIndexed(chart, key = { _, track -> "chart_" + track.idString }, contentType = { _, _ -> "chart_item" }) { index, track ->
+                        TopChartCoverCard(rank = index + 1, track = track, modifier = Modifier.width(150.dp)) {
+                            onTrackClick(track.idString, chart)
+                        }
+                    }
+                }
+            }
+        }
         if (trends.isNotEmpty()) {
             item(key = "trends_title") {
                 HiFiSectionHeader(stringResource(R.string.search_v_trende), Modifier.padding(start = contentStart, end = 20.dp, top = 24.dp, bottom = 12.dp))
@@ -166,6 +187,28 @@ internal fun DiscoverList(
                     repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TopChartCoverCard(rank: Int, track: TrackDetailsDto, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val palette = HiFi.palette
+    Box(modifier = modifier) {
+        CoverCard(track = track, modifier = Modifier.fillMaxWidth(), onClick = onClick)
+        Box(
+            modifier = Modifier
+                .padding(8.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (palette.isDark) Color.Black.copy(alpha = 0.72f) else palette.barFill)
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+            Text(
+                text = "#$rank",
+                color = palette.textPrimary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
         }
     }
 }
@@ -279,7 +322,7 @@ internal fun ResultsList(
                         ) {
                             Box(Modifier.hifiSoftShadow(CircleShape, 14.dp)) { Cover(artist.coverUri, Icons.Rounded.Person, CircleShape, 88.dp) }
                             Spacer(Modifier.height(8.dp))
-                            Text(artist.name.orEmpty(), style = HiFiType.CardTitle.copy(fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(artist.name.orEmpty(), style = HiFiType.CardTitle.copy(color = HiFi.palette.textPrimary, fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -319,8 +362,8 @@ internal fun ResultsList(
                         Column(Modifier.width(150.dp).hifiPress({ onAlbumClick(album) })) {
                             Box(Modifier.hifiSoftShadow(RoundedCornerShape(16.dp), 18.dp)) { Cover(album.coverUri, Icons.Rounded.Album, RoundedCornerShape(16.dp), 150.dp) }
                             Spacer(Modifier.height(9.dp))
-                            Text(album.title.orEmpty(), style = HiFiType.CardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(listOfNotNull(album.year?.toString(), album.artists.firstOrNull()?.name).joinToString(" · "), style = HiFiType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(album.title.orEmpty(), style = HiFiType.CardTitle.copy(color = HiFi.palette.textPrimary), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(listOfNotNull(album.year?.toString(), album.artists.firstOrNull()?.name).joinToString(" · "), style = HiFiType.Caption.copy(color = HiFi.palette.textSecondary), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -332,6 +375,7 @@ internal fun ResultsList(
 /** The top match on a card tinted with the app color; a knob plays a track result right away. */
 @Composable
 internal fun BestResultCard(title: String, subtitle: String, coverUri: String?, round: Boolean, onClick: () -> Unit, onPlay: (() -> Unit)?) {
+    val palette = HiFi.palette
     val tint = LocalArtworkTint.current
     val shape = RoundedCornerShape(24.dp)
     Row(
@@ -340,8 +384,15 @@ internal fun BestResultCard(title: String, subtitle: String, coverUri: String?, 
             .height(104.dp)
             .hifiSoftShadow(shape, 16.dp)
             .clip(shape)
-            .background(Brush.linearGradient(listOf(tint.primary.copy(alpha = 0.55f), tint.secondary.copy(alpha = 0.55f), HiFi.Ground)))
-            .hifiGlass(shape, fill = Color.Black.copy(alpha = 0.18f), border = Color.White.copy(alpha = 0.12f))
+            .background(
+                if (palette.isDark) Brush.linearGradient(listOf(tint.primary.copy(alpha = 0.55f), tint.secondary.copy(alpha = 0.55f), palette.ground))
+                else Brush.linearGradient(listOf(tint.primary.copy(alpha = 0.22f), tint.secondary.copy(alpha = 0.16f), palette.cardFill))
+            )
+            .hifiGlass(
+                shape,
+                fill = if (palette.isDark) Color.Black.copy(alpha = 0.18f) else palette.cardFill,
+                border = palette.glassBorder
+            )
             .hifiPress(onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -351,15 +402,15 @@ internal fun BestResultCard(title: String, subtitle: String, coverUri: String?, 
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = Color.White.copy(alpha = 0.76f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = palette.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = palette.textPrimary.copy(alpha = 0.76f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (onPlay != null) {
             HiFiKnob(onClick = onPlay, contentDescription = stringResource(R.string.cd_slushat), size = 54.dp) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(26.dp))
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = palette.onMetal, modifier = Modifier.size(26.dp))
             }
         } else {
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(24.dp))
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.7f), modifier = Modifier.size(24.dp))
         }
     }
 }

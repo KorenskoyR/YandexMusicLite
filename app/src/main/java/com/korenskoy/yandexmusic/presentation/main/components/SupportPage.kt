@@ -69,6 +69,7 @@ import kotlinx.coroutines.delay
 /** «Поддержать разработчика»: the anodized card at the top of «О приложении». */
 @Composable
 internal fun SupportEntryRow(onClick: () -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(20.dp)
     Row(
         Modifier
@@ -81,14 +82,14 @@ internal fun SupportEntryRow(onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Plaque(40.dp) { Icon(Icons.Rounded.FavoriteBorder, contentDescription = null, tint = HiFi.Love, modifier = Modifier.size(22.dp)) }
+        Plaque(40.dp) { Icon(Icons.Rounded.FavoriteBorder, contentDescription = null, tint = palette.love, modifier = Modifier.size(22.dp)) }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.support_title), color = Color.White, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(stringResource(R.string.support_row_hint), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.support_title), color = palette.textPrimary, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.support_row_hint), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
     }
 }
 
@@ -97,7 +98,7 @@ internal fun SupportEntryRow(onClick: () -> Unit) {
 internal fun SupportDisclaimer(modifier: Modifier = Modifier) {
     Text(
         stringResource(R.string.support_disclaimer),
-        color = Color.White.copy(alpha = 0.46f), fontSize = 11.sp, lineHeight = 15.sp,
+        color = HiFi.palette.textPrimary.copy(alpha = 0.46f), fontSize = 11.sp, lineHeight = 15.sp,
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp)
     )
 }
@@ -110,7 +111,7 @@ internal fun SupportDisclaimer(modifier: Modifier = Modifier) {
 internal fun ColumnScope.SupportPage() {
     Text(
         stringResource(R.string.support_intro),
-        color = HiFi.TextSecondary, fontSize = 14.sp, lineHeight = 20.sp,
+        color = HiFi.palette.textSecondary, fontSize = 14.sp, lineHeight = 20.sp,
         modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 14.dp)
     )
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -133,6 +134,7 @@ internal fun ColumnScope.SupportPage() {
 
 @Composable
 private fun YooMoneyCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
+    val palette = HiFi.palette
     val context = LocalContext.current
     var noBrowser by remember { mutableStateOf(false) }
     val open = { noBrowser = !openPage(context, Donations.YOOMONEY_URL) }
@@ -148,7 +150,7 @@ private fun YooMoneyCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
         ) {
             Text(
                 stringResource(if (noBrowser) R.string.support_no_browser else R.string.support_yoomoney_hint),
-                color = if (noBrowser) HiFi.Warning else HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp,
+                color = if (noBrowser) palette.warning else palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
             )
             MetalPillButton(stringResource(R.string.support_open), onClick = open, icon = Icons.AutoMirrored.Rounded.OpenInNew, height = 46.dp, modifier = Modifier.fillMaxWidth())
@@ -158,6 +160,7 @@ private fun YooMoneyCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
 
 @Composable
 private fun UsdtCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
+    val palette = HiFi.palette
     val context = LocalContext.current
     var copies by remember { mutableIntStateOf(0) }
     var copied by remember { mutableStateOf(false) }
@@ -169,7 +172,7 @@ private fun UsdtCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
     }
     SupportCard("₮", stringResource(R.string.support_usdt), stringResource(R.string.support_usdt_sub), modifier) {
         CodeBeside(stacked, code = { HiFiQrCode(Donations.USDT_TRC20, qr, stringResource(R.string.support_usdt_qr_cd)) }) {
-            Text(stringResource(R.string.support_usdt_hint), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(stringResource(R.string.support_usdt_hint), color = palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
             GlassPillButton(
                 stringResource(R.string.support_copy), onClick = { if (copyAddress(context)) copies++ },
                 icon = Icons.Rounded.ContentCopy, height = 46.dp, modifier = Modifier.fillMaxWidth()
@@ -182,13 +185,13 @@ private fun UsdtCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (copied) {
-                Icon(Icons.Rounded.Check, contentDescription = null, tint = HiFi.Success, modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.Check, contentDescription = null, tint = palette.success, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.support_copied), color = HiFi.Success, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.support_copied), color = palette.success, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
             } else {
-                Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = HiFi.Warning, modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = palette.warning, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.support_usdt_network), color = HiFi.Warning, fontSize = 12.sp, lineHeight = 17.sp)
+                Text(stringResource(R.string.support_usdt_network), color = palette.warning, fontSize = 12.sp, lineHeight = 17.sp)
             }
         }
     }
@@ -197,19 +200,21 @@ private fun UsdtCard(qr: Dp, stacked: Boolean, modifier: Modifier) {
 /** The address in full, in a recessed well: one line where it fits, two halves where it does not. */
 @Composable
 private fun Address() {
+    val palette = HiFi.palette
+    val wellFill = if (palette.isDark) Color.Black.copy(alpha = 0.38f) else Color(0xFF11141C).copy(alpha = 0.06f)
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.38f))
-            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+            .background(wellFill)
+            .border(1.dp, palette.glassBorder.copy(alpha = if (palette.isDark) 0.45f else 0.9f), RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         val address = Donations.USDT_TRC20
         val oneLine = maxWidth >= ONE_LINE
         Text(
             if (oneLine) address else address.chunked((address.length + 1) / 2).joinToString("\n"),
-            color = Color.White, fontSize = 14.sp, lineHeight = 20.sp,
+            color = palette.textPrimary, fontSize = 14.sp, lineHeight = 20.sp,
             style = TextStyle(fontFamily = FontFamily.Monospace, letterSpacing = 0.2.sp),
             maxLines = 2
         )
@@ -235,20 +240,21 @@ private fun CodeBeside(stacked: Boolean, code: @Composable () -> Unit, side: @Co
 
 @Composable
 private fun SupportCard(mark: String, title: String, subtitle: String, modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(22.dp)
     Column(
         modifier
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
+            .background(palette.cardFill)
+            .border(1.dp, palette.cardBorder, shape)
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Plaque(34.dp) { Text(mark, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold) }
+            Plaque(34.dp) { Text(mark, color = palette.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(title, color = Color.White, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = HiFi.TextTertiary, fontSize = 12.sp, lineHeight = 16.sp)
+                Text(title, color = palette.textPrimary, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = palette.textTertiary, fontSize = 12.sp, lineHeight = 16.sp)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -258,11 +264,17 @@ private fun SupportCard(mark: String, title: String, subtitle: String, modifier:
 
 @Composable
 private fun Plaque(size: Dp, content: @Composable () -> Unit) {
+    val isDark = HiFi.palette.isDark
+    val fill = if (isDark) {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFF11141C).copy(alpha = 0.09f), Color(0xFF11141C).copy(alpha = 0.03f)))
+    }
     androidx.compose.foundation.layout.Box(
         Modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.28f))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f)))),
+            .background(fill),
         contentAlignment = Alignment.Center
     ) { content() }
 }

@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.main.components
 
+import android.app.TimePickerDialog
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.rounded.Brightness6
+import androidx.compose.material.icons.rounded.Fullscreen
+import com.korenskoy.yandexmusic.data.security.AppIntegrity
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -167,6 +175,9 @@ fun SettingsSheet(
     // (480 dp) cut the page's choices and buttons; narrower ones go page by page, as standing
     val twoPanes = isLandscape && com.korenskoy.yandexmusic.utils.currentWindowSizeDp().widthDp >= SETTINGS_TWO_PANES_DP
     val lite = LocalHiFiLite.current
+    val palette = HiFi.palette
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { AppIntegrity.probeUi(context) }
     val scope = rememberCoroutineScope()
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     LaunchedEffect(visible.currentState, visible.targetState) {
@@ -223,7 +234,7 @@ fun SettingsSheet(
                             .padding(top = if (isLandscape) 0.dp else 24.dp)
                             .offset { IntOffset(0, dragOffset.value.roundToInt()) }
                             .clip(sheetShape)
-                            .background(HiFi.SheetFill)
+                            .background(palette.sheetFill)
                             .hifiGrain(enabled = !lite, alpha = 0.35f)
                             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
                     ) {
@@ -247,7 +258,7 @@ fun SettingsSheet(
                                 .padding(top = 10.dp)
                                 .size(width = 40.dp, height = 5.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.28f))
+                                .background(palette.textPrimary.copy(alpha = 0.28f))
                                 .align(Alignment.CenterHorizontally)
                         )
                         Row(
@@ -257,21 +268,21 @@ fun SettingsSheet(
                             val sub = page.takeIf { !twoPanes }
                             if (sub != null) {
                                 GlassCircleButton(onClick = { pageName = sub.parent?.name }, contentDescription = stringResource(R.string.cd_nazad)) {
-                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
                                 }
                                 Spacer(Modifier.width(12.dp))
                             }
                             // A long title («Поддержать разработчика») gets smaller on a narrow phone, never cut
                             BasicText(
                                 text = sub?.let { stringResource(it.titleRes) } ?: stringResource(R.string.settings_title),
-                                style = HiFiType.LargeTitle.copy(fontSize = if (sub != null) 24.sp else 28.sp, lineHeight = 34.sp, color = Color.White),
+                                style = HiFiType.LargeTitle.copy(fontSize = if (sub != null) 24.sp else 28.sp, lineHeight = 34.sp, color = palette.textPrimary),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 autoSize = TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = if (sub != null) 24.sp else 28.sp, stepSize = 1.sp),
                                 modifier = Modifier.weight(1f)
                             )
                             GlassCircleButton(onClick = close, contentDescription = stringResource(R.string.cd_zakryt)) {
-                                Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Rounded.Close, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -440,25 +451,27 @@ private fun aboutSummary(): String = stringResource(R.string.settings_version, B
 
 @Composable
 private fun ColumnScope.RootPage(state: SettingsUiState, onOpen: (SettingsPage) -> Unit) {
+    val palette = HiFi.palette
     Spacer(Modifier.heightIn(min = 14.dp))
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.White.copy(alpha = 0.05f))) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(palette.cardFill)) {
         AccountCard(state.accountName, state.avatarUrl, state.hasPlus, onSwitch = null, onClick = { onOpen(SettingsPage.ACCOUNT) })
     }
     Spacer(Modifier.heightIn(min = 14.dp))
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.White.copy(alpha = 0.05f)).selectableGroup()) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(palette.cardFill).selectableGroup()) {
         SectionRow(SettingsPage.PLAYBACK, stringResource(R.string.settings_section_playback), playbackSummary(state), onOpen)
         SectionRow(SettingsPage.INTERFACE, stringResource(R.string.settings_section_interface), interfaceSummary(state), onOpen)
         SectionRow(SettingsPage.ABOUT, stringResource(R.string.settings_group_about), aboutSummary(), onOpen)
     }
     Text(
         "YANDEX MUSIC LITE",
-        style = HiFiType.SectionCaps.copy(color = Color.White.copy(alpha = 0.40f), fontSize = 12.sp),
+        style = HiFiType.SectionCaps.copy(color = palette.textPrimary.copy(alpha = 0.40f), fontSize = 12.sp),
         modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 28.dp)
     )
 }
 
 @Composable
 private fun SectionRow(page: SettingsPage, title: String, summary: String, onOpen: (SettingsPage) -> Unit) {
+    val palette = HiFi.palette
     Row(
         Modifier
             .fillMaxWidth()
@@ -470,23 +483,24 @@ private fun SectionRow(page: SettingsPage, title: String, summary: String, onOpe
         IconPlaque(page.icon, size = 40.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(summary, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(title, color = palette.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(summary, color = palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
 private fun SectionNavItem(page: SettingsPage, title: String, summary: String, selected: Boolean, onOpen: (SettingsPage) -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(18.dp)
     Row(
         Modifier
             .fillMaxWidth()
             .padding(bottom = 6.dp)
             .clip(shape)
-            .then(if (selected) Modifier.background(Color.White.copy(alpha = 0.10f)).border(1.dp, Color(0x4DC9CED8), shape) else Modifier)
+            .then(if (selected) Modifier.background(palette.pillFill).border(1.dp, palette.glassBorder, shape) else Modifier)
             .selectable(selected = selected, role = Role.Tab) { onOpen(page) }
             .heightIn(min = 68.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -495,8 +509,8 @@ private fun SectionNavItem(page: SettingsPage, title: String, summary: String, s
         IconPlaque(page.icon, size = 40.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(summary, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(title, color = palette.textPrimary, fontSize = 16.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(summary, color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -519,12 +533,13 @@ private fun ColumnScope.SettingsPageContent(page: SettingsPage, state: SettingsU
 /** Lying, a sub-page's title in the pane with the way back to its page. */
 @Composable
 private fun SubPageHeader(page: SettingsPage, onBack: () -> Unit) {
+    val palette = HiFi.palette
     Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(12.dp))
-        Text(stringResource(page.titleRes), style = HiFiType.LargeTitle.copy(fontSize = 22.sp, lineHeight = 30.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(page.titleRes), style = HiFiType.LargeTitle.copy(color = palette.textPrimary, fontSize = 22.sp, lineHeight = 30.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -593,6 +608,7 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
     SettingsNote(stringResource(R.string.settings_skip_ai_note))
     SettingsNote(stringResource(R.string.settings_wave_tuning_note))
     SettingsGroup(stringResource(R.string.settings_group_reserve)) {
+        val palette = HiFi.palette
         SwitchRow(Icons.Rounded.Timeline, stringResource(R.string.settings_smooth), stringResource(R.string.settings_smooth_hint), state.smoothPlayback, actions.onSmoothPlaybackChange)
         RoadReserveRows(state.reserveMb, actions.onReserveChange, state.reserveUsedBytes, actions.onClearReserve)
         // Only where a card or a flash drive can take it (the downloads' drive, with a key to encrypt)
@@ -603,19 +619,20 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
         if (state.smoothPlayback && state.reserveMb == 0) {
             Text(
                 stringResource(R.string.settings_smooth_no_cache),
-                color = HiFi.Warning,
+                color = palette.warning,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
                 modifier = Modifier
                     .padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(HiFi.Warning.copy(alpha = 0.12f))
-                    .border(1.dp, HiFi.Warning.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                    .background(palette.warning.copy(alpha = 0.12f))
+                    .border(1.dp, palette.warning.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             )
         }
     }
     SettingsGroup(stringResource(R.string.settings_group_downloads)) {
+        val palette = HiFi.palette
         SwitchRow(Icons.Rounded.Download, stringResource(R.string.settings_auto_download), stringResource(R.string.settings_auto_download_hint), state.autoDownload, actions.onAutoDownloadChange)
         SettingsRow(icon = Icons.Rounded.CloudDownload, title = stringResource(R.string.settings_download_all), onClick = actions.onDownloadAll)
         SettingsRow(
@@ -650,7 +667,7 @@ private fun ColumnScope.PlaybackPage(state: SettingsUiState, actions: SettingsAc
             onClick = null,
             trailing = {
                 TextButton(onClick = actions.onClearDownloads) {
-                    Text(stringResource(R.string.settings_clear), color = HiFi.Danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_clear), color = palette.danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -737,6 +754,14 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
     // Beside the car: the microphone of "В авто" is where it is asked for most
     VoiceSearchGroup()
     SettingsGroup(stringResource(R.string.settings_g_look)) {
+        SwitchRow(
+            Icons.Rounded.Fullscreen,
+            stringResource(R.string.settings_fullscreen_mode),
+            stringResource(R.string.settings_fullscreen_mode_hint),
+            state.fullscreenMode,
+            actions.onFullscreenModeChange
+        )
+        ThemeAppearanceRow(state, actions)
         UiScaleRow(state.uiScaleAuto, actions.onUiScaleAutoChange, state.uiScaleManual, actions.onUiScaleManualChange)
         SegmentedRow(Icons.Rounded.Animation, stringResource(R.string.settings_animations)) {
             HiFiSegmented(
@@ -751,6 +776,155 @@ private fun ColumnScope.InterfacePage(state: SettingsUiState, actions: SettingsA
             )
             Spacer(Modifier.heightIn(min = 10.dp))
             SettingsHint(stringResource(R.string.settings_animations_note))
+        }
+    }
+}
+
+@Composable
+private fun ThemeAppearanceRow(state: SettingsUiState, actions: SettingsActions) {
+    val palette = HiFi.palette
+    val context = LocalContext.current
+    SegmentedRow(Icons.Rounded.Brightness6, stringResource(R.string.settings_theme)) {
+        HiFiSegmented(
+            options = listOf(
+                stringResource(R.string.settings_theme_auto),
+                stringResource(R.string.settings_theme_light),
+                stringResource(R.string.settings_theme_dark),
+                stringResource(R.string.settings_theme_schedule)
+            ),
+            selectedIndex = state.themeMode.ordinal,
+            onSelect = { actions.onThemeModeChange(AppThemeMode.entries[it]) },
+            fontSize = 12.sp
+        )
+        if (state.themeMode == AppThemeMode.SCHEDULE) {
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(palette.pillFill)
+                    .border(1.dp, palette.glassBorder, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .selectableGroup()
+            ) {
+                ScheduleOptionRow(
+                    title = stringResource(R.string.settings_theme_schedule_sunset),
+                    subtitle = stringResource(R.string.settings_theme_schedule_sunset_hint),
+                    selected = state.themeScheduleType == ThemeScheduleType.SUNSET_TO_SUNRISE,
+                    onClick = { actions.onThemeScheduleTypeChange(ThemeScheduleType.SUNSET_TO_SUNRISE) }
+                )
+                Spacer(Modifier.fillMaxWidth().height(1.dp).background(palette.hairline))
+                ScheduleOptionRow(
+                    title = stringResource(R.string.settings_theme_schedule_custom),
+                    subtitle = null,
+                    selected = state.themeScheduleType == ThemeScheduleType.CUSTOM,
+                    onClick = { actions.onThemeScheduleTypeChange(ThemeScheduleType.CUSTOM) }
+                )
+                if (state.themeScheduleType == ThemeScheduleType.CUSTOM) {
+                    Spacer(Modifier.fillMaxWidth().height(1.dp).background(palette.hairline))
+                    ScheduleTimeRow(
+                        label = stringResource(R.string.settings_theme_light_time),
+                        minutes = state.themeLightMinutes,
+                        onPick = {
+                            val current = state.themeLightMinutes
+                            TimePickerDialog(
+                                context,
+                                { _, h, m -> actions.onThemeLightMinutesChange(h * 60 + m) },
+                                current / 60,
+                                current % 60,
+                                true
+                            ).show()
+                        }
+                    )
+                    Spacer(Modifier.fillMaxWidth().height(1.dp).background(palette.hairline))
+                    ScheduleTimeRow(
+                        label = stringResource(R.string.settings_theme_dark_time),
+                        minutes = state.themeDarkMinutes,
+                        onPick = {
+                            val current = state.themeDarkMinutes
+                            TimePickerDialog(
+                                context,
+                                { _, h, m -> actions.onThemeDarkMinutesChange(h * 60 + m) },
+                                current / 60,
+                                current % 60,
+                                true
+                            ).show()
+                        }
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            SettingsHint(stringResource(R.string.settings_theme_schedule_note))
+        }
+    }
+}
+
+@Composable
+private fun ScheduleOptionRow(
+    title: String,
+    subtitle: String?,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val palette = HiFi.palette
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioMark(selected)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = palette.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            )
+            if (subtitle != null) {
+                Text(subtitle, color = palette.textTertiary, fontSize = 12.sp, lineHeight = 16.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleTimeRow(label: String, minutes: Int, onPick: () -> Unit) {
+    val palette = HiFi.palette
+    val formatted = ThemePolicy.formatMinutes(minutes)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onPick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = palette.textPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(palette.pillFill)
+                .border(1.dp, palette.glassBorder, RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = formatted,
+                color = palette.textPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -836,11 +1010,12 @@ private fun SwitchRow(icon: ImageVector, title: String, hint: String, checked: B
 /** A choice of a few options with a line of explanation each: segments would cut the longer names. */
 @Composable
 private fun RadioListRow(icon: ImageVector, title: String, options: List<Pair<String, String?>>, selectedIndex: Int, onSelect: (Int) -> Unit) {
+    val palette = HiFi.palette
     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(icon, size = 32.dp)
             Spacer(Modifier.width(12.dp))
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(title, color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         }
         Column(Modifier.padding(start = 44.dp, top = 6.dp).selectableGroup()) {
             options.forEachIndexed { index, (label, hint) ->
@@ -857,8 +1032,8 @@ private fun RadioListRow(icon: ImageVector, title: String, options: List<Pair<St
                     RadioMark(selected)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(label, color = Color.White, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-                        if (hint != null) Text(hint, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp)
+                        Text(label, color = palette.textPrimary, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                        if (hint != null) Text(hint, color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp)
                     }
                 }
             }
@@ -868,25 +1043,26 @@ private fun RadioListRow(icon: ImageVector, title: String, options: List<Pair<St
 
 @Composable
 private fun RadioMark(selected: Boolean) {
+    val palette = HiFi.palette
     Box(
         Modifier
             .size(22.dp)
             .clip(CircleShape)
             .then(
-                if (selected) Modifier.background(HiFi.Accent).padding(6.dp).clip(CircleShape).background(Color.White)
-                else Modifier.border(2.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                if (selected) Modifier.background(palette.textPrimary).padding(6.dp).clip(CircleShape).background(palette.ground)
+                else Modifier.border(2.dp, palette.textPrimary.copy(alpha = 0.35f), CircleShape)
             )
     )
 }
 
 @Composable
 private fun SettingsHint(text: String) {
-    Text(text, color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+    Text(text, color = HiFi.palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
 }
 
 @Composable
 private fun SettingsNote(text: String) {
-    Text(text, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp))
+    Text(text, color = HiFi.palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp))
 }
 
 /**
@@ -954,7 +1130,7 @@ private fun StoragePlaceRow(storage: StorageStatus, actions: SettingsActions) {
         hint?.let { SettingsHint(it) }
         if (storage.place == Place.USB && moving == null) {
             TextButton(onClick = { pickFolder() }) {
-                Text(stringResource(R.string.settings_storage_usb_other), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.settings_storage_usb_other), color = HiFi.palette.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

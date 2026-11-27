@@ -10,8 +10,11 @@ import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.data.download.StorageStatus
 import androidx.compose.runtime.Immutable
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.StartPage
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
 
 /** The pages of the settings: a short root list and one page per section. */
 enum class SettingsPage {
@@ -77,7 +80,12 @@ data class SettingsUiState(
     val uiScaleAuto: Boolean = true,
     val uiScaleManual: Float = 1f,
     val animationMode: AnimationMode = AnimationMode.AUTO,
-    val autoCheckUpdates: Boolean = com.korenskoy.yandexmusic.domain.repository.SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES
+    val autoCheckUpdates: Boolean = com.korenskoy.yandexmusic.domain.repository.SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES,
+    val themeMode: AppThemeMode = AppThemeMode.DARK,
+    val themeScheduleType: ThemeScheduleType = ThemeScheduleType.CUSTOM,
+    val themeLightMinutes: Int = ThemePolicy.DEFAULT_LIGHT_MINUTES,
+    val themeDarkMinutes: Int = ThemePolicy.DEFAULT_DARK_MINUTES,
+    val fullscreenMode: Boolean = false
 )
 
 /** What the settings can do. Every action has a harmless default, so previews and tests pass only what they need. */
@@ -127,5 +135,10 @@ data class SettingsActions(
     val onUiScaleAutoChange: (Boolean) -> Unit = {},
     val onUiScaleManualChange: (Float) -> Unit = {},
     val onAnimationModeChange: (AnimationMode) -> Unit = {},
-    val onAutoCheckUpdatesChange: (Boolean) -> Unit = {}
+    val onAutoCheckUpdatesChange: (Boolean) -> Unit = {},
+    val onThemeModeChange: (AppThemeMode) -> Unit = {},
+    val onThemeScheduleTypeChange: (ThemeScheduleType) -> Unit = {},
+    val onThemeLightMinutesChange: (Int) -> Unit = {},
+    val onThemeDarkMinutesChange: (Int) -> Unit = {},
+    val onFullscreenModeChange: (Boolean) -> Unit = {}
 )

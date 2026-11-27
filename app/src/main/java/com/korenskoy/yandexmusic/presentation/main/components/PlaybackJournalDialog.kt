@@ -65,12 +65,13 @@ fun PlaybackJournalDialog(
     val locale = LocalConfiguration.current.locales[0]
     val time = remember(locale) { SimpleDateFormat("HH:mm", locale) }
     val s = snapshot.summary
+    val palette = HiFi.palette
     HiFiAlertDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.journal_title),
         content = {
             Column {
-                Text(stringResource(R.string.journal_hint), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+                Text(stringResource(R.string.journal_hint), color = palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
                 if (backgroundRestricted && (closedByThePhone(snapshot) || snapshot.summary.stalls >= STALLS_WORTH_THE_HINT)) {
                     Spacer(Modifier.height(12.dp))
                     BackgroundHint(stringResource(R.string.journal_background_hint), stringResource(R.string.journal_allow_background), onAllowBackground)
@@ -82,18 +83,18 @@ fun PlaybackJournalDialog(
                 Spacer(Modifier.height(12.dp))
                 summaryLines(resources, s).forEach { (label, value) ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(label, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Text(label, color = palette.textPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(8.dp))
-                        Text(value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(value, color = palette.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 if (snapshot.events.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.journal_events), color = HiFi.TextTertiary, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                    Text(stringResource(R.string.journal_events), color = palette.textTertiary, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                     Spacer(Modifier.height(6.dp))
                     snapshot.events.takeLast(SHOWN).reversed().forEach { event ->
                         Row(Modifier.padding(vertical = 3.dp)) {
-                            Text(time.format(Date(event.atMs)), color = HiFi.TextTertiary, fontSize = 13.sp, modifier = Modifier.width(48.dp))
+                            Text(time.format(Date(event.atMs)), color = palette.textTertiary, fontSize = 13.sp, modifier = Modifier.width(48.dp))
                             Text(eventText(resources, event), color = eventColor(event), fontSize = 13.sp, lineHeight = 18.sp)
                         }
                     }
@@ -119,34 +120,39 @@ internal fun closedByThePhone(snapshot: PlaybackJournal.Snapshot): Boolean =
 
 @Composable
 private fun BackgroundHint(text: String, action: String, onAllow: () -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(14.dp)
     Column(
         Modifier
             .fillMaxWidth()
-            .hifiGlass(shape, fill = HiFi.Warning.copy(alpha = 0.10f), border = HiFi.Warning.copy(alpha = 0.35f))
+            .hifiGlass(shape, fill = palette.warning.copy(alpha = 0.10f), border = palette.warning.copy(alpha = 0.35f))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Text(text, color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
+        Text(text, color = palette.textPrimary, fontSize = 13.sp, lineHeight = 18.sp)
         Box(
             Modifier
                 .heightIn(min = 40.dp)
                 .clickable(role = Role.Button, onClick = onAllow),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(action, color = HiFi.Warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(action, color = palette.warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
-private fun eventColor(event: PlaybackJournal.Event): Color = when (event.kind) {
-    PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE,
-    PlaybackJournal.Kind.WAVE_REPEAT, PlaybackJournal.Kind.ERROR, PlaybackJournal.Kind.KILLED, PlaybackJournal.Kind.UNDERRUN,
-    PlaybackJournal.Kind.SLOW_START, PlaybackJournal.Kind.WAVE_STUCK, PlaybackJournal.Kind.OUTPUT_STALL,
-    PlaybackJournal.Kind.POSITION_BACK, PlaybackJournal.Kind.RETURN_FAILED -> HiFi.Warning
-    PlaybackJournal.Kind.PAUSED -> if (event.cause?.byListener == true) Color.White.copy(alpha = 0.82f) else HiFi.Warning
-    PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY, PlaybackJournal.Kind.LINK_BACK, PlaybackJournal.Kind.RESUMED,
-    PlaybackJournal.Kind.LINK_RENEWED -> HiFi.Success
-    else -> Color.White.copy(alpha = 0.82f)
+@Composable
+private fun eventColor(event: PlaybackJournal.Event): Color {
+    val palette = HiFi.palette
+    return when (event.kind) {
+        PlaybackJournal.Kind.STALL, PlaybackJournal.Kind.CROSSFADE_LATE, PlaybackJournal.Kind.LINK_WEAK, PlaybackJournal.Kind.LINK_NONE,
+        PlaybackJournal.Kind.WAVE_REPEAT, PlaybackJournal.Kind.ERROR, PlaybackJournal.Kind.KILLED, PlaybackJournal.Kind.UNDERRUN,
+        PlaybackJournal.Kind.SLOW_START, PlaybackJournal.Kind.WAVE_STUCK, PlaybackJournal.Kind.OUTPUT_STALL,
+        PlaybackJournal.Kind.POSITION_BACK, PlaybackJournal.Kind.RETURN_FAILED -> palette.warning
+        PlaybackJournal.Kind.PAUSED -> if (event.cause?.byListener == true) palette.textPrimary.copy(alpha = 0.82f) else palette.warning
+        PlaybackJournal.Kind.COPY, PlaybackJournal.Kind.STEADY, PlaybackJournal.Kind.LINK_BACK, PlaybackJournal.Kind.RESUMED,
+        PlaybackJournal.Kind.LINK_RENEWED -> palette.success
+        else -> palette.textPrimary.copy(alpha = 0.82f)
+    }
 }
 
 private fun seconds(ms: Long): String = String.format(Locale.US, "%.1f", ms / 1000f).removeSuffix(".0")

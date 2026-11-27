@@ -137,7 +137,7 @@ internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: 
         chevron = false,
         trailing = {
             Text(
-                status, color = if (works) HiFi.Success else HiFi.Warning, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                status, color = if (works) HiFi.palette.success else HiFi.palette.warning, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(end = 6.dp).widthIn(max = 150.dp)
             )
         }
@@ -153,7 +153,7 @@ internal fun VoiceSearchRows(route: VoiceRoute, micGranted: Boolean, onInstall: 
                     else -> R.string.settings_voice_hint_service
                 }
             ),
-            color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp
+            color = HiFi.palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp
         )
         val action = if (needsMic) onAllowMic else onInstall.takeIf { route == VoiceRoute.NONE }
         if (action != null) {
@@ -199,7 +199,7 @@ internal fun WheelVoiceRows() {
     )
     Text(
         stringResource(R.string.settings_wheel_voice_how),
-        color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp,
+        color = HiFi.palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp,
         modifier = Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 14.dp)
     )
     SettingsRow(
@@ -211,7 +211,7 @@ internal fun WheelVoiceRows() {
         trailing = {
             Icon(
                 if (advanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                contentDescription = null, tint = HiFi.TextSecondary, modifier = Modifier.size(24.dp)
+                contentDescription = null, tint = HiFi.palette.textSecondary, modifier = Modifier.size(24.dp)
             )
         }
     )
@@ -220,7 +220,7 @@ internal fun WheelVoiceRows() {
             Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(stringResource(R.string.settings_wheel_advanced_how), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(stringResource(R.string.settings_wheel_advanced_how), color = HiFi.palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
             CopyField(stringResource(R.string.settings_wheel_action), MainActivity.ACTION_START_VOICE, copy)
             CopyField(stringResource(R.string.settings_wheel_package), context.packageName, copy)
             CopyField(stringResource(R.string.settings_wheel_adb), VoiceSearchActivity.adbCommand(context), copy)
@@ -231,6 +231,7 @@ internal fun WheelVoiceRows() {
 /** A value to type into another program: its name over it, the value in a recessed field, a copy button inside. */
 @Composable
 private fun CopyField(label: String, value: String, onCopy: (String, String) -> Unit) {
+    val palette = HiFi.palette
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label.uppercase(), style = HiFiType.SectionCaps)
         Row(
@@ -242,7 +243,7 @@ private fun CopyField(label: String, value: String, onCopy: (String, String) -> 
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                value, color = Color.White, fontSize = 14.sp, lineHeight = 19.sp, fontFamily = FontFamily.Monospace,
+                value, color = palette.textPrimary, fontSize = 14.sp, lineHeight = 19.sp, fontFamily = FontFamily.Monospace,
                 modifier = Modifier.weight(1f)
             )
             val description = stringResource(R.string.settings_copy_cd, label)
@@ -254,7 +255,7 @@ private fun CopyField(label: String, value: String, onCopy: (String, String) -> 
                     .semantics { contentDescription = description },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.ContentCopy, contentDescription = null, tint = HiFi.TextSecondary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.ContentCopy, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(20.dp))
             }
         }
     }

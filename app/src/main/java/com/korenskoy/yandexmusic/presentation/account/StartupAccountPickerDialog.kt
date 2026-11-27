@@ -77,7 +77,7 @@ fun StartupAccountPickerDialog(
                         BorderStroke(
                             1.2.dp,
                             Brush.verticalGradient(
-                                listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.05f))
+                                listOf(HiFi.palette.glassBorder, HiFi.palette.cardBorder)
                             )
                         ),
                         RoundedCornerShape(28.dp)
@@ -85,6 +85,7 @@ fun StartupAccountPickerDialog(
                 color = HiFiDialogDefaults.Container,
                 tonalElevation = 0.dp
             ) {
+                val palette = HiFi.palette
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -101,14 +102,14 @@ fun StartupAccountPickerDialog(
                                 .size(44.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
+                                    Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = palette.onMetal,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -118,14 +119,14 @@ fun StartupAccountPickerDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.startup_account_picker_vyberite_profil),
-                                color = Color.White,
+                                color = palette.textPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = stringResource(R.string.startup_account_picker_vhod_v_yandex_music),
-                                color = Color.White.copy(alpha = 0.6f),
+                                color = palette.textSecondary,
                                 fontSize = 12.sp
                             )
                         }
@@ -135,7 +136,7 @@ fun StartupAccountPickerDialog(
 
                     Text(
                         text = stringResource(R.string.startup_account_picker_dostupnye_akkaunty),
-                        color = Color.White.copy(alpha = 0.45f),
+                        color = palette.textTertiary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.8.sp
@@ -161,18 +162,15 @@ fun StartupAccountPickerDialog(
                                     .clip(RoundedCornerShape(16.dp))
                                     .background(
                                         if (isSelected) {
-                                            // Selected = dark anodized metal, no colour
-                                            Brush.verticalGradient(listOf(HiFi.AnodizedLight, HiFi.AnodizedDark))
+                                            Brush.verticalGradient(listOf(palette.anodizedLight, palette.anodizedDark))
                                         } else {
-                                            Brush.horizontalGradient(
-                                                listOf(Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.03f))
-                                            )
+                                            Brush.horizontalGradient(listOf(palette.cardFill, palette.cardFill))
                                         }
                                     )
                                     .border(
                                         BorderStroke(
                                             1.dp,
-                                            if (isSelected) Color(0x80C9CED8) else Color.White.copy(alpha = 0.08f)
+                                            if (isSelected) palette.steelEdge.copy(alpha = 0.55f) else palette.cardBorder
                                         ),
                                         RoundedCornerShape(16.dp)
                                     )
@@ -185,15 +183,7 @@ fun StartupAccountPickerDialog(
                                     modifier = Modifier
                                         .size(38.dp)
                                         .clip(CircleShape)
-                                        .background(
-                                            if (isSelected) {
-                                                Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
-                                            } else {
-                                                Brush.linearGradient(
-                                                    listOf(HiFi.SteelLight, HiFi.SteelDark)
-                                                )
-                                            }
-                                        ),
+                                        .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (!account.avatarUrl.isNullOrBlank()) {
@@ -205,7 +195,7 @@ fun StartupAccountPickerDialog(
                                             error = {
                                                 Text(
                                                     text = initialLetter.toString(),
-                                                    color = Color.White,
+                                                    color = palette.onMetal,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 16.sp
                                                 )
@@ -214,7 +204,7 @@ fun StartupAccountPickerDialog(
                                     } else {
                                         Text(
                                             text = initialLetter.toString(),
-                                            color = Color.White,
+                                            color = palette.onMetal,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 16.sp
                                         )
@@ -227,7 +217,7 @@ fun StartupAccountPickerDialog(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = account.displayName.ifBlank { account.login }.ifBlank { "UID: ${account.uid}" },
-                                        color = Color.White,
+                                        color = palette.textPrimary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -236,7 +226,7 @@ fun StartupAccountPickerDialog(
                                     if (account.login.isNotBlank() && account.displayName != account.login) {
                                         Text(
                                             text = account.login,
-                                            color = Color.White.copy(alpha = 0.45f),
+                                            color = palette.textTertiary,
                                             fontSize = 11.5.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -249,14 +239,14 @@ fun StartupAccountPickerDialog(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
-                                            .background(HiFi.AnodizedLight)
-                                            .border(BorderStroke(1.dp, HiFi.SteelEdge), CircleShape),
+                                            .background(palette.anodizedLight)
+                                            .border(BorderStroke(1.dp, palette.steelEdge), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = null,
-                                            tint = Color.White,
+                                            tint = palette.textPrimary,
                                             modifier = Modifier.size(14.dp)
                                         )
                                     }
@@ -280,16 +270,15 @@ fun StartupAccountPickerDialog(
                             checked = rememberAsDefault,
                             onCheckedChange = { rememberAsDefault = it },
                             colors = CheckboxDefaults.colors(
-                                // Monochrome like the rest of the dialog: a white box with a dark tick
-                                checkedColor = Color.White,
-                                uncheckedColor = Color.White.copy(alpha = 0.4f),
-                                checkmarkColor = HiFi.Ground
+                                checkedColor = palette.textPrimary,
+                                uncheckedColor = palette.textTertiary,
+                                checkmarkColor = palette.ground
                             )
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.startup_account_picker_zapomnit_kak_profil_po),
-                            color = Color.White.copy(alpha = 0.85f),
+                            color = palette.textPrimary.copy(alpha = 0.85f),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -308,7 +297,7 @@ fun StartupAccountPickerDialog(
                             modifier = Modifier
                                 .heightIn(min = 44.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color.White.copy(alpha = 0.08f))
+                                .background(palette.pillFill)
                                 .clickable { onAddNewAccount() }
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -316,13 +305,13 @@ fun StartupAccountPickerDialog(
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.8f),
+                                tint = palette.textPrimary.copy(alpha = 0.8f),
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = stringResource(R.string.startup_account_picker_novyy),
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = palette.textPrimary.copy(alpha = 0.8f),
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -334,12 +323,11 @@ fun StartupAccountPickerDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                // The Hi-Fi metal capsule: steel rim, anodized face
                                 .clip(CircleShape)
-                                .background(Brush.verticalGradient(HiFi.MetalEdge))
+                                .background(Brush.verticalGradient(palette.metalEdge))
                                 .padding(1.5.dp)
                                 .clip(CircleShape)
-                                .background(Brush.radialGradient(HiFi.KnobFace, center = androidx.compose.ui.geometry.Offset.Zero, radius = 900f))
+                                .background(Brush.radialGradient(palette.knobFace, center = androidx.compose.ui.geometry.Offset.Zero, radius = 900f))
                                 .clickable(enabled = selectedUid.isNotBlank()) {
                                     onSelectAccount(selectedUid, rememberAsDefault)
                                 }
@@ -348,7 +336,7 @@ fun StartupAccountPickerDialog(
                         ) {
                             Text(
                                 text = stringResource(R.string.startup_account_picker_voyti),
-                                color = Color.White,
+                                color = palette.textPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )

@@ -32,20 +32,21 @@ fun CrashLogDialog(
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val format = androidx.compose.runtime.remember(locale) { SimpleDateFormat("dd.MM.yyyy HH:mm", locale) }
+    val palette = HiFi.palette
     HiFiAlertDialog(
         onDismissRequest = onDismiss,
         title = title,
         content = {
             Column {
                 if (reports.isEmpty()) {
-                    Text(stringResource(R.string.crash_log_none), color = HiFi.TextSecondary, fontSize = 15.sp)
+                    Text(stringResource(R.string.crash_log_none), color = palette.textSecondary, fontSize = 15.sp)
                 } else {
                     reports.take(5).forEach { report ->
-                        Text(format.format(report.time), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text(report.summary, color = HiFi.TextSecondary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(format.format(report.time), color = palette.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(report.summary, color = palette.textSecondary, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(10.dp))
                     }
-                    Text(stringResource(R.string.crash_log_privacy), color = HiFi.TextTertiary, fontSize = 12.sp)
+                    Text(stringResource(R.string.crash_log_privacy), color = palette.textTertiary, fontSize = 12.sp)
                 }
             }
         },

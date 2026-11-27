@@ -39,15 +39,16 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
  */
 @Composable
 fun ExplicitMark(modifier: Modifier = Modifier) {
+    val palette = HiFi.palette
     val label = stringResource(R.string.explicit_mark_cd)
     BoxWithConstraints(
         modifier
             .semantics { contentDescription = label }
-            .background(HiFi.ExplicitPlate, RoundedCornerShape(percent = 18)),
+            .background(palette.explicitPlate, RoundedCornerShape(percent = 18)),
         contentAlignment = Alignment.Center
     ) {
         val letter = with(LocalDensity.current) { (maxHeight * EXPLICIT_LETTER).toSp() }
-        Text("E", color = HiFi.Ground, fontSize = letter, lineHeight = letter, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+        Text("E", color = palette.ground, fontSize = letter, lineHeight = letter, fontWeight = FontWeight.ExtraBold, maxLines = 1)
     }
 }
 
@@ -69,7 +70,7 @@ fun TrackHeadline(
     fontSize: TextUnit,
     modifier: Modifier = Modifier,
     explicit: Boolean = false,
-    color: Color = Color.White,
+    color: Color = HiFi.palette.textPrimary,
     fontWeight: FontWeight = FontWeight.ExtraBold,
     maxLines: Int = 2,
     minScale: Float = 0.7f,
@@ -125,7 +126,7 @@ fun TrackTitleLine(
     explicit: Boolean,
     fontSize: TextUnit,
     modifier: Modifier = Modifier,
-    color: Color = Color.White,
+    color: Color = HiFi.palette.textPrimary,
     fontWeight: FontWeight? = null,
     lineHeight: TextUnit = TextUnit.Unspecified,
     style: TextStyle = androidx.compose.material3.LocalTextStyle.current

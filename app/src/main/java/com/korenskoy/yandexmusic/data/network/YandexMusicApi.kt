@@ -180,6 +180,9 @@ interface YandexMusicApi {
         @Path("albumId") albumId: String
     ): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.AlbumDto>
 
+    @GET("landing3/chart")
+    suspend fun getChart(): ResponseWrapper<com.korenskoy.yandexmusic.data.dto.ChartInfoResponseDto>
+
     @GET("search")
     suspend fun search(
         @retrofit2.http.Query("text") text: String,

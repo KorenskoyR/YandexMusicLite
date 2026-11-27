@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation.player
 
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Shuffle
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
 import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
 import com.korenskoy.yandexmusic.presentation.hifi.TrackHeadline
 import com.korenskoy.yandexmusic.presentation.hifi.toArtist
@@ -64,7 +68,7 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -156,6 +160,7 @@ internal fun PlayerHeader(
     onSleepAtEndOfTrack: () -> Unit,
     onCancelSleepTimer: () -> Unit
 ) {
+    val palette = HiFi.palette
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     // On a narrow phone (360 dp) the balancing space would leave the caption too little room for both words
     val balanced = maxWidth >= 350.dp
@@ -165,7 +170,7 @@ internal fun PlayerHeader(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         GlassCircleButton(onClick = onCollapse, contentDescription = stringResource(R.string.cd_svernut_pleer), size = 44.dp) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(28.dp))
         }
         // Balances the two buttons on the right, so the caption stays in the middle
         if (balanced) Spacer(Modifier.width(44.dp))
@@ -174,7 +179,7 @@ internal fun PlayerHeader(
             androidx.compose.foundation.text.BasicText(
                 text = stringResource(R.string.full_player_seychas_igraet),
                 style = androidx.compose.ui.text.TextStyle(
-                    color = Color.White.copy(alpha = 0.66f),
+                    color = palette.textSecondary,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -187,7 +192,7 @@ internal fun PlayerHeader(
             if (sourceLabel.isNotEmpty()) {
                 Text(
                     text = sourceLabel,
-                    color = Color.White.copy(alpha = 0.88f),
+                    color = palette.textPrimary.copy(alpha = 0.88f),
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -201,7 +206,7 @@ internal fun PlayerHeader(
             Spacer(Modifier.width(44.dp))
         } else {
             GlassCircleButton(onClick = onQueue, contentDescription = stringResource(R.string.cd_ochered), size = 44.dp) {
-                Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
+                Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(21.dp))
             }
         }
     }
@@ -217,6 +222,7 @@ private fun SleepTimerButton(
     onCancel: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val palette = HiFi.palette
     Box {
         Box(
             modifier = Modifier
@@ -228,7 +234,7 @@ private fun SleepTimerButton(
             Icon(
                 imageVector = Icons.Default.Bedtime,
                 contentDescription = stringResource(R.string.cd_sleep_timer),
-                tint = Color.White,
+                tint = palette.textPrimary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -241,7 +247,7 @@ private fun SleepTimerButton(
             border = BorderStroke(1.dp, HiFiDialogDefaults.Rim)
         ) {
         AppScale(appDensity) {
-            val colors = MenuDefaults.itemColors(textColor = Color.White)
+            val colors = MenuDefaults.itemColors(textColor = palette.textPrimary)
             for (minutes in listOf(15, 30, 45, 60)) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.sleep_minutes, minutes)) },
@@ -256,7 +262,7 @@ private fun SleepTimerButton(
             )
             if (state != null) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.sleep_off), color = HiFi.Danger) },
+                    text = { Text(stringResource(R.string.sleep_off), color = palette.danger) },
                     onClick = { expanded = false; onCancel() },
                     colors = colors
                 )
@@ -285,7 +291,7 @@ internal fun SleepTimerCaption(state: SleepTimerState?) {
     }
     Text(
         text = text,
-        color = Color.White.copy(alpha = 0.80f),
+        color = HiFi.palette.textPrimary.copy(alpha = 0.80f),
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         textAlign = TextAlign.Center,
@@ -316,7 +322,7 @@ internal fun PlayerCover(
         rememberInfiniteTransition(label = "cover_breath").animateFloat(
             initialValue = 1f,
             targetValue = 1.035f,
-            animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing), AnimRepeatMode.Reverse),
             label = "cover_scale"
         )
     } else null
@@ -357,9 +363,9 @@ internal fun PlayerCover(
                     Modifier
                         .fillMaxSize()
                         .then(coverModifier)
-                        .hifiSoftShadow(CoverShape, 30.dp, Color.Black.copy(alpha = 0.55f))
+                        .hifiSoftShadow(CoverShape, 30.dp, if (HiFi.palette.isDark) Color.Black.copy(alpha = 0.55f) else Color(0xFF11141C).copy(alpha = 0.22f))
                         .clip(CoverShape)
-                        .background(HiFi.Placeholder)
+                        .background(HiFi.palette.placeholder)
                 ) {
                     // A new track's cover slides in from the side it came from, inside the same frame
                     AnimatedContent(
@@ -423,78 +429,160 @@ internal fun TitleRow(
     /** The words of the track: the "Текст" button shows when Yandex has them. */
     lyrics: TrackLyrics? = null,
     lyricsOpen: Boolean = false,
+    repeatMode: RepeatMode = RepeatMode.OFF,
+    onCycleRepeat: () -> Unit = {},
+    shuffled: Boolean = false,
+    onToggleShuffle: () -> Unit = {},
+    showRepeatAndShuffle: Boolean = false,
+    strip: Boolean = false,
     onLyrics: () -> Unit = {}
 ) {
+    val palette = HiFi.palette
     val lite = LocalHiFiLite.current
+    val showOnlineActions = !track.isRadio && !track.isLocal
+    val showLyrics = showOnlineActions && lyrics?.offered == true
+    val showDownload = showOnlineActions && offline != null
+    val showTrackWave = showOnlineActions && onTrackWave != null
+    val actionCount = (if (showLyrics) 1 else 0) +
+        (if (showDownload) 1 else 0) +
+        (if (showOnlineActions) 1 else 0) +
+        (if (showTrackWave) 1 else 0) +
+        (if (showRepeatAndShuffle) 2 else 0)
+
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-    // A narrow row (a small phone, a low unit lying down): the round buttons beside the title are a little
-    // smaller and closer, so the title keeps its room
-    val narrow = maxWidth < NARROW_TITLE_ROW_DP.dp
-    val button = if (narrow) 40.dp else 44.dp
-    val gap = if (narrow) 8.dp else 10.dp
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 12.dp)) {
-        AnimatedContent(
-            targetState = track,
-            contentKey = { it.idString },
-            transitionSpec = { trackChange(direction, lite) },
-            label = "title_change",
-            modifier = Modifier.weight(1f)
-        ) { track ->
-        Column(Modifier.fillMaxWidth()) {
-            // Two lines and a smaller type before an ellipsis; the "E" plate after an explicit title.
-            // The title leads to the album, the artist to the artist's page
-            TrackHeadline(
-                title = track.title ?: stringResource(R.string.bez_nazvaniya),
-                fontSize = if (compact) 22.sp else 26.sp,
-                explicit = track.showsExplicit,
-                modifier = Modifier.toAlbum(track)
-            )
-            val aiMark = rememberAiMark(track)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = track.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { stringResource(if (track.isRadio) R.string.car_source_radio else R.string.player_unknown_artist) },
-                    color = Color.White.copy(alpha = 0.70f),
-                    fontSize = if (compact) 15.sp else 17.sp,
-                    lineHeight = 22.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false).toArtist(track)
-                )
-                if (aiMark != null) AiChip(Modifier.padding(start = 8.dp), fontSize = 11.sp, height = 20.dp, horizontal = 7.dp)
-            }
+        val narrow = maxWidth < NARROW_TITLE_ROW_DP.dp
+        val button = when {
+            strip -> 34.dp
+            narrow -> 40.dp
+            else -> 44.dp
         }
-        }
-        // A station, or the user's own file: nothing to keep, add or start a wave from
-        if (!track.isRadio && !track.isLocal) Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-            if (lyrics?.offered == true) LyricsButton(open = lyricsOpen, size = button, onClick = onLyrics)
-            if (offline != null) TrackDownloadButton(offline, onDownloadClick, size = button)
-            GlassCircleButton(
-                onClick = onAddToPlaylist,
-                contentDescription = stringResource(R.string.track_context_menu_dobavit_v_pleylist),
-                size = button
-            ) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-            }
-            if (onTrackWave != null) {
-                GlassCircleButton(onClick = onTrackWave, contentDescription = stringResource(R.string.wave_by_track_cd), size = button) {
-                    Icon(Icons.Rounded.Waves, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+        val gap = if (strip) 6.dp else if (narrow) 8.dp else 10.dp
+        val stackActionsBelow = !strip && actionCount > 3 && maxWidth < 520.dp
+
+        val titleColumn: @Composable (Modifier) -> Unit = { mod ->
+            AnimatedContent(
+                targetState = track,
+                contentKey = { it.idString },
+                transitionSpec = { trackChange(direction, lite) },
+                label = "title_change",
+                modifier = mod
+            ) { t ->
+                Column(Modifier.fillMaxWidth()) {
+                    TrackHeadline(
+                        title = t.title ?: stringResource(R.string.bez_nazvaniya),
+                        fontSize = if (compact) 22.sp else 26.sp,
+                        explicit = t.showsExplicit,
+                        color = palette.textPrimary,
+                        modifier = Modifier.toAlbum(t)
+                    )
+                    val aiMark = rememberAiMark(t)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = t.artists.joinToString(", ") { it.name ?: "" }.ifEmpty { stringResource(if (t.isRadio) R.string.car_source_radio else R.string.player_unknown_artist) },
+                            color = palette.textSecondary,
+                            fontSize = if (compact) 15.sp else 17.sp,
+                            lineHeight = 22.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false).toArtist(t)
+                        )
+                        if (aiMark != null) AiChip(Modifier.padding(start = 8.dp), fontSize = 11.sp, height = 20.dp, horizontal = 7.dp)
+                    }
                 }
             }
         }
+
+        val actionButtons: @Composable () -> Unit = {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
+                if (showLyrics) LyricsButton(open = lyricsOpen, size = button, onClick = onLyrics)
+                offline?.takeIf { showOnlineActions }?.let { TrackDownloadButton(it, onDownloadClick, size = button) }
+                if (showOnlineActions) {
+                    GlassCircleButton(
+                        onClick = onAddToPlaylist,
+                        contentDescription = stringResource(R.string.track_context_menu_dobavit_v_pleylist),
+                        size = button
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(22.dp))
+                    }
+                    onTrackWave?.let { waveClick ->
+                        GlassCircleButton(onClick = waveClick, contentDescription = stringResource(R.string.wave_by_track_cd), size = button) {
+                            Icon(Icons.Rounded.Waves, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                }
+                if (showRepeatAndShuffle) {
+                    RepeatActionButton(repeatMode = repeatMode, onClick = onCycleRepeat, size = button)
+                    ShuffleActionButton(shuffled = shuffled, onClick = onToggleShuffle, size = button)
+                }
+            }
+        }
+
+        if (stackActionsBelow && actionCount > 0) {
+            Column(Modifier.fillMaxWidth()) {
+                titleColumn(Modifier.fillMaxWidth())
+                Spacer(Modifier.height(if (compact) 6.dp else 10.dp))
+                actionButtons()
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 12.dp)) {
+                titleColumn(Modifier.weight(1f))
+                if (actionCount > 0) actionButtons()
+            }
+        }
     }
+}
+
+@Composable
+private fun RepeatActionButton(repeatMode: RepeatMode, onClick: () -> Unit, size: Dp = 44.dp) {
+    val palette = HiFi.palette
+    val active = repeatMode != RepeatMode.OFF
+    GlassCircleButton(
+        onClick = onClick,
+        contentDescription = stringResource(R.string.cd_repeat),
+        size = size,
+        fill = if (active) palette.textPrimary.copy(alpha = 0.92f) else palette.glassFill,
+        border = if (active) palette.textPrimary.copy(alpha = 0.92f) else palette.glassBorder
+    ) {
+        Icon(
+            imageVector = if (repeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+            contentDescription = null,
+            tint = if (active) palette.ground else palette.textPrimary,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun ShuffleActionButton(shuffled: Boolean, onClick: () -> Unit, size: Dp = 44.dp) {
+    val palette = HiFi.palette
+    GlassCircleButton(
+        onClick = onClick,
+        contentDescription = stringResource(R.string.cd_shuffle),
+        size = size,
+        fill = if (shuffled) palette.textPrimary.copy(alpha = 0.92f) else palette.glassFill,
+        border = if (shuffled) palette.textPrimary.copy(alpha = 0.92f) else palette.glassBorder
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Shuffle,
+            contentDescription = null,
+            tint = if (shuffled) palette.ground else palette.textPrimary,
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
 
 /** "Текст": glass, lit while the words are shown over the cover. */
 @Composable
 internal fun LyricsButton(open: Boolean, onClick: () -> Unit, size: Dp = 44.dp) {
+    val palette = HiFi.palette
     GlassCircleButton(
         onClick = onClick,
         contentDescription = stringResource(if (open) R.string.lyrics_hide else R.string.lyrics_show),
         size = size,
-        modifier = if (open) Modifier.background(Color.White.copy(alpha = 0.92f), CircleShape) else Modifier
+        fill = if (open) palette.textPrimary.copy(alpha = 0.92f) else palette.glassFill,
+        border = if (open) palette.textPrimary.copy(alpha = 0.92f) else palette.glassBorder
     ) {
-        Icon(Icons.Rounded.Lyrics, contentDescription = null, tint = if (open) HiFi.Ground else Color.White, modifier = Modifier.size(22.dp))
+        Icon(Icons.Rounded.Lyrics, contentDescription = null, tint = if (open) palette.ground else palette.textPrimary, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -507,6 +595,7 @@ private const val NARROW_TITLE_ROW_DP = 400
  */
 @Composable
 internal fun TrackDownloadButton(state: TrackOfflineState, onClick: () -> Unit, size: Dp = 44.dp) {
+    val palette = HiFi.palette
     val description = stringResource(
         when (state) {
             TrackOfflineState.NONE -> R.string.track_download
@@ -518,18 +607,18 @@ internal fun TrackDownloadButton(state: TrackOfflineState, onClick: () -> Unit, 
         Crossfade(targetState = state, animationSpec = HiFiMotion.quick(), label = "download_state") { shown ->
             Box(Modifier.size(size), contentAlignment = Alignment.Center) {
                 when (shown) {
-                    TrackOfflineState.NONE -> Icon(Icons.Rounded.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-                    TrackOfflineState.DONE -> Icon(Icons.Rounded.DownloadDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    TrackOfflineState.NONE -> Icon(Icons.Rounded.Download, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(22.dp))
+                    TrackOfflineState.DONE -> Icon(Icons.Rounded.DownloadDone, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(22.dp))
                     TrackOfflineState.DOWNLOADING -> {
                         val lite = LocalHiFiLite.current
                         val turn = if (lite) null else rememberInfiniteTransition(label = "download_ring")
                             .animateFloat(0f, 360f, infiniteRepeatable(tween(1_100, easing = LinearEasing)), label = "download_turn")
                         Canvas(Modifier.fillMaxSize().padding(5.dp)) {
                             val stroke = 2.5.dp.toPx()
-                            drawArc(Color.White.copy(alpha = 0.16f), 0f, 360f, false, style = Stroke(stroke))
-                            drawArc(Color.White, (turn?.value ?: 0f) - 90f, 110f, false, style = Stroke(stroke, cap = StrokeCap.Round))
+                            drawArc(palette.textPrimary.copy(alpha = 0.16f), 0f, 360f, false, style = Stroke(stroke))
+                            drawArc(palette.textPrimary, (turn?.value ?: 0f) - 90f, 110f, false, style = Stroke(stroke, cap = StrokeCap.Round))
                         }
-                        Box(Modifier.size(11.dp).clip(RoundedCornerShape(2.5.dp)).background(Color.White))
+                        Box(Modifier.size(11.dp).clip(RoundedCornerShape(2.5.dp)).background(palette.textPrimary))
                     }
                 }
             }
@@ -540,6 +629,7 @@ internal fun TrackDownloadButton(state: TrackOfflineState, onClick: () -> Unit, 
 /** The real stream quality in a recessed chip; a tap explains what plays and what the server offered. */
 @Composable
 internal fun QualityChip(isRadio: Boolean, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val text = if (isRadio) stringResource(R.string.full_player_fm_stereo_128_kbps) else LocalStreamQuality.current
     // The chip's height is kept while the quality is not known yet
     if (text == null) {
@@ -557,7 +647,7 @@ internal fun QualityChip(isRadio: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = text.uppercase(),
-            color = Color.White.copy(alpha = 0.80f),
+            color = palette.textPrimary.copy(alpha = 0.80f),
             fontSize = 11.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 0.12.em,
@@ -567,10 +657,10 @@ internal fun QualityChip(isRadio: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun PlayerTimeline(progress: () -> Long, durationMs: Long, isPlaying: Boolean, onSeek: (Long) -> Unit) {
+internal fun PlayerTimeline(progress: () -> Long, durationMs: Long, isPlaying: Boolean, onSeek: (Long) -> Unit, height: Float = 44f) {
     var scrub by remember(durationMs) { mutableStateOf<Float?>(null) }
     Column(Modifier.fillMaxWidth()) {
-        HiFiTimeline(progress, durationMs, isPlaying, onSeek, height = 44f, onScrub = { scrub = it })
+        HiFiTimeline(progress, durationMs, isPlaying, onSeek, height = height, onScrub = { scrub = it })
         TimeReadout(progress, durationMs, scrub)
     }
 }
@@ -585,13 +675,14 @@ internal fun TimeReadout(
     lineHeight: TextUnit = 16.sp,
     lift: Dp = 4.dp
 ) {
+    val palette = HiFi.palette
     val currentProgress by rememberUpdatedState(progress)
     val second by remember(durationMs, scrub) {
         derivedStateOf { (scrub?.let { TimelineMath.seekPosition(it, durationMs) } ?: currentProgress()) / 1000L }
     }
     val (elapsed, remaining) = TimelineMath.readout(second * 1000L, durationMs)
     val color by animateColorAsState(
-        if (scrub != null) Color.White.copy(alpha = 0.95f) else Color.White.copy(alpha = 0.62f),
+        if (scrub != null) palette.textPrimary.copy(alpha = 0.95f) else palette.textSecondary,
         HiFiMotion.quick(),
         label = "time_color"
     )
@@ -607,6 +698,13 @@ internal fun TimeReadout(
 @Composable
 internal fun NextPlate(next: TrackDetailsDto, onClick: () -> Unit) {
     val context = LocalContext.current
+    val palette = HiFi.palette
+    val plateFill = if (palette.isDark) PlateFill else palette.cardFill
+    val highlightColors = if (palette.isDark) {
+        listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.12f))
+    } else {
+        listOf(palette.glassBorder, palette.glassBorder, palette.glassBorder)
+    }
     val title = next.title ?: stringResource(R.string.bez_nazvaniya)
     val artist = next.artists.joinToString(", ") { it.name ?: "" }
     Row(
@@ -614,10 +712,10 @@ internal fun NextPlate(next: TrackDetailsDto, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(64.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(PlateFill)
+            .background(plateFill)
             .drawWithCache {
                 val r = CornerRadius(20.dp.toPx())
-                val highlight = Brush.verticalGradient(0f to Color.White.copy(alpha = 0.22f), 0.08f to Color.White.copy(alpha = 0.12f), 1f to Color.White.copy(alpha = 0.12f))
+                val highlight = Brush.verticalGradient(0f to highlightColors[0], 0.08f to highlightColors[1], 1f to highlightColors[2])
                 onDrawBehind { drawRoundRect(highlight, cornerRadius = r, style = Stroke(1.dp.toPx())) }
             }
             .clickable(onClickLabel = stringResource(R.string.cd_ochered), role = Role.Button, onClick = onClick)
@@ -632,13 +730,13 @@ internal fun NextPlate(next: TrackDetailsDto, onClick: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.08f))
-                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                .background(palette.placeholder)
+                .border(1.dp, palette.glassBorder, RoundedCornerShape(10.dp))
         )
         Column(Modifier.weight(1f)) {
             Text(
                 text = stringResource(R.string.full_player_dalee),
-                color = Color.White.copy(alpha = 0.66f),
+                color = palette.textSecondary,
                 fontSize = 10.sp,
                 lineHeight = 13.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -646,9 +744,9 @@ internal fun NextPlate(next: TrackDetailsDto, onClick: () -> Unit) {
             )
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) { append(title) }
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = palette.textPrimary)) { append(title) }
                     if (artist.isNotEmpty()) {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.70f))) { append(" · $artist") }
+                        withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = palette.textSecondary)) { append(" · $artist") }
                     }
                 },
                 fontSize = 15.sp,
@@ -660,7 +758,7 @@ internal fun NextPlate(next: TrackDetailsDto, onClick: () -> Unit) {
         Icon(
             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.6f),
+            tint = palette.textTertiary,
             modifier = Modifier.size(20.dp)
         )
     }

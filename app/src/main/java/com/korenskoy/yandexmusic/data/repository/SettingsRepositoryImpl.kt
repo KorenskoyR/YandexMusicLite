@@ -6,6 +6,10 @@ import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -220,4 +224,32 @@ class SettingsRepositoryImpl @Inject constructor(
     private val autoCheckUpdatesPref = bool("auto_check_updates", SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES)
     override val autoCheckUpdates = autoCheckUpdatesPref.first
     override suspend fun setAutoCheckUpdates(enabled: Boolean) = autoCheckUpdatesPref.second(enabled)
+
+    private val themeModePref = choice("theme_mode", AppThemeMode.DARK)
+    override val themeMode = themeModePref.first
+    override suspend fun setThemeMode(mode: AppThemeMode) = themeModePref.second(mode)
+
+    private val themeSchedulePref = choice("theme_schedule_type", ThemeScheduleType.CUSTOM)
+    override val themeScheduleType = themeSchedulePref.first
+    override suspend fun setThemeScheduleType(type: ThemeScheduleType) = themeSchedulePref.second(type)
+
+    private val THEME_LIGHT_MIN_KEY = intPreferencesKey("theme_light_minutes")
+    override val themeLightMinutes: Flow<Int> = context.dataStore.data.map {
+        (it[THEME_LIGHT_MIN_KEY] ?: ThemePolicy.DEFAULT_LIGHT_MINUTES).coerceIn(0, 24 * 60 - 1)
+    }
+    override suspend fun setThemeLightMinutes(minutes: Int) {
+        context.dataStore.edit { it[THEME_LIGHT_MIN_KEY] = minutes.coerceIn(0, 24 * 60 - 1) }
+    }
+
+    private val THEME_DARK_MIN_KEY = intPreferencesKey("theme_dark_minutes")
+    override val themeDarkMinutes: Flow<Int> = context.dataStore.data.map {
+        (it[THEME_DARK_MIN_KEY] ?: ThemePolicy.DEFAULT_DARK_MINUTES).coerceIn(0, 24 * 60 - 1)
+    }
+    override suspend fun setThemeDarkMinutes(minutes: Int) {
+        context.dataStore.edit { it[THEME_DARK_MIN_KEY] = minutes.coerceIn(0, 24 * 60 - 1) }
+    }
+
+    private val fullscreenPref = bool("fullscreen_mode", false)
+    override val fullscreenMode = fullscreenPref.first
+    override suspend fun setFullscreenMode(enabled: Boolean) = fullscreenPref.second(enabled)
 }

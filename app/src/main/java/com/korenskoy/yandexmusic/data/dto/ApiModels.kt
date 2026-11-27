@@ -247,10 +247,23 @@ data class PlaylistCoverDto(
 )
 
 @Serializable
+data class ChartPositionDto(
+    @SerialName("position") val position: Int? = null,
+    @SerialName("progress") val progress: String? = null,
+    @SerialName("shift") val shift: Int? = null
+)
+
+@Serializable
+data class ChartInfoResponseDto(
+    @SerialName("chart") val chart: UserPlaylistDto? = null
+)
+
+@Serializable
 data class PlaylistTrackDto(
     @SerialName("id") val id: JsonElement? = null,
     @SerialName("albumId") val albumId: JsonElement? = null,
-    @SerialName("track") val track: TrackDetailsDto? = null
+    @SerialName("track") val track: TrackDetailsDto? = null,
+    @SerialName("chart") val chart: ChartPositionDto? = null
 ) {
     val trackId: String?
         get() = track?.idString ?: (id as? JsonPrimitive)?.content

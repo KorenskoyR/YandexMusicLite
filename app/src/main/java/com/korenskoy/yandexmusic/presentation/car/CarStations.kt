@@ -78,6 +78,7 @@ class CarRadio(
 /** "Станции · 6 избранных": the glass button under the station's card, as «Очередь» is under a track's cover. */
 @Composable
 internal fun StationsPill(u: Scale, favourites: Int, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val count = if (favourites > 0) {
         russianQuantityString(favourites, R.string.car_stations_fav_one, R.string.car_stations_fav_few, R.string.car_stations_fav_many)
     } else null
@@ -91,10 +92,10 @@ internal fun StationsPill(u: Scale, favourites: Int, onClick: () -> Unit) {
             .padding(horizontal = u(28f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Rounded.Radio, contentDescription = null, tint = Color.White, modifier = Modifier.size(u(24f)))
+        Icon(Icons.Rounded.Radio, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
         Spacer(Modifier.width(u(12f)))
-        Text(stringResource(R.string.car_stations), color = Color.White, fontSize = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
-        if (count != null) Text(" · $count", color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(20f), fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(stringResource(R.string.car_stations), color = palette.textPrimary, fontSize = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
+        if (count != null) Text(" · $count", color = palette.textSecondary, fontSize = u.sp(20f), fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -104,17 +105,18 @@ internal fun StationsPill(u: Scale, favourites: Int, onClick: () -> Unit) {
  */
 @Composable
 internal fun CarStationsPanel(u: Scale, radio: CarRadio, modifier: Modifier, onClose: () -> Unit) {
+    val palette = HiFi.palette
     Column(
         modifier
             .clip(RoundedCornerShape(u(30f)))
-            .background(HiFi.SheetFill.copy(alpha = 0.97f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+            .background(palette.sheetFill.copy(alpha = 0.97f))
+            .border(1.dp, palette.glassBorder, RoundedCornerShape(u(30f)))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
             .padding(start = u(16f), end = u(16f), top = u(18f), bottom = u(8f))
     ) {
         Row(Modifier.padding(start = u(8f), end = u(2f), bottom = u(8f)), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(R.string.car_stations), color = Color.White, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold,
+                stringResource(R.string.car_stations), color = palette.textPrimary, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold,
                 maxLines = 1, modifier = Modifier.weight(1f)
             )
             Box(
@@ -124,7 +126,7 @@ internal fun CarStationsPanel(u: Scale, radio: CarRadio, modifier: Modifier, onC
                     .clickable(role = Role.Button, onClick = onClose),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
             }
         }
         CarStationsList(u, radio, Modifier.weight(1f).fillMaxWidth(), onPlayed = onClose)
@@ -134,6 +136,7 @@ internal fun CarStationsPanel(u: Scale, radio: CarRadio, modifier: Modifier, onC
 /** The switch «Избранные · 6 / Все · 37» and the rows under it. [onPlayed] follows a tap that starts a station. */
 @Composable
 internal fun CarStationsList(u: Scale, radio: CarRadio, modifier: Modifier, onPlayed: () -> Unit = {}) {
+    val palette = HiFi.palette
     var showAll by rememberSaveable { mutableStateOf(radio.favourites.isEmpty()) }
     val shown = if (showAll) radio.stations else radio.favouriteStations
     Column(modifier) {
@@ -160,7 +163,7 @@ internal fun CarStationsList(u: Scale, radio: CarRadio, modifier: Modifier, onPl
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text, color = if (on) Color.White else Color.White.copy(alpha = 0.72f), fontSize = u.sp(17f),
+                        text, color = if (on) palette.onMetal else palette.textSecondary, fontSize = u.sp(17f),
                         fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -170,7 +173,7 @@ internal fun CarStationsList(u: Scale, radio: CarRadio, modifier: Modifier, onPl
         if (shown.isEmpty()) {
             Text(
                 stringResource(R.string.car_stations_none),
-                color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(18f), lineHeight = u.sp(26f), textAlign = TextAlign.Center,
+                color = palette.textSecondary, fontSize = u.sp(18f), lineHeight = u.sp(26f), textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = u(16f), vertical = u(24f))
             )
         } else {
@@ -189,8 +192,11 @@ internal fun CarStationsList(u: Scale, radio: CarRadio, modifier: Modifier, onPl
 
 @Composable
 private fun StationRow(u: Scale, station: RadioStation, onAir: Boolean, favourite: Boolean, onPlay: () -> Unit, onToggle: () -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(u(22f))
     val playLabel = stringResource(R.string.car_station_play_cd, station.name)
+    val rowPrimary = if (onAir) palette.onMetal else palette.textPrimary
+    val rowSecondary = if (onAir) palette.onMetal.copy(alpha = 0.72f) else palette.textSecondary
     Row(
         Modifier
             .fillMaxWidth()
@@ -212,19 +218,19 @@ private fun StationRow(u: Scale, station: RadioStation, onAir: Boolean, favourit
             StationLogo(u, station)
             Spacer(Modifier.width(u(16f)))
             Column(Modifier.weight(1f)) {
-                Text(station.name, color = Color.White, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(station.name, color = rowPrimary, fontSize = u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (onAir) {
-                        Box(Modifier.size(u(8f)).clip(CircleShape).background(HiFi.Live))
+                        Box(Modifier.size(u(8f)).clip(CircleShape).background(palette.live))
                         Spacer(Modifier.width(u(6f)))
                         Text(
-                            stringResource(R.string.car_station_on_air) + "  ", color = Color.White, fontSize = u.sp(12f),
+                            stringResource(R.string.car_station_on_air) + "  ", color = rowPrimary, fontSize = u.sp(12f),
                             fontWeight = FontWeight.ExtraBold, letterSpacing = 0.14.em, maxLines = 1
                         )
                     }
                     Text(
                         // On air the mark takes the room of the genre: the frequency and the stream's format stay whole
-                        listOfNotNull(station.frequency, station.format, station.category.title.takeIf { !onAir }).joinToString(" · "), color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f),
+                        listOfNotNull(station.frequency, station.format, station.category.title.takeIf { !onAir }).joinToString(" · "), color = rowSecondary, fontSize = u.sp(15f),
                         lineHeight = u.sp(20f), maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -242,31 +248,34 @@ private fun StationRow(u: Scale, station: RadioStation, onAir: Boolean, favourit
         ) {
             Icon(
                 if (favourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, contentDescription = null,
-                tint = if (favourite) HiFi.Love else Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f))
+                tint = if (favourite) palette.love else palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(u(26f))
             )
         }
     }
 }
 
-/** The station's logo on its brand colours, as the radio page shows it; its initial when it has none. */
+/** The station's logo rendered cleanly edge-to-edge matching CarCover; its initial when it has none. */
 @Composable
 private fun StationLogo(u: Scale, station: RadioStation) {
     val context = LocalContext.current
     val shape = RoundedCornerShape(u(14f))
+    val model: Any? = station.iconRes ?: station.logoUrl.ifEmpty { null }
     Box(
         Modifier
             .size(u(56f))
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(station.brandColorStart), Color(station.brandColorEnd)))),
+            .background(
+                if (model != null) Brush.linearGradient(listOf(HiFi.palette.placeholder, HiFi.palette.placeholder))
+                else Brush.linearGradient(listOf(Color(station.brandColorStart), Color(station.brandColorEnd)))
+            ),
         contentAlignment = Alignment.Center
     ) {
-        val model: Any? = station.iconRes ?: station.logoUrl.ifEmpty { null }
         if (model != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context).data(model).crossfade(true).browserUserAgent().build(),
                 contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(u(6f))
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
         } else {
             Text(station.name.take(1), color = Color.White, fontSize = u.sp(24f), fontWeight = FontWeight.ExtraBold)

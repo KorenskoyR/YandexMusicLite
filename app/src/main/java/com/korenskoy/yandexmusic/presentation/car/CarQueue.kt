@@ -90,6 +90,7 @@ internal fun carSwipeStep(travelledPx: Float, thresholdPx: Float): Int = when {
 /** "Очередь · 24 трека": the glass button under the biggest cover. */
 @Composable
 internal fun QueuePill(u: Scale, count: String, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val description = stringResource(R.string.car_queue_cd, count)
     Row(
         Modifier
@@ -100,10 +101,10 @@ internal fun QueuePill(u: Scale, count: String, onClick: () -> Unit) {
             .padding(horizontal = u(28f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(u(24f)))
+        Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
         Spacer(Modifier.width(u(12f)))
-        Text(stringResource(R.string.car_queue), color = Color.White, fontSize = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
-        Text(" · $count", color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(20f), fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(stringResource(R.string.car_queue), color = palette.textPrimary, fontSize = u.sp(20f), fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(" · $count", color = palette.textSecondary, fontSize = u.sp(20f), fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -119,18 +120,19 @@ internal fun CarQueuePanel(
     onClick: (TrackDetailsDto) -> Unit,
     onClose: () -> Unit
 ) {
+    val palette = HiFi.palette
     Column(
         modifier
             .clip(RoundedCornerShape(u(30f)))
-            .background(HiFi.SheetFill.copy(alpha = 0.97f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+            .background(palette.sheetFill.copy(alpha = 0.97f))
+            .border(1.dp, palette.glassBorder, RoundedCornerShape(u(30f)))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
             .padding(start = u(16f), end = u(16f), top = u(18f), bottom = u(8f))
     ) {
         Row(Modifier.padding(start = u(8f), end = u(2f), bottom = u(8f)), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.car_queue), color = Color.White, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                Text(caption, color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.car_queue), color = palette.textPrimary, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                Text(caption, color = palette.textSecondary, fontSize = u.sp(15f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Box(
                 Modifier
@@ -139,7 +141,7 @@ internal fun CarQueuePanel(
                     .clickable(role = Role.Button, onClick = onClose),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
             }
         }
         LazyColumn(
@@ -155,7 +157,7 @@ internal fun CarQueuePanel(
             if (!loading && upcoming.isEmpty()) item(key = "empty") {
                 Text(
                     stringResource(R.string.car_queue_empty),
-                    color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(17f),
+                    color = palette.textSecondary, fontSize = u.sp(17f),
                     modifier = Modifier.padding(horizontal = u(10f), vertical = u(16f))
                 )
             }
@@ -178,15 +180,16 @@ internal fun CarNextList(
     loading: Boolean,
     onClick: (TrackDetailsDto) -> Unit
 ) {
+    val palette = HiFi.palette
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(start = u(10f), end = u(10f), bottom = u(10f)), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                caption.uppercase(), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold,
+                caption.uppercase(), color = palette.textSecondary, fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.14.em, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
             )
             if (upcoming.isNotEmpty()) {
                 Spacer(Modifier.width(u(12f)))
-                Text(count, color = Color.White.copy(alpha = 0.55f), fontSize = u.sp(15f), maxLines = 1)
+                Text(count, color = palette.textTertiary, fontSize = u.sp(15f), maxLines = 1)
             }
         }
         val shape = RoundedCornerShape(u(30f))
@@ -195,8 +198,8 @@ internal fun CarNextList(
                 .weight(1f)
                 .fillMaxWidth()
                 .clip(shape)
-                .background(HiFi.SheetFill.copy(alpha = 0.55f))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), shape),
+                .background(palette.sheetFill.copy(alpha = 0.72f))
+                .border(1.dp, palette.glassBorder, shape),
             contentPadding = PaddingValues(horizontal = u(12f), vertical = u(10f)),
             verticalArrangement = Arrangement.spacedBy(u(4f))
         ) {
@@ -209,7 +212,7 @@ internal fun CarNextList(
             if (!loading && upcoming.isEmpty()) item(key = "empty") {
                 Text(
                     stringResource(R.string.car_queue_empty),
-                    color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(17f),
+                    color = palette.textSecondary, fontSize = u.sp(17f),
                     modifier = Modifier.padding(horizontal = u(10f), vertical = u(16f))
                 )
             }
@@ -220,6 +223,7 @@ internal fun CarNextList(
 @Composable
 private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onClick: (() -> Unit)?) {
     val context = LocalContext.current
+    val palette = HiFi.palette
     val title = track.title ?: stringResource(R.string.bez_nazvaniya)
     val shape = RoundedCornerShape(u(18f))
     val description = if (onClick != null) stringResource(R.string.car_next_play_cd, title) else title
@@ -228,13 +232,13 @@ private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onCli
             .fillMaxWidth()
             .heightIn(min = u(84f))
             .clip(shape)
-            .then(if (isCurrent) Modifier.background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.10f), shape) else Modifier)
+            .then(if (isCurrent) Modifier.background(palette.pillFill).border(1.dp, palette.glassBorder, shape) else Modifier)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = description, onClick = onClick) else Modifier)
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(horizontal = u(10f), vertical = u(8f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(u(68f)).clip(RoundedCornerShape(u(14f))).background(HiFi.Placeholder), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(u(68f)).clip(RoundedCornerShape(u(14f))).background(palette.placeholder), contentAlignment = Alignment.Center) {
             AsyncImage(
                 model = ImageRequest.Builder(context).cover(track.coverUri, CoverSize.Small).crossfade(true).build(),
                 contentDescription = null,
@@ -248,11 +252,11 @@ private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onCli
             TrackTitleLine(title, track.showsExplicit, u.sp(22f), lineHeight = u.sp(28f), fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isCurrent) {
-                    Text(stringResource(R.string.car_queue_now) + " · ", color = Color.White.copy(alpha = 0.86f), fontSize = u.sp(13f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em, maxLines = 1)
+                    Text(stringResource(R.string.car_queue_now) + " · ", color = palette.textPrimary.copy(alpha = 0.86f), fontSize = u.sp(13f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em, maxLines = 1)
                 }
                 Text(
                     track.artists.joinToString { it.name ?: "" },
-                    color = Color.White.copy(alpha = 0.64f), fontSize = u.sp(17f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = palette.textSecondary, fontSize = u.sp(17f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
                 if (rememberAiMark(track) != null) AiChip(Modifier.padding(start = u(10f)), fontSize = u.sp(12f), height = u(22f), horizontal = u(8f))
@@ -263,7 +267,7 @@ private fun QueueRow(u: Scale, track: TrackDetailsDto, isCurrent: Boolean, onCli
 
 @Composable
 private fun QueueRowPlaceholder(u: Scale) {
-    val fill = Color.White.copy(alpha = 0.06f)
+    val fill = HiFi.palette.pillFill
     Row(Modifier.fillMaxWidth().height(u(84f)).padding(horizontal = u(10f), vertical = u(8f)), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(u(68f)).clip(RoundedCornerShape(u(14f))).background(fill))
         Spacer(Modifier.width(u(16f)))
@@ -293,6 +297,7 @@ internal fun NextRow(
     onCaptionClick: (() -> Unit)? = null
 ) {
     if (tracks.isEmpty() && !loading) return
+    val palette = HiFi.palette
     val limit = maxWidth
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val n = CAR_NEXT_COUNT
@@ -300,7 +305,7 @@ internal fun NextRow(
         Column(Modifier.width(card * n + gap * (n - 1))) {
             Text(
                 caption.uppercase() + if (onCaptionClick != null) " ›" else "",
-                color = Color.White.copy(alpha = 0.66f),
+                color = palette.textSecondary,
                 fontSize = u.sp(13f),
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.16.em,
@@ -337,6 +342,7 @@ internal fun NextRow(
 @Composable
 private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> Unit) {
     val context = LocalContext.current
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(u(14f))
     val title = track.title ?: stringResource(R.string.bez_nazvaniya)
     val description = stringResource(R.string.car_next_play_cd, title)
@@ -355,13 +361,13 @@ private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> 
                 .size(size)
                 .hifiSoftShadow(shape, u(12f))
                 .clip(shape)
-                .background(HiFi.Placeholder)
+                .background(palette.placeholder)
         )
         Spacer(Modifier.height(u(8f)))
         TrackTitleLine(title, track.showsExplicit, u.sp(15f), lineHeight = u.sp(19f), fontWeight = FontWeight.Bold)
         Text(
             track.artists.joinToString { it.name ?: "" },
-            color = Color.White.copy(alpha = 0.66f),
+            color = palette.textSecondary,
             fontSize = u.sp(13f),
             lineHeight = u.sp(17f),
             maxLines = 1,
@@ -373,7 +379,7 @@ private fun NextCard(u: Scale, track: TrackDetailsDto, size: Dp, onClick: () -> 
 /** Exactly a card's height (cover, 8, lines of 19 and 17), so the row does not jump when the tracks arrive. */
 @Composable
 private fun NextCardPlaceholder(u: Scale, size: Dp) {
-    val fill = Color.White.copy(alpha = 0.06f)
+    val fill = HiFi.palette.pillFill
     Column(Modifier.width(size)) {
         Box(Modifier.size(size).clip(RoundedCornerShape(u(14f))).background(fill))
         Spacer(Modifier.height(u(13f)))

@@ -3,6 +3,7 @@ package com.korenskoy.yandexmusic.widget
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
@@ -60,6 +61,10 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.player.PlaybackController
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.player.TrackReactions
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import com.korenskoy.yandexmusic.utils.CoverSize
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 import dagger.hilt.EntryPoint
@@ -69,6 +74,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Calendar
 import kotlin.math.roundToInt
 
 /** What every widget shows: the track, its cover and a soft glow made of it, the state of play. */
@@ -86,7 +92,8 @@ data class WidgetNow(
     /** «МОЯ ВОЛНА», «РАДИО»; null for the rest. */
     val source: String?,
     val cover: Bitmap?,
-    val glow: Bitmap?
+    val glow: Bitmap?,
+    val isLightTheme: Boolean = false
 ) {
     val hasTrack: Boolean get() = title != null
 }
@@ -96,6 +103,7 @@ data class WidgetNow(
 interface WidgetDependencies {
     fun playbackController(): PlaybackController
     fun reactions(): TrackReactions
+    fun settingsRepository(): SettingsRepository
 }
 
 /** The widgets' clock: moved every half-minute while music plays (see [NowPlayingWidgetUpdater]), never faster. */
@@ -126,12 +134,30 @@ internal fun rememberWidgetNow(context: Context): WidgetNow {
     val deps = remember { EntryPointAccessors.fromApplication(context.applicationContext, WidgetDependencies::class.java) }
     val controller = deps.playbackController()
     val reactions = deps.reactions()
+    val settings = deps.settingsRepository()
     val track by controller.currentTrack.collectAsState()
     val isPlaying by controller.isPlaying.collectAsState()
     val source by controller.currentSource.collectAsState()
     val liked by reactions.likedTrackIds.collectAsState()
     val stations by reactions.favoriteStationIds.collectAsState()
+    val themeMode by settings.themeMode.collectAsState(initial = AppThemeMode.DARK)
+    val scheduleType by settings.themeScheduleType.collectAsState(initial = ThemeScheduleType.SUNSET_TO_SUNRISE)
+    val lightMinutes by settings.themeLightMinutes.collectAsState(initial = ThemePolicy.DEFAULT_LIGHT_MINUTES)
+    val darkMinutes by settings.themeDarkMinutes.collectAsState(initial = ThemePolicy.DEFAULT_DARK_MINUTES)
     val tick by WidgetClock.tick.collectAsState()
+    val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val nowMinutes = remember(tick) {
+        val cal = Calendar.getInstance()
+        cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+    }
+    val isLightTheme = ThemePolicy.isLightTheme(
+        mode = themeMode,
+        scheduleType = scheduleType,
+        lightMinutes = lightMinutes,
+        darkMinutes = darkMinutes,
+        nowMinutes = nowMinutes,
+        systemDark = systemDark
+    )
     val trackId = track?.idString
     val cached = remember(trackId) { trackId?.let { WidgetArtCache.get(it) } ?: (null to null) }
     var art by remember(trackId) { mutableStateOf(cached) }
@@ -171,7 +197,8 @@ internal fun rememberWidgetNow(context: Context): WidgetNow {
             else -> null
         },
         cover = art.first,
-        glow = art.second
+        glow = art.second,
+        isLightTheme = isLightTheme
     )
 }
 
@@ -196,10 +223,65 @@ private const val GLOW_TINY = 6
 private const val GLOW_PX = 96
 
 /** Oval shape drawables so buttons stay round on Android 7.1–11 (API < 31) where cornerRadius is ignored. */
-internal enum class WidgetFill(val drawableRes: Int) {
-    CHIP(R.drawable.widget_round_chip),
-    KNOB(R.drawable.widget_round_knob),
-    SHADE(R.drawable.widget_round_shade)
+internal enum class WidgetFill(val drawableRes: Int, val lightDrawableRes: Int) {
+    CHIP(R.drawable.widget_round_chip, R.drawable.widget_round_chip_light),
+    KNOB(R.drawable.widget_round_knob, R.drawable.widget_round_knob_light),
+    SHADE(R.drawable.widget_round_shade, R.drawable.widget_round_shade);
+
+    fun forTheme(isLight: Boolean): Int = if (isLight) lightDrawableRes else drawableRes
+}
+
+/** Light & dark widget palette tokens paired with API 25–37 compatible XML shape drawables. */
+internal class WidgetTheme private constructor(
+    val isLight: Boolean,
+    val text: ColorProvider,
+    val textSoft: ColorProvider,
+    val caps: ColorProvider,
+    val iconTint: Color,
+    val onKnob: Color,
+    val love: Color,
+    val bg24: Int,
+    val bg28: Int,
+    val shade28: Int,
+    val coverChip14: Int,
+    val coverChip18: Int,
+    val pillChip: Int
+) {
+    companion object {
+        val Dark = WidgetTheme(
+            isLight = false,
+            text = ColorProvider(Color.White),
+            textSoft = ColorProvider(Color.White.copy(alpha = 0.72f)),
+            caps = ColorProvider(Color.White.copy(alpha = 0.66f)),
+            iconTint = Color.White,
+            onKnob = Color(0xFF141821),
+            love = Color(0xFFFF5470),
+            bg24 = R.drawable.widget_bg_24,
+            bg28 = R.drawable.widget_bg_28,
+            shade28 = R.drawable.widget_shade_28,
+            coverChip14 = R.drawable.widget_cover_chip_14,
+            coverChip18 = R.drawable.widget_cover_chip_18,
+            pillChip = R.drawable.widget_pill_chip
+        )
+
+        val Light = WidgetTheme(
+            isLight = true,
+            text = ColorProvider(Color(0xFF11141C)),
+            textSoft = ColorProvider(Color(0xB311141C)),
+            caps = ColorProvider(Color(0x9E11141C)),
+            iconTint = Color(0xFF11141C),
+            onKnob = Color(0xFFF4F6FA),
+            love = Color(0xFFE0244D),
+            bg24 = R.drawable.widget_bg_24_light,
+            bg28 = R.drawable.widget_bg_28_light,
+            shade28 = R.drawable.widget_shade_28_light,
+            coverChip14 = R.drawable.widget_cover_chip_14_light,
+            coverChip18 = R.drawable.widget_cover_chip_18_light,
+            pillChip = R.drawable.widget_pill_chip_light
+        )
+
+        fun of(isLight: Boolean): WidgetTheme = if (isLight) Light else Dark
+    }
 }
 
 /** Pre-rounds (and optionally center-crops) a bitmap for API < 31 where Glance cornerRadius is ignored. */
@@ -263,27 +345,33 @@ internal fun rememberWidgetBitmap(
     }
 }
 
-/** White progress strip cached by percentage so progress colours work identically on API 25–37. */
+/** Progress strip cached by percentage so progress colours work identically on API 25–37 in dark and light themes. */
 internal object WidgetProgressStrips {
     private const val WIDTH_PX = 240
     private const val HEIGHT_PX = 6
     private const val TRACK_COLOR = 0x38FFFFFF
     private const val FILL_COLOR = 0xFFFFFFFF.toInt()
-    private val cache = arrayOfNulls<Bitmap>(101)
+    private const val TRACK_COLOR_LIGHT = 0x2611141C
+    private const val FILL_COLOR_LIGHT = 0xFF141821.toInt()
+    private val cacheDark = arrayOfNulls<Bitmap>(101)
+    private val cacheLight = arrayOfNulls<Bitmap>(101)
     private val lock = Any()
 
-    fun forProgress(progress: Float): Bitmap {
+    fun forProgress(progress: Float, isLight: Boolean = false): Bitmap {
         val pct = (progress.coerceIn(0f, 1f) * 100f).roundToInt().coerceIn(0, 100)
+        val cache = if (isLight) cacheLight else cacheDark
+        val trackColor = if (isLight) TRACK_COLOR_LIGHT else TRACK_COLOR
+        val fillColor = if (isLight) FILL_COLOR_LIGHT else FILL_COLOR
         synchronized(lock) {
             cache[pct]?.let { return it }
             val bmp = createBitmap(WIDTH_PX, HEIGHT_PX)
             val canvas = Canvas(bmp)
             val r = HEIGHT_PX / 2f
-            val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TRACK_COLOR }
+            val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = trackColor }
             canvas.drawRoundRect(RectF(0f, 0f, WIDTH_PX.toFloat(), HEIGHT_PX.toFloat()), r, r, trackPaint)
             if (pct > 0) {
                 val fillW = (WIDTH_PX * pct / 100f).coerceAtLeast(HEIGHT_PX.toFloat())
-                val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = FILL_COLOR }
+                val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fillColor }
                 canvas.drawRoundRect(RectF(0f, 0f, fillW, HEIGHT_PX.toFloat()), r, r, fillPaint)
             }
             cache[pct] = bmp
@@ -293,9 +381,9 @@ internal object WidgetProgressStrips {
 }
 
 @Composable
-internal fun WidgetProgressBar(progress: Float, height: Dp) {
+internal fun WidgetProgressBar(progress: Float, height: Dp, isLight: Boolean = false) {
     Image(
-        provider = ImageProvider(WidgetProgressStrips.forProgress(progress)),
+        provider = ImageProvider(WidgetProgressStrips.forProgress(progress, isLight)),
         contentDescription = null,
         modifier = GlanceModifier.fillMaxWidth().height(height),
         contentScale = ContentScale.FillBounds
@@ -316,13 +404,13 @@ internal fun DpSize.safeOrDefault(fallbackW: Float, fallbackH: Float): Pair<Floa
     return if (invalid) fallbackW to fallbackH else w to h
 }
 
-/** The widgets' colours: the app's dark ground, its white and its heart. */
+/** The widgets' colours: kept for dark compatibility, prefer [WidgetTheme]. */
 internal object WidgetColors {
-    val text = ColorProvider(Color.White)
-    val textSoft = ColorProvider(Color.White.copy(alpha = 0.72f))
-    val caps = ColorProvider(Color.White.copy(alpha = 0.66f))
-    val onKnob = Color(0xFF141821)
-    val love = Color(0xFFFF5470)
+    val text = WidgetTheme.Dark.text
+    val textSoft = WidgetTheme.Dark.textSoft
+    val caps = WidgetTheme.Dark.caps
+    val onKnob = WidgetTheme.Dark.onKnob
+    val love = WidgetTheme.Dark.love
 }
 
 /** A round button with an icon, staying circular across Android 7.1–17. */
@@ -334,10 +422,11 @@ internal fun WidgetRound(
     size: Dp,
     iconSize: Dp,
     fill: WidgetFill?,
-    tint: Color = Color.White
+    tint: Color = Color.White,
+    isLight: Boolean = false
 ) {
     val sized = GlanceModifier.size(size)
-    val shaped = if (fill != null) sized.background(ImageProvider(fill.drawableRes)) else sized
+    val shaped = if (fill != null) sized.background(ImageProvider(fill.forTheme(isLight))) else sized
     val rounded = if (Build.VERSION.SDK_INT >= 31) shaped.cornerRadius(size / 2) else shaped
     val base = rounded.clickable(action).semantics { contentDescription = description }
     Box(modifier = base, contentAlignment = Alignment.Center) {

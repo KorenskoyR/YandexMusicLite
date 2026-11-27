@@ -1,8 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main
 
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.material.icons.rounded.Mic
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
@@ -123,14 +125,16 @@ fun SearchScreen(
     onSubmit: () -> Unit = {},
     /** The microphone in the field; null when the device has no voice input. */
     onVoice: (() -> Unit)? = null,
-    initiallyShowHistory: Boolean = false
+    initiallyShowHistory: Boolean = false,
+    topChart: List<TrackDetailsDto> = emptyList()
 ) {
+    val palette = HiFi.palette
     val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
-    val statusBar = WindowInsets.systemBars.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
+    val statusBar = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
     val contentStart = 20.dp
-    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
+    val bottomSafe = WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
+    val contentBottom = if (isLandscape) DockClearance + bottomSafe else (if (hasActiveTrack) 168.dp else 100.dp) + bottomSafe
     val focusManager = LocalFocusManager.current
     val historyPanel = remember { MutableTransitionState(initiallyShowHistory) }
     val historyOpen = historyPanel.targetState
@@ -166,6 +170,7 @@ fun SearchScreen(
                     list = discoverList,
                     top = listTop,
                     weeklyHits = weeklyHits,
+                    topChart = topChart,
                     trendTracks = trendTracks,
                     contentStart = contentStart,
                     contentBottom = contentBottom,
@@ -238,7 +243,7 @@ fun SearchScreen(
                 HiFiTextAction(stringResource(R.string.search_cancel), onClick = {
                     onQueryChange("")
                     focusManager.clearFocus()
-                }, color = Color.White)
+                }, color = palette.textPrimary)
             }
         }
         if (filters.isNotEmpty()) {
@@ -321,27 +326,32 @@ internal fun SearchField(
     modifier: Modifier = Modifier,
     onVoice: (() -> Unit)? = null
 ) {
+    val palette = HiFi.palette
     val lit by animateFloatAsState(if (focused) 1f else 0f, HiFiMotion.standard(), label = "field_rim")
     Row(
         modifier = modifier
             .height(SearchFieldHeight)
-            .hifiSoftShadow(RoundedCornerShape(27.dp), 26.dp)
+            .hifiSoftShadow(
+                RoundedCornerShape(27.dp),
+                26.dp,
+                color = if (palette.isDark) Color.Black.copy(alpha = 0.42f) else Color(0xFF11141C).copy(alpha = 0.14f)
+            )
             .hifiMachined(27.dp, lit = { lit })
             .padding(start = 16.dp, end = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(21.dp))
+        Icon(Icons.Rounded.Search, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.72f), modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (query.isEmpty()) {
-                Text(stringResource(R.string.search_treki_artisty_albomy), color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.search_treki_artisty_albomy), color = palette.textSecondary, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                cursorBrush = SolidColor(HiFi.Accent),
+                textStyle = TextStyle(color = palette.textPrimary, fontSize = 16.sp),
+                cursorBrush = SolidColor(palette.textPrimary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 modifier = Modifier.fillMaxWidth().onFocusChanged { onFocusChange(it.isFocused) }
@@ -349,19 +359,19 @@ internal fun SearchField(
         }
         if (query.isNotEmpty()) {
             FieldIconButton(onClick = { onQueryChange("") }, description = stringResource(R.string.cd_ochistit)) {
-                Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
             }
         } else {
             // An empty field offers the voice and the recent queries
             if (onVoice != null) {
                 FieldIconButton(onClick = onVoice, description = stringResource(R.string.voice_search)) {
-                    Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
+                    Icon(Icons.Rounded.Mic, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(21.dp))
                 }
             }
             if (hasHistory) {
-                Spacer(Modifier.size(width = 1.dp, height = 24.dp).background(Color.White.copy(alpha = 0.14f)))
+                Spacer(Modifier.size(width = 1.dp, height = 24.dp).background(palette.hairline))
                 FieldIconButton(onClick = onHistory, description = stringResource(R.string.search_recent_button), selected = historyOpen) {
-                    Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White.copy(alpha = if (historyOpen) 1f else 0.78f), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.History, contentDescription = null, tint = palette.textPrimary.copy(alpha = if (historyOpen) 1f else 0.78f), modifier = Modifier.size(20.dp))
                 }
             }
         }

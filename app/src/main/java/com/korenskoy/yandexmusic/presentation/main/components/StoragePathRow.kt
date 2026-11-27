@@ -81,16 +81,17 @@ internal fun StoragePathRow(check: PathCheck?, noDrive: Boolean, onCheck: (Strin
             }
         }
     }
+    val palette = HiFi.palette
     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 14.dp)) {
         if (noDrive) {
             Text(
                 stringResource(R.string.settings_storage_no_drive),
-                color = HiFi.Warning, fontSize = 13.sp, lineHeight = 18.sp,
+                color = palette.warning, fontSize = 13.sp, lineHeight = 18.sp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(HiFi.Warning.copy(alpha = 0.12f))
-                    .border(1.dp, HiFi.Warning.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                    .background(palette.warning.copy(alpha = 0.12f))
+                    .border(1.dp, palette.warning.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             )
             Spacer(Modifier.height(10.dp))
@@ -99,7 +100,7 @@ internal fun StoragePathRow(check: PathCheck?, noDrive: Boolean, onCheck: (Strin
             GlassPillButton(stringResource(R.string.settings_storage_path), onClick = { open = true }, icon = Icons.Rounded.Edit, height = 44.dp)
             return@Column
         }
-        Text(stringResource(R.string.settings_storage_path_title), color = HiFi.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.settings_storage_path_title), color = palette.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val field: @Composable (Modifier) -> Unit = { modifier ->

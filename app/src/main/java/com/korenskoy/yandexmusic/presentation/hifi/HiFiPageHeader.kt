@@ -106,7 +106,7 @@ fun Modifier.fadeUnderHeader(topPx: () -> Float, fadePx: Float): Modifier = this
 fun HiFiCollapsingTitle(text: String, collapse: () -> Float, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = HiFiType.LargeTitle,
+        style = HiFiType.LargeTitle.copy(color = HiFi.palette.textPrimary),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier.graphicsLayer {
@@ -122,28 +122,33 @@ fun HiFiCollapsingTitle(text: String, collapse: () -> Float, modifier: Modifier 
  * A well cut into the panel with a steel rim: the search field and the small buttons next to the title.
  * [lit] brightens the rim (a field in use); it is read in the draw phase.
  */
-fun Modifier.hifiMachined(cornerRadius: Dp, lit: () -> Float = { 0f }): Modifier = this.drawWithCache {
-    val rimWidth = 1.dp.toPx()
-    val outer = CornerRadius(cornerRadius.toPx())
-    val inner = CornerRadius((cornerRadius.toPx() - rimWidth).coerceAtLeast(0f))
-    val rim = Brush.verticalGradient(
-        0f to HiFi.SteelEdge.copy(alpha = 0.50f),
-        0.45f to HiFi.MetalEdge[1].copy(alpha = 0.70f),
-        1f to HiFi.MetalEdge[2].copy(alpha = 0.50f)
-    )
-    val litRim = Brush.sweepGradient(HiFi.MetalSweep, Offset(size.width / 2f, size.height / 2f))
-    val well = Brush.verticalGradient(listOf(WellTop, WellBottom))
-    val innerShadow = Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.85f), 0.14f to Color.Transparent)
-    val wellSize = Size(size.width - 2 * rimWidth, size.height - 2 * rimWidth)
-    val wellAt = Offset(rimWidth, rimWidth)
-    val lipAt = Offset(0f, size.height - rimWidth)
-    onDrawBehind {
-        drawRoundRect(rim, cornerRadius = outer, style = Stroke(rimWidth * 2))
-        val glow = lit()
-        if (glow > 0f) drawRoundRect(litRim, cornerRadius = outer, style = Stroke(rimWidth * 2), alpha = glow)
-        drawRoundRect(well, wellAt, wellSize, inner)
-        drawRoundRect(innerShadow, wellAt, wellSize, inner)
-        drawRect(Color.White.copy(alpha = 0.04f), lipAt, Size(size.width, rimWidth))
+@Composable
+fun Modifier.hifiMachined(cornerRadius: Dp, lit: () -> Float = { 0f }): Modifier {
+    val palette = HiFi.palette
+    val wellTop = if (palette.isDark) WellTop else palette.wellCenter
+    val wellBottom = if (palette.isDark) WellBottom else palette.wellMid
+    val shadowTop = if (palette.isDark) Color.Black.copy(alpha = 0.85f) else Color(0x1811141C)
+    return this.drawWithCache {
+        val rimWidth = 1.dp.toPx()
+        val outer = CornerRadius(cornerRadius.toPx())
+        val inner = CornerRadius((cornerRadius.toPx() - rimWidth).coerceAtLeast(0f))
+        val rim = Brush.verticalGradient(
+            0f to palette.steelEdge.copy(alpha = 0.50f),
+            0.45f to palette.metalEdge[1].copy(alpha = 0.70f),
+            1f to palette.metalEdge[2].copy(alpha = 0.50f)
+        )
+        val litRim = Brush.sweepGradient(palette.metalSweep, Offset(size.width / 2f, size.height / 2f))
+        val well = Brush.verticalGradient(listOf(wellTop, wellBottom))
+        val innerShadow = Brush.verticalGradient(0f to shadowTop, 0.14f to Color.Transparent)
+        val wellSize = Size(size.width - 2 * rimWidth, size.height - 2 * rimWidth)
+        val wellAt = Offset(rimWidth, rimWidth)
+        onDrawBehind {
+            drawRoundRect(rim, cornerRadius = outer, style = Stroke(rimWidth * 2))
+            val glow = lit()
+            if (glow > 0f) drawRoundRect(litRim, cornerRadius = outer, style = Stroke(rimWidth * 2), alpha = glow)
+            drawRoundRect(well, wellAt, wellSize, inner)
+            drawRoundRect(innerShadow, wellAt, wellSize, inner)
+        }
     }
 }
 
@@ -185,6 +190,9 @@ fun HiFiLinkBadge(modifier: Modifier = Modifier, height: Dp = 28.dp, fontSize: T
     // The text stays through the fade-out
     val lastBad = remember { arrayOf(LinkState.WEAK) }
     if (state != LinkState.GOOD) lastBad[0] = state
+    val palette = HiFi.palette
+    val chipFill = if (palette.isDark) Color.Black.copy(alpha = 0.45f) else palette.glassFill
+    val chipBorder = if (palette.isDark) Color.White.copy(alpha = 0.10f) else palette.glassBorder
     AnimatedVisibility(
         visible = state != LinkState.GOOD,
         enter = fadeIn(HiFiMotion.standard()),
@@ -195,17 +203,17 @@ fun HiFiLinkBadge(modifier: Modifier = Modifier, height: Dp = 28.dp, fontSize: T
             Modifier
                 .height(height)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)), CircleShape)
+                .background(chipFill)
+                .border(BorderStroke(1.dp, chipBorder), CircleShape)
                 .padding(start = height * 0.34f, end = height * 0.42f)
                 .semantics { liveRegion = LiveRegionMode.Polite },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(height * 0.26f)
         ) {
-            SignalMark(litBars = if (lastBad[0] == LinkState.WEAK) 1 else 0, size = height * 0.5f)
+            SignalMark(litBars = if (lastBad[0] == LinkState.WEAK) 1 else 0, size = height * 0.5f, color = palette.textPrimary)
             Text(
                 stringResource(if (lastBad[0] == LinkState.WEAK) R.string.link_weak else R.string.link_none),
-                color = Color.White.copy(alpha = 0.90f),
+                color = palette.textPrimary.copy(alpha = 0.90f),
                 fontSize = fontSize,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1
@@ -215,14 +223,14 @@ fun HiFiLinkBadge(modifier: Modifier = Modifier, height: Dp = 28.dp, fontSize: T
 }
 
 @Composable
-private fun SignalMark(litBars: Int, size: Dp) {
+private fun SignalMark(litBars: Int, size: Dp, color: Color = Color.White) {
     Canvas(Modifier.size(size)) {
         val bars = 4
         val width = this.size.width / (bars * 2 - 1)
         for (bar in 0 until bars) {
             val barHeight = this.size.height * (bar + 1) / bars
             drawRoundRect(
-                color = if (bar < litBars) Color.White else Color.White.copy(alpha = 0.28f),
+                color = if (bar < litBars) color else color.copy(alpha = 0.28f),
                 topLeft = Offset(bar * width * 2, this.size.height - barHeight),
                 size = Size(width, barHeight),
                 cornerRadius = CornerRadius(width / 2.5f)
@@ -262,7 +270,7 @@ fun HiFiWideHeader(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = HiFiType.LargeTitle.copy(fontSize = 19.sp, lineHeight = 24.sp),
+                        style = HiFiType.LargeTitle.copy(color = HiFi.palette.textPrimary, fontSize = 19.sp, lineHeight = 24.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -286,7 +294,7 @@ fun HiFiWideHeader(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = HiFiType.LargeTitle.copy(fontSize = 20.sp, lineHeight = 26.sp),
+                        style = HiFiType.LargeTitle.copy(color = HiFi.palette.textPrimary, fontSize = 20.sp, lineHeight = 26.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -311,6 +319,7 @@ fun HiFiWideHeader(
                 Text(
                     text = title,
                     style = HiFiType.LargeTitle.copy(
+                        color = HiFi.palette.textPrimary,
                         fontSize = if (short) 20.sp else 26.sp,
                         lineHeight = if (short) 26.sp else 32.sp
                     ),

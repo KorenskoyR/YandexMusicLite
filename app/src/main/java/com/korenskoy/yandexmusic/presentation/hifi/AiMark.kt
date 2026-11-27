@@ -56,20 +56,21 @@ fun rememberAiMark(track: TrackDetailsDto?): String? {
 /** "ИИ" after the artist: quiet glass, like the rest of the row's secondary marks. */
 @Composable
 fun AiChip(modifier: Modifier = Modifier, fontSize: TextUnit = 10.sp, height: Dp = 17.dp, horizontal: Dp = 6.dp) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(height / 2 + 1.dp)
     val description = stringResource(R.string.ai_mark_cd)
     Box(
         modifier
             .height(height)
-            .background(Color.White.copy(alpha = 0.10f), shape)
-            .border(1.dp, Color.White.copy(alpha = 0.24f), shape)
+            .background(if (palette.isDark) Color.White.copy(alpha = 0.10f) else palette.glassFill, shape)
+            .border(1.dp, if (palette.isDark) Color.White.copy(alpha = 0.24f) else palette.glassBorder, shape)
             .padding(horizontal = horizontal)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center
     ) {
         Text(
             stringResource(R.string.ai_mark),
-            color = Color.White.copy(alpha = 0.88f),
+            color = palette.textPrimary.copy(alpha = 0.88f),
             fontSize = fontSize,
             lineHeight = fontSize,
             fontWeight = FontWeight.ExtraBold,

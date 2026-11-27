@@ -2,7 +2,7 @@ package com.korenskoy.yandexmusic.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val HiFiAccent = Color(0xFF0A6CFF)
+val HiFiAccent = Color(0xFFE6EAF2)
 val HiFiGround = Color(0xFF05060A)
 val DarkBackground = Color(0xFF121212)
 val DarkSurface = Color(0xFF1E1E1E)

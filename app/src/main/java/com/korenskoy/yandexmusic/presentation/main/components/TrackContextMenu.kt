@@ -161,6 +161,8 @@ fun TrackContextMenu(
     val close: () -> Unit = {
         if (asSidePanel) onDismiss() else scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
     }
+    val palette = HiFi.palette
+    val containerColor = if (palette.isDark) HiFiDialogDefaults.Container else palette.dialogContainer
     val menuBody: @Composable () -> Unit = {
         BackHandler {
             if (pickerStepsBack) picking = false else close()
@@ -183,7 +185,7 @@ fun TrackContextMenu(
                             .clickable(role = Role.Button, onClickLabel = backLabel) { picking = false },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = backLabel, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = backLabel, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
                     }
                     Spacer(Modifier.width(4.dp))
                 }
@@ -201,18 +203,18 @@ fun TrackContextMenu(
                         Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .background(palette.pillFill)
                             .clickable(role = Role.Button, onClickLabel = closeLabel, onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Rounded.Close, contentDescription = closeLabel, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Rounded.Close, contentDescription = closeLabel, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
                     }
                 }
             }
             Text(
                 text = if (picking) stringResource(R.string.track_context_menu_dobavit_v_pleylist)
                 else track.artists.joinToString { it.name.orEmpty() },
-                color = Color.White.copy(alpha = 0.6f),
+                color = palette.textSecondary,
                 fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -226,15 +228,15 @@ fun TrackContextMenu(
                         .padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
+                        .background(palette.pillFill)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AiChip(fontSize = 11.sp, height = 22.dp, horizontal = 7.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(aiMark, color = Color.White.copy(alpha = 0.86f), fontSize = 14.sp, lineHeight = 19.sp)
-                        Text(stringResource(R.string.ai_menu_source), color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, lineHeight = 16.sp)
+                        Text(aiMark, color = palette.textPrimary.copy(alpha = 0.86f), fontSize = 14.sp, lineHeight = 19.sp)
+                        Text(stringResource(R.string.ai_menu_source), color = palette.textTertiary, fontSize = 12.sp, lineHeight = 16.sp)
                     }
                 }
             }
@@ -303,7 +305,7 @@ fun TrackContextMenu(
                 ContextMenuItem(
                     if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     stringResource(if (isLiked) R.string.track_menu_unlike else R.string.track_menu_like),
-                    iconTint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.75f)
+                    iconTint = if (isLiked) palette.love else palette.textPrimary.copy(alpha = 0.75f)
                 ) {
                     onToggleLike()
                     onDismiss()
@@ -317,7 +319,7 @@ fun TrackContextMenu(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .height(48.dp)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, HiFiDialogDefaults.Container)))
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, containerColor)))
             )
         }
         }
@@ -344,7 +346,7 @@ fun TrackContextMenu(
                         .windowInsetsPadding(WindowInsets.safeDrawing)
                         .padding(12.dp)
                         .clip(RoundedCornerShape(28.dp))
-                        .background(HiFiDialogDefaults.Container)
+                        .background(containerColor)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
                         .padding(top = 14.dp)
                 ) { menuBody() }
@@ -354,9 +356,10 @@ fun TrackContextMenu(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
-            containerColor = HiFiDialogDefaults.Container,
+            containerColor = containerColor,
             properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false)
         ) {
+            com.korenskoy.yandexmusic.presentation.hifi.SyncDialogWindowSystemBars()
             AppScale(appDensity) {
                 Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
                     menuBody()
@@ -372,6 +375,7 @@ private val SIDE_PANEL_MAX = 420.dp
 
 @Composable
 private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
+    val palette = HiFi.palette
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -383,10 +387,10 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(HiFi.SteelLight),
+                .background(palette.steelLight),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(22.dp))
+            Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.35f), modifier = Modifier.size(22.dp))
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current).cover(playlist.coverUri, CoverSize.Small).build(),
                 contentDescription = null,
@@ -396,10 +400,10 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column {
-            Text(playlist.title.orEmpty(), color = Color.White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(playlist.title.orEmpty(), color = palette.textPrimary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 russianQuantityString(playlist.trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
-                color = Color.White.copy(alpha = 0.6f),
+                color = palette.textSecondary,
                 fontSize = 12.sp
             )
         }
@@ -410,9 +414,10 @@ private fun PlaylistPickerRow(playlist: UserPlaylistDto, onClick: () -> Unit) {
 private fun ContextMenuItem(
     icon: ImageVector,
     text: String,
-    iconTint: Color = Color.White.copy(alpha = 0.75f),
+    iconTint: Color = HiFi.palette.textPrimary.copy(alpha = 0.75f),
     onClick: () -> Unit
 ) {
+    val palette = HiFi.palette
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -429,7 +434,7 @@ private fun ContextMenuItem(
         Text(
             text = text,
             fontSize = 16.sp,
-            color = Color.White
+            color = palette.textPrimary
         )
     }
 }

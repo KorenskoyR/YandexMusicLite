@@ -58,7 +58,7 @@ class WidgetRenderAuditTest {
     private fun dummyBitmap(size: Int, color: Int): Bitmap =
         Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { Canvas(it).drawColor(color) }
 
-    private fun playingNow(withCover: Boolean = true, isRadio: Boolean = false): WidgetNow {
+    private fun playingNow(withCover: Boolean = true, isRadio: Boolean = false, isLight: Boolean = false): WidgetNow {
         val cover = if (withCover) dummyBitmap(64, Color.rgb(156, 44, 62)) else null
         val glow = if (withCover) dummyBitmap(32, Color.rgb(68, 22, 34)) else null
         return WidgetNow(
@@ -73,14 +73,16 @@ class WidgetRenderAuditTest {
             durationMs = if (isRadio) 0L else 285_000L,
             source = if (isRadio) "РАДИО" else "МОЯ ВОЛНА",
             cover = cover,
-            glow = glow
+            glow = glow,
+            isLightTheme = isLight
         )
     }
 
-    private fun emptyNow() = WidgetNow(
+    private fun emptyNow(isLight: Boolean = false) = WidgetNow(
         title = null, artist = null, isPlaying = false, isLiked = false,
         isRadio = false, canReact = false, progress = null,
-        positionMs = 0L, durationMs = 0L, source = null, cover = null, glow = null
+        positionMs = 0L, durationMs = 0L, source = null, cover = null, glow = null,
+        isLightTheme = isLight
     )
 
     private fun collectLeaves(root: View, view: View, ox: Int, oy: Int, out: MutableList<LeafBox>) {
@@ -426,11 +428,24 @@ class WidgetRenderAuditTest {
             Profile("cover", 150, 150),
             Profile("cover", 110, 110)
         )
+        val lightCaptureTargets = setOf(
+            Profile("line", 320, 72),
+            Profile("line", 472, 157),
+            Profile("player", 320, 160),
+            Profile("player", 472, 353),
+            Profile("cover", 160, 160),
+            Profile("cover", 216, 353),
+            Profile("cover", 340, 170)
+        )
         val states = listOf(
-            Triple("playing", playingNow(withCover = true, isRadio = false), true),
-            Triple("radio", playingNow(withCover = true, isRadio = true), false),
-            Triple("nothing", emptyNow(), false),
-            Triple("nocover", playingNow(withCover = false, isRadio = false), false)
+            Triple("playing", playingNow(withCover = true, isRadio = false, isLight = false), true),
+            Triple("radio", playingNow(withCover = true, isRadio = true, isLight = false), false),
+            Triple("nothing", emptyNow(isLight = false), false),
+            Triple("nocover", playingNow(withCover = false, isRadio = false, isLight = false), false),
+            Triple("playing_light", playingNow(withCover = true, isRadio = false, isLight = true), true),
+            Triple("radio_light", playingNow(withCover = true, isRadio = true, isLight = true), false),
+            Triple("nothing_light", emptyNow(isLight = true), false),
+            Triple("nocover_light", playingNow(withCover = false, isRadio = false, isLight = true), false)
         )
 
         val failures = mutableListOf<String>()
@@ -441,8 +456,10 @@ class WidgetRenderAuditTest {
                     "player" -> true
                     else -> p.w >= 160 && p.h >= 160
                 }
-                val captureWave = stateName == "nothing" && p == Profile("player", 472, 353)
-                val capture = (doCapture || captureWave) && p in captureTargets
+                val captureWave = (stateName == "nothing" || stateName == "nothing_light") && p == Profile("player", 472, 353)
+                val targetSet = if (now.isLightTheme) lightCaptureTargets else captureTargets
+                val capture = (doCapture || captureWave) && p in targetSet &&
+                    !(stateName == "playing_light" && p !in lightCaptureTargets)
                 renderAndAudit(p, stateName, now, expectTitle, capture, failures)
             }
         }

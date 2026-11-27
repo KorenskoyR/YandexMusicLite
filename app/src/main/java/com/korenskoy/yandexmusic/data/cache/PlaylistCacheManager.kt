@@ -194,6 +194,9 @@ class PlaylistCacheManager @Inject constructor(
     suspend fun savePopularTracks(tracks: List<TrackDetailsDto>) = saveList(CacheDatabase.SHARED, POPULAR, tracks)
     suspend fun loadPopularTracks(): List<TrackDetailsDto> = loadList(CacheDatabase.SHARED, POPULAR)
 
+    suspend fun saveTopChart(tracks: List<TrackDetailsDto>) = saveList(CacheDatabase.SHARED, TOP_CHART, tracks)
+    suspend fun loadTopChart(): List<TrackDetailsDto> = loadList(CacheDatabase.SHARED, TOP_CHART)
+
     // --- Helpers ---
 
     private suspend fun saveList(owner: String, list: String, tracks: List<TrackDetailsDto>) {
@@ -284,6 +287,7 @@ class PlaylistCacheManager @Inject constructor(
         const val WEEKLY_HITS = "weekly_hits"
         const val TRENDS = "trends"
         const val POPULAR = "popular"
+        const val TOP_CHART = "top_chart"
         const val LIKES_REVISION = "likes_revision"
         const val USER_PLAYLISTS = "user_playlists"
         const val SAVED_PLAYLISTS = "saved_playlists"

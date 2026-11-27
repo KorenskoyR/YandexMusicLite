@@ -117,6 +117,7 @@ data class EqualizerActions(
 @Composable
 internal fun ColumnScope.EqualizerPage(state: AppEqualizer.State, actions: EqualizerActions) {
     val settings = state.settings
+    val palette = HiFi.palette
     var saving by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AppEqualizer.Preset?>(null) }
     // Leaving the page while «Сравнить» is held: the equalizer is heard again
@@ -141,7 +142,7 @@ internal fun ColumnScope.EqualizerPage(state: AppEqualizer.State, actions: Equal
             EqCurve(state, actions, Modifier.fillMaxWidth().height((maxWidth * 0.62f).coerceIn(200.dp, 320.dp)))
         }
         Text(
-            stringResource(R.string.equalizer_bands_hint), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp,
+            stringResource(R.string.equalizer_bands_hint), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp,
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 12.dp)
         )
     }
@@ -166,7 +167,7 @@ internal fun ColumnScope.EqualizerPage(state: AppEqualizer.State, actions: Equal
             HiFiFilterPill("+ " + stringResource(R.string.equalizer_save_mine), selected = false, onClick = { saving = true })
         }
         if (state.presetId == null) {
-            Text(stringResource(R.string.equalizer_own_curve), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp, modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 12.dp))
+            Text(stringResource(R.string.equalizer_own_curve), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp, modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 12.dp))
         }
     }
 
@@ -235,6 +236,7 @@ internal fun ColumnScope.EqualizerPage(state: AppEqualizer.State, actions: Equal
 /** Held — the music without the equalizer; let go — with it. A screen reader's tap turns it on and off. */
 @Composable
 private fun CompareRow(enabled: Boolean, comparing: Boolean, onComparing: (Boolean) -> Unit) {
+    val palette = HiFi.palette
     val current by rememberUpdatedState(onComparing)
     val label = stringResource(R.string.equalizer_compare)
     Row(
@@ -262,10 +264,10 @@ private fun CompareRow(enabled: Boolean, comparing: Boolean, onComparing: (Boole
         IconPlaque(Icons.Rounded.GraphicEq, size = 32.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.45f), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(label, color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.45f), fontSize = 16.sp, fontWeight = FontWeight.Medium)
             Text(
                 stringResource(if (comparing) R.string.equalizer_comparing else R.string.equalizer_compare_hint),
-                color = if (comparing) HiFi.Accent else HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp
+                color = if (comparing) palette.textPrimary else palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp
             )
         }
     }
@@ -281,13 +283,14 @@ private fun LevelRow(
     range: ClosedFloatingPointRange<Float> = -EqDesign.MAX_DB..EqDesign.MAX_DB,
     hint: String? = null
 ) {
+    val palette = HiFi.palette
     var shown by remember(value) { mutableFloatStateOf(value) }
     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(icon, size = 32.dp)
             Spacer(Modifier.width(12.dp))
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            Text(dbLong(shown), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(dbLong(shown), color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         HiFiSlider(
             value = shown,
@@ -295,19 +298,18 @@ private fun LevelRow(
             valueRange = range,
             modifier = Modifier.semantics { contentDescription = title }
         )
-        if (hint != null) Text(hint, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp)
+        if (hint != null) Text(hint, color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp)
     }
 }
-
-/** The curve of the bands in the app's blue, a knob of the app's sliders on each band. */
-private val CURVE = HiFi.Accent
-private val CURVE_LIGHT = Color(0xFF5C9DFF)
 
 /** Where band [i] sits across a width: equal steps, an octave each. */
 private fun bandX(i: Int, width: Float, n: Int = EqDesign.BANDS.size) = width * (i + 0.5f) / n
 
 @Composable
 private fun EqCurve(state: AppEqualizer.State, actions: EqualizerActions, modifier: Modifier) {
+    val palette = HiFi.palette
+    val curveColor = if (palette.isDark) Color(0xFFE6EAF2) else Color(0xFF181B24)
+    val curveLine = if (palette.isDark) Color.White else Color(0xFF11131A)
     val settings = state.settings
     val dim = if (settings.enabled) 1f else 0.45f
     // The bands' curve goes through the knobs; with «Басы» or «Верха» moved, what is heard in all is dashed over it
@@ -318,7 +320,7 @@ private fun EqCurve(state: AppEqualizer.State, actions: EqualizerActions, modifi
     Column(modifier.padding(horizontal = 6.dp, vertical = 12.dp)) {
         Row(Modifier.fillMaxWidth()) {
             settings.gains.forEach { g ->
-                Text(dbShort(g), color = Color.White.copy(alpha = 0.86f * dim), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f))
+                Text(dbShort(g), color = palette.textPrimary.copy(alpha = 0.86f * dim), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f))
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 6.dp)) {
@@ -328,13 +330,13 @@ private fun EqCurve(state: AppEqualizer.State, actions: EqualizerActions, modifi
                 val inset = KNOB_RADIUS.toPx()
                 fun y(db: Double) = (inset + (h - 2 * inset) * (0.5 - db.coerceIn(-14.0, 14.0) / (2 * EqDesign.MAX_DB))).toFloat()
                 for (db in listOf(12.0, 6.0, 0.0, -6.0, -12.0)) {
-                    drawLine(Color.White.copy(alpha = if (db == 0.0) 0.20f else 0.07f), Offset(0f, y(db)), Offset(w, y(db)), 1.dp.toPx())
+                    drawLine(palette.textPrimary.copy(alpha = if (db == 0.0) 0.22f else 0.08f), Offset(0f, y(db)), Offset(w, y(db)), 1.dp.toPx())
                 }
                 val mid = y(0.0)
                 for (i in settings.gains.indices) {
                     val x = bandX(i, w)
-                    drawLine(Color.White.copy(alpha = 0.10f), Offset(x, inset), Offset(x, h - inset), 4.dp.toPx(), StrokeCap.Round)
-                    drawLine(CURVE.copy(alpha = 0.9f * dim), Offset(x, mid), Offset(x, y(settings.gains[i].toDouble())), 4.dp.toPx(), StrokeCap.Round)
+                    drawLine(palette.textPrimary.copy(alpha = 0.12f), Offset(x, inset), Offset(x, h - inset), 4.dp.toPx(), StrokeCap.Round)
+                    drawLine(curveColor.copy(alpha = 0.85f * dim), Offset(x, mid), Offset(x, y(settings.gains[i].toDouble())), 4.dp.toPx(), StrokeCap.Round)
                 }
                 fun curveOf(chain: EqChain): Path {
                     val path = Path()
@@ -353,21 +355,22 @@ private fun EqCurve(state: AppEqualizer.State, actions: EqualizerActions, modifi
                     lineTo(0f, mid)
                     close()
                 }
-                drawPath(fill, Brush.verticalGradient(listOf(CURVE.copy(alpha = 0.34f * dim), Color.Transparent)))
-                drawPath(line, CURVE_LIGHT.copy(alpha = dim), style = Stroke(2.5.dp.toPx()))
+                drawPath(fill, Brush.verticalGradient(listOf(curveColor.copy(alpha = 0.24f * dim), Color.Transparent)))
+                drawPath(line, curveLine.copy(alpha = dim), style = Stroke(2.5.dp.toPx()))
                 whole?.let {
                     drawPath(
-                        curveOf(it), Color.White.copy(alpha = 0.55f * dim),
+                        curveOf(it), palette.textPrimary.copy(alpha = 0.55f * dim),
                         style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())))
                     )
                 }
-                // The knobs of the app's sliders: a metal rim, a dark face
+                // The knobs of the app's sliders: a metal rim, a face matching the active theme
+                val shadowCol = if (palette.isDark) Color.Black.copy(alpha = 0.35f) else Color(0xFF11141C).copy(alpha = 0.18f)
                 for (i in settings.gains.indices) {
                     val c = Offset(bandX(i, w), y(settings.gains[i].toDouble()))
                     val r = KNOB_RADIUS.toPx()
-                    drawCircle(Color.Black.copy(alpha = 0.35f), r + 2.dp.toPx(), c + Offset(0f, 2.dp.toPx()))
-                    drawCircle(Brush.sweepGradient(HiFi.MetalSweep, c), r, c)
-                    drawCircle(Brush.radialGradient(HiFi.KnobFace, c, r), r - 1.5.dp.toPx(), c)
+                    drawCircle(shadowCol, r + 2.dp.toPx(), c + Offset(0f, 2.dp.toPx()))
+                    drawCircle(Brush.sweepGradient(palette.metalSweep, c), r, c)
+                    drawCircle(Brush.radialGradient(palette.knobFace, c, r), r - 1.5.dp.toPx(), c)
                 }
             }
             // One touch column per band: drag, tap to set, double tap — back to 0; a slider for the screen reader
@@ -377,7 +380,7 @@ private fun EqCurve(state: AppEqualizer.State, actions: EqualizerActions, modifi
         }
         Row(Modifier.fillMaxWidth()) {
             EqDesign.BANDS.forEach { hz ->
-                Text(hertzShort(hz), color = HiFi.TextTertiary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f))
+                Text(hertzShort(hz), color = palette.textTertiary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f))
             }
         }
     }

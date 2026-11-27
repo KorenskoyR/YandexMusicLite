@@ -44,6 +44,7 @@ class SearchViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val weeklyHits: StateFlow<List<TrackDetailsDto>> = libraryRepository.weeklyHits
+    val topChart: StateFlow<List<TrackDetailsDto>> = libraryRepository.topChart
     val trendTracks: StateFlow<List<TrackDetailsDto>> = libraryRepository.trendTracks
 
     fun loadMoreHits() = libraryRepository.loadMoreHits()

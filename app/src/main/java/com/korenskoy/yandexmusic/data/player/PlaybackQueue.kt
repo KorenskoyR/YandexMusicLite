@@ -1,5 +1,7 @@
 package com.korenskoy.yandexmusic.data.player
 
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
+
 /** Where the current queue came from. */
 enum class PlaylistSource {
     LIBRARY, VIBE, SEARCH, TRENDS, RADIO, NONE,
@@ -80,6 +82,29 @@ object PlaybackQueue {
         // Regular playlists loop back to the start so playback never silently stops.
         queueSize > 0 -> NextAction.PlayIndex(0)
         else -> NextAction.FallbackLibrary
+    }
+
+    /** Repeat/shuffle controls apply to playlists/liked/downloaded (`LIBRARY`) and local device (`DEVICE`), not Radio or Wave. */
+    fun supportsRepeatAndShuffle(source: PlaylistSource, isRadio: Boolean): Boolean =
+        !isRadio && (source == PlaylistSource.LIBRARY || source == PlaylistSource.DEVICE)
+
+    /**
+     * Resolves next track under [repeatMode]:
+     * - [RepeatMode.ONE] repeats the current track on natural completion ([isAuto] = true); manual skip advances normally.
+     * - [RepeatMode.OFF] and [RepeatMode.ALL] preserve playlist wrap-around to index 0 so music never stops unexpectedly.
+     */
+    fun <T> nextActionForRepeat(
+        queue: List<T>,
+        currentIndex: Int,
+        source: PlaylistSource,
+        repeatMode: RepeatMode,
+        isAuto: Boolean,
+        skip: (T) -> Boolean
+    ): NextAction {
+        if (isAuto && repeatMode == RepeatMode.ONE && currentIndex in queue.indices) {
+            return NextAction.PlayIndex(currentIndex)
+        }
+        return nextAction(queue, currentIndex, source, skip)
     }
 
     /**

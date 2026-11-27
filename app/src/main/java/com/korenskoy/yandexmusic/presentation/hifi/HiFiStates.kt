@@ -79,6 +79,7 @@ fun HiFiEmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null
 ) {
+    val p = HiFi.palette
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -87,10 +88,10 @@ fun HiFiEmptyState(
     ) {
         IconPlaque(icon, size = 56.dp)
         Spacer(Modifier.height(18.dp))
-        Text(title, style = HiFiType.CardTitle.copy(fontSize = HiFiType.RowTitle.fontSize), textAlign = TextAlign.Center)
+        Text(title, style = HiFiType.CardTitle.copy(fontSize = HiFiType.RowTitle.fontSize, color = p.textPrimary), textAlign = TextAlign.Center)
         if (message != null) {
             Spacer(Modifier.height(6.dp))
-            Text(message, style = HiFiType.Caption, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 320.dp))
+            Text(message, style = HiFiType.Caption.copy(color = p.textSecondary), textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 320.dp))
         }
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(20.dp))
@@ -142,16 +143,17 @@ fun HiFiSkeletonRows(modifier: Modifier = Modifier, count: Int = 6, coverSize: D
 
 @Composable
 private fun SkeletonBlock(pulse: State<Float>?, modifier: Modifier, radius: Dp) {
+    val base = if (HiFi.palette.isDark) Color.White else Color(0xFF11141C)
     Box(
         modifier.drawBehind {
-            drawRoundRect(Color.White.copy(alpha = pulse?.value ?: 0.08f), cornerRadius = CornerRadius(radius.toPx()))
+            drawRoundRect(base.copy(alpha = pulse?.value ?: 0.08f), cornerRadius = CornerRadius(radius.toPx()))
         }
     )
 }
 
-/** The Hi-Fi activity mark: a thin white arc turning in place, drawn and rotated in the draw phase. */
+/** The Hi-Fi activity mark: a thin arc turning in place, drawn and rotated in the draw phase. */
 @Composable
-fun HiFiActivityIndicator(modifier: Modifier = Modifier, size: Dp = 22.dp, color: Color = Color.White) {
+fun HiFiActivityIndicator(modifier: Modifier = Modifier, size: Dp = 22.dp, color: Color = HiFi.palette.textPrimary) {
     val turn = rememberInfiniteTransition(label = "activity").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -184,22 +186,25 @@ fun HiFiActivityIndicator(modifier: Modifier = Modifier, size: Dp = 22.dp, color
 /** The one message plate of the app: dark glass with a hairline rim, white text — above the mini-player. */
 @Composable
 fun HiFiSnackbar(message: String, modifier: Modifier = Modifier, actionLabel: String? = null, onAction: () -> Unit = {}) {
+    val p = HiFi.palette
+    val snackFill = if (p.isDark) Color(0xF21A1D26) else Color(0xF5FFFFFF)
+    val actionCol = p.textPrimary
     Row(
         modifier
             .padding(horizontal = 16.dp)
             .widthIn(max = 560.dp)
             .fillMaxWidth()
-            .hifiSoftShadow(RoundedCornerShape(18.dp), 20.dp)
-            .hifiGlass(RoundedCornerShape(18.dp), fill = Color(0xF21A1D26), border = HiFi.GlassBorder)
+            .hifiSoftShadow(RoundedCornerShape(18.dp), 20.dp, if (p.isDark) Color.Black.copy(alpha = 0.55f) else Color(0xFF11141C).copy(alpha = 0.16f))
+            .hifiGlass(RoundedCornerShape(18.dp), fill = snackFill, border = p.glassBorder)
             .padding(start = 18.dp, end = if (actionLabel != null) 6.dp else 18.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(message, style = HiFiType.Body, modifier = Modifier.weight(1f))
+        Text(message, style = HiFiType.Body.copy(color = p.textPrimary), modifier = Modifier.weight(1f))
         if (actionLabel != null) {
             Spacer(Modifier.width(8.dp))
             Text(
                 actionLabel,
-                color = Color(0xFF8FB6FF),
+                color = actionCol,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
@@ -212,11 +217,15 @@ fun HiFiSnackbar(message: String, modifier: Modifier = Modifier, actionLabel: St
 }
 
 /**
- * The Hi-Fi progress bar: a recessed groove with a white fill. [progress] null means "working, amount
- * unknown": a short white segment sweeps along the groove (still in lite mode).
+ * The Hi-Fi progress bar: a recessed groove with a contrasting fill. [progress] null means "working, amount
+ * unknown": a short segment sweeps along the groove (still in lite mode).
  */
 @Composable
 fun HiFiProgressBar(progress: (() -> Float)?, modifier: Modifier = Modifier, height: Dp = 6.dp) {
+    val p = HiFi.palette
+    val trackBg = if (p.isDark) Color.Black.copy(alpha = 0.45f) else Color(0xFF11141C).copy(alpha = 0.12f)
+    val trackRim = if (p.isDark) Color.White.copy(alpha = 0.08f) else Color(0xFF11141C).copy(alpha = 0.14f)
+    val barFill = p.textPrimary
     val sweep: State<Float>? = if (progress == null && !LocalHiFiLite.current) {
         rememberInfiniteTransition(label = "progress_sweep").animateFloat(
             initialValue = 0f,
@@ -231,17 +240,17 @@ fun HiFiProgressBar(progress: (() -> Float)?, modifier: Modifier = Modifier, hei
             .height(height)
             .drawBehind {
                 val r = CornerRadius(this.size.height / 2f)
-                drawRoundRect(Color.Black.copy(alpha = 0.45f), cornerRadius = r)
-                drawRoundRect(Color.White.copy(alpha = 0.08f), cornerRadius = r, style = Stroke(1f))
+                drawRoundRect(trackBg, cornerRadius = r)
+                drawRoundRect(trackRim, cornerRadius = r, style = Stroke(1f))
                 if (progress != null) {
                     val w = this.size.width * progress().coerceIn(0f, 1f)
-                    if (w > 0f) drawRoundRect(Color.White, size = Size(w.coerceAtLeast(this.size.height), this.size.height), cornerRadius = r)
+                    if (w > 0f) drawRoundRect(barFill, size = Size(w.coerceAtLeast(this.size.height), this.size.height), cornerRadius = r)
                 } else {
                     val segment = this.size.width * 0.28f
                     val x = -segment + (sweep?.value ?: 0.5f) * (this.size.width + segment)
                     clipRect {
                         drawRoundRect(
-                            Color.White,
+                            barFill,
                             topLeft = Offset(x, 0f),
                             size = Size(segment, this.size.height),
                             cornerRadius = r

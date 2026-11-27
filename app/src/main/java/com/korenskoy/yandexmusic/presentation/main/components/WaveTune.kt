@@ -184,26 +184,39 @@ fun WavePill(
     /** False on a crowded row: the word alone, so every pill says its whole name. */
     showIcon: Boolean = true
 ) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(height / 2)
+    val contentColor = if (active) {
+        if (palette.isDark) Color.White else palette.ground
+    } else {
+        palette.textPrimary
+    }
     Row(
         modifier
             .heightIn(min = height)
             .clip(shape)
             .then(
-                if (active) Modifier.background(Brush.radialGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))).border(1.dp, Color(0x8CC9CED8), shape)
-                else Modifier.background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.16f), shape)
+                if (active) {
+                    if (palette.isDark) {
+                        Modifier.background(Brush.radialGradient(listOf(Color(0xFF2F333E), Color(0xFF16181E)))).border(1.dp, Color(0x8CC9CED8), shape)
+                    } else {
+                        Modifier.background(palette.textPrimary.copy(alpha = 0.90f)).border(1.dp, palette.textPrimary, shape)
+                    }
+                } else {
+                    Modifier.background(palette.pillFill).border(1.dp, palette.glassBorder, shape)
+                }
             )
             .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
             .padding(start = if (showIcon) height * 0.3f else height * 0.42f, end = height * 0.42f),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (showIcon) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(height * 0.5f))
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(height * 0.5f))
             Spacer(Modifier.width(height * 0.2f))
         }
         BasicText(
             text,
-            style = TextStyle(color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Bold),
+            style = TextStyle(color = contentColor, fontSize = fontSize, fontWeight = FontWeight.Bold),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             autoSize = TextAutoSize.StepBased(minFontSize = fontSize * 0.8f, maxFontSize = fontSize, stepSize = 0.5.sp),
@@ -385,6 +398,7 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                 exit = if (isLandscape) slideOutHorizontally(HiFiMotion.standard()) { it } else slideOutVertically(HiFiMotion.standard()) { it },
                 modifier = Modifier.align(if (isLandscape) Alignment.CenterEnd else Alignment.BottomCenter)
             ) {
+                val palette = HiFi.palette
                 val shape = if (isLandscape) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
                 // On a side the panel follows the screen: wide enough for the words, never more than half of it
                 val sideWidth = sidePanelWidth(currentWindowSizeDp().widthDp.dp)
@@ -396,7 +410,7 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                             else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)).widthIn(max = 640.dp).fillMaxWidth()
                         )
                         .clip(shape)
-                        .background(HiFi.SheetFill)
+                        .background(palette.sheetFill)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
                         .verticalScroll(rememberScrollState())
                         .then(if (isLandscape) Modifier else Modifier.navigationBarsPadding())
@@ -407,7 +421,7 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                             Modifier
                                 .size(width = 40.dp, height = 5.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.28f))
+                                .background(palette.textPrimary.copy(alpha = 0.25f))
                                 .align(Alignment.CenterHorizontally)
                         )
                         Spacer(Modifier.height(12.dp))
@@ -420,21 +434,21 @@ fun WaveTuneSheet(tuning: WaveTuning, onChange: (WaveTuning) -> Unit, onDismiss:
                         // On a side the reset is a round button: the title keeps its one line beside it
                         if (isLandscape) {
                             GlassCircleButton(onClick = { onChange(WaveTuning()) }, contentDescription = stringResource(R.string.wave_tune_reset)) {
-                                Icon(Icons.Rounded.RestartAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Rounded.RestartAlt, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
                             }
                         } else {
                             WavePill(Icons.Rounded.RestartAlt, stringResource(R.string.wave_tune_reset), active = false, height = 36.dp, fontSize = 14.sp, onClick = { onChange(WaveTuning()) })
                         }
                         Spacer(Modifier.width(8.dp))
                         GlassCircleButton(onClick = close, contentDescription = stringResource(R.string.cd_zakryt)) {
-                            Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.Close, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
                         }
                     }
                     // Options wrap onto the next line wherever the panel is: a strip of five cuts the words short
                     WaveTuneChoices(tuning, onChange, segments = false, optionHeight = 44.dp, fontSize = 15.sp, gap = if (isLandscape) 14.dp else 18.dp)
                     Text(
                         stringResource(R.string.wave_tune_note),
-                        color = HiFi.TextTertiary,
+                        color = palette.textTertiary,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         modifier = Modifier.padding(top = 18.dp)

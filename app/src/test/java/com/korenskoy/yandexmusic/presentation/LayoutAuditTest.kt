@@ -1,5 +1,9 @@
 package com.korenskoy.yandexmusic.presentation
 
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
+import com.korenskoy.yandexmusic.presentation.main.components.TamperBannerOverlay
 import com.korenskoy.yandexmusic.data.updater.InstallState
 import com.korenskoy.yandexmusic.data.updater.UpdateCheckResult
 import com.korenskoy.yandexmusic.presentation.update.UpdateDialog
@@ -142,12 +146,12 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
     private val lyrics = LyricsUi(known = { LyricsAnswer.Text(words) }, load = { LyricsAnswer.Text(words) })
 
     /** Renders [content] as the app does: on the living background, at the interface scale. */
-    private fun show(content: @Composable () -> Unit) {
+    private fun show(darkTheme: Boolean = true, content: @Composable () -> Unit) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             val system = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(system.density * scale, system.fontScale)) {
-                YandexMusicTheme {
+                YandexMusicTheme(darkTheme = darkTheme) {
                     CompositionLocalProvider(
                         LocalArtworkTint provides tint,
                         LocalLyrics provides lyrics,
@@ -178,13 +182,24 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         )
     }
 
-    private fun player(lyricsOpen: Boolean, wheelOnLeft: Boolean = true) = show {
+    private fun player(
+        lyricsOpen: Boolean,
+        wheelOnLeft: Boolean = true,
+        darkTheme: Boolean = true,
+        repeatAndShuffle: Boolean = false
+    ) = show(darkTheme = darkTheme) {
         FullScreenPlayer(
             track = tracks[1], isPlaying = true, isLiked = false, progress = { 61_000L }, queue = tracks,
             onPlayPauseClick = {}, onToggleLike = {}, onNextClick = {}, onPrevClick = {}, onSeekTo = {},
             onTrackSelect = {}, onRemoveFromQueue = {}, onCollapse = {}, onCloseAndClear = {}, onDislikeClick = {},
-            sourceLabel = "Моя волна", onTrackWave = {}, offline = com.korenskoy.yandexmusic.data.download.TrackOfflineState.NONE,
-            initialLyricsOpen = lyricsOpen, coverOnRight = wheelOnLeft
+            sourceLabel = if (repeatAndShuffle) "Мне нравится" else "Моя волна",
+            onTrackWave = {},
+            offline = com.korenskoy.yandexmusic.data.download.TrackOfflineState.NONE,
+            initialLyricsOpen = lyricsOpen,
+            coverOnRight = wheelOnLeft,
+            repeatMode = if (repeatAndShuffle) RepeatMode.ONE else RepeatMode.OFF,
+            shuffled = repeatAndShuffle,
+            showRepeatAndShuffle = repeatAndShuffle
         )
     }
 
@@ -199,8 +214,10 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
         playlistsOpen: Boolean = false,
         layout: CarLayout = CarLayout.AUTO,
         wheelOnLeft: Boolean = true,
-        underCover: com.korenskoy.yandexmusic.domain.model.CarUnderCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE
-    ) = show {
+        underCover: com.korenskoy.yandexmusic.domain.model.CarUnderCover = com.korenskoy.yandexmusic.domain.model.CarUnderCover.QUEUE,
+        darkTheme: Boolean = true,
+        repeatMode: RepeatMode = RepeatMode.OFF
+    ) = show(darkTheme = darkTheme) {
         val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
         val radio = CarRadio(stations, setOf(stations[0].id, stations[3].id, stations[9].id, stations[14].id), onAir = stations[0].id, onPlay = {}, onToggleFavourite = {})
         val station = TrackDetailsDto(
@@ -216,7 +233,7 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             shuffled = shuffled, onOpenSettings = {}, onVoiceSearch = {}, waveTuning = WaveTuning(),
             radio = radio, initialStationsOpen = stationsOpen, isLiked = onRadio,
             playlists = carPlaylists(tracks[1].idString), initialPlaylistsOpen = playlistsOpen, layout = layout,
-            steeringWheelOnLeft = wheelOnLeft, underCover = underCover
+            steeringWheelOnLeft = wheelOnLeft, underCover = underCover, repeatMode = repeatMode
         )
     }
 
@@ -522,6 +539,60 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "settings_no_drive" -> show {
                 SettingsSheet(state = SettingsUiState(storage = StorageStatus(pickerAvailable = false)), actions = SettingsActions(), onDismiss = {}, initialPage = SettingsPage.PLAYBACK)
             }
+            "player_repeat" -> player(lyricsOpen = false, repeatAndShuffle = true)
+            "player_light" -> player(lyricsOpen = false, darkTheme = false, repeatAndShuffle = true)
+            "car_repeat" -> car(source = PlaylistSource.LIBRARY, shuffled = true, repeatMode = RepeatMode.ALL)
+            "car_light" -> car(source = PlaylistSource.LIBRARY, shuffled = true, darkTheme = false, repeatMode = RepeatMode.ONE)
+            "search_topchart" -> show {
+                SearchScreen(
+                    query = "", onQueryChange = {}, results = emptyList(), weeklyHits = tracks, topChart = tracks, trendTracks = tracks,
+                    isSearching = false, currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(),
+                    onTrackClick = { _, _ -> }, onToggleLike = {}, history = listOf("кино")
+                )
+            }
+            "search_light" -> show(darkTheme = false) {
+                SearchScreen(
+                    query = "", onQueryChange = {}, results = emptyList(), weeklyHits = tracks, topChart = tracks, trendTracks = tracks,
+                    isSearching = false, currentTrackId = null, isPlaying = false, likedTrackIds = emptySet(),
+                    onTrackClick = { _, _ -> }, onToggleLike = {}, history = listOf("кино")
+                )
+            }
+            "settings_schedule" -> show {
+                SettingsSheet(
+                    state = SettingsUiState(
+                        themeMode = AppThemeMode.SCHEDULE,
+                        themeScheduleType = ThemeScheduleType.CUSTOM,
+                        fullscreenMode = true
+                    ),
+                    actions = SettingsActions(),
+                    onDismiss = {},
+                    initialPage = SettingsPage.INTERFACE
+                )
+            }
+            "settings_light" -> show(darkTheme = false) {
+                SettingsSheet(
+                    state = SettingsUiState(
+                        themeMode = AppThemeMode.SCHEDULE,
+                        themeScheduleType = ThemeScheduleType.CUSTOM,
+                        fullscreenMode = true
+                    ),
+                    actions = SettingsActions(),
+                    onDismiss = {},
+                    initialPage = SettingsPage.INTERFACE
+                )
+            }
+            "radio_light" -> {
+                val stations = RadioRepository(ApplicationProvider.getApplicationContext()).getBuiltinStations()
+                show(darkTheme = false) {
+                    RadioScreen(
+                        stations = stations, allStations = stations, selectedCategory = RadioCategory.ALL,
+                        onCategorySelect = {}, currentStationId = stations.first().id, isPlaying = true,
+                        favoriteStationIds = setOf(stations[1].id), onStationClick = {}, onToggleFavorite = {}, onPlayPause = {}
+                    )
+                }
+            }
+            "tamper_dark" -> show(darkTheme = true) { TamperBannerOverlay() }
+            "tamper_light" -> show(darkTheme = false) { TamperBannerOverlay() }
             else -> error(screen)
         }
         keepPictures()
@@ -560,7 +631,9 @@ class LayoutAuditTest(private val screen: String, private val qualifiers: String
             "crash_log", "playlist_name_dialog", "voice_listening", "queue_sheet", "playlist_screen",
             "catalog_album", "local_music",
             "player_right", "player_lyrics_right", "auth_strip", "auth_code", "settings_drives", "settings_no_drive",
-            "settings_about", "settings_support", "no_plus", "update_failed", "equalizer"
+            "settings_about", "settings_support", "no_plus", "update_failed", "equalizer",
+            "player_repeat", "player_light", "car_repeat", "car_light", "search_topchart", "search_light",
+            "settings_schedule", "settings_light", "radio_light", "tamper_dark", "tamper_light"
         )
 
         /**

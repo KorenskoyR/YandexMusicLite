@@ -2,8 +2,11 @@ package com.korenskoy.yandexmusic.presentation.main
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -109,16 +112,17 @@ import com.korenskoy.yandexmusic.utils.russianQuantityString
 
 @Composable
 internal fun PlaylistCover(playlist: UserPlaylistDto, modifier: Modifier) {
+    val palette = HiFi.palette
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))),
+            .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.QueueMusic,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.35f),
+            tint = palette.onMetal.copy(alpha = 0.45f),
             modifier = Modifier.size(36.dp)
         )
         AsyncImage(
@@ -204,16 +208,17 @@ fun PlaylistScreen(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(R.string.cd_nazad),
-                tint = Color.White,
+                tint = HiFi.palette.textPrimary,
                 modifier = Modifier.size(22.dp)
             )
         }
     }
+    val palette = HiFi.palette
     val menu: @Composable () -> Unit = {
             editedOrder?.let { order ->
                 Text(
                     text = stringResource(R.string.playlist_reorder_done),
-                    color = Color.White,
+                    color = palette.textPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     modifier = Modifier
@@ -231,15 +236,14 @@ fun PlaylistScreen(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color(0x352A2A38))
-                        .border(BorderStroke(1.dp, Color(0x40FFFFFF)), CircleShape)
+                        .hifiGlass(CircleShape)
                         .clickable { showMenu = true },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = stringResource(R.string.cd_playlist_menu),
-                        tint = Color.White,
+                        tint = palette.textPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -277,14 +281,14 @@ fun PlaylistScreen(
     val details: @Composable () -> Unit = {
         Text(
             text = russianQuantityString(trackCount, R.string.tracks_count_one, R.string.tracks_count_few, R.string.tracks_count_many),
-            color = Color.White.copy(alpha = 0.7f),
+            color = palette.textSecondary,
             fontSize = 14.sp
         )
         OfflineCaption(offline)
         if (playlist.isPublic) {
             Text(
                 text = stringResource(R.string.playlist_public_badge).uppercase(),
-                color = Color.White.copy(alpha = 0.66f),
+                color = palette.textSecondary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.1.em
@@ -300,7 +304,7 @@ fun PlaylistScreen(
             HiFiWideHeader(
                 title = playlist.title.orEmpty(),
                 modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top))
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 back = backButton,
                 cover = { size -> PlaylistCover(playlist, Modifier.size(size)) },
@@ -324,7 +328,7 @@ fun PlaylistScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top))
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -392,7 +396,7 @@ fun PlaylistScreen(
                     contentPadding = PaddingValues(bottom = contentBottom),
                     modifier = Modifier
                         .fillMaxSize()
-                        .navigationBarsPadding()
+                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom))
                         // Rows lie right on the backdrop, like on the album page (no lighter panel)
                         .padding(horizontal = 12.dp)
                 ) {
@@ -437,18 +441,19 @@ private fun ReorderList(
         contentPadding = PaddingValues(bottom = contentBottom),
         modifier = Modifier
             .fillMaxSize()
-            .navigationBarsPadding()
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom))
             .padding(horizontal = 12.dp)
     ) {
         itemsIndexed(tracks, key = { _, track -> track.idString }) { index, track ->
             val dragged = track.idString == draggedId
+            val palette = HiFi.palette
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .zIndex(if (dragged) 1f else 0f)
                     .graphicsLayer { translationY = if (dragged) dragOffset else 0f }
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (dragged) HiFi.GlassFill else Color.Transparent)
+                    .background(if (dragged) palette.glassFill else Color.Transparent)
                     .semantics {
                         customActions = listOfNotNull(
                             CustomAccessibilityAction(upLabel) { onMove(index, index - 1); true }.takeIf { index > 0 },
@@ -459,10 +464,10 @@ private fun ReorderList(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(track.title.orEmpty(), color = Color.White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(track.title.orEmpty(), color = palette.textPrimary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         track.artists.joinToString { it.name.orEmpty() },
-                        color = Color.White.copy(alpha = 0.6f),
+                        color = palette.textSecondary,
                         fontSize = 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -471,7 +476,7 @@ private fun ReorderList(
                 Icon(
                     imageVector = Icons.Default.DragHandle,
                     contentDescription = stringResource(R.string.cd_drag_handle),
-                    tint = Color.White.copy(alpha = 0.7f),
+                    tint = palette.textSecondary,
                     modifier = Modifier
                         .size(48.dp)
                         .padding(12.dp)

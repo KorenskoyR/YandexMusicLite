@@ -50,6 +50,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -79,16 +80,29 @@ import androidx.compose.ui.unit.sp
 
 /** Text styles of the Hi-Fi language. */
 object HiFiType {
-    val LargeTitle = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em, color = Color.White)
-    val SectionCaps = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.1.em, color = HiFi.TextSecondary)
-    val RowTitle = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-    val CardTitle = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold, color = Color.White)
-    val Body = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, color = Color.White)
-    val Caption = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, color = HiFi.TextSecondary)
+    val LargeTitle: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em, color = HiFi.palette.textPrimary)
+    val SectionCaps: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.1.em, color = HiFi.palette.textSecondary)
+    val RowTitle: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = HiFi.palette.textPrimary)
+    val CardTitle: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold, color = HiFi.palette.textPrimary)
+    val Body: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, color = HiFi.palette.textPrimary)
+    val Caption: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, color = HiFi.palette.textSecondary)
 }
 
 /** Frosted glass surface (fill + hairline border). */
-fun Modifier.hifiGlass(shape: Shape, fill: Color = HiFi.GlassFill, border: Color = HiFi.GlassBorder): Modifier =
+@Composable
+fun Modifier.hifiGlass(shape: Shape, fill: Color = HiFi.palette.glassFill, border: Color = HiFi.palette.glassBorder): Modifier =
     this.clip(shape).background(fill).border(1.dp, border, shape)
 
 /**
@@ -123,48 +137,71 @@ fun Modifier.hifiSoftShadow(
         .graphicsLayer()
 }
 
-/** A "recessed" window: dark, with an inner shadow at the top and a light lip at the bottom. */
-fun Modifier.hifiRecessed(cornerRadius: Dp): Modifier = this.drawWithCache {
-    val r = CornerRadius(cornerRadius.toPx())
-    val fill = Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.58f), Color.Black.copy(alpha = 0.36f)))
-    val innerShadow = Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.18f to Color.Transparent)
-    val lip = 1.dp.toPx()
-    onDrawBehind {
-        drawRoundRect(fill, cornerRadius = r)
-        drawRoundRect(innerShadow, cornerRadius = r)
-        drawRoundRect(color = Color.White.copy(alpha = 0.06f), cornerRadius = r, style = Stroke(1f))
-        // The light lip follows the rounded bottom edge (a straight line used to poke out past the corners)
-        clipRect(top = size.height - r.y) {
-            drawRoundRect(color = Color.White.copy(alpha = 0.10f), cornerRadius = r, style = Stroke(lip))
+/** A "recessed" window: dark in night mode, softly inset in daylight mode. */
+@Composable
+fun Modifier.hifiRecessed(cornerRadius: Dp): Modifier {
+    val isDark = HiFi.palette.isDark
+    return this.drawWithCache {
+        val r = CornerRadius(cornerRadius.toPx())
+        val fill = if (isDark) {
+            Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.58f), Color.Black.copy(alpha = 0.36f)))
+        } else {
+            Brush.verticalGradient(listOf(Color(0xFF11141C).copy(alpha = 0.10f), Color(0xFF11141C).copy(alpha = 0.05f)))
+        }
+        val innerShadow = Brush.verticalGradient(
+            0f to Color.Black.copy(alpha = if (isDark) 0.55f else 0.09f),
+            0.18f to Color.Transparent
+        )
+        val lip = 1.dp.toPx()
+        onDrawBehind {
+            drawRoundRect(fill, cornerRadius = r)
+            drawRoundRect(innerShadow, cornerRadius = r)
+            drawRoundRect(
+                color = if (isDark) Color.White.copy(alpha = 0.06f) else Color(0xFF11141C).copy(alpha = 0.12f),
+                cornerRadius = r,
+                style = Stroke(1f)
+            )
+            // The light lip follows the rounded bottom edge (a straight line used to poke out past the corners)
+            clipRect(top = size.height - r.y) {
+                drawRoundRect(
+                    color = Color.White.copy(alpha = if (isDark) 0.10f else 0.55f),
+                    cornerRadius = r,
+                    style = Stroke(lip)
+                )
+            }
         }
     }
 }
 
-/** Dark anodized metal with a thin steel edge — the "selected" material (no glowing dots). */
-fun Modifier.hifiAnodized(shape: Shape): Modifier = this
-    .clip(shape)
-    .background(Brush.radialGradient(listOf(HiFi.AnodizedLight, HiFi.AnodizedDark), radius = 600f, center = Offset(0f, 0f)))
-    .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Transparent)))
-    .border(BorderStroke(1.dp, Brush.verticalGradient(HiFi.MetalEdge.map { it.copy(alpha = 0.65f) })), shape)
+/** Anodized metal with a thin steel edge — the "selected" material (dark metal in night, satin silver in day). */
+@Composable
+fun Modifier.hifiAnodized(shape: Shape): Modifier {
+    val p = HiFi.palette
+    return this
+        .clip(shape)
+        .background(Brush.radialGradient(listOf(p.anodizedLight, p.anodizedDark), radius = 600f, center = Offset(0f, 0f)))
+        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (p.isDark) 0.06f else 0.45f), Color.Transparent)))
+        .border(BorderStroke(1.dp, Brush.verticalGradient(p.metalEdge.map { it.copy(alpha = if (p.isDark) 0.65f else 0.85f) })), shape)
+}
 
 /** Page title, 30/700. */
 @Composable
 fun HiFiLargeTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text = text, style = HiFiType.LargeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
+    Text(text = text, style = HiFiType.LargeTitle.copy(color = HiFi.palette.textPrimary), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
 }
 
 /** Section header: small caps with letter-spacing, optional trailing action. */
 @Composable
 fun HiFiSectionHeader(text: String, modifier: Modifier = Modifier, action: (@Composable RowScope.() -> Unit)? = null) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(text = text.uppercase(), style = HiFiType.SectionCaps, modifier = Modifier.weight(1f))
+        Text(text = text.uppercase(), style = HiFiType.SectionCaps.copy(color = HiFi.palette.textSecondary), modifier = Modifier.weight(1f))
         action?.invoke(this)
     }
 }
 
 /** A quiet text action (≥44dp touch height). */
 @Composable
-fun HiFiTextAction(text: String, onClick: () -> Unit, color: Color = Color.White.copy(alpha = 0.82f)) {
+fun HiFiTextAction(text: String, onClick: () -> Unit, color: Color = HiFi.palette.textPrimary.copy(alpha = 0.82f)) {
     Box(
         modifier = Modifier
             .height(44.dp)
@@ -184,12 +221,14 @@ fun GlassCircleButton(
     contentDescription: String,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
+    fill: Color = HiFi.palette.glassFill,
+    border: Color = HiFi.palette.glassBorder,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier
             .size(size)
-            .hifiGlass(CircleShape)
+            .hifiGlass(CircleShape, fill = fill, border = border)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
@@ -208,17 +247,19 @@ fun MetalPillButton(
     enabled: Boolean = true
 ) {
     val view = LocalView.current
+    val p = HiFi.palette
+    val shadowCol = if (p.isDark) Color.Black else Color(0xFF11141C).copy(alpha = 0.25f)
     Box(
         modifier = modifier
             .height(height)
             .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
-            .shadow(14.dp, CircleShape, ambientColor = Color.Black, spotColor = Color.Black)
+            .shadow(if (p.isDark) 14.dp else 8.dp, CircleShape, ambientColor = shadowCol, spotColor = shadowCol)
             .clip(CircleShape)
-            .background(Brush.verticalGradient(HiFi.MetalEdge))
+            .background(Brush.verticalGradient(p.metalEdge))
             .padding(1.5.dp)
             .clip(CircleShape)
-            .background(Brush.radialGradient(HiFi.KnobFace, center = Offset(0f, 0f), radius = 900f))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent)))
+            .background(Brush.radialGradient(p.knobFace, center = Offset(0f, 0f), radius = 900f))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (p.isDark) 0.10f else 0.35f), Color.Transparent)))
             .clickable(enabled = enabled, role = Role.Button) {
                 view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                 onClick()
@@ -257,17 +298,18 @@ fun GlassPillButton(
  */
 @Composable
 private fun PillLabel(text: String, icon: ImageVector?) {
+    val contentCol = HiFi.palette.onMetal
     BoxWithConstraints(contentAlignment = Alignment.Center) {
         val boxWidth = maxWidth
         val sidePad = if (boxWidth < 130.dp) 10.dp else 14.dp
         Row(Modifier.padding(horizontal = sidePad), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             if (icon != null && boxWidth >= 148.dp) {
-                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                Icon(icon, contentDescription = null, tint = contentCol, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(8.dp))
             }
             BasicText(
                 text,
-                style = TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(color = contentCol, fontSize = 16.sp, fontWeight = FontWeight.Bold),
                 maxLines = 1,
                 autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp, stepSize = 0.5.sp)
             )
@@ -278,22 +320,27 @@ private fun PillLabel(text: String, icon: ImageVector?) {
 /** Filter/genre pill: anodized when selected, glass otherwise. */
 @Composable
 fun HiFiFilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    val p = HiFi.palette
     val shape = RoundedCornerShape(18.dp)
+    val txtCol = if (selected) p.textPrimary else p.textPrimary.copy(alpha = 0.86f)
     Row(
         modifier = modifier
             .height(36.dp)
-            .then(if (selected) Modifier.hifiAnodized(shape) else Modifier.hifiGlass(shape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f)))
+            .then(
+                if (selected) Modifier.hifiAnodized(shape)
+                else Modifier.hifiGlass(shape, fill = p.pillFill, border = p.glassBorder)
+            )
             .selectable(selected = selected, role = Role.Tab, onClick = onClick)
             .padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+            Icon(icon, contentDescription = null, tint = txtCol, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
         }
         Text(
             text,
-            color = if (selected) Color.White else Color.White.copy(alpha = 0.86f),
+            color = txtCol,
             fontSize = 14.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1
@@ -303,29 +350,39 @@ fun HiFiFilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifie
 
 /** A small metal plaque behind a row's icon. */
 @Composable
-fun IconPlaque(icon: ImageVector, modifier: Modifier = Modifier, size: Dp = 34.dp, tint: Color = Color.White, danger: Boolean = false) {
+fun IconPlaque(icon: ImageVector, modifier: Modifier = Modifier, size: Dp = 34.dp, tint: Color = HiFi.palette.textPrimary, danger: Boolean = false) {
+    val p = HiFi.palette
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.28f))
             .background(
                 Brush.verticalGradient(
-                    if (danger) listOf(HiFi.Danger.copy(alpha = 0.18f), HiFi.Danger.copy(alpha = 0.06f))
-                    else listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f))
+                    when {
+                        danger -> listOf(p.danger.copy(alpha = 0.18f), p.danger.copy(alpha = 0.06f))
+                        p.isDark -> listOf(Color.White.copy(alpha = 0.13f), Color.White.copy(alpha = 0.04f))
+                        else -> listOf(Color(0xFF11141C).copy(alpha = 0.09f), Color(0xFF11141C).copy(alpha = 0.04f))
+                    }
                 )
             )
             .drawBehind {
-                drawLine(Color.White.copy(alpha = 0.18f), Offset(size.toPx() * 0.15f, 0.5f), Offset(this.size.width - size.toPx() * 0.15f, 0.5f), 1f)
+                drawLine(
+                    if (p.isDark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.70f),
+                    Offset(size.toPx() * 0.15f, 0.5f),
+                    Offset(this.size.width - size.toPx() * 0.15f, 0.5f),
+                    1f
+                )
             },
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = if (danger) HiFi.Danger else tint, modifier = Modifier.size(size * 0.56f))
+        Icon(icon, contentDescription = null, tint = if (danger) p.danger else tint, modifier = Modifier.size(size * 0.56f))
     }
 }
 
 /** Segmented control: a recessed track with a metal piece sliding under the selected option. */
 @Composable
 fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp) {
+    val p = HiFi.palette
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
@@ -360,7 +417,7 @@ fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> 
                     BasicText(
                         label,
                         style = TextStyle(
-                            color = if (selected) Color.White else Color.White.copy(alpha = 0.70f),
+                            color = if (selected) p.textPrimary else p.textSecondary,
                             fontSize = fontSize,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
                         ),
@@ -373,11 +430,15 @@ fun HiFiSegmented(options: List<String>, selectedIndex: Int, onSelect: (Int) -> 
     }
 }
 
-/** A hardware-like toggle: blue track when on, a bright metal thumb. */
+/** A hardware-like toggle: satin silver/graphite track when on, a bright metal thumb. */
 @Composable
 fun HiFiSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    val track by animateColorAsState(if (checked) HiFi.Accent else Color.Black.copy(alpha = 0.5f), HiFiMotion.quick(), label = "switch_track")
+    val p = HiFi.palette
+    val offTrack = if (p.isDark) Color.Black.copy(alpha = 0.5f) else Color(0xFF11141C).copy(alpha = 0.16f)
+    val onTrack = if (p.isDark) Color(0xFFDCE1EB) else Color(0xFF1B1E28)
+    val track by animateColorAsState(if (checked) onTrack else offTrack, HiFiMotion.quick(), label = "switch_track")
     val thumbX by animateDpAsState(if (checked) 24.dp else 2.dp, HiFiMotion.spring(), label = "switch_thumb")
+    val thumbBorder = if (p.isDark) Color(0xFF141720).copy(alpha = 0.25f) else Color.White.copy(alpha = 0.35f)
     val view = LocalView.current
     // Touched over 48 dp of height; the track itself stays 54 × 32
     Box(
@@ -394,7 +455,7 @@ fun HiFiSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: M
                 .size(width = 54.dp, height = 32.dp)
                 .clip(CircleShape)
                 .background(track)
-                .border(1.dp, Color.White.copy(alpha = if (checked) 0.0f else 0.10f), CircleShape)
+                .border(1.dp, if (checked) p.glassBorder.copy(alpha = 0.35f) else p.glassBorder, CircleShape)
         ) {
             Box(
                 modifier = Modifier
@@ -402,13 +463,14 @@ fun HiFiSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: M
                     .size(28.dp)
                     .shadow(4.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(Brush.sweepGradient(HiFi.BrightMetalSweep))
+                    .background(Brush.sweepGradient(p.brightMetalSweep))
+                    .border(0.75.dp, thumbBorder, CircleShape)
             )
         }
     }
 }
 
-/** Slider with a recessed track, white filled part and a small metal knob. */
+/** Slider with a recessed track, white/dark filled part and a small metal knob. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HiFiSlider(
@@ -419,6 +481,7 @@ fun HiFiSlider(
     steps: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null
 ) {
+    val p = HiFi.palette
     val interaction = remember { MutableInteractionSource() }
     Slider(
         value = value,
@@ -434,10 +497,10 @@ fun HiFiSlider(
                     .size(26.dp)
                     .shadow(5.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(Brush.sweepGradient(HiFi.MetalSweep))
+                    .background(Brush.sweepGradient(p.metalSweep))
                     .padding(1.5.dp)
                     .clip(CircleShape)
-                    .background(Brush.radialGradient(HiFi.KnobFace))
+                    .background(Brush.radialGradient(p.knobFace))
             )
         },
         track = { state ->
@@ -453,10 +516,10 @@ fun HiFiSlider(
                         .fillMaxWidth(fraction)
                         .fillMaxHeight()
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.9f))
+                        .background(if (p.isDark) Color.White.copy(alpha = 0.9f) else p.textPrimary.copy(alpha = 0.85f))
                 )
             }
         },
-        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White)
+        colors = SliderDefaults.colors(thumbColor = p.onMetal, activeTrackColor = p.textPrimary)
     )
 }

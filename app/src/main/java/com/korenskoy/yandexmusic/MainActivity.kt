@@ -1,66 +1,81 @@
 package com.korenskoy.yandexmusic
 
-import androidx.compose.runtime.mutableStateOf
-import com.korenskoy.yandexmusic.presentation.voice.VoiceInput
-import com.korenskoy.yandexmusic.presentation.account.NoPlusScreen
-import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
 import android.app.SearchManager
-import android.graphics.Color
-import android.provider.MediaStore
-import androidx.activity.SystemBarStyle
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.platform.LocalResources
-import com.korenskoy.yandexmusic.data.download.DownloadStorage
-import com.korenskoy.yandexmusic.data.player.AppPresence
-import com.korenskoy.yandexmusic.data.player.MediaLibraryTree
-import com.korenskoy.yandexmusic.presentation.hifi.HiFi
-import com.korenskoy.yandexmusic.presentation.splash.SplashScreen
-import javax.inject.Inject
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableIntStateOf
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.Density
-import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
-import com.korenskoy.yandexmusic.utils.DisplayScale
+import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import com.korenskoy.yandexmusic.presentation.hifi.LocalFullscreenMode
+import com.korenskoy.yandexmusic.presentation.hifi.applyWindowSystemBars
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import com.google.common.util.concurrent.ListenableFuture
+import com.korenskoy.yandexmusic.data.download.DownloadStorage
+import com.korenskoy.yandexmusic.data.player.AppPresence
+import com.korenskoy.yandexmusic.data.player.MediaLibraryTree
+import com.korenskoy.yandexmusic.data.player.MusicService
+import com.korenskoy.yandexmusic.data.security.AppIntegrity
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
+import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
+import com.korenskoy.yandexmusic.presentation.account.AccountViewModel
+import com.korenskoy.yandexmusic.presentation.account.NoPlusScreen
 import com.korenskoy.yandexmusic.presentation.auth.AuthScreen
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.main.MainScreen
 import com.korenskoy.yandexmusic.presentation.main.MainViewModel
+import com.korenskoy.yandexmusic.presentation.main.components.TamperBannerOverlay
+import com.korenskoy.yandexmusic.presentation.splash.SplashScreen
+import com.korenskoy.yandexmusic.presentation.voice.VoiceInput
 import com.korenskoy.yandexmusic.ui.theme.YandexMusicTheme
+import com.korenskoy.yandexmusic.utils.DisplayScale
 import dagger.hilt.android.AndroidEntryPoint
-import android.content.ComponentName
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
-import com.google.common.util.concurrent.ListenableFuture
-import com.korenskoy.yandexmusic.data.player.MusicService
+import kotlinx.coroutines.launch
+import java.util.Calendar
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -110,16 +125,36 @@ class MainActivity : ComponentActivity() {
     /** Last multi-window state for which insets were requested on API 30+, avoiding redundant double passes. */
     private var lastInsetsState: Boolean? = null
 
+    private var latestDarkTheme: Boolean = true
+    private var latestFullscreenMode: Boolean = false
+    private var appliedEdgeToEdgeDark: Boolean? = null
+
+    private fun applySystemUi(darkTheme: Boolean, fullscreen: Boolean) {
+        latestDarkTheme = darkTheme
+        latestFullscreenMode = fullscreen
+        val inMultiWindow = isInMultiWindowMode
+        if (appliedEdgeToEdgeDark != darkTheme && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R || !inMultiWindow)) {
+            appliedEdgeToEdgeDark = darkTheme
+            enableEdgeToEdge(
+                statusBarStyle = if (darkTheme) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.argb(0x28, 0, 0, 0)),
+                navigationBarStyle = if (darkTheme) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.argb(0x28, 0, 0, 0))
+            )
+        }
+        applyWindowSystemBars(window, darkTheme, fullscreen, inMultiWindow)
+        window.decorView.post {
+            if (!isDestroyed) {
+                applyWindowSystemBars(window, latestDarkTheme, latestFullscreenMode, isInMultiWindowMode)
+            }
+        }
+    }
+
     private fun applyWindowInsetsMode(inMultiWindow: Boolean) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             if (appliedLegacyMultiWindow != inMultiWindow) {
                 appliedLegacyMultiWindow = inMultiWindow
                 WindowCompat.setDecorFitsSystemWindows(window, inMultiWindow)
                 if (!inMultiWindow) {
-                    enableEdgeToEdge(
-                        statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-                        navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
-                    )
+                    applySystemUi(latestDarkTheme, latestFullscreenMode)
                 }
             }
             val decor = window.decorView
@@ -142,6 +177,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        AppIntegrity.probeUi(applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -156,8 +192,6 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null && intent?.action == ACTION_START_VOICE) voiceSignal++
         if (savedInstanceState == null) takeWidgetAsks(intent)
 
-        // The app is always dark: dark system bars whatever the system's own theme. "Auto" followed the system,
-        // so a light head unit got a light navigation bar (painted turquoise by the vendor) and dark status icons
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
@@ -176,12 +210,55 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @androidx.compose.runtime.Composable
+    @Composable
     private fun AppRoot() {
         // Scale the whole UI for screens whose reported density is wrong (dense car head units):
         // the app cannot change the system density, so it overrides its own instead.
         val uiScaleAuto by settingsRepository.uiScaleAuto.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE_AUTO)
         val uiScaleManual by settingsRepository.uiScaleManual.collectAsStateWithLifecycle(initialValue = SettingsRepository.DEFAULT_UI_SCALE)
+        val themeMode by settingsRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.DARK)
+        val scheduleType by settingsRepository.themeScheduleType.collectAsStateWithLifecycle(initialValue = ThemeScheduleType.CUSTOM)
+        val lightMinutes by settingsRepository.themeLightMinutes.collectAsStateWithLifecycle(initialValue = ThemePolicy.DEFAULT_LIGHT_MINUTES)
+        val darkMinutes by settingsRepository.themeDarkMinutes.collectAsStateWithLifecycle(initialValue = ThemePolicy.DEFAULT_DARK_MINUTES)
+        val fullscreenMode by settingsRepository.fullscreenMode.collectAsStateWithLifecycle(initialValue = false)
+        val tampered by AppIntegrity.tampered.collectAsStateWithLifecycle()
+
+        var nowMinutes by remember { mutableIntStateOf(currentMinuteOfDay()) }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+            nowMinutes = currentMinuteOfDay()
+        }
+        DisposableEffect(themeMode) {
+            if (themeMode != AppThemeMode.SCHEDULE) {
+                onDispose {}
+            } else {
+                val filter = IntentFilter().apply {
+                    addAction(Intent.ACTION_TIME_TICK)
+                    addAction(Intent.ACTION_TIME_CHANGED)
+                    addAction(Intent.ACTION_TIMEZONE_CHANGED)
+                }
+                val receiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        nowMinutes = currentMinuteOfDay()
+                    }
+                }
+                ContextCompat.registerReceiver(this@MainActivity, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+                onDispose { runCatching { unregisterReceiver(receiver) } }
+            }
+        }
+
+        val isLight = ThemePolicy.isLightTheme(
+            mode = themeMode,
+            scheduleType = scheduleType,
+            lightMinutes = lightMinutes,
+            darkMinutes = darkMinutes,
+            nowMinutes = nowMinutes,
+            systemDark = isSystemInDarkTheme()
+        )
+        val darkTheme = !isLight
+        LaunchedEffect(darkTheme, fullscreenMode) {
+            applySystemUi(darkTheme, fullscreenMode)
+        }
+
         val resources = LocalResources.current
         val baseDensity = LocalDensity.current
         // The window, not the screen: half of it beside a navigator or a launcher's strip holds less. Resized
@@ -193,18 +270,37 @@ class MainActivity : ComponentActivity() {
             DisplayScale.effectiveScale(uiScaleAuto, uiScaleManual, info)
         }
         CompositionLocalProvider(
-            LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale)
+            LocalDensity provides Density(density = baseDensity.density * uiScale, fontScale = baseDensity.fontScale),
+            LocalFullscreenMode provides fullscreenMode
         ) {
-            YandexMusicTheme {
+            YandexMusicTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = HiFi.Ground
+                    color = HiFi.palette.ground
                 ) {
-                    // Skip the splash when the app is re-entered with a session already on screen
-                    AppNavigation(skipSplash = restored, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal, launch = launch, waveSignal = waveSignal, tabSignal = tabSignal)
+                    Box(Modifier.fillMaxSize()) {
+                        // Skip the splash when the app is re-entered with a session already on screen
+                        AppNavigation(skipSplash = restored, openPlayerSignal = openPlayerSignal, voiceSignal = voiceSignal, launch = launch, waveSignal = waveSignal, tabSignal = tabSignal)
+                        if (tampered) {
+                            TamperBannerOverlay()
+                        }
+                    }
                 }
             }
         }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            applySystemUi(latestDarkTheme, latestFullscreenMode)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        AppIntegrity.probeUi(applicationContext)
+        applySystemUi(latestDarkTheme, latestFullscreenMode)
     }
 
     private val wheelVoiceTimeout = android.os.Handler(android.os.Looper.getMainLooper())
@@ -318,6 +414,11 @@ class MainActivity : ComponentActivity() {
 
         /** The voice window listens about 5 s and answers within a few more: no answer by then — nothing was said. */
         private const val WHEEL_VOICE_TIMEOUT_MS = 15_000L
+
+        private fun currentMinuteOfDay(): Int {
+            val cal = Calendar.getInstance()
+            return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        }
     }
 }
 

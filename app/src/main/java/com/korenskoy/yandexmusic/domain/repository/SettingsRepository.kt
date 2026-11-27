@@ -6,6 +6,9 @@ import com.korenskoy.yandexmusic.domain.model.CarUnderCover
 import com.korenskoy.yandexmusic.domain.model.StartPage
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
@@ -126,6 +129,21 @@ interface SettingsRepository {
      */
     val cardRoot: Flow<String?>
     suspend fun setCardRoot(path: String?)
+
+    val themeMode: Flow<AppThemeMode>
+    suspend fun setThemeMode(mode: AppThemeMode)
+
+    val themeScheduleType: Flow<ThemeScheduleType>
+    suspend fun setThemeScheduleType(type: ThemeScheduleType)
+
+    val themeLightMinutes: Flow<Int>
+    suspend fun setThemeLightMinutes(minutes: Int)
+
+    val themeDarkMinutes: Flow<Int>
+    suspend fun setThemeDarkMinutes(minutes: Int)
+
+    val fullscreenMode: Flow<Boolean>
+    suspend fun setFullscreenMode(enabled: Boolean)
 
     companion object {
         const val DEFAULT_CROSSFADE_SECONDS = 3

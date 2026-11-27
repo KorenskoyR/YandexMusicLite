@@ -69,11 +69,12 @@ fun HiFiBackdrop(
     bottomFade: Boolean = true
 ) {
     val lite = LocalHiFiLite.current
+    val palette = HiFi.palette
     val liveBlur = !lite && coverUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(HiFi.Ground)
+            .background(palette.ground)
     ) {
         if (liveBlur) {
             val context = LocalContext.current
@@ -84,7 +85,7 @@ fun HiFiBackdrop(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = 0.55f * intensity }
+                    .graphicsLayer { alpha = (if (palette.isDark) 0.55f else 0.20f) * intensity }
                     .blur(90.dp, BlurredEdgeTreatment.Rectangle)
             )
         }
@@ -94,7 +95,12 @@ fun HiFiBackdrop(
                 .drawWithCache {
                     val maxDim = max(size.width, size.height)
                     val center = Offset(size.width * glowCenter.x, size.height * glowCenter.y)
-                    val glowAlpha = if (liveBlur) 0.30f else 0.55f
+                    val glowAlpha = if (palette.isDark) {
+                        if (liveBlur) 0.30f else 0.55f
+                    } else {
+                        if (liveBlur) 0.14f else 0.22f
+                    }
+                    val secondAlpha = if (palette.isDark) 0.40f else 0.16f
                     val glow = Brush.radialGradient(
                         colors = listOf(
                             tint.primary.copy(alpha = glowAlpha * intensity),
@@ -105,19 +111,19 @@ fun HiFiBackdrop(
                         radius = maxDim * 0.72f
                     )
                     val second = Brush.radialGradient(
-                        colors = listOf(tint.secondary.copy(alpha = 0.40f * intensity), Color.Transparent),
+                        colors = listOf(tint.secondary.copy(alpha = secondAlpha * intensity), Color.Transparent),
                         center = Offset(size.width * (1f - glowCenter.x * 0.3f), size.height * (glowCenter.y + 0.32f)),
                         radius = maxDim * 0.5f
                     )
                     val vignette = Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color.Transparent, HiFi.Ground.copy(alpha = 0.82f)),
+                        colors = listOf(Color.Transparent, Color.Transparent, palette.ground.copy(alpha = if (palette.isDark) 0.82f else 0.65f)),
                         center = Offset(size.width * 0.5f, size.height * 0.36f),
                         radius = maxDim * 0.85f
                     )
                     val fade = Brush.verticalGradient(
                         0f to Color.Transparent,
                         0.55f to Color.Transparent,
-                        1f to HiFi.Ground.copy(alpha = 0.92f)
+                        1f to palette.ground.copy(alpha = if (palette.isDark) 0.92f else 0.88f)
                     )
                     onDrawBehind {
                         drawRect(glow)
@@ -126,7 +132,7 @@ fun HiFiBackdrop(
                         if (bottomFade) drawRect(fade)
                     }
                 }
-                .hifiGrain(enabled = !lite, alpha = 0.45f)
+                .hifiGrain(enabled = !lite, alpha = if (palette.isDark) 0.45f else 0.18f)
         )
     }
 }

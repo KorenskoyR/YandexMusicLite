@@ -69,10 +69,11 @@ fun SplashScreen(
         onSplashFinished()
     }
 
+    val palette = HiFi.palette
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(HiFi.Ground)
+            .background(palette.ground)
             .alpha(screenAlpha.value),
         contentAlignment = Alignment.Center
     ) {
@@ -85,7 +86,7 @@ fun SplashScreen(
             val radius1 = maxRadius * waveProgress
             val alpha1 = 1f - waveProgress
             val brush1 = Brush.radialGradient(
-                colors = listOf(Color.Transparent, HiFi.SteelEdge.copy(alpha = alpha1 * 0.35f), Color.Transparent),
+                colors = listOf(Color.Transparent, palette.steelEdge.copy(alpha = alpha1 * 0.35f), Color.Transparent),
                 center = center,
                 radius = if (radius1 > 0) radius1 else 1f
             )
@@ -96,7 +97,7 @@ fun SplashScreen(
             val radius2 = maxRadius * waveProgress2
             val alpha2 = 1f - waveProgress2
             val brush2 = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color.White.copy(alpha = alpha2 * 0.22f), Color.Transparent),
+                colors = listOf(Color.Transparent, palette.textPrimary.copy(alpha = alpha2 * 0.20f), Color.Transparent),
                 center = center,
                 radius = if (radius2 > 0) radius2 else 1f
             )
@@ -116,7 +117,7 @@ fun SplashScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom))
                 .padding(bottom = if (isLandscape) 24.dp else (48 * scaleFactor).dp)
                 .alpha(textAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -124,7 +125,7 @@ fun SplashScreen(
             Text(
                 text = stringResource(R.string.splash_yandex_music_lite),
                 style = TextStyle(
-                    color = Color.White,
+                    color = palette.textPrimary,
                     fontSize = (18 * scaleFactor).sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = (3 * scaleFactor).sp
@@ -134,7 +135,7 @@ fun SplashScreen(
             Text(
                 text = stringResource(R.string.splash_lossless_audio),
                 style = TextStyle(
-                    color = HiFi.TextSecondary,
+                    color = palette.textSecondary,
                     fontSize = (12 * scaleFactor).sp,
                     fontWeight = FontWeight.Normal,
                     letterSpacing = (2 * scaleFactor).sp

@@ -110,13 +110,14 @@ fun UpdateDialog(
                     BorderStroke(
                         1.2.dp,
                         Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.05f))
+                            listOf(HiFi.palette.glassBorder, HiFi.palette.cardBorder)
                         )
                     ),
                     RoundedCornerShape(28.dp)
                 )
                 .padding(22.dp)
         ) {
+            val palette = HiFi.palette
             Column(modifier = Modifier.fillMaxWidth().then(if (roomy) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
                 // Header Row
                 Row(
@@ -127,15 +128,13 @@ fun UpdateDialog(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))
-                            ),
+                            .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.SystemUpdate,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = palette.onMetal,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -143,26 +142,26 @@ fun UpdateDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.update_dostupno_obnovlenie),
-                            color = Color.White,
+                            color = palette.textPrimary,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = stringResource(R.string.cache_menu_yandex_music_lite),
-                                color = Color.White.copy(alpha = 0.6f),
+                                color = palette.textSecondary,
                                 fontSize = 12.sp
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color.White.copy(alpha = 0.10f))
+                                    .background(palette.pillFill)
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "v${updateInfo.versionName}",
-                                    color = Color.White,
+                                    color = palette.textPrimary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -175,14 +174,14 @@ fun UpdateDialog(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .background(palette.pillFill)
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.cd_zakryt),
-                            tint = Color.White.copy(alpha = 0.8f),
+                            tint = palette.textPrimary.copy(alpha = 0.8f),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -194,7 +193,7 @@ fun UpdateDialog(
                 // Changelog Card
                 Text(
                     text = stringResource(R.string.update_chto_novogo_v_etoy),
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = palette.textPrimary.copy(alpha = 0.85f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -205,9 +204,9 @@ fun UpdateDialog(
                         .fillMaxWidth()
                         .heightIn(max = 180.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.04f))
+                        .background(palette.cardFill)
                         .border(
-                            BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                            BorderStroke(1.dp, palette.cardBorder),
                             RoundedCornerShape(16.dp)
                         )
                         .padding(14.dp)
@@ -215,7 +214,7 @@ fun UpdateDialog(
                 ) {
                     Text(
                         text = updateInfo.changelog,
-                        color = Color.White.copy(alpha = 0.75f),
+                        color = palette.textPrimary.copy(alpha = 0.78f),
                         fontSize = 12.5.sp,
                         lineHeight = 18.sp
                     )
@@ -225,8 +224,8 @@ fun UpdateDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     val sizeMb = String.format(Locale.US, "%.2f", updateInfo.apkSizeBytes / (1024f * 1024f))
                     Text(
-                        text = stringResource(R.string.update_file_size, sizeMb.toString()),
-                        color = Color.White.copy(alpha = 0.45f),
+                        text = stringResource(R.string.update_file_size, sizeMb),
+                        color = palette.textTertiary,
                         fontSize = 11.sp
                     )
                 }
@@ -241,13 +240,13 @@ fun UpdateDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.update_zagruzka_paketa),
-                            color = HiFi.TextSecondary,
+                            color = palette.textSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
                             text = "$percent%",
-                            color = Color.White,
+                            color = palette.textPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -260,7 +259,7 @@ fun UpdateDialog(
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = statusMessage,
-                        color = HiFi.Danger,
+                        color = palette.danger,
                         fontSize = 12.sp
                     )
                 }
@@ -276,8 +275,8 @@ fun UpdateDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(HiFi.Warning.copy(alpha = 0.15f))
-                            .border(BorderStroke(1.dp, HiFi.Warning.copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
+                            .background(palette.warning.copy(alpha = 0.15f))
+                            .border(BorderStroke(1.dp, palette.warning.copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
                             .padding(14.dp)
                     ) {
                         Column {
@@ -285,13 +284,13 @@ fun UpdateDialog(
                                 Icon(
                                     imageVector = Icons.Default.SystemUpdate,
                                     contentDescription = null,
-                                    tint = HiFi.Warning,
+                                    tint = palette.warning,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.update_perehod_na_ofitsialnyy_reliz),
-                                    color = HiFi.Warning,
+                                    color = palette.warning,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -299,7 +298,7 @@ fun UpdateDialog(
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = stringResource(R.string.update_etot_reliz_podpisan_ofitsialnym),
-                                color = Color.White.copy(alpha = 0.85f),
+                                color = palette.textPrimary.copy(alpha = 0.85f),
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
                             )
@@ -313,8 +312,8 @@ fun UpdateDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(HiFi.Warning.copy(alpha = 0.12f))
-                            .border(BorderStroke(1.dp, HiFi.Warning.copy(alpha = 0.35f)), RoundedCornerShape(14.dp))
+                            .background(palette.warning.copy(alpha = 0.12f))
+                            .border(BorderStroke(1.dp, palette.warning.copy(alpha = 0.35f)), RoundedCornerShape(14.dp))
                             .clickable { onRequestPermission() }
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
@@ -322,13 +321,13 @@ fun UpdateDialog(
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = null,
-                                tint = HiFi.Warning,
+                                tint = palette.warning,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = stringResource(R.string.update_trebuetsya_odin_raz_razreshit),
-                                color = HiFi.Warning,
+                                color = palette.warning,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
                             )
@@ -340,8 +339,7 @@ fun UpdateDialog(
 
                 Spacer(modifier = Modifier.height(22.dp))
 
-                // Actions: on a narrow window (a third of a phone, a free window) they go on to a second line, to the
-                // right as before, instead of squeezing their words
+                // Actions
                 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
                 androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -358,7 +356,7 @@ fun UpdateDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.update_pozzhe),
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = palette.textSecondary,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -368,40 +366,38 @@ fun UpdateDialog(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color.White.copy(alpha = 0.1f))
-                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)), RoundedCornerShape(14.dp))
+                                .background(palette.pillFill)
+                                .border(BorderStroke(1.dp, palette.glassBorder), RoundedCornerShape(14.dp))
                                 .clickable { onShareOrSave() }
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.update_sohranit_apk),
-                                color = Color.White,
+                                color = palette.textPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
 
-                    // The file for installing by hand, once an install did not finish
                     val offerFile = downloadProgress >= 2f && (installFailed || failedBefore)
                     if (offerFile && !isSignatureMismatch) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color.White.copy(alpha = 0.1f))
-                                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)), RoundedCornerShape(14.dp))
+                                .background(palette.pillFill)
+                                .border(BorderStroke(1.dp, palette.glassBorder), RoundedCornerShape(14.dp))
                                 .clickable { onSaveFile() }
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.update_save_file),
-                                color = Color.White,
+                                color = palette.textPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
-
 
                     // Primary Action Button (Download / Install)
                     val isDownloading = downloadProgress in 0f..1f || installing
@@ -409,12 +405,11 @@ fun UpdateDialog(
 
                     Box(
                         modifier = Modifier
-                            // The Hi-Fi metal capsule: steel rim, anodized face
                             .clip(CircleShape)
-                            .background(Brush.verticalGradient(HiFi.MetalEdge))
+                            .background(Brush.verticalGradient(palette.metalEdge))
                             .padding(1.5.dp)
                             .clip(CircleShape)
-                            .background(Brush.radialGradient(HiFi.KnobFace, center = Offset.Zero, radius = 900f))
+                            .background(Brush.radialGradient(palette.knobFace, center = Offset.Zero, radius = 900f))
                             .clickable(enabled = !isDownloading) {
                                 if (isReadyToInstall) {
                                     if (!hasInstallPermission) {
@@ -437,7 +432,7 @@ fun UpdateDialog(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(if (installing) R.string.update_installing else R.string.update_zagruzka),
-                                    color = Color.White,
+                                    color = palette.textPrimary,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -445,13 +440,13 @@ fun UpdateDialog(
                                 Icon(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = palette.textPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.update_razreshit_v_nastroykah),
-                                    color = Color.White,
+                                    color = palette.textPrimary,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -459,7 +454,7 @@ fun UpdateDialog(
                                 Icon(
                                     imageVector = Icons.Default.SystemUpdate,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = palette.textPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -471,7 +466,7 @@ fun UpdateDialog(
                                             else -> R.string.update_install
                                         }
                                     ),
-                                    color = Color.White,
+                                    color = palette.textPrimary,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -479,13 +474,13 @@ fun UpdateDialog(
                                 Icon(
                                     imageVector = Icons.Default.Download,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = palette.textPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.update_obnovit_seychas),
-                                    color = Color.White,
+                                    color = palette.textPrimary,
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -496,7 +491,7 @@ fun UpdateDialog(
 
                 // Not now and not this version: quiet, below the main actions, until a download starts
                 if (onSkip != null && downloadProgress < 0f) {
-                    Box(Modifier.fillMaxWidth().padding(top = 14.dp).height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                    Box(Modifier.fillMaxWidth().padding(top = 14.dp).height(1.dp).background(palette.hairline))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -507,9 +502,9 @@ fun UpdateDialog(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.update_skip_version), color = Color.White.copy(alpha = 0.78f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.update_skip_version), color = palette.textPrimary.copy(alpha = 0.78f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                     if (showSkipHint) {
                         Text(
@@ -544,19 +539,20 @@ private fun InstallFailedNote(state: InstallState?, failedBefore: Boolean) {
         state is InstallState.Failed && !state.reason.isNullOrBlank() -> stringResource(R.string.update_failed_reason, state.reason)
         else -> stringResource(R.string.update_failed_unknown)
     }
+    val palette = HiFi.palette
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(HiFi.Warning.copy(alpha = 0.12f))
-            .border(BorderStroke(1.dp, HiFi.Warning.copy(alpha = 0.4f)), RoundedCornerShape(14.dp))
+            .background(palette.warning.copy(alpha = 0.12f))
+            .border(BorderStroke(1.dp, palette.warning.copy(alpha = 0.4f)), RoundedCornerShape(14.dp))
             .padding(14.dp)
             .semantics { liveRegion = LiveRegionMode.Polite }
     ) {
         if (!failedBefore) {
-            Text(stringResource(R.string.update_failed_title), color = HiFi.Warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.update_failed_title), color = palette.warning, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
         }
-        Text(text, color = Color.White.copy(alpha = 0.86f), fontSize = 12.5.sp, lineHeight = 18.sp)
+        Text(text, color = palette.textPrimary.copy(alpha = 0.86f), fontSize = 12.5.sp, lineHeight = 18.sp)
     }
 }

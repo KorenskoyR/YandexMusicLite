@@ -1,8 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.radio
 
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import com.korenskoy.yandexmusic.presentation.main.components.DockClearance
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.animation.fadeOut
@@ -146,15 +148,16 @@ fun RadioScreen(
     modifier: Modifier = Modifier,
     hasActiveTrack: Boolean = false
 ) {
+    val palette = HiFi.palette
     val isLandscape = com.korenskoy.yandexmusic.utils.isLandscapeWindow()
     val contentStart = 16.dp
-    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val contentBottom = if (isLandscape) DockClearance + navigationBar else (if (hasActiveTrack) 168.dp else 100.dp)
+    val bottomSafe = WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
+    val contentBottom = if (isLandscape) DockClearance + bottomSafe else (if (hasActiveTrack) 168.dp else 100.dp) + bottomSafe
     val current = allStations.firstOrNull { it.id == currentStationId }
     val hero = current ?: allStations.firstOrNull { it.id in favoriteStationIds } ?: allStations.firstOrNull()
     val favorites = remember(allStations, favoriteStationIds) { allStations.filter { it.id in favoriteStationIds } }
 
-    val statusBar = WindowInsets.systemBars.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
+    val statusBar = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
     val list = rememberLazyListState()
     val collapseState = rememberHeaderCollapse(list)
@@ -217,7 +220,7 @@ fun RadioScreen(
                             // The name in full where a smaller type holds it (Android 9–13 draw it wider: «Новое Ра…»)
                             androidx.compose.foundation.text.BasicText(
                                 station.name,
-                                style = androidx.compose.ui.text.TextStyle(color = Color.White, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                                style = androidx.compose.ui.text.TextStyle(color = palette.textPrimary, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 12.sp, stepSize = 0.5.sp)
@@ -252,7 +255,7 @@ fun RadioScreen(
     )
     Text(
         russianQuantityString(allStations.size, R.string.stations_count_one, R.string.stations_count_few, R.string.stations_count_many),
-        style = HiFiType.Caption.copy(fontSize = 15.sp),
+        style = HiFiType.Caption.copy(color = palette.textSecondary, fontSize = 15.sp),
         modifier = Modifier
             .padding(start = contentStart + 4.dp, top = statusBar + 50.dp)
             .graphicsLayer {
@@ -273,12 +276,12 @@ fun RadioScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isPlaying) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(HiFi.Live))
+                Box(Modifier.size(7.dp).clip(CircleShape).background(palette.live))
                 Spacer(Modifier.width(7.dp))
             }
             Text(
                 stringResource(R.string.radio_on_air_station, current.name),
-                color = Color.White.copy(alpha = 0.84f),
+                color = palette.textPrimary.copy(alpha = 0.84f),
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -368,7 +371,7 @@ private fun OnAirCard(
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StationLogo(station, 76.dp, 18.dp, Modifier.hifiSoftShadow(RoundedCornerShape(18.dp), 16.dp), plainBackground = true)
+            StationLogo(station, 76.dp, 18.dp, Modifier.hifiSoftShadow(RoundedCornerShape(18.dp), 16.dp))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(station.name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -394,6 +397,7 @@ private fun stationSubtitle(station: RadioStation): String =
  */
 @Composable
 private fun TuningWindow(selected: RadioStation, stations: List<RadioStation>, onTune: (RadioStation) -> Unit) {
+    val palette = HiFi.palette
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -441,6 +445,7 @@ private fun TuningWindow(selected: RadioStation, stations: List<RadioStation>, o
                     }
                 }
                 .drawBehind {
+                    val tunerStroke = Color.White
                     val scaleTop = 12.dp.toPx()
                     val minorStep = size.width / 40f
                     var i = 0
@@ -448,13 +453,13 @@ private fun TuningWindow(selected: RadioStation, stations: List<RadioStation>, o
                         val x = i * minorStep
                         val major = i % 8 == 0
                         val h = if (major) 20.dp.toPx() else 12.dp.toPx()
-                        drawLine(Color.White.copy(alpha = if (major) 0.75f else 0.32f), Offset(x, scaleTop + (20.dp.toPx() - h)), Offset(x, scaleTop + 20.dp.toPx()), if (major) 1.5.dp.toPx() else 1f)
+                        drawLine(tunerStroke.copy(alpha = if (major) 0.75f else 0.32f), Offset(x, scaleTop + (20.dp.toPx() - h)), Offset(x, scaleTop + 20.dp.toPx()), if (major) 1.5.dp.toPx() else 1f)
                         i++
                     }
-                    marks.forEach { f -> drawCircle(Color.White.copy(alpha = 0.55f), 2.dp.toPx(), Offset(f * size.width, 3.dp.toPx())) }
+                    marks.forEach { f -> drawCircle(tunerStroke.copy(alpha = 0.55f), 2.dp.toPx(), Offset(f * size.width, 3.dp.toPx())) }
                     val nx = needle.value * size.width
-                    drawLine(HiFi.Accent.copy(alpha = 0.35f), Offset(nx, 0f), Offset(nx, scaleTop + 22.dp.toPx()), 6.dp.toPx())
-                    drawLine(HiFi.Accent, Offset(nx, 0f), Offset(nx, scaleTop + 22.dp.toPx()), 2.dp.toPx())
+                    drawLine(Color.White.copy(alpha = 0.35f), Offset(nx, 0f), Offset(nx, scaleTop + 22.dp.toPx()), 6.dp.toPx())
+                    drawLine(Color.White, Offset(nx, 0f), Offset(nx, scaleTop + 22.dp.toPx()), 2.dp.toPx())
                 }
         )
         Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).offset { IntOffset(0, 0) }, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -475,6 +480,7 @@ private fun StationRow(
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val palette = HiFi.palette
     Row(
         modifier
             .fillMaxWidth()
@@ -486,47 +492,52 @@ private fun StationRow(
         StationLogo(station, 48.dp, 12.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(station.name, color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.95f), fontSize = 16.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(stationSubtitle(station), style = HiFiType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(station.name, color = if (isCurrent) palette.textPrimary else palette.textPrimary.copy(alpha = 0.95f), fontSize = 16.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stationSubtitle(station), style = HiFiType.Caption.copy(color = palette.textSecondary), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (isPlaying) {
-            Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = HiFi.Accent, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
         }
         Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onToggleFavorite), contentAlignment = Alignment.Center) {
             Icon(
                 if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = stringResource(R.string.cd_v_izbrannoe),
-                tint = if (isFavorite) HiFi.Love else Color.White.copy(alpha = 0.8f),
+                tint = if (isFavorite) palette.love else palette.textPrimary.copy(alpha = 0.75f),
                 modifier = Modifier.size(20.dp)
             )
         }
     }
 }
 
-/** Station logo on its brand colors (or plain white, as on the on-air card). */
+/** Station logo rendered seamlessly edge-to-edge matching CarCover (brand gradient + initial fallback if no logo). */
 @Composable
-private fun StationLogo(station: RadioStation, size: Dp, corner: Dp, modifier: Modifier = Modifier, plainBackground: Boolean = false) {
+private fun StationLogo(station: RadioStation, size: Dp, corner: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val shape = RoundedCornerShape(corner)
+    val model: Any? = station.iconRes ?: station.logoUrl.ifEmpty { null }
     Box(
         modifier
             .size(size)
             .clip(shape)
             .background(
-                if (plainBackground) Brush.linearGradient(listOf(Color.White, HiFi.Paper))
+                if (model != null) Brush.linearGradient(listOf(HiFi.palette.placeholder, HiFi.palette.placeholder))
                 else Brush.linearGradient(listOf(Color(station.brandColorStart), Color(station.brandColorEnd)))
             ),
         contentAlignment = Alignment.Center
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(station.iconRes ?: station.logoUrl)
-                .crossfade(true)
-                .browserUserAgent()
-                .build(),
-            contentDescription = station.name,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize().padding(size * 0.14f)
-        )
+        if (model != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(model)
+                    .crossfade(true)
+                    .browserUserAgent()
+                    .build(),
+                contentDescription = station.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text(station.name.take(1), color = Color.White, fontSize = (size.value * 0.42f).sp, fontWeight = FontWeight.ExtraBold)
+        }
     }
 }

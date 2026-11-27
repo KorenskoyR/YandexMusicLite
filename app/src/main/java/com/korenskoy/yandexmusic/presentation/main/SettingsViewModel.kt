@@ -29,8 +29,11 @@ import com.korenskoy.yandexmusic.data.player.PlaybackController
 import com.korenskoy.yandexmusic.data.player.SoundMode
 import com.korenskoy.yandexmusic.data.reserve.RoadReserve
 import com.korenskoy.yandexmusic.domain.model.AnimationMode
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
 import com.korenskoy.yandexmusic.domain.model.StartMusic
 import com.korenskoy.yandexmusic.domain.model.StartPage
+import com.korenskoy.yandexmusic.domain.model.ThemePolicy
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -79,11 +82,19 @@ class SettingsViewModel @Inject constructor(
     /** Whether an equalizer is on the device; asked again each time the sound settings open. */
     private val equalizerFound = MutableStateFlow<SystemEqualizer.Target?>(null)
     private data class Look(val startPage: StartPage, val expand: Boolean, val swipe: Boolean, val left: Boolean, val clock: Boolean, val under: CarUnderCover = CarUnderCover.QUEUE, val mini: MiniOnWave = MiniOnWave.LANDSCAPE, val carLayout: CarLayout = CarLayout.AUTO)
+    private data class ThemePref(
+        val mode: AppThemeMode = AppThemeMode.DARK,
+        val scheduleType: ThemeScheduleType = ThemeScheduleType.CUSTOM,
+        val lightMinutes: Int = ThemePolicy.DEFAULT_LIGHT_MINUTES,
+        val darkMinutes: Int = ThemePolicy.DEFAULT_DARK_MINUTES,
+        val fullscreen: Boolean = false
+    )
     private data class Scale(
         val auto: Boolean,
         val manual: Float,
         val animations: AnimationMode,
-        val autoCheckUpdates: Boolean = SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES
+        val autoCheckUpdates: Boolean = SettingsRepository.DEFAULT_AUTO_CHECK_UPDATES,
+        val theme: ThemePref = ThemePref()
     )
     private data class Library(
         val reserveMb: Int,
@@ -112,11 +123,21 @@ class SettingsViewModel @Inject constructor(
         settings.carLayout
     ) { look, under, mini, carLayout -> look.copy(under = under, mini = mini, carLayout = carLayout) }
 
+    private val themePref: Flow<ThemePref> = combine(
+        settings.themeMode,
+        settings.themeScheduleType,
+        settings.themeLightMinutes,
+        settings.themeDarkMinutes,
+        settings.fullscreenMode,
+        ::ThemePref
+    )
+
     private val scale: Flow<Scale> = combine(
         settings.uiScaleAuto,
         settings.uiScaleManual,
         settings.animationMode,
         settings.autoCheckUpdates,
+        themePref,
         ::Scale
     )
 
@@ -160,7 +181,12 @@ class SettingsViewModel @Inject constructor(
             uiScaleAuto = sc.auto,
             uiScaleManual = sc.manual,
             animationMode = sc.animations,
-            autoCheckUpdates = sc.autoCheckUpdates
+            autoCheckUpdates = sc.autoCheckUpdates,
+            themeMode = sc.theme.mode,
+            themeScheduleType = sc.theme.scheduleType,
+            themeLightMinutes = sc.theme.lightMinutes,
+            themeDarkMinutes = sc.theme.darkMinutes,
+            fullscreenMode = sc.theme.fullscreen
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -300,4 +326,9 @@ class SettingsViewModel @Inject constructor(
     fun setUiScaleManual(scale: Float) = save { setUiScaleManual(scale) }
     fun setAnimationMode(value: AnimationMode) = save { setAnimationMode(value) }
     fun setAutoCheckUpdates(enabled: Boolean) = save { setAutoCheckUpdates(enabled) }
+    fun setThemeMode(mode: AppThemeMode) = save { setThemeMode(mode) }
+    fun setThemeScheduleType(type: ThemeScheduleType) = save { setThemeScheduleType(type) }
+    fun setThemeLightMinutes(minutes: Int) = save { setThemeLightMinutes(minutes) }
+    fun setThemeDarkMinutes(minutes: Int) = save { setThemeDarkMinutes(minutes) }
+    fun setFullscreenMode(enabled: Boolean) = save { setFullscreenMode(enabled) }
 }

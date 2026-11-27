@@ -65,7 +65,7 @@ fun ArtistChoiceDialog(track: TrackDetailsDto, onPick: (id: String, name: String
                     val id = artist.idString ?: return@forEach
                     Text(
                         artist.name.orEmpty(),
-                        color = Color.White,
+                        color = HiFi.palette.textPrimary,
                         fontSize = 17.sp,
                         modifier = Modifier
                             .fillMaxWidth()

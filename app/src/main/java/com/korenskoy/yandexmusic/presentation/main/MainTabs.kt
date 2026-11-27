@@ -133,6 +133,7 @@ internal fun SearchTab(
     val found by searchVm.found.collectAsStateWithLifecycle()
     val history by searchVm.history.collectAsStateWithLifecycle()
     val weeklyHits by searchVm.weeklyHits.collectAsStateWithLifecycle()
+    val topChart by searchVm.topChart.collectAsStateWithLifecycle()
     val trendTracks by searchVm.trendTracks.collectAsStateWithLifecycle()
     // What was said goes into the field without "включи" and the like, and the search runs at once
     val voice = rememberVoiceInput { phrase ->
@@ -144,6 +145,7 @@ internal fun SearchTab(
         onQueryChange = { searchVm.onQueryChange(it) },
         results = results,
         weeklyHits = weeklyHits,
+        topChart = topChart,
         trendTracks = trendTracks,
         isSearching = isSearching,
         currentTrackId = now.trackId,
@@ -346,6 +348,7 @@ internal fun CarTab(
     val aiMarks by viewModel.aiMarks.collectAsStateWithLifecycle()
     val deviceMusic by viewModel.carDeviceMusic.collectAsStateWithLifecycle()
     val shuffled by viewModel.shuffled.collectAsStateWithLifecycle()
+    val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val stations by radioVm.stations.collectAsStateWithLifecycle()
     val favouriteStations by radioVm.favoriteStationIds.collectAsStateWithLifecycle()
     val onAir = now.track?.takeIf { it.isRadio }?.idString?.removePrefix("radio_")
@@ -405,6 +408,8 @@ internal fun CarTab(
         onBackToMyWave = viewModel::returnToMyWave,
         shuffled = shuffled,
         onToggleShuffle = viewModel::toggleShuffle,
+        repeatMode = repeatMode,
+        onCycleRepeat = viewModel::cycleRepeatMode,
         radio = radio,
         // A station's heart is its place among the favourites, not a like
         isLiked = if (onAir != null) onAir in favouriteStations else now.trackId?.let { it in now.likedTrackIds } == true,
@@ -489,7 +494,12 @@ internal fun settingsHost(
             onUiScaleAutoChange = settingsVm::setUiScaleAuto,
             onUiScaleManualChange = settingsVm::setUiScaleManual,
             onAnimationModeChange = settingsVm::setAnimationMode,
-            onAutoCheckUpdatesChange = settingsVm::setAutoCheckUpdates
+            onAutoCheckUpdatesChange = settingsVm::setAutoCheckUpdates,
+            onThemeModeChange = settingsVm::setThemeMode,
+            onThemeScheduleTypeChange = settingsVm::setThemeScheduleType,
+            onThemeLightMinutesChange = settingsVm::setThemeLightMinutes,
+            onThemeDarkMinutesChange = settingsVm::setThemeDarkMinutes,
+            onFullscreenModeChange = settingsVm::setFullscreenMode
         )
     }
     return settings to settingsActions

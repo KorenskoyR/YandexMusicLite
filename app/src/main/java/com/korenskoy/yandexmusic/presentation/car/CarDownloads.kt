@@ -88,18 +88,19 @@ internal fun CarDownloadsPanel(
     onPlayDevice: (folderKey: String?) -> Unit,
     onClose: () -> Unit
 ) {
+    val palette = HiFi.palette
     Column(
         modifier
             .clip(RoundedCornerShape(u(30f)))
-            .background(HiFi.SheetFill.copy(alpha = 0.97f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+            .background(palette.sheetFill.copy(alpha = 0.97f))
+            .border(1.dp, palette.glassBorder, RoundedCornerShape(u(30f)))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
             .padding(start = u(16f), end = u(16f), top = u(18f), bottom = u(8f))
     ) {
         Row(Modifier.padding(start = u(8f), end = u(2f), bottom = u(10f)), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.car_source_downloaded), color = Color.White, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                Text(stringResource(R.string.car_downloads_caption), color = Color.White.copy(alpha = 0.62f), fontSize = u.sp(15f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.car_source_downloaded), color = palette.textPrimary, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                Text(stringResource(R.string.car_downloads_caption), color = palette.textSecondary, fontSize = u.sp(15f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Box(
                 Modifier
@@ -108,7 +109,7 @@ internal fun CarDownloadsPanel(
                     .clickable(role = Role.Button, onClick = onClose),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
             }
         }
         val appSubtitle = if (music.downloadedCount > 0) {
@@ -138,7 +139,7 @@ internal fun CarDownloadsPanel(
                 item(key = "folders_title") {
                     Text(
                         foldersTitle,
-                        color = Color.White.copy(alpha = 0.60f), fontSize = u.sp(13f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em,
+                        color = palette.textSecondary, fontSize = u.sp(13f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em,
                         modifier = Modifier.padding(start = u(10f), top = u(8f))
                     )
                 }
@@ -150,6 +151,7 @@ internal fun CarDownloadsPanel(
 
 @Composable
 private fun SourceRow(u: Scale, icon: ImageVector, title: String, subtitle: String, enabled: Boolean, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val shape = RoundedCornerShape(u(22f))
     val description = stringResource(R.string.car_next_play_cd, title)
     Row(
@@ -157,8 +159,8 @@ private fun SourceRow(u: Scale, icon: ImageVector, title: String, subtitle: Stri
             .fillMaxWidth()
             .heightIn(min = u(100f))
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .background(palette.pillFill)
+            .border(1.dp, palette.glassBorder, shape)
             .then(if (enabled) Modifier.clickable(role = Role.Button, onClickLabel = description, onClick = onClick) else Modifier)
             .semantics(mergeDescendants = true) { contentDescription = "$title, $subtitle" }
             .padding(horizontal = u(16f), vertical = u(14f)),
@@ -168,21 +170,21 @@ private fun SourceRow(u: Scale, icon: ImageVector, title: String, subtitle: Stri
             Modifier
                 .size(u(72f))
                 .clip(RoundedCornerShape(u(18f)))
-                .background(HiFi.Placeholder)
-                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(u(18f))),
+                .background(palette.placeholder)
+                .border(1.dp, palette.glassBorder, RoundedCornerShape(u(18f))),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = if (enabled) 0.92f else 0.45f), modifier = Modifier.size(u(34f)))
+            Icon(icon, contentDescription = null, tint = palette.textPrimary.copy(alpha = if (enabled) 0.92f else 0.45f), modifier = Modifier.size(u(34f)))
         }
         Spacer(Modifier.width(u(18f)))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White.copy(alpha = if (enabled) 1f else 0.55f), fontSize = u.sp(23f), lineHeight = u.sp(29f), fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = Color.White.copy(alpha = 0.64f), fontSize = u.sp(16f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = palette.textPrimary.copy(alpha = if (enabled) 1f else 0.55f), fontSize = u.sp(23f), lineHeight = u.sp(29f), fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = palette.textSecondary, fontSize = u.sp(16f), lineHeight = u.sp(22f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (enabled) {
             Spacer(Modifier.width(u(12f)))
             HiFiKnob(onClick = onClick, contentDescription = description, size = u(60f)) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(u(28f)))
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = palette.onMetal, modifier = Modifier.size(u(28f)))
             }
         }
     }
@@ -190,6 +192,7 @@ private fun SourceRow(u: Scale, icon: ImageVector, title: String, subtitle: Stri
 
 @Composable
 private fun FolderRow(u: Scale, folder: CarDeviceFolder, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val name = folder.name ?: localSourceLabel(folder.source)
     val description = stringResource(R.string.car_next_play_cd, name)
     Row(
@@ -202,10 +205,10 @@ private fun FolderRow(u: Scale, folder: CarDeviceFolder, onClick: () -> Unit) {
             .padding(horizontal = u(12f), vertical = u(8f)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Rounded.Folder, contentDescription = null, tint = Color.White.copy(alpha = 0.80f), modifier = Modifier.size(u(30f)))
+        Icon(Icons.Rounded.Folder, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.80f), modifier = Modifier.size(u(30f)))
         Spacer(Modifier.width(u(16f)))
-        Text(name, color = Color.White, fontSize = u.sp(21f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(name, color = palette.textPrimary, fontSize = u.sp(21f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(u(12f)))
-        Text(folder.count.toString(), color = Color.White.copy(alpha = 0.55f), fontSize = u.sp(17f), maxLines = 1)
+        Text(folder.count.toString(), color = palette.textTertiary, fontSize = u.sp(17f), maxLines = 1)
     }
 }

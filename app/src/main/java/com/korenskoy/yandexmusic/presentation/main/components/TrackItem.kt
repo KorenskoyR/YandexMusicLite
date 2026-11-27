@@ -83,6 +83,7 @@ fun TrackItem(
     val menuPlaylist = LocalTrackMenuPlaylist.current
     val openMenu: (() -> Unit)? = menu?.let { { it.open(track, menuPlaylist) } }
     val context = LocalContext.current
+    val palette = HiFi.palette
 
     Row(
         modifier = Modifier
@@ -104,7 +105,7 @@ fun TrackItem(
             modifier = Modifier
                 .size(50.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(HiFi.Placeholder),
+                .background(palette.placeholder),
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
@@ -127,7 +128,7 @@ fun TrackItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = track.title ?: stringResource(R.string.bez_nazvaniya),
-                    style = HiFiType.Body.copy(fontSize = HiFiType.RowTitle.fontSize, lineHeight = HiFiType.RowTitle.lineHeight),
+                    style = HiFiType.Body.copy(color = palette.textPrimary, fontSize = HiFiType.RowTitle.fontSize, lineHeight = HiFiType.RowTitle.lineHeight),
                     fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -142,7 +143,7 @@ fun TrackItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = track.artists.joinToString { it.name ?: "" }.ifEmpty { stringResource(R.string.player_unknown_artist) },
-                    style = HiFiType.Caption,
+                    style = HiFiType.Caption.copy(color = palette.textSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
@@ -154,7 +155,7 @@ fun TrackItem(
         if (isDownloaded) {
             Icon(
                 imageVector = Icons.Rounded.DownloadDone,
-                tint = Color.White.copy(alpha = 0.62f),
+                tint = palette.textSecondary,
                 contentDescription = stringResource(R.string.cd_skachan),
                 modifier = Modifier.size(18.dp)
             )
@@ -163,7 +164,7 @@ fun TrackItem(
             val downloading = stringResource(R.string.cd_skachivaetsya)
             HiFiActivityIndicator(
                 size = 16.dp,
-                color = Color.White.copy(alpha = 0.8f),
+                color = palette.textPrimary.copy(alpha = 0.8f),
                 modifier = Modifier.semantics { contentDescription = downloading }
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -179,12 +180,16 @@ fun TrackItem(
             contentAlignment = Alignment.Center
         ) {
             Box(
-                modifier = Modifier.size(34.dp).hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f)),
+                modifier = Modifier.size(34.dp).hifiGlass(
+                    CircleShape,
+                    fill = palette.pillFill,
+                    border = if (palette.isDark) Color.White.copy(alpha = 0.14f) else palette.glassBorder
+                ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                    tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.6f),
+                    tint = if (isLiked) palette.love else palette.textSecondary,
                     contentDescription = null,
                     modifier = Modifier.size(17.dp)
                 )
@@ -200,7 +205,7 @@ fun TrackItem(
                     .semantics { contentDescription = menuDescription },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.MoreVert, contentDescription = null, tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.MoreVert, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(20.dp))
             }
         }
     }

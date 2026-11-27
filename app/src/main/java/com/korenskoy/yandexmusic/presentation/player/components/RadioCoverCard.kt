@@ -55,26 +55,67 @@ fun RadioCoverCard(
     stationName: String = ""
 ) {
     val context = LocalContext.current
+    val palette = HiFi.palette
+    val shape = RoundedCornerShape(24.dp)
 
     Box(
         modifier = modifier
-            .hifiSoftShadow(RoundedCornerShape(24.dp), 28.dp, Color.Black.copy(alpha = 0.55f))
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(
-                        HiFi.AnodizedLight,
-                        HiFi.AnodizedDark
-                    ),
-                    radius = 900f
-                )
+            .hifiSoftShadow(
+                shape,
+                28.dp,
+                color = if (palette.isDark) Color.Black.copy(alpha = 0.55f) else Color(0xFF11141C).copy(alpha = 0.18f)
             )
+            .clip(shape)
+            .background(palette.placeholder)
             .border(
-                BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
-                RoundedCornerShape(24.dp)
+                BorderStroke(1.dp, if (palette.isDark) Color.White.copy(alpha = 0.10f) else palette.glassBorder),
+                shape
             ),
         contentAlignment = Alignment.Center
     ) {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(coverUrl)
+                .crossfade(true)
+                .browserUserAgent()
+                .build(),
+            contentDescription = stringResource(R.string.cd_logotip_radiostantsii),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+            error = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.radialGradient(listOf(palette.anodizedLight, palette.anodizedDark))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stationName.take(1).uppercase(),
+                        color = palette.textPrimary.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 64.sp
+                    )
+                }
+            }
+        )
+
+        // Subtle studio glass sheen matching CarCover
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.08f),
+                        0.45f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.14f)
+                    )
+                )
+        )
 
         // "В ЭФИРЕ" in the top-left corner; the dot blinks only while effects are on
         if (showLiveBadge) {
@@ -95,7 +136,7 @@ fun RadioCoverCard(
                     .padding(16.dp)
                     .height(30.dp)
                     .clip(CircleShape)
-                    .background(Color(0x73080A14))
+                    .background(Color(0x99080A14))
                     .padding(horizontal = 12.dp)
             ) {
                 Box(
@@ -103,7 +144,7 @@ fun RadioCoverCard(
                         .size(8.dp)
                         .graphicsLayer { alpha = blink?.value ?: 1f }
                         .clip(CircleShape)
-                        .background(HiFi.Live)
+                        .background(palette.live)
                 )
                 Spacer(modifier = Modifier.width(7.dp))
                 Text(
@@ -114,44 +155,6 @@ fun RadioCoverCard(
                     letterSpacing = 0.12.em
                 )
             }
-        }
-
-        // Centered Round Logo with subtle glowing aura
-        Box(
-            modifier = Modifier
-                .fillMaxSize(0.58f)
-                .aspectRatio(1f)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .hifiSoftShadow(CircleShape, 16.dp, Color.Black.copy(alpha = 0.6f))
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center
-        ) {
-            SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(coverUrl)
-                    .crossfade(true)
-                    .browserUserAgent()
-                    .build(),
-                contentDescription = stringResource(R.string.cd_logotip_radiostantsii),
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
-                error = {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = stationName.take(1).uppercase(),
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 64.sp
-                        )
-                    }
-                }
-            )
         }
     }
 }

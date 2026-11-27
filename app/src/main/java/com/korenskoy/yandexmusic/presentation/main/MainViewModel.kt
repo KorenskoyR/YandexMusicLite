@@ -66,6 +66,7 @@ import com.korenskoy.yandexmusic.data.player.PlaybackController
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.player.SleepTimerState
 import com.korenskoy.yandexmusic.data.repository.LibraryRepository
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
 import com.korenskoy.yandexmusic.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -179,7 +180,13 @@ class MainViewModel @Inject constructor(
     fun playLocalAll(queue: List<LocalTrack>, shuffle: Boolean) {
         val order = if (shuffle) queue.shuffled() else queue
         val first = order.firstOrNull() ?: return
-        playLocal(first, order)
+        playRequests.userStarted()
+        playbackController.playOnDevice(
+            trackId = first.id,
+            playlist = localMusic.toDtos(order),
+            shuffled = shuffle,
+            originalOrder = if (shuffle) localMusic.toDtos(queue) else null
+        )
     }
 
     /**
@@ -625,6 +632,9 @@ class MainViewModel @Inject constructor(
     /** "Перемешано" in the car's "Любимое". */
     val shuffled: StateFlow<Boolean> = playbackController.shuffled
     fun toggleShuffle() = playbackController.toggleShuffle()
+
+    val repeatMode: StateFlow<RepeatMode> = playbackController.repeatMode
+    fun cycleRepeatMode() = playbackController.cycleRepeatMode()
 
     fun togglePlayPause() = playbackController.togglePlayPause()
 

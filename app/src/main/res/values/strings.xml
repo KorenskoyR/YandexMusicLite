@@ -652,8 +652,6 @@
     <string name="settings_mini_landscape">Горизонтально</string>
     <string name="settings_mini_on_wave_hint">Там, где мини-плеер показан, кнопка «Плеер ›» не нужна и скрыта.</string>
     <string name="settings_steering_hint">Управление — со стороны водителя. Лёжа полный плеер ставит обложку со стороны пассажира.</string>
-    <string name="car_shuffle">Перемешать</string>
-    <string name="car_shuffled">Перемешано</string>
     <string name="car_liked_shuffled">Любимое · перемешано</string>
     <string name="auth_phone_why_old">Компонент Android System WebView на этом устройстве устарел (версия %1$d), и окно входа Яндекса в нём не работает. Подтвердите вход на телефоне — это займёт минуту.</string>
     <string name="auth_webview_why_old">Окно входа Яндекса открывается через системный компонент Android System WebView, а на этом устройстве он устарел (версия %1$d) и страницу входа не показывает.</string>
@@ -939,4 +937,27 @@
     <string name="track_link_album">Открыть альбом</string>
     <string name="track_link_which_artist">Чья страница?</string>
     <string name="download_all_nothing">Все треки «Мне нравится» уже на устройстве</string>
+    <string name="search_top_chart">Топ-чарт</string>
+    <string name="settings_fullscreen_mode">Полноэкранный режим</string>
+    <string name="settings_fullscreen_mode_hint">Скрывать строку состояния и панель навигации</string>
+    <string name="settings_theme">Тема оформления</string>
+    <string name="settings_theme_auto">Авто</string>
+    <string name="settings_theme_light">Дневная</string>
+    <string name="settings_theme_dark">Ночная</string>
+    <string name="settings_theme_schedule">Расписание</string>
+    <string name="settings_theme_schedule_sunset">С вечера до утра</string>
+    <string name="settings_theme_schedule_sunset_hint">Дневная с 07:00, ночная с 19:00</string>
+    <string name="settings_theme_schedule_custom">Персональный</string>
+    <string name="settings_theme_light_time">Светлый режим</string>
+    <string name="settings_theme_dark_time">Режим затемнения</string>
+    <string name="settings_theme_schedule_note">Переключайтесь между режимами, основываясь на заданном вами расписании.</string>
+    <string name="cd_repeat">Повтор</string>
+    <string name="cd_shuffle">Перемешать</string>
+    <string name="tamper_badge">НЕОФИЦИАЛЬНАЯ ПЕРЕСБОРКА</string>
+    <string name="tamper_title">Обнаружена перепакованная копия</string>
+    <string name="tamper_body">Это приложение было изменено или пересобрано третьими лицами. Оригинальный Yandex Music Lite от автора всегда бесплатен и публикуется только на официальном GitHub.</string>
+    <string name="tamper_cta">Открыть официальный GitHub</string>
+    <string name="tamper_qr_hint">Наведите камеру телефона, чтобы открыть оригинал</string>
+    <string name="tamper_no_browser">Не удалось открыть браузер — отсканируйте QR или скопируйте ссылку</string>
+    <string name="tamper_copied">Ссылка скопирована</string>
 </resources>

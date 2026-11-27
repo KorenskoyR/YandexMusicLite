@@ -64,15 +64,24 @@ enum class MainTab(@param:StringRes val title: Int, val icon: ImageVector, val r
 private val BarShape = RoundedCornerShape(32.dp)
 private val IndicatorShape = RoundedCornerShape(27.dp)
 
-private fun Modifier.glassBar(): Modifier = this
-    .hifiSoftShadow(BarShape, 18.dp)
-    .clip(BarShape)
-    .background(HiFi.BarFill)
-    .border(1.dp, Color.White.copy(alpha = 0.14f), BarShape)
+@Composable
+private fun Modifier.glassBar(): Modifier {
+    val palette = HiFi.palette
+    val border = if (palette.isDark) Color.White.copy(alpha = 0.14f) else palette.glassBorder
+    return this
+        .hifiSoftShadow(
+            BarShape,
+            18.dp,
+            color = if (palette.isDark) Color.Black.copy(alpha = 0.42f) else Color(0xFF11141C).copy(alpha = 0.14f)
+        )
+        .clip(BarShape)
+        .background(palette.barFill)
+        .border(1.dp, border, BarShape)
+}
 
 /**
  * The tab bar: a floating glass capsule with five tabs in the usual order. The light pill under the
- * active tab slides with a spring; the active icon is blue.
+ * active tab slides with a spring; the active icon and label use high-contrast monochrome ink.
  */
 @Composable
 fun FloatingGlassBottomBar(
@@ -81,11 +90,14 @@ fun FloatingGlassBottomBar(
     modifier: Modifier = Modifier,
     fixedTabHeight: Dp? = null
 ) {
+    val palette = HiFi.palette
     val windowSize = com.korenskoy.yandexmusic.utils.currentWindowSizeDp()
     val scaleFactor = if (fixedTabHeight != null) 1f else (windowSize.widthDp / 400f).coerceIn(0.9f, 1.2f)
     val tabs = MainTab.entries
     val activeIndex = tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val tabHeight = fixedTabHeight ?: (54.dp * scaleFactor).coerceIn(50.dp, 62.dp)
+    val indicatorFill = if (palette.isDark) Color.White.copy(alpha = 0.14f) else Color(0xFF11141C).copy(alpha = 0.10f)
+    val indicatorBorder = if (palette.isDark) Color.White.copy(alpha = 0.20f) else Color(0xFF11141C).copy(alpha = 0.14f)
 
     Box(
         modifier = modifier
@@ -102,7 +114,8 @@ fun FloatingGlassBottomBar(
                     .width(tabWidth)
                     .height(tabHeight)
                     .clip(IndicatorShape)
-                    .background(Color.White.copy(alpha = 0.13f))
+                    .background(indicatorFill)
+                    .border(1.dp, indicatorBorder, IndicatorShape)
             )
             Row(Modifier.fillMaxWidth().height(tabHeight)) {
                 tabs.forEach { tab ->
@@ -153,12 +166,13 @@ fun FloatingGlassDock(
  */
 @Composable
 fun DockScrim(modifier: Modifier = Modifier) {
+    val scrim = HiFi.palette.ground.copy(alpha = 0.90f)
     val navigationBar = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
     Box(
         modifier
             .fillMaxWidth()
             .height(navigationBar + DockClearance + 36.dp)
-            .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to HiFi.Scrim, 1f to HiFi.Scrim))
+            .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to scrim, 1f to scrim))
     )
 }
 
@@ -178,8 +192,9 @@ val DockClearance = DockHeight + DockBottomGap + 12.dp
 
 @Composable
 private fun TabItem(tab: MainTab, selected: Boolean, scaleFactor: Float, modifier: Modifier, onClick: () -> Unit) {
+    val palette = HiFi.palette
     val iconColor by animateColorAsState(
-        if (selected) HiFi.Accent else Color.White.copy(alpha = 0.86f),
+        if (selected) palette.textPrimary else palette.textPrimary.copy(alpha = 0.56f),
         HiFiMotion.standard(),
         label = "tab_icon_${tab.route}"
     )
@@ -195,7 +210,7 @@ private fun TabItem(tab: MainTab, selected: Boolean, scaleFactor: Float, modifie
             Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(tab.title),
-                color = if (selected) Color.White else Color.White.copy(alpha = 0.80f),
+                color = if (selected) palette.textPrimary else palette.textPrimary.copy(alpha = 0.62f),
                 fontSize = (10.5f * scaleFactor).sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                 maxLines = 1,

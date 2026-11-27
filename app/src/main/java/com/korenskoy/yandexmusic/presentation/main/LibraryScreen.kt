@@ -1,8 +1,10 @@
 package com.korenskoy.yandexmusic.presentation.main
 
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
 import com.korenskoy.yandexmusic.presentation.hifi.TrackTitleLine
@@ -244,7 +246,7 @@ fun LibraryScreen(
         val listPadding = PaddingValues(start = contentStart, end = 20.dp, bottom = contentBottom)
         when (shown) {
             null -> Box(Modifier.fillMaxSize()) {
-            val statusBar = WindowInsets.systemBars.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
+            val statusBar = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
             val density = LocalDensity.current
             val list = rememberLazyListState()
             val collapse by rememberHeaderCollapse(list)
@@ -305,14 +307,14 @@ fun LibraryScreen(
                     Spacer(Modifier.width(10.dp))
                 }
                 HiFiWellButton(onClick = { showSettings = true }, contentDescription = stringResource(R.string.library_settings)) {
-                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = HiFi.palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(20.dp))
                 }
             }
             }
             LibrarySection.LIKED, LibrarySection.DOWNLOADED -> {
                 val list = if (shown == LibrarySection.LIKED) tracks else downloaded
                 val appearance = rememberAppearance(shown)
-                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)) {
+                LazyColumn(modifier = Modifier.fillMaxSize().predictiveBack(back).windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)) {
                     item(key = "header") {
                         SectionHeader(
                             title = stringResource(if (shown == LibrarySection.LIKED) R.string.library_liked else R.string.library_downloaded),
@@ -496,11 +498,12 @@ private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean
             .width(132.dp)
             .hifiPress(onClick)
     ) {
+        val palette = HiFi.palette
         Box(
             Modifier
                 .size(132.dp)
                 .clip(shape)
-                .background(if (isLiked) Brush.linearGradient(listOf(Color(0xFF7A2E3A), HiFi.Love)) else Brush.linearGradient(listOf(HiFi.Placeholder, HiFi.Placeholder)))
+                .background(if (isLiked) Brush.linearGradient(listOf(Color(0xFF7A2E3A), palette.love)) else Brush.linearGradient(listOf(palette.placeholder, palette.placeholder)))
         ) {
             if (isLiked || cover == null) {
                 Icon(
@@ -510,7 +513,7 @@ private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean
                         else -> Icons.AutoMirrored.Rounded.QueueMusic
                     },
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = if (isLiked) 1f else 0.6f),
+                    tint = if (isLiked) Color.White else palette.textTertiary,
                     modifier = Modifier.align(Alignment.Center).size(40.dp)
                 )
             } else {
@@ -544,6 +547,7 @@ private fun KeptCard(title: String, count: Int, cover: String?, isLiked: Boolean
 /** One library section row: metal plaque, title, count, chevron, hairline below. */
 @Composable
 private fun SectionRow(icon: ImageVector, title: String, count: Int, onClick: () -> Unit) {
+    val palette = HiFi.palette
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -554,11 +558,11 @@ private fun SectionRow(icon: ImageVector, title: String, count: Int, onClick: ()
         IconPlaque(icon, size = 36.dp)
         Spacer(Modifier.width(14.dp))
         Text(title, style = HiFiType.RowTitle, modifier = Modifier.weight(1f))
-        Text(count.toString(), color = HiFi.TextTertiary, fontSize = 15.sp)
+        Text(count.toString(), color = palette.textTertiary, fontSize = 15.sp)
         Spacer(Modifier.width(4.dp))
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(20.dp))
     }
-    Box(Modifier.fillMaxWidth().padding(start = 50.dp).height(1.dp).background(HiFi.Hairline))
+    Box(Modifier.fillMaxWidth().padding(start = 50.dp).height(1.dp).background(palette.hairline))
 }
 
 /** Back button, page title and count — the header of every library sub-page. */
@@ -566,7 +570,7 @@ private fun SectionRow(icon: ImageVector, title: String, count: Int, onClick: ()
 private fun SectionHeader(title: String, count: Int, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = HiFi.palette.textPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
@@ -606,8 +610,8 @@ internal fun CoverCard(track: TrackDetailsDto, modifier: Modifier = Modifier, on
                 .aspectRatio(1f)
                 .hifiSoftShadow(RoundedCornerShape(16.dp), 18.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(HiFi.Placeholder)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                .background(HiFi.palette.placeholder)
+                .border(1.dp, HiFi.palette.cardBorder, RoundedCornerShape(16.dp))
         )
         Spacer(Modifier.height(9.dp))
         TrackTitleLine(track.title ?: stringResource(R.string.bez_nazvaniya), track.showsExplicit, HiFiType.CardTitle.fontSize, style = HiFiType.CardTitle, color = HiFiType.CardTitle.color)
@@ -637,7 +641,7 @@ private fun PlaylistsPage(
         )
     }
     val cells: List<UserPlaylistDto?> = listOf<UserPlaylistDto?>(null) + playlists
-    LazyColumn(modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)), contentPadding = contentPadding) {
+    LazyColumn(modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)), contentPadding = contentPadding) {
         item(key = "header") {
             PageHeader(stringResource(R.string.library_playlists_row), onBack)
         }
@@ -652,16 +656,17 @@ private fun PlaylistsPage(
                             .hifiPress({ if (playlist == null) naming = true else onOpen(playlist) })
                     ) {
                         if (playlist == null) {
+                            val palette = HiFi.palette
                             Box(
                                 Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(Color.White.copy(alpha = 0.06f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp)),
+                                    .background(palette.cardFill)
+                                    .border(1.dp, palette.glassBorder, RoundedCornerShape(16.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(40.dp))
+                                Icon(Icons.Rounded.Add, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.85f), modifier = Modifier.size(40.dp))
                             }
                             Spacer(Modifier.height(9.dp))
                             Text(stringResource(R.string.playlist_new), style = HiFiType.CardTitle, maxLines = 1)
@@ -693,7 +698,7 @@ private fun PlaylistsPage(
 private fun PageHeader(title: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = HiFi.palette.textPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(14.dp))
         Text(title, style = HiFiType.LargeTitle.copy(fontSize = 28.sp, lineHeight = 34.sp))
@@ -741,7 +746,7 @@ private fun AlbumsPage(
     onOpen: (AlbumDto) -> Unit
 ) {
     val context = LocalContext.current
-    LazyColumn(modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)), contentPadding = contentPadding) {
+    LazyColumn(modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)), contentPadding = contentPadding) {
         item(key = "header") { PageHeader(stringResource(R.string.library_albums_row), onBack) }
         if (albums.isEmpty()) {
             item(key = "empty") {
@@ -753,7 +758,8 @@ private fun AlbumsPage(
                 row.forEach { album ->
                     Column(Modifier.weight(1f).hifiPress({ onOpen(album) })) {
                         val shape = RoundedCornerShape(16.dp)
-                        Box(Modifier.fillMaxWidth().aspectRatio(1f).hifiSoftShadow(shape, 18.dp).clip(shape).background(HiFi.Placeholder)) {
+                        val palette = HiFi.palette
+                        Box(Modifier.fillMaxWidth().aspectRatio(1f).hifiSoftShadow(shape, 18.dp).clip(shape).background(palette.placeholder)) {
                             if (album.coverUri != null) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(context).cover(album.coverUri, CoverSize.Medium).build(),
@@ -762,7 +768,7 @@ private fun AlbumsPage(
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
-                                Icon(Icons.Rounded.Album, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.Center).size(40.dp))
+                                Icon(Icons.Rounded.Album, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.align(Alignment.Center).size(40.dp))
                             }
                             if (album.idString?.let(OfflineCollection::albumKey) in keptKeys) KeptBadge(Modifier.align(Alignment.BottomEnd))
                         }

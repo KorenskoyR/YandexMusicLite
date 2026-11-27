@@ -2,8 +2,10 @@ package com.korenskoy.yandexmusic.presentation.local
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.mutableIntStateOf
 import android.app.Activity
@@ -208,10 +210,18 @@ fun LocalFolderCard(library: LocalMusicRepository.Library, isNew: Boolean, onCli
             )
             if (isNew) {
                 Spacer(Modifier.width(6.dp))
+                val badgePalette = HiFi.palette
                 Text(
                     stringResource(R.string.local_card_new),
-                    color = Color(0xFF9CC3FF), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1,
-                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(HiFi.Accent.copy(alpha = 0.22f)).padding(horizontal = 6.dp, vertical = 1.dp)
+                    color = badgePalette.textPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgePalette.pillFill)
+                        .border(1.dp, badgePalette.glassBorder, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
                 )
             }
         }
@@ -292,7 +302,7 @@ fun LocalMusicPage(
     val showSource = sources.size > 1 && source == null
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)),
+        modifier = modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = contentBottom)
     ) {
         item(key = "header") {
@@ -411,8 +421,9 @@ private fun LocalTrackRow(track: LocalTrack, ui: LocalMusicUi, playing: Boolean,
             .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(50.dp).clip(RoundedCornerShape(10.dp)).background(HiFi.Placeholder), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(22.dp))
+        val palette = HiFi.palette
+        Box(Modifier.size(50.dp).clip(RoundedCornerShape(10.dp)).background(palette.placeholder), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = palette.textTertiary.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
             AsyncImage(
                 model = ImageRequest.Builder(context).cover(track.art, CoverSize.Small).build(),
                 contentDescription = null,
@@ -440,7 +451,7 @@ private fun LocalTrackRow(track: LocalTrack, ui: LocalMusicUi, playing: Boolean,
         }
         if (track.durationMs > 0) {
             Spacer(Modifier.width(10.dp))
-            Text(durationText(track.durationMs), color = HiFi.TextTertiary, fontSize = 13.sp, maxLines = 1)
+            Text(durationText(track.durationMs), color = palette.textTertiary, fontSize = 13.sp, maxLines = 1)
         }
     }
 }
@@ -458,7 +469,7 @@ internal fun durationText(ms: Long): String {
 private fun PageHeader(title: String, subtitle: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         GlassCircleButton(onClick = onBack, contentDescription = stringResource(R.string.cd_nazad)) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = HiFi.palette.textPrimary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
@@ -482,7 +493,7 @@ private fun GroupHeader(title: String, count: Int, source: LocalSource?, onBack:
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(18.dp))
+        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = HiFi.palette.textPrimary.copy(alpha = 0.75f), modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = HiFiType.CardTitle.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -516,6 +527,7 @@ private fun SortHeader(sort: LocalSort, onSort: (LocalSort) -> Unit) {
     HiFiSectionHeader(stringResource(R.string.local_view_tracks), Modifier.padding(start = 12.dp, end = 4.dp, top = 16.dp, bottom = 2.dp)) {
         val description = stringResource(R.string.local_sort_cd, current)
         Box {
+            val palette = HiFi.palette
             Row(
                 Modifier
                     .heightIn(min = 44.dp)
@@ -525,8 +537,8 @@ private fun SortHeader(sort: LocalSort, onSort: (LocalSort) -> Unit) {
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(current, color = Color.White.copy(alpha = 0.86f), fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                Text(current, color = palette.textPrimary.copy(alpha = 0.86f), fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
             }
             val appDensity = LocalDensity.current
             DropdownMenu(
@@ -537,7 +549,7 @@ private fun SortHeader(sort: LocalSort, onSort: (LocalSort) -> Unit) {
                 border = BorderStroke(1.dp, HiFiDialogDefaults.Rim)
             ) {
                 AppScale(appDensity) {
-                    val colors = MenuDefaults.itemColors(textColor = Color.White)
+                    val colors = MenuDefaults.itemColors(textColor = palette.textPrimary)
                     LocalSort.entries.forEach { option ->
                         DropdownMenuItem(
                             text = { Text(sortLabel(option), fontWeight = if (option == sort) FontWeight.Bold else FontWeight.Normal) },
@@ -568,21 +580,22 @@ private fun GroupRow(icon: androidx.compose.ui.graphics.vector.ImageVector, titl
             Text(title, style = HiFiType.RowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOfNotNull(tracksText(count), source?.let { localWhere(it) }).joinToString(" · "), style = HiFiType.Caption, maxLines = 1)
         }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = HiFi.palette.textTertiary, modifier = Modifier.size(20.dp))
     }
 }
 
 /** Before the first look: why the access, Android's one question, and the way for head units that hide the drive. */
 @Composable
 private fun AccessCard(deniedForever: Boolean, onAllow: () -> Unit, onAddFolder: () -> Unit) {
+    val palette = HiFi.palette
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .padding(top = 18.dp)
                 .clip(RoundedCornerShape(26.dp))
-                .background(Color.White.copy(alpha = 0.05f))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp))
+                .background(palette.cardFill)
+                .border(1.dp, palette.cardBorder, RoundedCornerShape(26.dp))
                 .padding(horizontal = 22.dp, vertical = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -590,18 +603,18 @@ private fun AccessCard(deniedForever: Boolean, onAllow: () -> Unit, onAddFolder:
                 Modifier
                     .size(76.dp)
                     .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Color(0xFF3A4152), Color(0xFF15171F))))
-                    .border(1.dp, Color(0x5CC9CED8), CircleShape),
+                    .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark)))
+                    .border(1.dp, palette.steelEdge.copy(alpha = 0.45f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = Color(0xFFF4F6FA), modifier = Modifier.size(34.dp))
+                Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = palette.onMetal, modifier = Modifier.size(34.dp))
             }
             Spacer(Modifier.height(18.dp))
             Text(stringResource(R.string.local_access_title), style = HiFiType.CardTitle.copy(fontSize = 21.sp, lineHeight = 27.sp), textAlign = TextAlign.Center)
             Spacer(Modifier.height(10.dp))
             Text(
                 stringResource(if (deniedForever) R.string.local_access_denied else R.string.local_access_message),
-                color = Color.White.copy(alpha = 0.72f), fontSize = 15.sp, lineHeight = 22.sp, textAlign = TextAlign.Center,
+                color = palette.textSecondary, fontSize = 15.sp, lineHeight = 22.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 360.dp)
             )
             Spacer(Modifier.height(22.dp))
@@ -610,10 +623,10 @@ private fun AccessCard(deniedForever: Boolean, onAllow: () -> Unit, onAddFolder:
                 onAllow, Modifier.fillMaxWidth().widthIn(max = 360.dp), height = 50.dp
             )
             Spacer(Modifier.height(14.dp))
-            Text(stringResource(R.string.local_access_note), color = Color.White.copy(alpha = 0.50f), fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 360.dp))
+            Text(stringResource(R.string.local_access_note), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 360.dp))
         }
         Spacer(Modifier.height(18.dp))
-        Text(stringResource(R.string.local_add_folder_hint), color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(horizontal = 4.dp))
+        Text(stringResource(R.string.local_add_folder_hint), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(horizontal = 4.dp))
         Spacer(Modifier.height(12.dp))
         GlassPillButton(stringResource(R.string.local_add_folder), onAddFolder, Modifier.fillMaxWidth(), icon = Icons.Rounded.CreateNewFolder, height = 48.dp)
     }
@@ -622,32 +635,34 @@ private fun AccessCard(deniedForever: Boolean, onAllow: () -> Unit, onAddFolder:
 /** The music of the added folders shows, the rest of the device waits for the access. */
 @Composable
 private fun AccessBanner(onAllow: () -> Unit) {
+    val palette = HiFi.palette
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
-            .hifiGlass(RoundedCornerShape(18.dp), fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.12f))
+            .hifiGlass(RoundedCornerShape(18.dp), fill = palette.cardFill, border = palette.glassBorder)
             .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(stringResource(R.string.local_access_banner), style = HiFiType.Caption, modifier = Modifier.weight(1f))
-        HiFiTextAction(stringResource(R.string.local_access_banner_button), onAllow, color = Color.White)
+        HiFiTextAction(stringResource(R.string.local_access_banner_button), onAllow, color = palette.textPrimary)
     }
 }
 
 /** The folders added by hand, each can be taken off the list; "Добавить папку" for one more. */
 @Composable
 private fun AddedFolders(library: LocalMusicRepository.Library, onRemove: (String) -> Unit, onAdd: () -> Unit) {
+    val palette = HiFi.palette
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 22.dp)) {
         if (library.folders.isNotEmpty()) {
             HiFiSectionHeader(stringResource(R.string.local_folders_added), Modifier.padding(bottom = 6.dp))
             library.folders.forEach { folder ->
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Folder, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
+                    Icon(Icons.Rounded.Folder, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(12.dp))
                     Text(folder.name, style = HiFiType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     GlassCircleButton(onClick = { onRemove(folder.uri) }, contentDescription = stringResource(R.string.local_folder_remove_cd, folder.name), size = 36.dp) {
-                        Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -655,7 +670,7 @@ private fun AddedFolders(library: LocalMusicRepository.Library, onRemove: (Strin
         }
         GlassPillButton(stringResource(R.string.local_add_folder), onAdd, Modifier.fillMaxWidth(), icon = Icons.Rounded.CreateNewFolder, height = 48.dp)
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.local_add_folder_hint), color = Color.White.copy(alpha = 0.50f), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(horizontal = 4.dp))
+        Text(stringResource(R.string.local_add_folder_hint), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(horizontal = 4.dp))
     }
 }
 

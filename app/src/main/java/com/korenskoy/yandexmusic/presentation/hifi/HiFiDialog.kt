@@ -44,19 +44,29 @@ object HiFiDialogDefaults {
     val Shape = RoundedCornerShape(28.dp)
     val Rim = Color.White.copy(alpha = 0.10f)
 
-    /** Text fields inside dialogs: recessed dark well, white text, a steel (not blue) focus rim. */
+    /** Text fields inside dialogs: recessed well matching current theme, steel focus rim. */
     @Composable
-    fun textFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
-        focusedContainerColor = Color.Black.copy(alpha = 0.30f),
-        unfocusedContainerColor = Color.Black.copy(alpha = 0.30f),
-        focusedBorderColor = Color.White.copy(alpha = 0.45f),
-        unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-        cursorColor = HiFi.Accent,
-        focusedPlaceholderColor = HiFi.TextTertiary,
-        unfocusedPlaceholderColor = HiFi.TextTertiary
-    )
+    fun textFieldColors(): TextFieldColors {
+        val p = HiFi.palette
+        val fieldBg = if (p.isDark) Color.Black.copy(alpha = 0.30f) else Color(0xFF11141C).copy(alpha = 0.05f)
+        return OutlinedTextFieldDefaults.colors(
+            focusedTextColor = p.textPrimary,
+            unfocusedTextColor = p.textPrimary,
+            focusedContainerColor = fieldBg,
+            unfocusedContainerColor = fieldBg,
+            focusedBorderColor = p.textPrimary.copy(alpha = 0.45f),
+            unfocusedBorderColor = p.glassBorder,
+            cursorColor = p.textPrimary,
+            focusedPlaceholderColor = p.textTertiary,
+            unfocusedPlaceholderColor = p.textTertiary
+        )
+    }
+
+    @Composable
+    fun containerColor(): Color = HiFi.palette.dialogContainer
+
+    @Composable
+    fun rimColor(): Color = HiFi.palette.hairline
 }
 
 enum class HiFiDialogActionKind { Primary, Danger, Quiet }
@@ -75,6 +85,7 @@ fun AppDialog(
 ) {
     val appDensity = LocalDensity.current
     Dialog(onDismissRequest = onDismissRequest, properties = properties) {
+        SyncDialogWindowSystemBars()
         CompositionLocalProvider(LocalDensity provides appDensity, content = content)
     }
 }
@@ -97,6 +108,7 @@ fun HiFiAlertDialog(
     dismiss: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
 ) {
+    val palette = HiFi.palette
     AppDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
@@ -107,15 +119,15 @@ fun HiFiAlertDialog(
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .widthIn(min = 240.dp, max = 560.dp)
                 .clip(HiFiDialogDefaults.Shape)
-                .background(HiFiDialogDefaults.Container)
-                .border(1.dp, HiFiDialogDefaults.Rim, HiFiDialogDefaults.Shape)
+                .background(palette.dialogContainer)
+                .border(1.dp, palette.hairline, HiFiDialogDefaults.Shape)
                 .padding(22.dp)
         ) {
-            Text(title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+            Text(title, color = palette.textPrimary, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
             if (content != null) {
                 Spacer(Modifier.height(16.dp))
                 Box(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                    CompositionLocalProvider(LocalContentColor provides HiFi.TextSecondary) { content() }
+                    CompositionLocalProvider(LocalContentColor provides palette.textSecondary) { content() }
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -139,6 +151,7 @@ fun HiFiDialogAction(
     kind: HiFiDialogActionKind = HiFiDialogActionKind.Primary,
     enabled: Boolean = true
 ) {
+    val palette = HiFi.palette
     when (kind) {
         HiFiDialogActionKind.Primary ->
             MetalPillButton(text, onClick, Modifier.widthIn(min = 112.dp), height = 44.dp, enabled = enabled)
@@ -147,12 +160,12 @@ fun HiFiDialogAction(
                 .height(44.dp)
                 .widthIn(min = 112.dp)
                 .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
-                .hifiGlass(CircleShape, fill = HiFi.Danger.copy(alpha = 0.14f), border = HiFi.Danger.copy(alpha = 0.40f))
+                .hifiGlass(CircleShape, fill = palette.danger.copy(alpha = 0.14f), border = palette.danger.copy(alpha = 0.40f))
                 .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
                 .padding(horizontal = 20.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(text, color = HiFi.Danger, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(text, color = palette.danger, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
         HiFiDialogActionKind.Quiet -> HiFiTextAction(text, onClick)
     }

@@ -70,6 +70,7 @@ fun HiFiKnob(
         label = "knob_press"
     )
     val view = LocalView.current
+    val palette = HiFi.palette
     val grooves = size >= 56.dp
     Box(
         modifier = modifier
@@ -87,22 +88,24 @@ fun HiFiKnob(
                 if (r <= rimWidth + 1f) return@drawWithCache onDrawBehind { }
                 val faceR = r - rimWidth
                 val shadow = Brush.radialGradient(
-                    colors = listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent),
+                    colors = listOf(Color.Black.copy(alpha = if (palette.isDark) 0.6f else 0.22f), Color.Transparent),
                     center = c + Offset(0f, r * 0.22f),
                     radius = r * 1.32f
                 )
-                val rim = Brush.sweepGradient(HiFi.MetalSweep, center = c)
+                val rim = Brush.sweepGradient(palette.metalSweep, center = c)
                 val face = Brush.radialGradient(
-                    colors = HiFi.KnobFace,
+                    colors = palette.knobFace,
                     center = c - Offset(0f, faceR * 0.44f),
                     radius = faceR * 1.4f
                 )
                 val bottomShade = Brush.verticalGradient(
-                    0f to Color.Transparent, 0.6f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.45f),
+                    0f to Color.Transparent, 0.6f to Color.Transparent, 1f to Color.Black.copy(alpha = if (palette.isDark) 0.45f else 0.10f),
                     startY = c.y - faceR, endY = c.y + faceR
                 )
                 val grooveStep = 3.dp.toPx()
                 val grooveStroke = Stroke(width = 1f)
+                val grooveCol = if (palette.isDark) Color.White.copy(alpha = 0.03f) else Color(0xFF11141C).copy(alpha = 0.03f)
+                val arcCol = if (palette.isDark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.90f)
                 onDrawBehind {
                     drawCircle(shadow, radius = r * 1.32f, center = c + Offset(0f, r * 0.22f))
                     drawCircle(rim, radius = r, center = c)
@@ -110,13 +113,13 @@ fun HiFiKnob(
                     if (grooves) {
                         var gr = faceR * 0.2f
                         while (gr < faceR) {
-                            drawCircle(Color.White.copy(alpha = 0.03f), radius = gr, center = c, style = grooveStroke)
+                            drawCircle(grooveCol, radius = gr, center = c, style = grooveStroke)
                             gr += grooveStep
                         }
                     }
                     drawCircle(bottomShade, radius = faceR, center = c)
                     drawArc(
-                        color = Color.White.copy(alpha = 0.16f),
+                        color = arcCol,
                         startAngle = 200f, sweepAngle = 140f, useCenter = false,
                         topLeft = c - Offset(faceR - 1f, faceR - 1f),
                         size = Size((faceR - 1f) * 2, (faceR - 1f) * 2),
@@ -137,7 +140,7 @@ fun HiFiKnob(
 
 /** Play ↔ Pause glyph that cross-fades (120 ms) instead of jumping; play is optically nudged right. */
 @Composable
-fun PlayPauseGlyph(isPlaying: Boolean, size: Dp, tint: Color = HiFi.OnMetal) {
+fun PlayPauseGlyph(isPlaying: Boolean, size: Dp, tint: Color = HiFi.palette.onMetal) {
     Crossfade(targetState = isPlaying, animationSpec = HiFiMotion.quick(), label = "play_pause") { playing ->
         Icon(
             imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -210,8 +213,8 @@ fun SpectrumRing(
     maxLength: Dp,
     modifier: Modifier = Modifier,
     barWidth: Dp = 3.dp,
-    playedColor: Color = Color.White.copy(alpha = 0.95f),
-    restColor: Color = Color.White.copy(alpha = 0.26f)
+    playedColor: Color = HiFi.palette.spectrumActive,
+    restColor: Color = HiFi.palette.spectrumInactive
 ) {
     val lite = LocalHiFiLite.current
     val animate = !lite && mode != RingMode.Paused

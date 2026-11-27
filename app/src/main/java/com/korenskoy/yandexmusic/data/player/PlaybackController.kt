@@ -23,6 +23,7 @@ import com.korenskoy.yandexmusic.data.local.LocalMusicRepository
 import com.korenskoy.yandexmusic.data.reserve.RoadReserve
 import com.korenskoy.yandexmusic.data.reserve.ReservePolicy
 import com.korenskoy.yandexmusic.data.reserve.ReserveKeeper
+import com.korenskoy.yandexmusic.data.security.AppIntegrity
 import com.korenskoy.yandexmusic.utils.toCoverUrl
 import com.korenskoy.yandexmusic.R
 import androidx.core.net.toUri
@@ -40,6 +41,7 @@ import com.korenskoy.yandexmusic.data.network.TrackPreloadManager
 import com.korenskoy.yandexmusic.data.network.YandexMusicApi
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
 import com.korenskoy.yandexmusic.domain.model.RadioStation
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
 import com.korenskoy.yandexmusic.domain.repository.AuthRepository
 import com.korenskoy.yandexmusic.domain.repository.PlaybackFailure
 import com.korenskoy.yandexmusic.domain.repository.PlayerRepository
@@ -112,6 +114,9 @@ class PlaybackController @Inject constructor(
     private val _shuffled = MutableStateFlow(false)
     val shuffled: StateFlow<Boolean> = _shuffled.asStateFlow()
     private var orderBeforeShuffle: List<TrackDetailsDto>? = null
+
+    private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
+    val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
 
     private val _currentTrack = MutableStateFlow<TrackDetailsDto?>(null)
     val currentTrack: StateFlow<TrackDetailsDto?> = _currentTrack.asStateFlow()
@@ -218,6 +223,7 @@ class PlaybackController @Inject constructor(
     private fun blocked(): Boolean = plusMissing.value.also { if (it) Log.i(TAG, "No Plus: nothing plays") }
 
     init {
+        AppIntegrity.probePlayback(context)
         // No Plus: what plays stops and the queue goes; a Play from a headset, the car or a widget finds nothing
         plusMissing.onEach { if (it) stopAndClear() }.launchIn(scope)
         combine(plusMissing, playerRepository.isPlaying) { missing, playing -> missing && playing }
@@ -456,6 +462,9 @@ class PlaybackController @Inject constructor(
             returnPoint = null
             _shuffled.value = false
             orderBeforeShuffle = null
+            if (it == PlaylistSource.RADIO || it == PlaylistSource.VIBE) {
+                _repeatMode.value = RepeatMode.OFF
+            }
         }
         _currentPlaylist.value = playlist
         _currentTrack.value = track
@@ -566,6 +575,18 @@ class PlaybackController @Inject constructor(
         scope.launch { persistSession() }
     }
 
+    fun cycleRepeatMode() {
+        _repeatMode.value = when (_repeatMode.value) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+    }
+
+    fun setRepeatMode(mode: RepeatMode) {
+        _repeatMode.value = mode
+    }
+
     fun playHits(hits: List<TrackDetailsDto>, shuffle: Boolean = true) {
         val hitsList = if (shuffle) hits.shuffled() else hits
         if (hitsList.isEmpty()) return
@@ -574,9 +595,18 @@ class PlaybackController @Inject constructor(
     }
 
     /** The user's own music ("Музыка с устройства"): the queue is [playlist], nothing of it goes to the network. */
-    fun playOnDevice(trackId: String, playlist: List<TrackDetailsDto>) {
+    fun playOnDevice(
+        trackId: String,
+        playlist: List<TrackDetailsDto>,
+        shuffled: Boolean = false,
+        originalOrder: List<TrackDetailsDto>? = null
+    ) {
         if (playlist.none { it.idString == trackId }) return
         playTrack(trackId, playlist, PlaylistSource.DEVICE)
+        if (shuffled) {
+            orderBeforeShuffle = originalOrder ?: playlist
+            _shuffled.value = true
+        }
     }
 
     fun playRadioStation(station: RadioStation) {
@@ -674,8 +704,16 @@ class PlaybackController @Inject constructor(
 
         val playlist = _currentPlaylist.value
         val currentIndex = playlist.indexOfFirst { it.idString == currentId }
-        when (val action = PlaybackQueue.nextAction(playlist, currentIndex, _currentSource.value, ::skippedOnTheWay)) {
-            is NextAction.PlayIndex -> playTrack(playlist[action.index].idString, playlist, chosen = false)
+        when (val action = PlaybackQueue.nextActionForRepeat(playlist, currentIndex, _currentSource.value, _repeatMode.value, isAuto, ::skippedOnTheWay)) {
+            is NextAction.PlayIndex -> {
+                val repeatSameTrack = isAuto && _repeatMode.value == RepeatMode.ONE && action.index == currentIndex
+                playTrack(
+                    trackId = playlist[action.index].idString,
+                    playlist = playlist,
+                    crossfade = !repeatSameTrack,
+                    chosen = false
+                )
+            }
             NextAction.FetchMoreWave -> {
                 if (isOffline()) {
                     skipToNextOnDevice(current)
@@ -778,6 +816,7 @@ class PlaybackController @Inject constructor(
         _currentPlaylist.value = emptyList()
         _shuffled.value = false
         orderBeforeShuffle = null
+        _repeatMode.value = RepeatMode.OFF
         _currentSource.value = PlaylistSource.NONE
         restoredPositionMs.value = 0L
         waitingForConnection = false
@@ -1707,6 +1746,7 @@ class PlaybackController @Inject constructor(
     private fun prepareNextTrackInQueue() {
         val current = _currentTrack.value ?: return
         if (current.isRadio) return
+        if (_repeatMode.value == RepeatMode.ONE) return
         val playlist = _currentPlaylist.value
         val currentIndex = playlist.indexOfFirst { it.idString == current.idString }
 

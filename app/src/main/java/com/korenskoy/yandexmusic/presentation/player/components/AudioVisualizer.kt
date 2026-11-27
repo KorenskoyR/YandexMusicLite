@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import kotlin.math.sin
 
 @Composable
@@ -34,6 +35,7 @@ fun AudioVisualizer(
     modifier: Modifier = Modifier,
     isCompact: Boolean = false
 ) {
+    val barColor = HiFi.palette.textPrimary
     val barCount = if (isCompact) 4 else 6
     val barWidth = if (isCompact) 3.dp else 4.dp
     val spacing = if (isCompact) 2.dp else 4.dp
@@ -78,7 +80,7 @@ fun AudioVisualizer(
                         }
                     }
                     .clip(RoundedCornerShape(50))
-                    .background(Color.White)
+                    .background(barColor)
             )
         }
     }

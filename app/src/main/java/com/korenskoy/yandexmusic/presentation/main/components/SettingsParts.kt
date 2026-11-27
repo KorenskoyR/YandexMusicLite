@@ -77,7 +77,7 @@ internal fun ConfirmDialog(title: String, text: String, confirm: String, onConfi
     HiFiAlertDialog(
         onDismissRequest = onDismiss,
         title = title,
-        content = { Text(text, color = HiFi.TextSecondary, fontSize = 15.sp) },
+        content = { Text(text, color = HiFi.palette.textSecondary, fontSize = 15.sp) },
         confirm = { HiFiDialogAction(confirm, onConfirm, HiFiDialogActionKind.Danger) },
         dismiss = { HiFiDialogAction(stringResource(R.string.settings_cancel), onDismiss, HiFiDialogActionKind.Quiet) }
     )
@@ -85,10 +85,11 @@ internal fun ConfirmDialog(title: String, text: String, confirm: String, onConfi
 
 @Composable
 internal fun ColumnScope.SettingsGroup(title: String?, content: @Composable ColumnScope.() -> Unit) {
+    val palette = HiFi.palette
     if (title != null) {
         Text(
             title.uppercase(),
-            style = HiFiType.SectionCaps.copy(fontSize = 12.sp),
+            style = HiFiType.SectionCaps.copy(color = palette.textTertiary, fontSize = 12.sp),
             modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp)
         )
     } else {
@@ -98,8 +99,15 @@ internal fun ColumnScope.SettingsGroup(title: String?, content: @Composable Colu
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.03f), Color.Transparent))),
+            .background(palette.cardFill)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        if (palette.isDark) Color.White.copy(alpha = 0.03f) else Color.White.copy(alpha = 0.25f),
+                        Color.Transparent
+                    )
+                )
+            ),
         content = content
     )
 }
@@ -115,6 +123,7 @@ internal fun SettingsRow(
     chevron: Boolean = true,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    val palette = HiFi.palette
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -126,15 +135,15 @@ internal fun SettingsRow(
         IconPlaque(icon, size = 32.dp, danger = danger)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = if (danger) HiFi.Danger else Color.White, fontSize = 16.sp, fontWeight = if (danger) FontWeight.SemiBold else FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(title, color = if (danger) palette.danger else palette.textPrimary, fontSize = 16.sp, fontWeight = if (danger) FontWeight.SemiBold else FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         if (value != null) {
             Spacer(Modifier.width(8.dp))
             // Never wider than this: a long name beside it keeps its words whole («Журнал воспроизведения»),
             // a short value leaves the name all the room it needs
             Text(
-                value, color = HiFi.TextTertiary, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 2, textAlign = TextAlign.End,
+                value, color = palette.textTertiary, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 2, textAlign = TextAlign.End,
                 modifier = Modifier.widthIn(max = 150.dp)
             )
         }
@@ -143,13 +152,14 @@ internal fun SettingsRow(
             trailing()
         }
         if (chevron) {
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
         }
     }
 }
 
 @Composable
 internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onSwitch: (() -> Unit)?, onClick: (() -> Unit)? = null) {
+    val palette = HiFi.palette
     Row(
         Modifier
             .fillMaxWidth()
@@ -161,23 +171,23 @@ internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onS
             Modifier
                 .size(60.dp)
                 .clip(CircleShape)
-                .background(Brush.verticalGradient(HiFi.MetalEdge))
+                .background(Brush.verticalGradient(palette.metalEdge))
                 .padding(2.dp)
                 .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(HiFi.SteelLight, HiFi.SteelDark))),
+                .background(Brush.linearGradient(listOf(palette.steelLight, palette.steelDark))),
             contentAlignment = Alignment.Center
         ) {
-            Text((name.firstOrNull() ?: 'Я').uppercaseChar().toString(), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text((name.firstOrNull() ?: 'Я').uppercaseChar().toString(), color = palette.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             if (!avatarUrl.isNullOrBlank()) {
                 AsyncImage(model = avatarUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
             }
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(name.ifEmpty { "—" }, color = Color.White, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(name.ifEmpty { "—" }, color = palette.textPrimary, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 stringResource(if (hasPlus) R.string.settings_account_plus else R.string.settings_account_no_plus),
-                color = HiFi.TextSecondary,
+                color = palette.textSecondary,
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -188,35 +198,36 @@ internal fun AccountCard(name: String, avatarUrl: String?, hasPlus: Boolean, onS
                 Modifier
                     .height(36.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.10f))
+                    .background(palette.pillFill)
                     .clickable(role = Role.Button, onClick = onSwitch)
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.settings_switch_account), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_switch_account), color = palette.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         } else if (onClick != null) {
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
         }
     }
 }
 
 @Composable
 internal fun CrossfadeRow(seconds: Int, onChange: (Int) -> Unit) {
+    val palette = HiFi.palette
     var value by remember(seconds) { mutableFloatStateOf(seconds.toFloat()) }
     Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(Icons.Rounded.SwapHoriz, size = 32.dp)
             Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.settings_crossfade), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.settings_crossfade), color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             val shown = value.roundToInt()
             Text(
                 if (shown == 0) stringResource(R.string.settings_crossfade_off) else stringResource(R.string.settings_crossfade_seconds, shown),
-                color = Color.White,
+                color = palette.textPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -229,7 +240,7 @@ internal fun CrossfadeRow(seconds: Int, onChange: (Int) -> Unit) {
             steps = 11
         )
         if (value.roundToInt() > 0) {
-            Text(stringResource(R.string.settings_crossfade_hint), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 17.sp)
+            Text(stringResource(R.string.settings_crossfade_hint), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 17.sp)
         }
     }
 }
@@ -237,6 +248,7 @@ internal fun CrossfadeRow(seconds: Int, onChange: (Int) -> Unit) {
 /** For a device that plays FLAC in silence: the app cannot hear that by itself, so the user chooses. */
 @Composable
 internal fun SoundQualityRow(compatible: Boolean, onChange: (Boolean) -> Unit) {
+    val palette = HiFi.palette
     SegmentedRow(Icons.Rounded.GraphicEq, stringResource(R.string.settings_sound_quality)) {
         HiFiSegmented(
             options = listOf(stringResource(R.string.settings_sound_max), stringResource(R.string.settings_sound_compatible)),
@@ -247,7 +259,7 @@ internal fun SoundQualityRow(compatible: Boolean, onChange: (Boolean) -> Unit) {
         Spacer(Modifier.height(10.dp))
         Text(
             stringResource(if (compatible) R.string.settings_sound_compatible_note else R.string.settings_sound_max_note),
-            color = HiFi.TextSecondary,
+            color = palette.textSecondary,
             fontSize = 13.sp,
             lineHeight = 18.sp
         )
@@ -256,11 +268,12 @@ internal fun SoundQualityRow(compatible: Boolean, onChange: (Boolean) -> Unit) {
 
 @Composable
 internal fun SegmentedRow(icon: ImageVector, title: String, control: @Composable () -> Unit) {
+    val palette = HiFi.palette
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(icon, size = 32.dp)
             Spacer(Modifier.width(12.dp))
-            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(title, color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         }
         Spacer(Modifier.height(12.dp))
         control()
@@ -270,6 +283,7 @@ internal fun SegmentedRow(icon: ImageVector, title: String, control: @Composable
 /** Where the road reserve lives: the phone's memory or, encrypted, the downloads' card or flash drive. */
 @Composable
 internal fun ReservePlaceRow(onDrive: Boolean, driveIsUsb: Boolean, driveThere: Boolean, onChange: (Boolean) -> Unit) {
+    val palette = HiFi.palette
     SegmentedRow(Icons.Rounded.SdCard, stringResource(R.string.settings_reserve_place)) {
         HiFiSegmented(
             options = listOf(
@@ -283,7 +297,7 @@ internal fun ReservePlaceRow(onDrive: Boolean, driveIsUsb: Boolean, driveThere: 
         Spacer(Modifier.height(10.dp))
         Text(
             stringResource(if (onDrive && !driveThere) R.string.settings_reserve_place_gone else R.string.settings_reserve_place_hint),
-            color = HiFi.TextSecondary,
+            color = palette.textSecondary,
             fontSize = 13.sp,
             lineHeight = 18.sp
         )
@@ -293,6 +307,7 @@ internal fun ReservePlaceRow(onDrive: Boolean, driveIsUsb: Boolean, driveThere: 
 /** The road reserve: its size, what that means in tracks and hours, how full it is. */
 @Composable
 internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes: Long, onClear: () -> Unit) {
+    val palette = HiFi.palette
     val sizes = SettingsRepository.ROAD_RESERVE_SIZES_MB
     val enabled = sizeMb > 0
     val labels = sizes.map { mb ->
@@ -303,7 +318,7 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
         }
     }
     SegmentedRow(Icons.Rounded.Route, stringResource(R.string.settings_reserve_size)) {
-        Text(stringResource(R.string.settings_reserve_hint), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+        Text(stringResource(R.string.settings_reserve_hint), color = palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
         Spacer(Modifier.height(12.dp))
         HiFiSegmented(
             options = labels,
@@ -322,7 +337,7 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
                     else -> R.string.settings_reserve_estimate_1024
                 }
             ),
-            color = Color.White.copy(alpha = 0.86f),
+            color = palette.textPrimary.copy(alpha = 0.86f),
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             lineHeight = 20.sp
@@ -331,11 +346,11 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
             val limitBytes = sizeMb * 1024L * 1024L
             val fraction = (usedBytes.toFloat() / limitBytes).coerceIn(0f, 1f)
             Spacer(Modifier.height(10.dp))
-            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.Black.copy(alpha = 0.45f))) {
-                Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(Brush.verticalGradient(listOf(HiFi.Paper, HiFi.SteelEdge))))
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(if (palette.isDark) Color.Black.copy(alpha = 0.45f) else palette.wellMid)) {
+                Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(Brush.verticalGradient(listOf(if (palette.isDark) palette.paper else palette.textPrimary, palette.steelEdge))))
             }
             Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.settings_reserve_used, formatSize(usedBytes), labels[sizes.indexOf(sizeMb).coerceAtLeast(0)]), color = HiFi.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(stringResource(R.string.settings_reserve_used, formatSize(usedBytes), labels[sizes.indexOf(sizeMb).coerceAtLeast(0)]), color = palette.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
     if (enabled) {
@@ -346,14 +361,14 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
             onClick = null,
             trailing = {
                 TextButton(onClick = onClear) {
-                    Text(stringResource(R.string.settings_clear), color = HiFi.Danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.settings_clear), color = palette.danger, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         )
     }
     Text(
         stringResource(R.string.settings_reserve_note),
-        color = HiFi.TextTertiary,
+        color = palette.textTertiary,
         fontSize = 13.sp,
         lineHeight = 18.sp,
         modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 12.dp)
@@ -363,6 +378,7 @@ internal fun RoadReserveRows(sizeMb: Int, onSizeChange: (Int) -> Unit, usedBytes
 /** UI scale for screens whose reported density is wrong (dense car head units); applied in MainActivity. */
 @Composable
 internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualScale: Float, onManualChange: (Float) -> Unit) {
+    val palette = HiFi.palette
     val resources = LocalResources.current
     val window = com.korenskoy.yandexmusic.utils.currentWindowSizePx()
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -377,9 +393,9 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconPlaque(Icons.Rounded.Fullscreen, size = 32.dp)
             Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.settings_ui_scale_title), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.settings_ui_scale_title), color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             val percent = ((if (auto) info.autoScale else manualScale.coerceAtMost(ceiling)) * 100).roundToInt()
-            Text("$percent%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("$percent%", color = palette.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
         HiFiSegmented(
@@ -392,7 +408,7 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
             val physical = if (info.physicalDpi > 0) info.physicalDpi.toString() else "—"
             Text(
                 stringResource(R.string.settings_ui_scale_auto_info, info.widthPx, info.heightPx, windowMode, info.reportedDpi, physical, (info.autoScale * 100).roundToInt()),
-                color = HiFi.TextTertiary,
+                color = palette.textTertiary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
@@ -401,13 +417,13 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
                 AutoScaleReason.IMPLAUSIBLE -> stringResource(R.string.settings_ui_scale_implausible, String.format(java.util.Locale.US, "%.1f", info.impliedDiagonalIn))
                 AutoScaleReason.LIMITED -> stringResource(R.string.settings_ui_scale_limited)
                 else -> null
-            }?.let { Text(it, color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
+            }?.let { Text(it, color = palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)) }
         } else {
             // No further than this screen holds every page (a short side of 290 dp at the least)
             var value by remember(manualScale, ceiling) { mutableFloatStateOf(manualScale.coerceAtMost(ceiling)) }
             Text(
                 stringResource(R.string.settings_ui_scale_manual_value, (value * 100).roundToInt(), (info.reportedDpi * value).roundToInt(), windowMode),
-                color = HiFi.TextTertiary,
+                color = palette.textTertiary,
                 fontSize = 13.sp
             )
             HiFiSlider(
@@ -417,12 +433,12 @@ internal fun UiScaleRow(auto: Boolean, onAutoChange: (Boolean) -> Unit, manualSc
             if (ceiling < SettingsRepository.MAX_UI_SCALE) {
                 Text(
                     stringResource(R.string.settings_ui_scale_ceiling, (ceiling * 100).roundToInt()),
-                    color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)
+                    color = palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
         // The car screen fits itself to the screen whatever the scale: said here, where the scale is looked for
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.settings_ui_scale_car_note), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 18.sp)
+        Text(stringResource(R.string.settings_ui_scale_car_note), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 18.sp)
     }
 }

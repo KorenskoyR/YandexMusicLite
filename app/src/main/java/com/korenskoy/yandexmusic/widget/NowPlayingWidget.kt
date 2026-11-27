@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
@@ -61,6 +62,7 @@ fun LineWidget(now: WidgetNow) {
     val (w, h) = LocalSize.current.safeOrDefault(250f, 64f)
     val fs = context.resources.configuration.fontScale
     val spec = lineSpec(w, h, fs, now.hasTrack, now.canReact)
+    val theme = WidgetTheme.of(now.isLightTheme)
     val clickAction = if (now.hasTrack) WidgetActions.openPlayer(context) else WidgetActions.startWave(context)
 
     Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -68,43 +70,43 @@ fun LineWidget(now: WidgetNow) {
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .height(spec.cardH.dp)
-                .widgetCardBackground(R.drawable.widget_bg_24, 24.dp)
+                .widgetCardBackground(theme.bg24, 24.dp)
                 .padding(horizontal = spec.padH.dp, vertical = spec.padV.dp)
                 .clickable(clickAction),
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = if (!now.hasTrack && !spec.showText) Alignment.CenterHorizontally else Alignment.Start
         ) {
             if (!now.hasTrack) {
-                LineEmptyContent(context, spec)
+                LineEmptyContent(context, spec, theme)
                 return@Row
             }
             if (spec.showCover) {
-                LineCover(now, spec.cover)
+                LineCover(now, spec.cover, theme)
                 Spacer(GlanceModifier.width(spec.coverGap.dp))
             }
             Column(modifier = GlanceModifier.defaultWeight()) {
-                WidgetText(now.title.orEmpty(), 15.sp, bold = true)
+                WidgetText(now.title.orEmpty(), 15.sp, theme.text, bold = true)
                 if (spec.showArtist) {
-                    WidgetText(now.artist.orEmpty(), 12.sp, WidgetColors.textSoft)
+                    WidgetText(now.artist.orEmpty(), 12.sp, theme.textSoft)
                 }
                 if (spec.showProgress && now.progress != null) {
                     Spacer(GlanceModifier.height(6.dp))
-                    WidgetProgressBar(now.progress, 3.dp)
+                    WidgetProgressBar(now.progress, 3.dp, isLight = theme.isLight)
                 }
             }
             Spacer(GlanceModifier.width(6.dp))
-            LineButtons(context, now, spec)
+            LineButtons(context, now, spec, theme)
         }
     }
 }
 
 @Composable
-private fun RowScope.LineEmptyContent(context: Context, spec: LineSpec) {
+private fun RowScope.LineEmptyContent(context: Context, spec: LineSpec, theme: WidgetTheme) {
     if (spec.showText) {
         Column(modifier = GlanceModifier.defaultWeight()) {
-            WidgetText(context.getString(R.string.widget_wave_title), 15.sp, bold = true)
+            WidgetText(context.getString(R.string.widget_wave_title), 15.sp, theme.text, bold = true)
             if (spec.showArtist) {
-                WidgetText(context.getString(R.string.widget_wave_hint), 12.sp, WidgetColors.textSoft)
+                WidgetText(context.getString(R.string.widget_wave_hint), 12.sp, theme.textSoft)
             }
         }
         Spacer(GlanceModifier.width(8.dp))
@@ -117,14 +119,15 @@ private fun RowScope.LineEmptyContent(context: Context, spec: LineSpec) {
         size = spec.knob.dp,
         iconSize = iconDp,
         fill = WidgetFill.KNOB,
-        tint = WidgetColors.onKnob
+        tint = theme.onKnob,
+        isLight = theme.isLight
     )
 }
 
 @Composable
-private fun LineCover(now: WidgetNow, coverDp: Float) {
+private fun LineCover(now: WidgetNow, coverDp: Float, theme: WidgetTheme) {
     val bmp = rememberWidgetBitmap(now.cover, coverDp, coverDp, 14f, cropToAspect = true)
-    val base = GlanceModifier.size(coverDp.dp).background(ImageProvider(R.drawable.widget_cover_chip_14))
+    val base = GlanceModifier.size(coverDp.dp).background(ImageProvider(theme.coverChip14))
     val boxMod = if (Build.VERSION.SDK_INT >= 31) base.cornerRadius(14.dp) else base
     Box(modifier = boxMod, contentAlignment = Alignment.Center) {
         if (bmp != null) {
@@ -134,13 +137,18 @@ private fun LineCover(now: WidgetNow, coverDp: Float) {
             Image(ImageProvider(bmp), contentDescription = now.title, modifier = imgMod, contentScale = scale)
         } else {
             val noteDp = (coverDp * 0.46f).roundToInt().coerceAtLeast(18).dp
-            Image(ImageProvider(R.drawable.ic_notification), contentDescription = null, modifier = GlanceModifier.size(noteDp))
+            Image(
+                ImageProvider(R.drawable.ic_notification),
+                contentDescription = null,
+                modifier = GlanceModifier.size(noteDp),
+                colorFilter = ColorFilter.tint(theme.text)
+            )
         }
     }
 }
 
 @Composable
-private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec) {
+private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec, theme: WidgetTheme) {
     val chipIcon = (spec.chip * 0.50f).roundToInt().dp
     val knobIcon = (spec.knob * 0.46f).roundToInt().dp
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -152,7 +160,8 @@ private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec) {
                 size = spec.chip.dp,
                 iconSize = chipIcon,
                 fill = null,
-                tint = if (now.isLiked) WidgetColors.love else Color.White
+                tint = if (now.isLiked) theme.love else theme.iconTint,
+                isLight = theme.isLight
             )
             Spacer(GlanceModifier.width(spec.gap.dp))
         }
@@ -163,7 +172,9 @@ private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec) {
                 action = WidgetActions.previous(context),
                 size = spec.chip.dp,
                 iconSize = chipIcon,
-                fill = WidgetFill.CHIP
+                fill = WidgetFill.CHIP,
+                tint = theme.iconTint,
+                isLight = theme.isLight
             )
             Spacer(GlanceModifier.width(spec.gap.dp))
         }
@@ -174,7 +185,8 @@ private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec) {
             size = spec.knob.dp,
             iconSize = knobIcon,
             fill = WidgetFill.KNOB,
-            tint = WidgetColors.onKnob
+            tint = theme.onKnob,
+            isLight = theme.isLight
         )
         if (spec.showNext) {
             Spacer(GlanceModifier.width(spec.gap.dp))
@@ -184,7 +196,9 @@ private fun LineButtons(context: Context, now: WidgetNow, spec: LineSpec) {
                 action = WidgetActions.next(context),
                 size = spec.chip.dp,
                 iconSize = chipIcon,
-                fill = WidgetFill.CHIP
+                fill = WidgetFill.CHIP,
+                tint = theme.iconTint,
+                isLight = theme.isLight
             )
         }
     }

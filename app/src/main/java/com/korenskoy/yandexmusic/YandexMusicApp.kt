@@ -12,6 +12,7 @@ import coil3.SingletonImageLoader
 import coil3.PlatformContext
 import coil3.ImageLoader
 import android.app.Application
+import com.korenskoy.yandexmusic.data.security.AppIntegrity
 import androidx.work.Configuration
 import com.korenskoy.yandexmusic.widget.NowPlayingWidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
@@ -67,6 +68,7 @@ class YandexMusicApp : Application(), Configuration.Provider, SingletonImageLoad
             StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().detectActivityLeaks().penaltyLog().build())
         }
         super.onCreate()
+        AppIntegrity.probeBoot(this)
         widgetUpdater.start()
         bluetoothAutoplay.start()
         deviceWake.start()

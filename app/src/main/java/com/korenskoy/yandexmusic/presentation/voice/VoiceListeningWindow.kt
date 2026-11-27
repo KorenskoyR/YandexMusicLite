@@ -12,14 +12,16 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -100,15 +102,16 @@ fun VoiceListeningWindow(state: Listening, onRetry: () -> Unit, onOpenSettings: 
                 .padding(if (wide) 24.dp else 0.dp),
             contentAlignment = if (wide) Alignment.Center else Alignment.BottomCenter
         ) {
+            val palette = HiFi.palette
             val shape = if (wide) RoundedCornerShape(32.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             Column(
                 Modifier
                     .then(if (wide) Modifier.widthIn(max = 700.dp) else Modifier)
                     .fillMaxWidth()
                     .clip(shape)
-                    .background(HiFi.SheetFill)
-                    .border(1.dp, HiFi.GlassBorder, shape)
-                    .then(if (wide) Modifier else Modifier.navigationBarsPadding())
+                    .background(palette.sheetFill)
+                    .border(1.dp, palette.glassBorder, shape)
+                    .then(if (wide) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom)))
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = sizes.gap + 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -122,9 +125,10 @@ fun VoiceListeningWindow(state: Listening, onRetry: () -> Unit, onOpenSettings: 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Content(state: Listening, sizes: Sizes, onRetry: () -> Unit, onOpenSettings: () -> Unit, onClose: () -> Unit) {
+    val palette = HiFi.palette
     Text(
         stringResource(R.string.voice_search).uppercase(),
-        color = HiFi.TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.6.sp
+        color = palette.textSecondary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.6.sp
     )
     Spacer(Modifier.height(sizes.gap))
     Microphone(state, sizes, onTap = if (state is Listening.Hearing) onClose else onRetry)
@@ -132,13 +136,13 @@ private fun Content(state: Listening, sizes: Sizes, onRetry: () -> Unit, onOpenS
     val (title, body) = words(state)
     Text(
         title,
-        color = Color.White, fontSize = sizes.title, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center,
+        color = palette.textPrimary, fontSize = sizes.title, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center,
         maxLines = 2, overflow = TextOverflow.Ellipsis,
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
     )
     if (body.isNotEmpty()) {
         Spacer(Modifier.height(6.dp))
-        Text(body, color = HiFi.TextSecondary, fontSize = sizes.body, lineHeight = sizes.bodyLine, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(body, color = palette.textSecondary, fontSize = sizes.body, lineHeight = sizes.bodyLine, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
     if (state !is Listening.Heard) {
         Spacer(Modifier.height(sizes.gap + 6.dp))
@@ -159,13 +163,14 @@ private fun Content(state: Listening, sizes: Sizes, onRetry: () -> Unit, onOpenS
     }
     if (sizes.footer) {
         Spacer(Modifier.height(sizes.gap))
-        Text(stringResource(R.string.voice_by_service), color = HiFi.TextTertiary, fontSize = 13.sp, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.voice_by_service), color = palette.textTertiary, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 
 /** The metal microphone; while it listens, a ring around it breathes with the voice. */
 @Composable
 private fun Microphone(state: Listening, sizes: Sizes, onTap: () -> Unit) {
+    val palette = HiFi.palette
     val level = (state as? Listening.Hearing)?.level ?: 0f
     val grow by animateFloatAsState(if (state is Listening.Hearing) 1f + 0.12f * level else 1f, tween(90), label = "voice_level")
     val noMic = state is Listening.NoMic
@@ -179,14 +184,14 @@ private fun Microphone(state: Listening, sizes: Sizes, onTap: () -> Unit) {
                         scaleY = grow
                         alpha = 0.45f + 0.55f * level
                     }
-                    .border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                    .border(2.dp, palette.textPrimary.copy(alpha = 0.6f), CircleShape)
             )
         }
         HiFiKnob(onClick = onTap, contentDescription = stringResource(R.string.voice_search), size = sizes.knob) {
             Icon(
                 if (noMic) Icons.Rounded.MicOff else Icons.Rounded.Mic,
                 contentDescription = null,
-                tint = if (noMic) HiFi.Warning else HiFi.OnMetal,
+                tint = if (noMic) palette.warning else palette.onMetal,
                 modifier = Modifier.size(sizes.knob * 0.4f).align(Alignment.Center)
             )
         }

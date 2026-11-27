@@ -1,5 +1,13 @@
 package com.korenskoy.yandexmusic.presentation.car
 
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import com.korenskoy.yandexmusic.data.player.PlaybackQueue
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
 import com.korenskoy.yandexmusic.presentation.hifi.toArtist
 import com.korenskoy.yandexmusic.presentation.hifi.toAlbum
 import com.korenskoy.yandexmusic.presentation.hifi.showsExplicit
@@ -236,8 +244,11 @@ fun CarScreen(
     initialStationsOpen: Boolean = false,
     /** The user's playlists for «В плейлист»; null — no such button (not signed in, a preview). */
     playlists: CarPlaylists? = null,
-    initialPlaylistsOpen: Boolean = false
+    initialPlaylistsOpen: Boolean = false,
+    repeatMode: RepeatMode = RepeatMode.OFF,
+    onCycleRepeat: () -> Unit = {}
 ) {
+    val palette = HiFi.palette
     var tuneOpen by rememberSaveable { mutableStateOf(initialTuneOpen) }
     var queueOpen by rememberSaveable { mutableStateOf(initialQueueOpen) }
     var downloadsOpen by rememberSaveable { mutableStateOf(initialDownloadsOpen && deviceMusic?.opensPanel == true) }
@@ -337,10 +348,46 @@ fun CarScreen(
 
     val latestPrev by androidx.compose.runtime.rememberUpdatedState(onPrevClick)
     val latestNext by androidx.compose.runtime.rememberUpdatedState(onNextClick)
+    var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var tunePanelCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    LaunchedEffect(tuneOpen) { if (!tuneOpen) tunePanelCoords = null }
+    val showRepeatAndShuffle = PlaybackQueue.supportsRepeatAndShuffle(source, isRadio)
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(HiFi.Ground)
+            .background(palette.ground)
+            .onGloballyPositioned { rootCoords = it }
+            .then(
+                if (!tuneOpen) Modifier
+                else Modifier.pointerInput(tuneOpen) {
+                    awaitPointerEventScope {
+                        var dismissingOutside = false
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val down = event.changes.firstOrNull { it.changedToDown() }
+                            if (down != null) {
+                                val root = rootCoords
+                                val panel = tunePanelCoords
+                                val outside = if (root != null && panel != null && panel.isAttached) {
+                                    val posInWindow = root.localToWindow(down.position)
+                                    !panel.boundsInWindow().contains(posInWindow)
+                                } else {
+                                    true
+                                }
+                                if (outside) {
+                                    dismissingOutside = true
+                                    down.consume()
+                                    tuneOpen = false
+                                }
+                            } else if (dismissingOutside) {
+                                event.changes.forEach { it.consume() }
+                                if (event.changes.none { it.pressed }) dismissingOutside = false
+                            }
+                        }
+                    }
+                }
+            )
             .pointerInput(Unit) {
                 // One track per swipe: the distance adds up over the whole gesture and counts once the finger
                 // lifts (a quick swipe arrives as several moves, each of which used to switch a track)
@@ -388,12 +435,13 @@ fun CarScreen(
         HiFiBackdrop(tint = tint, coverUrl = coverUrl, glowCenter = farFocus, bottomFade = !lyingShape)
         if (lyingShape) {
             // Darken the driver's side so text reads at a glance
+            val groundColor = palette.ground
             Box(
                 Modifier
                     .fillMaxSize()
                     .drawWithCache {
                         val shade = Brush.horizontalGradient(
-                            0f to HiFi.Ground.copy(alpha = 0.92f), 0.42f to HiFi.Ground.copy(alpha = 0.72f), 0.78f to Color.Transparent,
+                            0f to groundColor.copy(alpha = 0.92f), 0.42f to groundColor.copy(alpha = 0.72f), 0.78f to Color.Transparent,
                             startX = if (steeringWheelOnLeft) 0f else size.width,
                             endX = if (steeringWheelOnLeft) size.width else 0f
                         )
@@ -426,16 +474,17 @@ fun CarScreen(
         val tunePanel: @Composable (Modifier, Boolean) -> Unit = { panelModifier, segments ->
             Column(
                 panelModifier
+                    .onGloballyPositioned { tunePanelCoords = it }
                     .clip(RoundedCornerShape(u(30f)))
-                    .background(HiFi.SheetFill.copy(alpha = 0.97f))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(u(30f)))
+                    .background(palette.sheetFill.copy(alpha = 0.97f))
+                    .border(1.dp, palette.glassBorder, RoundedCornerShape(u(30f)))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
                     // Never cut: on a cramped screen the panel scrolls inside its place
                     .verticalScroll(rememberScrollState())
                     .padding(start = u(24f), end = u(18f), top = u(16f), bottom = u(22f))
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.wave_tune_title), color = Color.White, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.wave_tune_title), color = palette.textPrimary, fontSize = u.sp(28f), fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
                     Box(
                         Modifier
                             .size(u(56f))
@@ -443,7 +492,7 @@ fun CarScreen(
                             .clickable(role = Role.Button) { tuneOpen = false },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = Color.White, modifier = Modifier.size(u(24f)))
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_zakryt), tint = palette.textPrimary, modifier = Modifier.size(u(24f)))
                     }
                 }
                 WaveTuneChoices(waveTuning, onWaveTuningChange, segments = segments, optionHeight = u(56f), fontSize = u.sp(15f), captionSize = u.sp(14f), gap = u(12f))
@@ -477,7 +526,7 @@ fun CarScreen(
             val pillFont = u.sp(18f)
             // Standing on a phone three pills and more go without icons: each says its whole name
             val pills = (if (trackWaveSeed != null && onWave) 2 else listOf(currentTrack?.let { !it.isRadio && !it.isLocal } == true, onWave).count { it }) +
-                listOf(active == CarSource.LIKED, lyrics?.offered == true).count { it }
+                listOf(lyrics?.offered == true).count { it }
             val icons = lyingShape || pills < 3 || maxWidth.value / u.factor >= WIDE_STANDING_ROW
             if (trackWaveSeed != null && onWave) {
                 WavePill(Icons.Rounded.Waves, stringResource(R.string.wave_back_to_mine), modifier = pill, showIcon = icons, active = false, height = pillHeight, fontSize = pillFont, onClick = onBackToMyWave)
@@ -492,13 +541,6 @@ fun CarScreen(
                     WavePill(Icons.Rounded.Tune, summary ?: stringResource(R.string.wave_tune_short), modifier = pill, showIcon = icons, active = summary != null, height = pillHeight, fontSize = pillFont,
                         onClick = openTune, description = summary?.let { stringResource(R.string.wave_tune_cd, it) } ?: stringResource(R.string.wave_tune_title))
                 }
-            }
-            // "Любимое": its own order or shuffled; the current track plays on either way
-            if (active == CarSource.LIKED) {
-                WavePill(
-                    Icons.Rounded.Shuffle, stringResource(if (shuffled) R.string.car_shuffled else R.string.car_shuffle), modifier = pill, showIcon = icons, active = shuffled,
-                    height = pillHeight, fontSize = pillFont, onClick = onToggleShuffle
-                )
             }
             if (lyrics?.offered == true) {
                 WavePill(
@@ -521,6 +563,9 @@ fun CarScreen(
             onCoverClick = { if (isRadio && radio != null) openStations() else if (!isRadio) openQueue() },
             coverDescription = stringResource(if (isRadio) R.string.car_stations else R.string.cd_ochered),
             onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen,
+            repeatMode = repeatMode, onCycleRepeat = onCycleRepeat,
+            shuffled = shuffled, onToggleShuffle = onToggleShuffle,
+            showRepeatAndShuffle = showRepeatAndShuffle,
             panelOpen = queueOpen || downloadsOpen || stationsOpen || playlistsOpen
         ) else Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             // Standing there is no room for the caption beside both buttons, the badge and the clock: it goes
@@ -571,7 +616,10 @@ fun CarScreen(
                             sources = sources, active = active, onSeek = onSeek,
                             modifier = Modifier.width(big(CarWide.DRIVER_WIDTH)).fillMaxHeight(),
                             showDock = false,
-                            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen, controlsGrow = controlsGrow
+                            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen, controlsGrow = controlsGrow,
+                            repeatMode = repeatMode, onCycleRepeat = onCycleRepeat,
+                            shuffled = shuffled, onToggleShuffle = onToggleShuffle,
+                            showRepeatAndShuffle = showRepeatAndShuffle
                         )
                     }
                     val middle: @Composable () -> Unit = {
@@ -612,7 +660,10 @@ fun CarScreen(
                             // As wide as the grown controls want; the cover's column gives way, down to its least
                             // An open panel (over the cover's column) gets its room back: the column as designed meanwhile
                             modifier = Modifier.width(u(if (panelOpen) DRIVER_COLUMN else carDriverWidth(roomWidth, controlsGrow))).fillMaxHeight(),
-                            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen, controlsGrow = controlsGrow
+                            onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen, controlsGrow = controlsGrow,
+                            repeatMode = repeatMode, onCycleRepeat = onCycleRepeat,
+                            shuffled = shuffled, onToggleShuffle = onToggleShuffle,
+                            showRepeatAndShuffle = showRepeatAndShuffle
                         )
                     }
                     // The cover alone, and under it the covers of what comes next: nothing lies on the cover
@@ -750,6 +801,9 @@ fun CarScreen(
                         showUpper = !overlay,
                         compactDock = true,
                         onAddToPlaylist = togglePlaylists.takeIf { canAdd }, playlistsOpen = playlistsOpen, controlsGrow = controlsGrow,
+                        repeatMode = repeatMode, onCycleRepeat = onCycleRepeat,
+                        shuffled = shuffled, onToggleShuffle = onToggleShuffle,
+                        showRepeatAndShuffle = showRepeatAndShuffle,
                         beforeDock = when {
                             isRadio && radio != null && !stationsOpen -> { { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { StationsPill(u, radio.favourites.size, onClick = openStations) } } }
                             isRadio || tuneOpen || downloadsOpen || playlistsOpen -> null
@@ -972,6 +1026,7 @@ private fun CarHeader(
     /** The controls' growth: the round buttons here grow with them, up to [HEADER_MAX_GROW]. */
     grow: Float = 1f
 ) {
+    val palette = HiFi.palette
     val u = u0
     val big = Scale(u0.factor * grow.coerceIn(1f, HEADER_MAX_GROW))
     Row(
@@ -987,7 +1042,7 @@ private fun CarHeader(
                 .clickable(role = Role.Button, onClick = onExit),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = Color.White, modifier = Modifier.size(big(26f)))
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = palette.textPrimary, modifier = Modifier.size(big(26f)))
         }
         // The same settings button as on "Моя музыка", as big as "back" so it is hit without aiming
         if (onOpenSettings != null) {
@@ -997,7 +1052,7 @@ private fun CarHeader(
                 contentDescription = stringResource(R.string.library_settings),
                 size = big(56f)
             ) {
-                Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(big(26f)))
+                Icon(Icons.Rounded.Settings, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(big(26f)))
             }
         }
         // The microphone beside it, the same well: one tap, then say what to play
@@ -1008,12 +1063,12 @@ private fun CarHeader(
                 contentDescription = stringResource(R.string.voice_search),
                 size = big(56f)
             ) {
-                Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(big(26f)))
+                Icon(Icons.Rounded.Mic, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(big(26f)))
             }
         }
         Spacer(Modifier.width(u(16f)))
         if (showCaption) {
-            Text(stringResource(R.string.car_label), color = Color.White.copy(alpha = 0.66f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
+            Text(stringResource(R.string.car_label), color = palette.textSecondary, fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em)
             Spacer(Modifier.width(u(14f)))
         }
         HiFiLinkBadge(height = u(32f), fontSize = u.sp(14f))
@@ -1049,8 +1104,9 @@ private fun CarClock(u: Scale) {
         }
     }
     Column(horizontalAlignment = Alignment.End) {
-        Text(time, color = Color.White, fontSize = u.sp(40f), lineHeight = u.sp(42f), fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em, style = Tabular)
-        Text(date, color = Color.White.copy(alpha = 0.60f), fontSize = u.sp(12f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em, maxLines = 1)
+        val palette = HiFi.palette
+        Text(time, color = palette.textPrimary, fontSize = u.sp(40f), lineHeight = u.sp(42f), fontWeight = FontWeight.Bold, letterSpacing = (-0.02).em, style = Tabular)
+        Text(date, color = palette.textTertiary, fontSize = u.sp(12f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em, maxLines = 1)
     }
 }
 
@@ -1088,8 +1144,14 @@ private fun DriverPanel(
     /** How much bigger than the design the controls may grow where the height allows (see [carControlsGrow]). */
     controlsGrow: Float = 1f,
     /** The title, the controls and the timeline; false while a panel takes their room on a short window. */
-    showUpper: Boolean = true
+    showUpper: Boolean = true,
+    repeatMode: RepeatMode = RepeatMode.OFF,
+    onCycleRepeat: () -> Unit = {},
+    shuffled: Boolean = false,
+    onToggleShuffle: () -> Unit = {},
+    showRepeatAndShuffle: Boolean = false
 ) {
+    val palette = HiFi.palette
     Column(modifier) {
         // The sources are laid out first and keep their size; the title, the gauge and the timeline take what they
         // leave. A head unit with a status bar of its own above the app squeezed the sources before
@@ -1099,7 +1161,7 @@ private fun DriverPanel(
             Column(Modifier.fillMaxWidth()) {
                 if (sourceLabel.isNotEmpty()) {
                     // One line always: a long track name in "Волна по треку «…»" must not push the title down
-                    Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em,
+                    Text(sourceLabel.uppercase(), color = palette.textSecondary, fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold, letterSpacing = 0.12.em,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1117,6 +1179,7 @@ private fun DriverPanel(
                             title = shown?.title ?: stringResource(R.string.car_source_wave),
                             fontSize = u.sp(if (compactDock) 38f else 46f),
                             explicit = shown?.showsExplicit == true,
+                            color = palette.textPrimary,
                             // As in the player: the title leads to the album, the artist to the artist's page
                             modifier = Modifier.padding(top = u(6f)).then(if (shown != null) Modifier.toAlbum(shown) else Modifier)
                         )
@@ -1124,7 +1187,7 @@ private fun DriverPanel(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 if (shown?.isRadio == true) stringResource(R.string.mini_player_live) else shown?.artists?.joinToString { it.name ?: "" }.orEmpty(),
-                                color = Color.White.copy(alpha = 0.72f),
+                                color = palette.textSecondary,
                                 fontSize = u.sp(26f),
                                 lineHeight = u.sp(32f),
                                 maxLines = 1,
@@ -1135,9 +1198,18 @@ private fun DriverPanel(
                         }
                     }
                 }
-                if (onAddToPlaylist != null) {
-                    Spacer(Modifier.width(u(16f)))
-                    AddToPlaylistButton(u(if (compactDock) 64f else 72f), open = playlistsOpen, onClick = onAddToPlaylist)
+                if (onAddToPlaylist != null || showRepeatAndShuffle) {
+                    Spacer(Modifier.width(u(14f)))
+                    val btnSize = u(if (compactDock) 58f else 66f)
+                    Row(horizontalArrangement = Arrangement.spacedBy(u(10f)), verticalAlignment = Alignment.CenterVertically) {
+                        if (onAddToPlaylist != null) {
+                            AddToPlaylistButton(btnSize, open = playlistsOpen, onClick = onAddToPlaylist)
+                        }
+                        if (showRepeatAndShuffle) {
+                            CarRepeatButton(btnSize, repeatMode = repeatMode, onClick = onCycleRepeat)
+                            CarShuffleButton(btnSize, shuffled = shuffled, onClick = onToggleShuffle)
+                        }
+                    }
                 }
                 }
             }
@@ -1207,10 +1279,11 @@ private fun GaugeCluster(
         val twoRows = canReact && twoRowsGrow >= oneRow * GAUGE_TWO_ROWS_GAIN
         val g = (if (twoRows) twoRowsGrow else oneRow).coerceAtLeast(GAUGE_LEAST)
         val k = Scale(u.factor * g)
+        val palette = HiFi.palette
         val dislike: @Composable () -> Unit = {
             if (canReact) {
                 GlassRound(k(sideSize), stringResource(R.string.cd_ne_nravitsya), onDislike) {
-                    Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = Color.White.copy(alpha = 0.88f), modifier = Modifier.size(k(sideIcon)))
+                    Icon(Icons.Rounded.HeartBroken, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.88f), modifier = Modifier.size(k(sideIcon)))
                 }
             } else {
                 Spacer(Modifier.size(k(sideSize)))
@@ -1222,7 +1295,7 @@ private fun GaugeCluster(
                     Icon(
                         if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                         contentDescription = null,
-                        tint = if (isLiked) HiFi.Love else Color.White.copy(alpha = 0.88f),
+                        tint = if (isLiked) palette.love else palette.textPrimary.copy(alpha = 0.88f),
                         modifier = Modifier.size(k(sideIcon))
                     )
                 }
@@ -1232,7 +1305,7 @@ private fun GaugeCluster(
         }
         val transport: @Composable () -> Unit = {
             HiFiKnob(onClick = onPrev, contentDescription = stringResource(R.string.cd_predyduschiy_trek), size = k(skipSize)) {
-                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(k(skipIcon)))
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = null, tint = palette.onMetal, modifier = Modifier.size(k(skipIcon)))
             }
             // The ring's bars end inside its own square: inner radius + the longest bar < half of it
             Box(Modifier.size(k(ringSize)), contentAlignment = Alignment.Center) {
@@ -1250,7 +1323,7 @@ private fun GaugeCluster(
                 }
             }
             HiFiKnob(onClick = onNext, contentDescription = stringResource(R.string.cd_sleduyuschiy_trek), size = k(skipSize)) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = HiFi.OnMetal, modifier = Modifier.size(k(skipIcon)))
+                Icon(Icons.Rounded.SkipNext, contentDescription = null, tint = palette.onMetal, modifier = Modifier.size(k(skipIcon)))
             }
         }
         if (twoRows) {
@@ -1393,8 +1466,14 @@ private fun CarStrip(
     onAddToPlaylist: (() -> Unit)?,
     playlistsOpen: Boolean,
     /** A panel lies over the title and the cover: they fade away under it, out of reach for touch and the reader. */
-    panelOpen: Boolean
+    panelOpen: Boolean,
+    repeatMode: RepeatMode = RepeatMode.OFF,
+    onCycleRepeat: () -> Unit = {},
+    shuffled: Boolean = false,
+    onToggleShuffle: () -> Unit = {},
+    showRepeatAndShuffle: Boolean = false
 ) {
+    val palette = HiFi.palette
     val underAlpha by androidx.compose.animation.core.animateFloatAsState(if (panelOpen) 0f else 1f, HiFiMotion.standard(), label = "car_strip_under")
     Column(
         Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = u(STRIP_SIDE), vertical = u(16f)),
@@ -1407,16 +1486,16 @@ private fun CarStrip(
                     Modifier.size(u(56f)).hifiGlass(CircleShape).clickable(role = Role.Button, onClick = onExit),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = Color.White, modifier = Modifier.size(u(26f)))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.car_exit), tint = palette.textPrimary, modifier = Modifier.size(u(26f)))
                 }
                 if (onOpenSettings != null) {
                     HiFiWellButton(onClick = onOpenSettings, contentDescription = stringResource(R.string.library_settings), size = u(56f)) {
-                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
+                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
                     }
                 }
                 if (onVoiceSearch != null) {
                     HiFiWellButton(onClick = onVoiceSearch, contentDescription = stringResource(R.string.voice_search), size = u(56f)) {
-                        Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
+                        Icon(Icons.Rounded.Mic, contentDescription = null, tint = palette.textPrimary.copy(alpha = 0.86f), modifier = Modifier.size(u(26f)))
                     }
                 }
             }
@@ -1434,7 +1513,7 @@ private fun CarStrip(
                 verticalArrangement = Arrangement.spacedBy(u(6f), Alignment.CenterVertically)
             ) {
                 if (sourceLabel.isNotEmpty()) {
-                    Text(sourceLabel.uppercase(), color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold,
+                    Text(sourceLabel.uppercase(), color = palette.textSecondary, fontSize = u.sp(14f), fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 0.12.em, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1442,16 +1521,25 @@ private fun CarStrip(
                         title = track?.title ?: stringResource(R.string.car_source_wave),
                         fontSize = u.sp(38f),
                         explicit = track?.showsExplicit == true,
+                        color = palette.textPrimary,
                         modifier = Modifier.weight(1f).then(if (track != null) Modifier.toAlbum(track) else Modifier)
                     )
-                    if (onAddToPlaylist != null) {
-                        Spacer(Modifier.width(u(12f)))
-                        AddToPlaylistButton(u(56f), open = playlistsOpen, onClick = onAddToPlaylist)
+                    if (onAddToPlaylist != null || showRepeatAndShuffle) {
+                        Spacer(Modifier.width(u(10f)))
+                        Row(horizontalArrangement = Arrangement.spacedBy(u(8f)), verticalAlignment = Alignment.CenterVertically) {
+                            if (onAddToPlaylist != null) {
+                                AddToPlaylistButton(u(52f), open = playlistsOpen, onClick = onAddToPlaylist)
+                            }
+                            if (showRepeatAndShuffle) {
+                                CarRepeatButton(u(52f), repeatMode = repeatMode, onClick = onCycleRepeat)
+                                CarShuffleButton(u(52f), shuffled = shuffled, onClick = onToggleShuffle)
+                            }
+                        }
                     }
                 }
                 Text(
                     if (track?.isRadio == true) stringResource(R.string.mini_player_live) else track?.artists?.joinToString { it.name ?: "" }.orEmpty(),
-                    color = Color.White.copy(alpha = 0.72f), fontSize = u.sp(22f), lineHeight = u.sp(28f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = palette.textSecondary, fontSize = u.sp(22f), lineHeight = u.sp(28f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = if (track != null) Modifier.toArtist(track) else Modifier
                 )
                 if (isRadio) CarLiveLine(u, Modifier.padding(top = u(6f)))
@@ -1528,11 +1616,63 @@ private class LyingShown {
 }
 
 @Composable
-private fun GlassRound(size: Dp, description: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+private fun CarRepeatButton(size: Dp, repeatMode: RepeatMode, onClick: () -> Unit) {
+    val palette = HiFi.palette
+    val active = repeatMode != RepeatMode.OFF
+    val description = stringResource(R.string.cd_repeat)
     Box(
         Modifier
             .size(size)
-            .hifiGlass(CircleShape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.14f))
+            .hifiGlass(
+                CircleShape,
+                fill = if (active) palette.textPrimary.copy(alpha = 0.92f) else palette.pillFill,
+                border = if (active) palette.textPrimary.copy(alpha = 0.92f) else palette.glassBorder
+            )
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (repeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+            contentDescription = null,
+            tint = if (active) palette.ground else palette.textPrimary,
+            modifier = Modifier.size(size * 0.42f)
+        )
+    }
+}
+
+@Composable
+private fun CarShuffleButton(size: Dp, shuffled: Boolean, onClick: () -> Unit) {
+    val palette = HiFi.palette
+    val description = stringResource(R.string.cd_shuffle)
+    Box(
+        Modifier
+            .size(size)
+            .hifiGlass(
+                CircleShape,
+                fill = if (shuffled) palette.textPrimary.copy(alpha = 0.92f) else palette.pillFill,
+                border = if (shuffled) palette.textPrimary.copy(alpha = 0.92f) else palette.glassBorder
+            )
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Shuffle,
+            contentDescription = null,
+            tint = if (shuffled) palette.ground else palette.textPrimary,
+            modifier = Modifier.size(size * 0.42f)
+        )
+    }
+}
+
+@Composable
+private fun GlassRound(size: Dp, description: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+    val palette = HiFi.palette
+    Box(
+        Modifier
+            .size(size)
+            .hifiGlass(CircleShape, fill = palette.pillFill, border = palette.glassBorder)
             .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center
@@ -1542,27 +1682,29 @@ private fun GlassRound(size: Dp, description: String, onClick: () -> Unit, conte
 /** Five big source tiles; the playing one is dark metal with a steel rim. */
 @Composable
 private fun Dock(u: Scale, items: List<DockItem>, active: CarSource?, compact: Boolean, narrow: Boolean = false) {
+    val palette = HiFi.palette
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(u(if (narrow) 8f else 12f))) {
         items.forEach { item ->
             val selected = item.source == active
             val shape = RoundedCornerShape(u(22f))
+            val labelTint = if (selected) palette.onMetal else palette.textPrimary.copy(alpha = 0.86f)
             Column(
                 Modifier
                     .weight(1f)
                     .height(u(if (compact) 88f else 96f))
                     .then(
                         if (selected) Modifier.hifiSoftShadow(shape, u(14f)).hifiAnodized(shape)
-                        else Modifier.hifiGlass(shape, fill = Color.White.copy(alpha = 0.06f), border = Color.White.copy(alpha = 0.10f))
+                        else Modifier.hifiGlass(shape, fill = palette.pillFill, border = palette.glassBorder)
                     )
                     .clickable(role = Role.Button, onClick = item.onClick),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Icon(item.icon, contentDescription = null, tint = if (selected) Color.White else Color.White.copy(alpha = 0.86f), modifier = Modifier.size(u(28f)))
+                Icon(item.icon, contentDescription = null, tint = labelTint, modifier = Modifier.size(u(28f)))
                 Spacer(Modifier.height(u(8f)))
                 Text(
                     item.label,
-                    color = if (selected) Color.White else Color.White.copy(alpha = 0.86f),
+                    color = labelTint,
                     fontSize = u.sp(if (narrow) 14f else 16f),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,

@@ -62,6 +62,9 @@ class LibraryRepository @Inject constructor(
     private val _weeklyHits = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
     val weeklyHits: StateFlow<List<TrackDetailsDto>> = _weeklyHits.asStateFlow()
 
+    private val _topChart = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
+    val topChart: StateFlow<List<TrackDetailsDto>> = _topChart.asStateFlow()
+
     private val _trendTracks = MutableStateFlow<List<TrackDetailsDto>>(emptyList())
     val trendTracks: StateFlow<List<TrackDetailsDto>> = _trendTracks.asStateFlow()
 
@@ -91,6 +94,7 @@ class LibraryRepository @Inject constructor(
         _likedTracks.value = cached
         _likedIds.value = cached.map { it.idString }.toSet()
         if (_weeklyHits.value.isEmpty()) _weeklyHits.value = cacheManager.loadWeeklyHits()
+        if (_topChart.value.isEmpty()) _topChart.value = cacheManager.loadTopChart()
         if (_trendTracks.value.isEmpty()) _trendTracks.value = cacheManager.loadTrendTracks()
         if (_popularTracks.value.isEmpty()) _popularTracks.value = cacheManager.loadPopularTracks()
     }
@@ -309,11 +313,17 @@ class LibraryRepository @Inject constructor(
     }
 
     private suspend fun doRefreshCharts() = supervisorScope {
+        val chartDeferred = async { fetchTopChart() }
         val hits = listOf("чарт", "топ 100").map { q -> async { searchTracks(q, 0) } }.flatMap { it.await() }.distinctBy { it.idString }
         val trends = listOf("новинки", "премьеры").map { q -> async { searchTracks(q, 0) } }.flatMap { it.await() }.distinctBy { it.idString }
+        val chart = chartDeferred.await()
         if (hits.isNotEmpty()) {
             _weeklyHits.value = hits
             cacheManager.saveWeeklyHits(hits)
+        }
+        if (chart.isNotEmpty()) {
+            _topChart.value = chart
+            cacheManager.saveTopChart(chart)
         }
         if (trends.isNotEmpty()) {
             _trendTracks.value = trends
@@ -326,8 +336,14 @@ class LibraryRepository @Inject constructor(
         }
         hitsPage = 1
         trendsPage = 1
-        chartsLoadedThisSession = hits.isNotEmpty() || trends.isNotEmpty()
+        chartsLoadedThisSession = hits.isNotEmpty() || trends.isNotEmpty() || chart.isNotEmpty()
     }
+
+    private suspend fun fetchTopChart(): List<TrackDetailsDto> = runCatching {
+        api.getChart().result?.chart?.tracks.orEmpty()
+            .mapNotNull { it.track }
+            .distinctBy { it.idString }
+    }.getOrDefault(emptyList())
 
     private suspend fun searchTracks(query: String, page: Int): List<TrackDetailsDto> =
         runCatching { api.search(query, page = page).result?.tracks?.results.orEmpty() }.getOrDefault(emptyList())

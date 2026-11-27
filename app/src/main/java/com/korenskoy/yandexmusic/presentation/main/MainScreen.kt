@@ -45,9 +45,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -426,6 +424,7 @@ fun MainScreen(
                                 }
                             }
                         }
+                        val bottomBarInsets = WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom)
                         if (singleRowDock) {
                             DockScrim(Modifier.align(Alignment.BottomCenter))
                             FloatingGlassDock(
@@ -434,7 +433,7 @@ fun MainScreen(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .windowInsetsPadding(sideInsets)
-                                    .navigationBarsPadding()
+                                    .windowInsetsPadding(bottomBarInsets)
                                     .padding(start = 16.dp, end = 16.dp, bottom = DockBottomGap),
                                 player = mini
                             )
@@ -442,7 +441,7 @@ fun MainScreen(
                             Column(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .navigationBarsPadding()
+                                    .windowInsetsPadding(bottomBarInsets)
                                     .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                                     .fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally
@@ -574,6 +573,9 @@ private fun PlayerHost(
     val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
     val offline by viewModel.currentTrackOffline.collectAsStateWithLifecycle()
     val steeringWheelOnLeft by viewModel.steeringWheelOnLeft.collectAsStateWithLifecycle()
+    val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
+    val shuffled by viewModel.shuffled.collectAsStateWithLifecycle()
+    val showRepeatAndShuffle = com.korenskoy.yandexmusic.data.player.PlaybackQueue.supportsRepeatAndShuffle(now.source, track.isRadio)
     val stationId = track.idString.removePrefix("radio_")
     FullScreenPlayer(
         track = track,
@@ -609,6 +611,11 @@ private fun PlayerHost(
         onDownload = { viewModel.downloadTrack(track) },
         onRemoveDownload = { viewModel.removeTrackFromDevice(track) },
         onQualityClick = onQualityClick,
+        repeatMode = repeatMode,
+        onCycleRepeat = viewModel::cycleRepeatMode,
+        shuffled = shuffled,
+        onToggleShuffle = viewModel::toggleShuffle,
+        showRepeatAndShuffle = showRepeatAndShuffle,
         coverModifier = coverModifier
     )
 }
@@ -667,7 +674,7 @@ private fun MainSnackbarHost(
             hostState = snackbar,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Bottom))
                 .padding(bottom = snackBottom)
         ) { data ->
             HiFiSnackbar(

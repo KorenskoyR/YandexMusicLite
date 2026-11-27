@@ -55,4 +55,17 @@ class RadioLogosTest {
         val shared = byHash.values.filter { it.size > 1 }.map { group -> group.map { it.key } }
         assertTrue("stations sharing one logo image: $shared", shared.isEmpty())
     }
+
+    @Test
+    fun includesAllElevenNewStationsForRelease1162() {
+        val ids = Regex("""RadioStation\("([^"]+)"""").findAll(repository).map { it.groupValues[1] }.toList()
+        assertTrue("expected >= 47 stations, got ${ids.size}", ids.size >= 47)
+        val expectedNew = listOf(
+            "record_mf", "rus_wave", "mayak", "shokolad", "marusya_fm",
+            "dlya_dvoih", "sputnik", "record_rock", "rus_rock", "miliceiskaya", "rodnyh_dorog", "pilot_fm"
+        )
+        for (id in expectedNew) {
+            assertTrue("missing new station id=$id", id in ids)
+        }
+    }
 }

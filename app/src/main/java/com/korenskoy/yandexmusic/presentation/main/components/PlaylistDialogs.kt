@@ -70,7 +70,7 @@ fun DeletePlaylistDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.playlist_delete),
         content = {
-            Text(stringResource(R.string.playlist_delete_confirm, playlistTitle), color = HiFi.TextSecondary, fontSize = 15.sp)
+            Text(stringResource(R.string.playlist_delete_confirm, playlistTitle), color = HiFi.palette.textSecondary, fontSize = 15.sp)
         },
         confirm = { HiFiDialogAction(stringResource(R.string.playlist_delete_button), onConfirm, HiFiDialogActionKind.Danger) },
         dismiss = { HiFiDialogAction(stringResource(R.string.account_management_otmena), onDismiss, HiFiDialogActionKind.Quiet) }

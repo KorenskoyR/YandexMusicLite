@@ -11,13 +11,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -83,9 +87,10 @@ fun NoPlusScreen(
     LaunchedEffect(checking) {
         if (checking) asked = true else if (asked) checkedOnce = true
     }
+    val palette = HiFi.palette
     Box(Modifier.fillMaxSize()) {
         HiFiBackdrop()
-        BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
             val wide = maxWidth >= WIDE && maxWidth > maxHeight
             if (wide) {
                 Row(
@@ -99,7 +104,7 @@ fun NoPlusScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         HiFiQrCode(PLUS_URL, 232.dp, stringResource(R.string.plus_qr_cd))
                         Text(
-                            stringResource(R.string.plus_qr_hint), color = HiFi.TextSecondary, fontSize = 15.sp, lineHeight = 21.sp,
+                            stringResource(R.string.plus_qr_hint), color = palette.textSecondary, fontSize = 15.sp, lineHeight = 21.sp,
                             textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 260.dp)
                         )
                     }
@@ -131,10 +136,11 @@ private fun ColumnScope.Body(
     showBuy: Boolean
 ) {
     val context = LocalContext.current
+    val palette = HiFi.palette
     var noBrowser by remember { mutableStateOf(false) }
-    IconPlaque(Icons.Rounded.StarOutline, size = 56.dp, tint = Color(0xFFFFD27A))
-    Text(stringResource(R.string.plus_title), color = Color.White, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.ExtraBold)
-    Text(stringResource(R.string.plus_why, account), color = HiFi.TextSecondary, fontSize = 16.sp, lineHeight = 24.sp)
+    IconPlaque(Icons.Rounded.StarOutline, size = 56.dp, tint = if (palette.isDark) Color(0xFFFFD27A) else palette.warning)
+    Text(stringResource(R.string.plus_title), color = palette.textPrimary, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.ExtraBold)
+    Text(stringResource(R.string.plus_why, account), color = palette.textSecondary, fontSize = 16.sp, lineHeight = 24.sp)
     if (showBuy) {
         MetalPillButton(
             stringResource(R.string.plus_buy), onClick = { noBrowser = !openPlus(context) }, icon = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -144,7 +150,7 @@ private fun ColumnScope.Body(
         if (noBrowser) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 HiFiQrCode(PLUS_URL, 180.dp, stringResource(R.string.plus_qr_cd))
-                Text(stringResource(R.string.plus_qr_hint), color = HiFi.TextSecondary, fontSize = 14.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.plus_qr_hint), color = palette.textSecondary, fontSize = 14.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
             }
         }
     }
@@ -157,16 +163,16 @@ private fun ColumnScope.Body(
         if (checking) {
             HiFiActivityIndicator(size = 18.dp)
             Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.plus_checking), color = HiFi.TextSecondary, fontSize = 14.sp)
+            Text(stringResource(R.string.plus_checking), color = palette.textSecondary, fontSize = 14.sp)
         } else if (checkedOnce) {
-            Text(stringResource(R.string.plus_still_none), color = HiFi.Warning, fontSize = 14.sp, lineHeight = 20.sp)
+            Text(stringResource(R.string.plus_still_none), color = palette.warning, fontSize = 14.sp, lineHeight = 20.sp)
         }
     }
-    Text(stringResource(R.string.plus_hint), color = HiFi.TextTertiary, fontSize = 13.sp, lineHeight = 19.sp)
+    Text(stringResource(R.string.plus_hint), color = palette.textTertiary, fontSize = 13.sp, lineHeight = 19.sp)
     TextButton(onClick = onSignOut) {
-        Text(stringResource(R.string.plus_sign_out), color = HiFi.TextSecondary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.plus_sign_out), color = palette.textSecondary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }
-    Text(stringResource(R.string.plus_disclaimer), color = Color.White.copy(alpha = 0.42f), fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 8.dp))
+    Text(stringResource(R.string.plus_disclaimer), color = palette.textTertiary, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 8.dp))
 }
 
 /** Opens Yandex's Plus page; false when there is no browser (some head units). */

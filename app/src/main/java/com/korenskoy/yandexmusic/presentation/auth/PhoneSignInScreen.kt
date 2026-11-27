@@ -15,15 +15,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -104,9 +107,10 @@ private fun SignInPage(
         side(m, width)
     }
 ) {
-    Box(Modifier.fillMaxSize().background(Color(0xFF05060A))) {
+    val palette = HiFi.palette
+    Box(Modifier.fillMaxSize().background(palette.ground)) {
         HiFiBackdrop()
-        BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().displayCutoutPadding()) {
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
             val wide = maxWidth >= 700.dp && maxWidth > maxHeight * 1.15f
             val m = SignInMetrics(
                 big = maxWidth >= 600.dp && maxHeight >= 600.dp,
@@ -120,7 +124,7 @@ private fun SignInPage(
             val header: @Composable ColumnScope.() -> Unit = {
                 Text(
                     stringResource(R.string.auth_phone_kicker),
-                    color = Color.White.copy(alpha = 0.62f),
+                    color = palette.textSecondary,
                     fontSize = if (m.big) 15.sp else 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.16.em
@@ -128,7 +132,7 @@ private fun SignInPage(
                 Spacer(Modifier.height(10.dp))
                 Text(
                     title,
-                    color = Color.White,
+                    color = palette.textPrimary,
                     fontSize = m.title,
                     lineHeight = m.titleLine,
                     fontWeight = FontWeight.ExtraBold,
@@ -136,7 +140,7 @@ private fun SignInPage(
                     modifier = Modifier.semantics { heading() }
                 )
                 Spacer(Modifier.height(12.dp))
-                Text(why, color = Color.White.copy(alpha = 0.72f), fontSize = m.body, lineHeight = m.bodyLine)
+                Text(why, color = palette.textSecondary, fontSize = m.body, lineHeight = m.bodyLine)
             }
             if (wide) {
                 val sideWidth = min(460.dp, maxWidth * 0.42f)
@@ -180,23 +184,24 @@ private fun SignInPage(
 
 @Composable
 private fun Step(m: SignInMetrics, number: Int, title: String, hint: String?) {
+    val palette = HiFi.palette
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Box(
             Modifier
                 .size(m.disc)
                 .clip(CircleShape)
-                .background(Brush.radialGradient(listOf(Color(0xFF2C303B), Color(0xFF0A0B0F)), center = Offset(m.disc.value, 0f)))
-                .border(1.5.dp, Color(0xFFA9AFBC), CircleShape),
+                .background(Brush.radialGradient(palette.knobFace, center = Offset(m.disc.value, 0f)))
+                .border(1.5.dp, palette.steelEdge, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(number.toString(), color = Color.White, fontSize = m.discText, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Text(number.toString(), color = palette.textPrimary, fontSize = m.discText, fontWeight = FontWeight.ExtraBold, maxLines = 1)
         }
         Spacer(Modifier.width(if (m.big) 18.dp else 14.dp))
         Column(Modifier.weight(1f).padding(top = if (m.big) 6.dp else 4.dp)) {
-            Text(title, color = Color.White, fontSize = m.stepTitle, lineHeight = m.stepLine, fontWeight = FontWeight.Bold)
+            Text(title, color = palette.textPrimary, fontSize = m.stepTitle, lineHeight = m.stepLine, fontWeight = FontWeight.Bold)
             if (hint != null) {
                 Spacer(Modifier.height(3.dp))
-                Text(hint, color = Color.White.copy(alpha = 0.64f), fontSize = m.stepHint, lineHeight = m.stepHintLine)
+                Text(hint, color = palette.textSecondary, fontSize = m.stepHint, lineHeight = m.stepHintLine)
             }
         }
     }
@@ -301,6 +306,8 @@ private fun CodeBoxes(userCode: String?, width: Dp, m: SignInMetrics) {
     // The letters follow the cell, not the font setting: a big font must not push them out of it
     val letter = with(density) { (box * 0.62f).toSp() }
     val description = userCode?.let { stringResource(R.string.auth_phone_code_cd, it.toCharArray().joinToString(" ")) }
+    val palette = HiFi.palette
+    val cellFill = if (palette.isDark) Color.Black.copy(alpha = 0.40f) else palette.cardFill
     Row(
         Modifier.clearAndSetSemantics { if (description != null) contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
@@ -308,21 +315,21 @@ private fun CodeBoxes(userCode: String?, width: Dp, m: SignInMetrics) {
     ) {
         groups.forEachIndexed { index, group ->
             if (index > 0) {
-                Text("–", color = Color.White.copy(alpha = 0.45f), fontSize = letter, modifier = Modifier.width(box * 0.4f), maxLines = 1)
+                Text("–", color = palette.textTertiary, fontSize = letter, modifier = Modifier.width(box * 0.4f), maxLines = 1)
             }
             group.forEach { char ->
                 Box(
                     Modifier
                         .size(box, box * 1.3f)
                         .clip(RoundedCornerShape(box * 0.24f))
-                        .background(Color.Black.copy(alpha = 0.40f))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(box * 0.24f)),
+                        .background(cellFill)
+                        .border(1.dp, palette.cardBorder, RoundedCornerShape(box * 0.24f)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (char != ' ') {
-                        Text(char.toString(), color = Color.White, fontSize = letter, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(char.toString(), color = palette.textPrimary, fontSize = letter, fontWeight = FontWeight.Bold, maxLines = 1)
                     } else {
-                        HiFiActivityIndicator(size = box * 0.36f, color = Color.White.copy(alpha = 0.5f))
+                        HiFiActivityIndicator(size = box * 0.36f, color = palette.textTertiary)
                     }
                 }
             }
@@ -368,9 +375,10 @@ private fun SignInStatus(state: PhoneSignInState, m: SignInMetrics) {
             HiFiActivityIndicator(size = if (m.big) 22.dp else 18.dp)
             Spacer(Modifier.width(12.dp))
         }
+        val palette = HiFi.palette
         Text(
             text,
-            color = if (busy) Color.White.copy(alpha = 0.78f) else HiFi.TextPrimary,
+            color = if (busy) palette.textSecondary else palette.textPrimary,
             fontSize = if (m.big) 18.sp else 15.sp,
             lineHeight = if (m.big) 24.sp else 20.sp,
             fontWeight = if (busy) FontWeight.Normal else FontWeight.SemiBold,
@@ -404,7 +412,7 @@ fun NoWebViewScreen(note: String?, onRetry: () -> Unit, outdatedWebView: Int? = 
             if (note != null) {
                 Text(
                     note,
-                    color = Color.White,
+                    color = HiFi.palette.textPrimary,
                     fontSize = if (m.big) 18.sp else 15.sp,
                     lineHeight = if (m.big) 24.sp else 20.sp,
                     fontWeight = FontWeight.SemiBold,

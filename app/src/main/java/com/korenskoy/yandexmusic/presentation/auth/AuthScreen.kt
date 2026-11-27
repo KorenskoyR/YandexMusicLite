@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material.icons.Icons
 import com.korenskoy.yandexmusic.presentation.hifi.LocalHiFiLite
+import com.korenskoy.yandexmusic.presentation.hifi.HiFi
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiActivityIndicator
 import com.korenskoy.yandexmusic.presentation.hifi.HiFiType
 import com.korenskoy.yandexmusic.presentation.hifi.IconPlaque
@@ -111,7 +112,7 @@ fun AuthScreen(
         // The page came back to its start after the user had done something on it: the strip stands out
         var startedOver by remember { mutableStateOf(false) }
         val keyboard = WindowInsets.isImeVisible
-        Column(Modifier.fillMaxSize().background(Color(0xFF05060A)).systemBarsPadding().imePadding()) {
+        Column(Modifier.fillMaxSize().background(HiFi.palette.ground).windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).imePadding()) {
         AndroidView(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         factory = { context ->
@@ -260,6 +261,7 @@ fun WaitingForInternetScreen() {
         )
     } else null
 
+    val ringColor = HiFi.palette.textPrimary
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         HiFiBackdrop()
         Spacer(
@@ -271,7 +273,7 @@ fun WaitingForInternetScreen() {
                     for (k in 0..1) {
                         val f = (p + k * 0.5f) % 1f
                         drawCircle(
-                            Color.White.copy(alpha = (1f - f) * 0.16f),
+                            ringColor.copy(alpha = (1f - f) * 0.16f),
                             radius = maxRadius * f,
                             style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx())
                         )

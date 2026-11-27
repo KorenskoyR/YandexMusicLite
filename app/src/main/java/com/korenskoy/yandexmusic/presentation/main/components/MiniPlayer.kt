@@ -121,6 +121,10 @@ fun MiniPlayer(
     val swipeToDismissNow by androidx.compose.runtime.rememberUpdatedState(swipeToDismiss)
     val durationMs = (track.durationMs ?: 0L).coerceAtLeast(0L)
 
+    val palette = HiFi.palette
+    val miniBorder = if (palette.isDark) Color.White.copy(alpha = 0.12f) else palette.glassBorder
+    val progressTrack = if (palette.isDark) Color.White.copy(alpha = 0.12f) else Color(0xFF11141C).copy(alpha = 0.14f)
+    val progressFill = palette.textPrimary.copy(alpha = 0.88f)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -133,10 +137,14 @@ fun MiniPlayer(
                 scaleX = 1f + 0.04f * lift
                 scaleY = 1f + 0.04f * lift
             }
-            .hifiSoftShadow(MiniShape, 18.dp)
+            .hifiSoftShadow(
+                MiniShape,
+                18.dp,
+                color = if (palette.isDark) Color.Black.copy(alpha = 0.42f) else Color(0xFF11141C).copy(alpha = 0.14f)
+            )
             .clip(MiniShape)
-            .background(HiFi.BarFill)
-            .border(1.dp, Color.White.copy(alpha = 0.12f), MiniShape)
+            .background(palette.barFill)
+            .border(1.dp, miniBorder, MiniShape)
             .clickable(role = Role.Button, onClickLabel = stringResource(R.string.cd_razvernut_pleer), onClick = onClick)
             .pointerInput(Unit) {
                 // The first clear movement decides: sideways dismisses, upwards opens the player
@@ -192,8 +200,8 @@ fun MiniPlayer(
                     val inset = 24.dp.toPx()
                     val y = size.height - 1.dp.toPx()
                     val w = size.width - inset * 2
-                    drawLine(Color.White.copy(alpha = 0.12f), Offset(inset, y), Offset(inset + w, y), 2.dp.toPx())
-                    if (fraction > 0f) drawLine(Color.White.copy(alpha = 0.9f), Offset(inset, y), Offset(inset + w * fraction, y), 2.dp.toPx())
+                    drawLine(progressTrack, Offset(inset, y), Offset(inset + w, y), 2.dp.toPx())
+                    if (fraction > 0f) drawLine(progressFill, Offset(inset, y), Offset(inset + w * fraction, y), 2.dp.toPx())
                 }
             }
     ) {
@@ -209,7 +217,7 @@ fun MiniPlayer(
                     .size(44.dp)
                     .hifiSoftShadow(RoundedCornerShape(12.dp), 8.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (track.isRadio) Color.White else HiFi.Placeholder),
+                    .background(if (track.isRadio) Color.White else palette.placeholder),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
@@ -219,10 +227,8 @@ fun MiniPlayer(
                         .apply { if (track.isRadio) browserUserAgent() }
                         .build(),
                     contentDescription = stringResource(R.string.cd_oblozhka),
-                    contentScale = if (track.isRadio) ContentScale.Fit else ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(if (track.isRadio) 4.dp else 0.dp)
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -235,14 +241,14 @@ fun MiniPlayer(
                 )
                 if (track.isRadio) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(HiFi.Live))
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(palette.live))
                         Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.mini_player_live), color = HiFi.TextSecondary, fontSize = 13.sp, maxLines = 1)
+                        Text(stringResource(R.string.mini_player_live), color = palette.textSecondary, fontSize = 13.sp, maxLines = 1)
                     }
                 } else {
                     Text(
                         text = track.artists.joinToString { it.name ?: "" }.ifEmpty { stringResource(R.string.player_unknown_artist) },
-                        color = HiFi.TextSecondary,
+                        color = palette.textSecondary,
                         fontSize = 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -261,7 +267,7 @@ fun MiniPlayer(
                     Icon(
                         Icons.Rounded.SkipPrevious,
                         contentDescription = stringResource(if (track.isRadio) R.string.cd_prev_station else R.string.cd_predyduschiy_trek),
-                        tint = Color.White,
+                        tint = palette.textPrimary,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -283,7 +289,7 @@ fun MiniPlayer(
                 Icon(
                     Icons.Rounded.SkipNext,
                     contentDescription = stringResource(if (track.isRadio) R.string.cd_next_station else R.string.cd_sleduyuschiy_trek),
-                    tint = Color.White,
+                    tint = palette.textPrimary,
                     modifier = Modifier.size(26.dp)
                 )
             }
