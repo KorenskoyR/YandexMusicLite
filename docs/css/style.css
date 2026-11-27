@@ -1,6 +1,6 @@
 /* ===================================================================
    Yandex Music Lite — Project Website
-   Theme: Hi-Fi — graphite, brushed metal, frosted glass, one blue accent
+   Theme: Monochrome Hi-Fi — graphite, brushed metal, frosted glass
    =================================================================== */
 
 :root {
@@ -13,17 +13,17 @@
   --glass-border: rgba(255, 255, 255, 0.09);
   --glass-border-hover: rgba(201, 206, 216, 0.35);
   --glass-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--glass-border);
-  --glass-shadow-glow: 0 20px 60px rgba(10, 108, 255, 0.18), 0 0 0 1px var(--glass-border-hover);
+  --glass-shadow-glow: 0 20px 60px rgba(201, 206, 216, 0.14), 0 0 0 1px var(--glass-border-hover);
 
-  --accent: #0A6CFF;
-  --accent-soft: #6F9BD8;
+  --accent: #E8ECF2;
+  --accent-soft: #C9CED8;
   --steel: #C9CED8;
   --on-metal: #F4F6FA;
   --metal-rim: conic-gradient(from 210deg, #8E94A3, #2A2C33 18%, #C9CED8 35%, #2A2C33 52%, #7C8291 70%, #1E2026 85%, #8E94A3);
   --metal-face: linear-gradient(180deg, #3A3F4B, #16181E);
 
-  --gradient-accent: linear-gradient(135deg, #C9CED8 0%, #6F9BD8 55%, #0A6CFF 100%);
-  --gradient-text: linear-gradient(135deg, #FFFFFF 35%, #C9CED8 70%, #6F9BD8 100%);
+  --gradient-accent: linear-gradient(135deg, #FFFFFF 0%, #C9CED8 55%, #8E94A3 100%);
+  --gradient-text: linear-gradient(135deg, #FFFFFF 35%, #D5DAE3 70%, #9CA3B2 100%);
   --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
 
   --text-primary: #FFFFFF;
@@ -53,6 +53,7 @@
 html {
   scroll-behavior: smooth;
   color-scheme: dark;
+  overflow-x: clip;
 }
 
 body {
@@ -61,7 +62,7 @@ body {
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.6;
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   position: relative;
@@ -89,7 +90,7 @@ body {
   left: 15%;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, #0A6CFF 0%, #1B2A6B 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(228, 232, 240, 0.24) 0%, rgba(124, 130, 145, 0.14) 50%, transparent 70%);
   animation: orbFloat1 20s ease-in-out infinite alternate;
 }
 
@@ -98,8 +99,8 @@ body {
   right: -100px;
   width: 650px;
   height: 650px;
-  background: radial-gradient(circle, #2B4C7E 0%, #1B2A6B 50%, transparent 70%);
-  opacity: 0.25;
+  background: radial-gradient(circle, rgba(164, 170, 184, 0.22) 0%, rgba(58, 63, 75, 0.18) 50%, transparent 70%);
+  opacity: 0.28;
   animation: orbFloat2 25s ease-in-out infinite alternate;
 }
 
@@ -108,8 +109,8 @@ body {
   left: -150px;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, #6F9BD8 0%, #2B4C7E 60%, transparent 70%);
-  opacity: 0.15;
+  background: radial-gradient(circle, rgba(201, 206, 216, 0.20) 0%, rgba(72, 77, 90, 0.14) 60%, transparent 70%);
+  opacity: 0.2;
   animation: orbFloat1 22s ease-in-out infinite alternate;
 }
 
@@ -209,7 +210,7 @@ h1, h2, h3, h4 {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  box-shadow: 0 0 16px rgba(10, 108, 255, 0.45);
+  box-shadow: 0 0 16px rgba(201, 206, 216, 0.35);
   transition: transform var(--transition-smooth);
 }
 
@@ -231,9 +232,9 @@ h1, h2, h3, h4 {
   letter-spacing: 0.08em;
   padding: 2px 7px;
   border-radius: 6px;
-  background: linear-gradient(135deg, rgba(10, 108, 255, 0.25), rgba(111, 155, 216, 0.25));
-  border: 1px solid rgba(10, 108, 255, 0.4);
-  color: var(--accent-soft);
+  background: linear-gradient(135deg, rgba(201, 206, 216, 0.22), rgba(142, 148, 163, 0.18));
+  border: 1px solid rgba(201, 206, 216, 0.36);
+  color: var(--on-metal);
 }
 
 .nav-links {
@@ -317,7 +318,7 @@ h1, h2, h3, h4 {
   background: var(--metal-face) padding-box, var(--metal-rim) border-box;
   border: 1.5px solid transparent;
   color: var(--on-metal);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 24px rgba(10, 108, 255, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 24px rgba(201, 206, 216, 0.16);
 }
 
 .btn-primary::before {
@@ -331,7 +332,7 @@ h1, h2, h3, h4 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 32px rgba(10, 108, 255, 0.4);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 32px rgba(255, 255, 255, 0.24);
 }
 
 .btn-primary:hover::before {
@@ -375,10 +376,10 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  background: rgba(10, 108, 255, 0.12);
-  border: 1px solid rgba(10, 108, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(201, 206, 216, 0.28);
   border-radius: 999px;
-  color: var(--accent-soft);
+  color: var(--on-metal);
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 24px;
@@ -388,8 +389,8 @@ h1, h2, h3, h4 {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--accent-soft);
-  box-shadow: 0 0 10px var(--accent-soft);
+  background-color: var(--on-metal);
+  box-shadow: 0 0 10px rgba(244, 246, 250, 0.85);
   animation: pulse 2s infinite;
 }
 
@@ -466,7 +467,7 @@ h1, h2, h3, h4 {
 .phone-ambient-glow {
   position: absolute;
   inset: -15px;
-  background: radial-gradient(circle at center, rgba(10, 108, 255, 0.35) 0%, rgba(111, 155, 216, 0.25) 45%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(228, 232, 240, 0.24) 0%, rgba(142, 148, 163, 0.18) 45%, transparent 70%);
   filter: blur(40px);
   z-index: 0;
   border-radius: 60px;
@@ -479,10 +480,10 @@ h1, h2, h3, h4 {
   background: #10121A;
   border-radius: 46px;
   padding: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8),
-              inset 0 0 0 2px rgba(255, 255, 255, 0.05),
-              0 0 40px rgba(10, 108, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.82),
+              inset 0 0 0 2px rgba(255, 255, 255, 0.06),
+              0 0 40px rgba(201, 206, 216, 0.16);
 }
 
 .phone-screen-container {
@@ -509,22 +510,18 @@ h1, h2, h3, h4 {
 /* Phone Screen Tabs Selector */
 .screen-tabs {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
   margin-top: 24px;
   background: rgba(16, 18, 26, 0.85);
   backdrop-filter: blur(20px);
   padding: 6px;
-  border-radius: 999px;
+  border-radius: 22px;
   border: 1px solid var(--glass-border);
   position: relative;
   z-index: 2;
   max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.screen-tabs::-webkit-scrollbar {
-  display: none;
 }
 
 .tab-btn {
@@ -534,7 +531,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-body);
   font-size: 0.8125rem;
   font-weight: 600;
-  padding: 8px 14px;
+  padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
@@ -546,9 +543,9 @@ h1, h2, h3, h4 {
 }
 
 .tab-btn.active {
-  background: var(--accent);
-  color: #FFFFFF;
-  box-shadow: 0 4px 14px rgba(10, 108, 255, 0.4);
+  background: #F4F6FA;
+  color: #090B10;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.18);
 }
 
 /* ===================================================================
@@ -605,7 +602,7 @@ h1, h2, h3, h4 {
   right: 0;
   width: 250px;
   height: 250px;
-  background: radial-gradient(circle, rgba(10, 108, 255, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
   pointer-events: none;
   transition: opacity var(--transition-smooth);
 }
@@ -630,26 +627,26 @@ h1, h2, h3, h4 {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: rgba(10, 108, 255, 0.12);
-  border: 1px solid rgba(10, 108, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  color: var(--accent-soft);
+  color: var(--on-metal);
   margin-bottom: 24px;
 }
 
 .bento-card-icon.soft {
-  background: rgba(111, 155, 216, 0.12);
-  border-color: rgba(111, 155, 216, 0.25);
-  color: var(--accent-soft);
+  background: rgba(201, 206, 216, 0.10);
+  border-color: rgba(201, 206, 216, 0.22);
+  color: var(--steel);
 }
 
 .bento-card-icon.steel {
-  background: rgba(201, 206, 216, 0.12);
-  border-color: rgba(201, 206, 216, 0.25);
-  color: var(--steel);
+  background: rgba(142, 148, 163, 0.12);
+  border-color: rgba(201, 206, 216, 0.24);
+  color: var(--on-metal);
 }
 
 .bento-card-title {
@@ -699,8 +696,8 @@ h1, h2, h3, h4 {
   gap: 48px;
   padding: 56px;
   background: linear-gradient(135deg, rgba(21, 23, 31, 0.9) 0%, rgba(5, 6, 10, 0.9) 100%);
-  border: 1px solid rgba(10, 108, 255, 0.25);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(10, 108, 255, 0.15);
+  border: 1px solid rgba(201, 206, 216, 0.24);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(201, 206, 216, 0.10);
   border-radius: var(--radius-xl);
   position: relative;
   overflow: hidden;
@@ -713,7 +710,7 @@ h1, h2, h3, h4 {
   right: -100px;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(10, 108, 255, 0.18) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -722,10 +719,10 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  background: rgba(10, 108, 255, 0.15);
-  border: 1px solid rgba(10, 108, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(201, 206, 216, 0.28);
   border-radius: 999px;
-  color: var(--accent-soft);
+  color: var(--on-metal);
   font-size: 0.8125rem;
   font-weight: 600;
   margin-bottom: 20px;
@@ -761,12 +758,12 @@ h1, h2, h3, h4 {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(10, 108, 255, 0.2);
-  border: 1px solid rgba(10, 108, 255, 0.4);
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(201, 206, 216, 0.34);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent-soft);
+  color: var(--on-metal);
   font-size: 0.875rem;
   flex-shrink: 0;
 }
@@ -784,16 +781,16 @@ h1, h2, h3, h4 {
   background: #10121A;
   border-radius: 26px;
   padding: 14px;
-  border: 1.5px solid rgba(10, 108, 255, 0.3);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(10, 108, 255, 0.2);
+  border: 1.5px solid rgba(201, 206, 216, 0.28);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(201, 206, 216, 0.14);
   transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
   animation: carAmbientFloat 6s ease-in-out infinite alternate;
 }
 
 .car-device-frame:hover {
   transform: translateY(-5px);
-  border-color: rgba(10, 108, 255, 0.55);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85), 0 0 50px rgba(10, 108, 255, 0.35);
+  border-color: rgba(244, 246, 250, 0.5);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85), 0 0 50px rgba(255, 255, 255, 0.22);
 }
 
 @keyframes carAmbientFloat {
@@ -997,7 +994,7 @@ h1, h2, h3, h4 {
   border-radius: var(--radius-xl);
   padding: 40px 32px;
   text-align: center;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 50px rgba(10, 108, 255, 0.2);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 50px rgba(201, 206, 216, 0.16);
   transform: scale(0.92);
   transition: transform var(--transition-smooth);
   position: relative;
@@ -1290,6 +1287,13 @@ a.support-qr:hover {
 /* ===================================================================
    Responsive Media Queries
    =================================================================== */
+.bento-grid > *,
+.car-spotlight-panel > *,
+.steps-grid > *,
+.support-grid > * {
+  min-width: 0;
+}
+
 @media (max-width: 1024px) {
   .hero-title {
     font-size: 3.25rem;

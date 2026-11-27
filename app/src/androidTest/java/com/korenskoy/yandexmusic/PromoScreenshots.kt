@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +35,11 @@ import com.korenskoy.yandexmusic.data.dto.TrackDetailsDto
 import com.korenskoy.yandexmusic.data.dto.UserPlaylistDto
 import com.korenskoy.yandexmusic.data.player.PlaylistSource
 import com.korenskoy.yandexmusic.data.repository.RadioRepository
+import com.korenskoy.yandexmusic.domain.model.AppThemeMode
 import com.korenskoy.yandexmusic.domain.model.RadioCategory
+import com.korenskoy.yandexmusic.domain.model.RepeatMode
+import com.korenskoy.yandexmusic.domain.model.ThemeScheduleType
+import androidx.core.view.WindowCompat
 import com.korenskoy.yandexmusic.presentation.car.CarScreen
 import com.korenskoy.yandexmusic.presentation.car.LocalCarClock
 import com.korenskoy.yandexmusic.presentation.hifi.ArtworkTint
@@ -49,12 +54,18 @@ import com.korenskoy.yandexmusic.presentation.main.components.FloatingGlassBotto
 import com.korenskoy.yandexmusic.presentation.main.components.LocalTrackMenu
 import com.korenskoy.yandexmusic.presentation.main.components.MainTab
 import com.korenskoy.yandexmusic.presentation.main.components.MiniPlayer
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsActions
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet
+import com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState
 import com.korenskoy.yandexmusic.presentation.main.components.TrackMenuLauncher
 import com.korenskoy.yandexmusic.presentation.main.waveShelfOf
 import com.korenskoy.yandexmusic.presentation.player.FullScreenPlayer
 import com.korenskoy.yandexmusic.presentation.radio.RadioScreen
 import com.korenskoy.yandexmusic.ui.theme.YandexMusicTheme
+import com.korenskoy.yandexmusic.utils.CoverSize
+import com.korenskoy.yandexmusic.utils.LocalAppWindowSize
 import com.korenskoy.yandexmusic.utils.LocalStreamQuality
+import com.korenskoy.yandexmusic.utils.prefetchCovers
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -127,6 +138,16 @@ class PromoScreenshots {
     }
 
     @Test
+    fun day() = shoot("day", darkTheme = false) {
+        HomeScreen(
+            waveTrack = nowPlaying, isPlaying = true, isLoading = false, isLiked = true, progress = { 82_000L },
+            shelf = waveShelfOf(true, tracks.drop(1).take(6), emptyList()), shimmer = false,
+            onPlayPause = {}, onLike = {}, onDislike = {}, onOpenPlayer = {}, onShelfClick = {}
+        )
+        BottomChrome(MainTab.HOME, mini = false)
+    }
+
+    @Test
     fun player() = shoot("player", settleMs = 3_500) { Player(queueOpen = false) }
 
     @Test
@@ -135,7 +156,10 @@ class PromoScreenshots {
     @Test
     fun search() = shoot("search") {
         SearchScreen(
-            query = "", onQueryChange = {}, results = emptyList(), weeklyHits = tracks.drop(2).take(6), trendTracks = tracks.drop(4),
+            query = "", onQueryChange = {}, results = emptyList(),
+            weeklyHits = tracks.drop(2).take(6),
+            topChart = tracks.drop(1).take(6),
+            trendTracks = tracks.drop(4),
             isSearching = false, currentTrackId = nowPlaying.idString, isPlaying = true, likedTrackIds = liked,
             onTrackClick = { _, _ -> }, onToggleLike = {}, hasActiveTrack = true
         )
@@ -143,18 +167,25 @@ class PromoScreenshots {
     }
 
     @Test
-    fun library() = shoot("library") {
+    fun library() {
         val playlists = listOf(
             UserPlaylistDto(kind = JsonPrimitive(1), title = "В дорогу", trackCount = 42, revision = 1, ogImage = cover("p1", 4, 30f)),
             UserPlaylistDto(kind = JsonPrimitive(2), title = "Спокойное", trackCount = 18, revision = 1, ogImage = cover("p2", 2, 200f))
         )
-        LibraryScreen(
-            tracks = tracks.drop(1), isLoading = false, currentTrackId = nowPlaying.idString, isPlaying = true, likedTrackIds = liked, downloadedTrackIds = setOf("2", "3", "4", "7"),
-            downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
-            onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {},
-            hasActiveTrack = true, playlists = playlists
+        prefetchCovers(
+            context,
+            playlists.mapIndexed { i, p -> TrackDetailsDto(id = JsonPrimitive("p$i"), coverUri = p.ogImage) },
+            listOf(CoverSize.Small, CoverSize.Medium)
         )
-        BottomChrome(MainTab.LIBRARY, mini = true)
+        shoot("library", settleMs = 4_000) {
+            LibraryScreen(
+                tracks = tracks.drop(1), isLoading = false, currentTrackId = nowPlaying.idString, isPlaying = true, likedTrackIds = liked, downloadedTrackIds = setOf("2", "3", "4", "7"),
+                downloadProgress = null, onTrackClick = {}, onPlayAllClick = {}, onShuffleClick = {},
+                onDownloadAllClick = {}, onCancelDownload = {}, onToggleLike = {},
+                hasActiveTrack = true, playlists = playlists
+            )
+            BottomChrome(MainTab.LIBRARY, mini = true)
+        }
     }
 
     @Test
@@ -178,11 +209,18 @@ class PromoScreenshots {
 
     @Test
     fun settings() = shoot("settings") {
-        com.korenskoy.yandexmusic.presentation.main.components.SettingsSheet(
-            state = com.korenskoy.yandexmusic.presentation.main.components.SettingsUiState(
-                accountName = "Алексей", hasPlus = true, crossfadeSeconds = 3, autoDownload = true, cacheSizeBytes = 1_288_000_000L
+        SettingsSheet(
+            state = SettingsUiState(
+                accountName = "Алексей",
+                hasPlus = true,
+                crossfadeSeconds = 3,
+                autoDownload = true,
+                cacheSizeBytes = 1_288_000_000L,
+                themeMode = AppThemeMode.SCHEDULE,
+                themeScheduleType = ThemeScheduleType.CUSTOM,
+                fullscreenMode = true
             ),
-            actions = com.korenskoy.yandexmusic.presentation.main.components.SettingsActions(),
+            actions = SettingsActions(),
             onDismiss = {}
         )
     }
@@ -206,7 +244,8 @@ class PromoScreenshots {
                     onPlayPauseClick = {}, onNextClick = {}, onPrevClick = {}, onToggleLike = {}, onDislikeClick = {},
                     onPlayMyVibe = {}, onPlayFavorites = {}, onPlayHits = {}, onPlayDownloaded = {}, onPlayRadio = {}, onExit = {},
                     isLandscape = true, steeringWheelOnLeft = true, progress = { 82_000L }, durationMs = 286_000,
-                    upcoming = tracks.drop(1).take(3), source = PlaylistSource.VIBE
+                    upcoming = tracks.drop(1).take(3), source = PlaylistSource.LIBRARY,
+                    shuffled = true, repeatMode = RepeatMode.ALL
                 )
             }
         }
@@ -218,7 +257,8 @@ class PromoScreenshots {
             track = nowPlaying, isPlaying = true, isLiked = true, progress = { 82_000L }, queue = tracks,
             onPlayPauseClick = {}, onToggleLike = {}, onNextClick = {}, onPrevClick = {}, onSeekTo = {},
             onTrackSelect = {}, onRemoveFromQueue = {}, onCollapse = {}, onCloseAndClear = {}, onDislikeClick = {},
-            sourceLabel = "Моя волна", initialQueueOpen = queueOpen
+            sourceLabel = "Мне нравится", initialQueueOpen = queueOpen,
+            repeatMode = RepeatMode.ALL, shuffled = true, showRepeatAndShuffle = true
         )
     }
 
@@ -246,30 +286,46 @@ class PromoScreenshots {
 
     private fun shoot(
         name: String,
-        settleMs: Long = 2_500,
+        settleMs: Long = 3_500,
+        darkTheme: Boolean = true,
         appTint: ArtworkTint = tint,
         backdropCover: String? = nowPlaying.coverUri,
         content: @Composable BoxScope.() -> Unit
     ) {
         if (name != "car") phoneOnly()
+        // Pre-generate covers and warm Coil's memory cache off the main composition pass
+        // so list/grid screens (queue, library) render covers on their very first frame.
+        prefetchCovers(context, tracks, listOf(CoverSize.Small, CoverSize.Medium, CoverSize.Large))
+        Thread.sleep(1_200)
         // Started directly: ActivityScenario waits for the main thread to go idle, and with the spectrum
         // and the timeline animating it never does
         val intent = Intent(context, ComponentActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val activity = instrumentation.startActivitySync(intent) as ComponentActivity
         instrumentation.runOnMainSync {
             activity.enableEdgeToEdge()
+            WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
+            }
             activity.setContent {
-                YandexMusicTheme {
-                    CompositionLocalProvider(
-                        LocalArtworkTint provides appTint,
-                        LocalHiFiLite provides false,
-                        // A quality every account gets from the regular stream
-                        LocalStreamQuality provides "MP3 · 192 кбит/с",
-                        LocalTrackMenu provides TrackMenuLauncher { _, _ -> }
-                    ) {
-                        Box(Modifier.fillMaxSize()) {
-                            HiFiBackdrop(coverUrl = backdropCover)
-                            content()
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val drawn = androidx.compose.ui.unit.IntSize(
+                        if (constraints.hasBoundedWidth) constraints.maxWidth else 0,
+                        if (constraints.hasBoundedHeight) constraints.maxHeight else 0
+                    )
+                    YandexMusicTheme(darkTheme = darkTheme) {
+                        CompositionLocalProvider(
+                            LocalAppWindowSize provides drawn,
+                            LocalArtworkTint provides appTint,
+                            LocalHiFiLite provides false,
+                            // A quality every account gets from the regular stream
+                            LocalStreamQuality provides "MP3 · 192 кбит/с",
+                            LocalTrackMenu provides TrackMenuLauncher { _, _ -> }
+                        ) {
+                            Box(Modifier.fillMaxSize()) {
+                                HiFiBackdrop(coverUrl = backdropCover)
+                                content()
+                            }
                         }
                     }
                 }
@@ -286,7 +342,11 @@ class PromoScreenshots {
     /** A generated cover (nobody's artwork), saved once; returns its file:// address. */
     private fun cover(name: String, style: Int, hue: Float): String {
         val file = File(coversDir, "$name.png")
-        if (!file.exists()) file.outputStream().use { drawCover(style, hue, name.hashCode()).compress(Bitmap.CompressFormat.PNG, 100, it) }
+        if (!file.exists() || file.length() == 0L) {
+            val tmp = File(coversDir, "$name.png.tmp")
+            tmp.outputStream().use { drawCover(style, hue, name.hashCode()).compress(Bitmap.CompressFormat.PNG, 100, it) }
+            tmp.renameTo(file)
+        }
         return "file://${file.absolutePath}"
     }
 
@@ -294,8 +354,9 @@ class PromoScreenshots {
         android.graphics.Color.HSVToColor(floatArrayOf((hue + 360f) % 360f, saturation, value))
 
     private fun drawCover(style: Int, hue: Float, seed: Int): Bitmap {
-        val size = 1000f
-        val bitmap = Bitmap.createBitmap(1000, 1000, Bitmap.Config.ARGB_8888)
+        val px = 512
+        val size = px.toFloat()
+        val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val random = Random(seed)

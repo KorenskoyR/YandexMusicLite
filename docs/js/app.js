@@ -61,8 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetSrc = button.getAttribute('data-screen');
         if (!targetSrc || button.classList.contains('active')) return;
 
-        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabButtons.forEach(btn => {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+        });
         button.classList.add('active');
+        button.setAttribute('aria-selected', 'true');
 
         // Cross-fade animation
         screenImg.classList.add('fade-out');
