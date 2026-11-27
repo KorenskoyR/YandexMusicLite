@@ -30,7 +30,7 @@ jobs:
           java-version: '21' # Robolectric screenshot tests for SDK 35 need Java 21
           distribution: 'temurin'
           cache: gradle
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-m2-${{ hashFiles('gradle/libs.versions.toml') }}
